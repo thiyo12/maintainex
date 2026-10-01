@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native
 import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Bell, Star, CheckCircle, MapPin, ArrowRight, Timer, Wallet, Lightning, Coffee, AlertTriangle } from 'phosphor-react-native'
+import { Bell, Star, CheckCircle, MapPin, ArrowRight, Timer, Wallet, Lightning, Coffee, Warning } from 'phosphor-react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useAuth } from '@/features/auth/context/auth'
 import { taskers } from '@/api/taskers'
@@ -42,7 +42,7 @@ export default function TaskerDashboard() {
   const [readinessComplete, setReadinessComplete] = useState(true)
 
   const lastPollRef = useRef<string>(new Date().toISOString())
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval>>()
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const alertedJobsRef = useRef<Set<string>>(new Set())
   const chatVisible = useRef(false)
 
@@ -212,7 +212,7 @@ export default function TaskerDashboard() {
           <AnimatedEntry delay={60}>
             <PressableScale onPress={() => router.push('/(tasker)/readiness' as any)} scaleTo={0.98}>
               <View style={styles.readinessBanner}>
-                <AlertTriangle size={20} color="#D97706" weight="fill" />
+                <Warning size={20} color="#D97706" weight="fill" />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.readinessTitle}>{t('readiness.notReady')}</Text>
                   <Text style={styles.readinessSub}>{t('readiness.completeSetup')}</Text>

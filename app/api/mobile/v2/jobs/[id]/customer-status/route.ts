@@ -88,11 +88,13 @@ export async function GET(
     changeOrderPending: !!pendingChangeOrder,
     completionRequested: workspace?.progressStatus === 'COMPLETION_REQUESTED',
     pinActive: !!activePin,
-    canConfirmArrival: job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS',
-    canApproveQuote: !acceptedQuote || acceptedQuote.status === 'PENDING',
+    canConfirmArrival:
+      inspection?.status === 'ARRIVED' &&
+      inspection?.verifiedByCustomer !== true,
+    canApproveQuote: job.status === 'OPEN' && !acceptedQuote,
     canApproveChangeOrder: !!pendingChangeOrder && pendingChangeOrder.status === 'SUBMITTED',
     canApproveCompletion: workspace?.progressStatus === 'COMPLETION_REQUESTED',
-    authorizedAmount: job.finalAuthorizedAmountCents ? Number(job.finalAuthorizedAmountCents) : null,
+    authorizedAmount: job.finalAuthorizedAmountCents != null ? Number(job.finalAuthorizedAmountCents) : null,
   }
 
   return NextResponse.json({ status: projection })

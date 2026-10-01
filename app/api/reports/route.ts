@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
+import { guardCrmRequest } from '@/lib/crm/security'
 import { getActivityLogs, getStatsForPeriod } from '@/lib/activity-log'
 import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
 import { prisma } from '@/lib/prisma'
@@ -28,10 +28,20 @@ function getDateRange(period: string): { start: Date; end: Date } {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const guard = await guardCrmRequest(request, {
+      permission: 'analytics:view',
+      level: 'read',
+    })
+    if (!guard.ok) return guard.response
+
+    const session: AdminSession = {
+      id: guard.context.adminId,
+      email: guard.context.email,
+      role: guard.context.role,
+      firstName: '',
+      lastName: '',
+      assignedCountries: guard.context.assignedCountries,
+      authType: 'adminUser',
     }
 
     const isSuper = session.role === 'SUPER_ADMIN'

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { getLocationName } from '@/lib/locations'
 import { hasCompanyPermission, type CompanyRole } from '@/lib/phase6/rbac'
 import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
@@ -42,6 +42,59 @@ export async function GET(
 
     const isOwner = job.customerId === user.id
     const requestedContext = new URL(_request.url).searchParams.get('context')
+
+    if (!isOwner && job.targetTaskerId) {
+      const [targetTasker, targetCompanies, workerAssignment] = await Promise.all([
+        prisma.taskerProfile.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        }),
+        getReadableCompanyIds(user.id),
+        prisma.companyJobAssignment.findFirst({
+          where: {
+            jobId: job.id,
+            workerUserId: user.id,
+            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
+          },
+          select: { companyId: true },
+        }),
+      ])
+
+      const readableTargetIds = new Set(
+        [
+          user.id,
+          targetTasker?.id ?? null,
+          ...targetCompanies,
+        ].filter((value): value is string => Boolean(value))
+      )
+
+      let hasAcceptedCompanyParticipation = false
+      const participantCompanyIds = [...new Set([
+        ...targetCompanies,
+        ...(workerAssignment?.companyId ? [workerAssignment.companyId] : []),
+      ])]
+
+      if (participantCompanyIds.length > 0) {
+        const acceptedCompanyQuote = await prisma.jobQuote.findFirst({
+          where: {
+            jobId: job.id,
+            providerType: 'COMPANY',
+            providerId: { in: participantCompanyIds },
+            status: 'ACCEPTED',
+          },
+          select: { id: true },
+        })
+        hasAcceptedCompanyParticipation = Boolean(acceptedCompanyQuote)
+      }
+
+      if (!readableTargetIds.has(job.targetTaskerId) && !hasAcceptedCompanyParticipation) {
+        return NextResponse.json(
+          { error: 'This direct booking is reserved for another provider' },
+          { status: 403 }
+        )
+      }
+    }
+
     let isQuoter = isOwner
     let providerContextId: string | null = null
     let providerContextType: 'INDIVIDUAL' | 'COMPANY' | null = null
@@ -314,6 +367,8 @@ export async function PATCH(
     const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
@@ -323,24 +378,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Only the customer can edit job details' }, { status: 403 })
     }
 
-    if (!['OPEN', 'QUOTE_ACCEPTED'].includes(job.status)) {
+    if (job.status !== 'OPEN') {
       return NextResponse.json(
-        { error: 'Job details are locked after work starts' },
+        { error: 'Job details are locked after quote acceptance. Use the change-order flow for post-acceptance scope changes.' },
         { status: 409 }
       )
-    }
-
-    if (job.status === 'QUOTE_ACCEPTED') {
-      const protectedEscrow = await prisma.jobEscrow.findFirst({
-        where: { jobId: id, status: 'PROTECTED' },
-        select: { id: true },
-      })
-      if (protectedEscrow) {
-        return NextResponse.json(
-          { error: 'Booking details are locked after payment is secured' },
-          { status: 409 }
-        )
-      }
     }
 
     const body = await request.json()
@@ -381,16 +423,8 @@ export async function PATCH(
       const current = locked[0]
       if (!current) throw new Error('EDIT_JOB_NOT_FOUND')
       if (current.customerId !== user.id) throw new Error('EDIT_FORBIDDEN')
-      if (!['OPEN', 'QUOTE_ACCEPTED'].includes(current.status)) {
-        throw new Error('EDIT_WORK_STARTED')
-      }
-
-      if (current.status === 'QUOTE_ACCEPTED') {
-        const protectedEscrow = await tx.jobEscrow.findFirst({
-          where: { jobId: id, status: 'PROTECTED' },
-          select: { id: true },
-        })
-        if (protectedEscrow) throw new Error('EDIT_PAYMENT_SECURED')
+      if (current.status !== 'OPEN') {
+        throw new Error('EDIT_BOOKING_LOCKED')
       }
 
       return tx.marketplaceJob.update({
@@ -413,11 +447,11 @@ export async function PATCH(
       if (error.message === 'EDIT_FORBIDDEN') {
         return NextResponse.json({ error: 'Only the customer can edit job details' }, { status: 403 })
       }
-      if (error.message === 'EDIT_WORK_STARTED') {
-        return NextResponse.json({ error: 'Job details are locked after work starts' }, { status: 409 })
-      }
-      if (error.message === 'EDIT_PAYMENT_SECURED') {
-        return NextResponse.json({ error: 'Booking details are locked after payment is secured' }, { status: 409 })
+      if (error.message === 'EDIT_BOOKING_LOCKED') {
+        return NextResponse.json(
+          { error: 'Job details are locked after quote acceptance. Use the change-order flow for post-acceptance scope changes.' },
+          { status: 409 }
+        )
       }
     }
     console.error('PATCH job error:', error)

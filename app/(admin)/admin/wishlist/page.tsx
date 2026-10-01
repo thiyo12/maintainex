@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/admin/AdminLayout'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface WishlistItem {
   id: string
@@ -28,6 +29,8 @@ interface WaitlistEntry {
 }
 
 export default function WishlistPage() {
+  const { user: admin } = useAdminSession()
+  const canManageWishlist = !!admin && (ROLE_PERMISSIONS[admin.role as AdminRole] || []).includes('wishlist:manage')
   const [activeTab, setActiveTab] = useState<'wishlist' | 'waitlist'>('wishlist')
   const [items, setItems] = useState<WishlistItem[]>([])
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([])
@@ -101,6 +104,7 @@ export default function WishlistPage() {
   }
 
   const handleCreate = async () => {
+    if (!canManageWishlist) return
     setActionLoading(true)
     try {
       const res = await fetch('/api/admin/wishlist', {
@@ -122,6 +126,7 @@ export default function WishlistPage() {
   }
 
   const handleUpdate = async (itemId: string, updates: Partial<WishlistItem>) => {
+    if (!canManageWishlist) return
     setActionLoading(true)
     try {
       const res = await fetch('/api/admin/wishlist', {
@@ -142,6 +147,7 @@ export default function WishlistPage() {
   }
 
   const handleDelete = async (itemId: string) => {
+    if (!canManageWishlist) return
     if (!confirm('Are you sure you want to delete this item?')) return
     
     try {
@@ -198,11 +204,11 @@ export default function WishlistPage() {
   }
 
   return (
-    <AdminLayout>
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
+    <>
+      <div className="p-4 md:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
           <h1 className="text-2xl font-bold">Website & App Wishlist</h1>
-          {activeTab === 'wishlist' && (
+          {activeTab === 'wishlist' && canManageWishlist && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
@@ -213,7 +219,7 @@ export default function WishlistPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
+        <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-full sm:w-fit overflow-x-auto">
           <button
             onClick={() => setActiveTab('wishlist')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition ${
@@ -263,8 +269,8 @@ export default function WishlistPage() {
             </div>
 
             {/* Filters */}
-            <div className="flex gap-4 mb-6">
-              <div className="flex gap-2">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center mb-6">
+              <div className="flex gap-2 overflow-x-auto pb-1">
                 {['NEW', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'REJECTED'].map((status) => (
                   <button
                     key={status}
@@ -328,6 +334,7 @@ export default function WishlistPage() {
                         )}
                       </div>
                       <div className="flex gap-2">
+                        {canManageWishlist ? <>
                         <button
                           onClick={() => setSelectedItem(item)}
                           className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
@@ -340,6 +347,7 @@ export default function WishlistPage() {
                         >
                           Delete
                         </button>
+                        </> : <span className="text-xs text-gray-400">Read only</span>}
                       </div>
                     </div>
                   </div>
@@ -356,8 +364,8 @@ export default function WishlistPage() {
               <div className="text-center py-8 text-gray-500">No waitlist signups yet</div>
             ) : (
               <>
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full">
+                <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+                  <table className="w-full min-w-[680px]">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
                         <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Phone</th>
@@ -411,7 +419,7 @@ export default function WishlistPage() {
         )}
 
         {/* Create Modal */}
-        {showCreateModal && (
+        {canManageWishlist && showCreateModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
               <h3 className="text-lg font-bold mb-4">Add Wishlist Item</h3>
@@ -486,7 +494,7 @@ export default function WishlistPage() {
         )}
 
         {/* Edit Modal */}
-        {selectedItem && (
+        {canManageWishlist && selectedItem && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
               <h3 className="text-lg font-bold mb-4">Edit Wishlist Item</h3>
@@ -552,6 +560,6 @@ export default function WishlistPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

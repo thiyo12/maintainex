@@ -1,4 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client'
+import { hasCompanyPermission, type CompanyRole } from '@/lib/phase6/rbac'
 
 /**
  * Inspection status machine for INSPECTION_FIRST jobs.
@@ -44,6 +45,80 @@ export function isInspectionTerminal(status: InspectionStatus): boolean {
   return TERMINAL_STATUSES.includes(status)
 }
 
+type InspectionActorTarget = {
+  jobId: string
+  taskerId: string | null
+  companyId: string | null
+}
+
+async function isAssignedInspectionProvider(
+  client: PrismaClient | Prisma.TransactionClient,
+  inspection: InspectionActorTarget,
+  userId: string,
+): Promise<boolean> {
+  if (inspection.taskerId) return inspection.taskerId === userId
+  if (!inspection.companyId) return false
+
+  const assignment = await client.companyJobAssignment.findFirst({
+    where: {
+      jobId: inspection.jobId,
+      companyId: inspection.companyId,
+      workerUserId: userId,
+      status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
+    },
+    select: { id: true },
+  })
+  return Boolean(assignment)
+}
+
+async function canScheduleInspection(
+  client: PrismaClient | Prisma.TransactionClient,
+  inspection: InspectionActorTarget,
+  userId: string,
+): Promise<boolean> {
+  if (await isAssignedInspectionProvider(client, inspection, userId)) return true
+  if (!inspection.companyId) return false
+
+  const membership = await client.teamMember.findFirst({
+    where: {
+      companyId: inspection.companyId,
+      userId,
+      status: 'ACTIVE',
+    },
+    select: { role: true },
+  })
+  if (!membership) return false
+
+  const role = membership.role as CompanyRole
+  return (
+    hasCompanyPermission(role, 'jobs:manage') ||
+    hasCompanyPermission(role, 'jobs:assign')
+  )
+}
+
+async function isInspectionParty(
+  client: PrismaClient | Prisma.TransactionClient,
+  inspection: InspectionActorTarget,
+  userId: string,
+): Promise<boolean> {
+  const job = await client.marketplaceJob.findUnique({
+    where: { id: inspection.jobId },
+    select: { customerId: true },
+  })
+  if (job?.customerId === userId) return true
+  if (await isAssignedInspectionProvider(client, inspection, userId)) return true
+
+  if (inspection.companyId) {
+    const membership = await client.teamMember.findFirst({
+      where: { companyId: inspection.companyId, userId, status: 'ACTIVE' },
+      select: { id: true },
+    })
+    return Boolean(membership)
+  }
+
+  return false
+}
+
 export interface CreateInspectionInput {
   jobId: string
   providerType: 'INDIVIDUAL' | 'COMPANY'
@@ -67,6 +142,32 @@ export async function createInspection(
   }
   if (!input.taskerId && !input.companyId) {
     return { success: false, error: 'Must specify either taskerId or companyId' }
+  }
+
+  const acceptedQuote = await client.jobQuote.findFirst({
+    where: { jobId: input.jobId, status: 'ACCEPTED' },
+    select: { providerId: true, providerType: true },
+  })
+  if (!acceptedQuote) {
+    return { success: false, error: 'Job has no accepted provider' }
+  }
+
+  if (
+    input.providerType === 'INDIVIDUAL' &&
+    (!input.taskerId ||
+      acceptedQuote.providerType !== 'INDIVIDUAL' ||
+      acceptedQuote.providerId !== input.taskerId)
+  ) {
+    return { success: false, error: 'Inspection provider does not match the accepted quote' }
+  }
+
+  if (
+    input.providerType === 'COMPANY' &&
+    (!input.companyId ||
+      acceptedQuote.providerType !== 'COMPANY' ||
+      acceptedQuote.providerId !== input.companyId)
+  ) {
+    return { success: false, error: 'Inspection company does not match the accepted quote' }
   }
 
   // Check for existing active inspection
@@ -141,23 +242,43 @@ export async function transitionInspection(
     return { success: false, error: `Invalid transition from ${currentStatus} to ${input.toStatus}` }
   }
 
-  // Verify provider identity for provider-only transitions
+  // The customer must verify the provider's arrival before inspection work can
+  // begin. Without this gate, the provider could move ARRIVED -> IN_PROGRESS and
+  // make the ARRIVED-only verification endpoint impossible to use.
+  if (
+    currentStatus === 'ARRIVED' &&
+    input.toStatus === 'IN_PROGRESS' &&
+    !inspection.verifiedByCustomer
+  ) {
+    return { success: false, error: 'Customer arrival verification is required before inspection starts' }
+  }
+
+  // Execution transitions must be performed by the accepted individual
+  // provider or the assigned company worker, never by an arbitrary company member.
   const isProviderTransition = ['EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(input.toStatus)
   if (isProviderTransition) {
-    if (inspection.taskerId && inspection.taskerId !== input.userId) {
+    const authorized = await isAssignedInspectionProvider(client, inspection, input.userId)
+    if (!authorized) {
       return { success: false, error: 'Not the assigned provider' }
-    }
-    if (inspection.companyId && inspection.companyId !== input.userId) {
-      return { success: false, error: 'Not the assigned company' }
     }
   }
 
-  // Verify customer identity for customer-only transitions
-  const isCustomerTransition = ['CANCELLED'].includes(input.toStatus)
+  // Cancellation / no-show are customer decisions.
+  const isCustomerTransition = ['CANCELLED', 'NO_SHOW'].includes(input.toStatus)
   if (isCustomerTransition) {
-    const job = await client.marketplaceJob.findUnique({ where: { id: inspection.jobId } })
+    const job = await client.marketplaceJob.findUnique({
+      where: { id: inspection.jobId },
+      select: { customerId: true },
+    })
     if (!job || job.customerId !== input.userId) {
       return { success: false, error: 'Not the job customer' }
+    }
+  }
+
+  if (input.toStatus === 'DISPUTED') {
+    const authorized = await isInspectionParty(client, inspection, input.userId)
+    if (!authorized) {
+      return { success: false, error: 'Not authorized for this inspection' }
     }
   }
 
@@ -183,7 +304,13 @@ export async function transitionInspection(
     }
   }
 
-  await client.jobInspection.update({ where: { id: input.inspectionId }, data: updateData })
+  const claimed = await client.jobInspection.updateMany({
+    where: { id: input.inspectionId, status: currentStatus },
+    data: updateData,
+  })
+  if (claimed.count !== 1) {
+    return { success: false, error: 'Inspection state changed concurrently' }
+  }
 
   return { success: true }
 }
@@ -208,12 +335,13 @@ export async function completeInspection(
     return { success: false, error: `Inspection must be IN_PROGRESS to complete, current: ${inspection.status}` }
   }
 
-  // Verify provider
-  if (inspection.taskerId && inspection.taskerId !== input.providerId) {
+  const authorizedProvider = await isAssignedInspectionProvider(
+    client,
+    inspection,
+    input.providerId,
+  )
+  if (!authorizedProvider) {
     return { success: false, error: 'Not the assigned provider' }
-  }
-  if (inspection.companyId && inspection.companyId !== input.providerId) {
-    return { success: false, error: 'Not the assigned company' }
   }
 
   await client.jobInspection.update({
@@ -248,6 +376,11 @@ export async function scheduleInspection(
   if (!inspection) return { success: false, error: 'Inspection not found' }
   if (inspection.status !== 'REQUESTED') {
     return { success: false, error: `Inspection must be REQUESTED to schedule, current: ${inspection.status}` }
+  }
+
+  const authorizedScheduler = await canScheduleInspection(client, inspection, input.userId)
+  if (!authorizedScheduler) {
+    return { success: false, error: 'Not authorized to schedule this inspection' }
   }
 
   await client.jobInspection.update({

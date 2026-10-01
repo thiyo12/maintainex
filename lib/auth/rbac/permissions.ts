@@ -29,6 +29,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'admins:view', 'admins:create', 'admins:edit', 'admins:delete',
     'settings:view', 'settings:edit',
     'security:view', 'security:audit',
+    'trust:view',
     'wishlist:view', 'wishlist:manage',
     'professions:read', 'professions:write',
     'credentials:read', 'credentials:write',
@@ -51,6 +52,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'professions:read', 'professions:write',
     'credentials:read', 'credentials:write',
     'risk_events:read', 'risk_events:resolve',
+    'trust:view',
     'audit:read',
   ],
   FINANCE: [
@@ -77,6 +79,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'professions:read', 'professions:write',
     'credentials:read', 'credentials:write',
     'risk_events:read', 'risk_events:resolve',
+    'trust:view',
     'audit:read',
   ],
   SUPPORT: [
@@ -90,11 +93,13 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'kyc:view',
     'queue:view',
     'risk_events:read',
+    'trust:view',
     'audit:read',
   ],
   TECHNICAL: [
     'dashboard:view',
     'security:view', 'security:audit',
+    'trust:view',
     'queue:view',
     'analytics:view',
     'audit:read',

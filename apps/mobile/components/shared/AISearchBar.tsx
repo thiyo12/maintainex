@@ -92,7 +92,7 @@ export default function AISearchBar({
   const [correctedQuery, setCorrectedQuery] = useState<string | undefined>()
   const [loading, setLoading] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDisposedRef = useRef(false)
 
   useEffect(() => { return () => { isDisposedRef.current = true } }, [])
@@ -130,7 +130,7 @@ export default function AISearchBar({
           .then((list) => {
             if (isDisposedRef.current) return
             const real = (list || []).slice(0, 3)
-            setTaskerResults(real.length > 0 ? real : SAMPLE_TASKER_RESULTS)
+            setTaskerResults((real.length > 0 ? real : SAMPLE_TASKER_RESULTS) as TaskerResult[])
           })
           .catch(() => { if (!isDisposedRef.current) setTaskerResults([]) })
           .finally(() => { if (!isDisposedRef.current) setTaskersLoading(false) })

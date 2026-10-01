@@ -42,8 +42,14 @@ export interface V2ProviderSummary {
   userId?: string
   name?: string | null
   profileImage?: string | null
+  avatar?: string | null
   rating?: number | null
   completedJobs?: number
+  isVerified?: boolean
+  isOnline?: boolean
+  latitude?: number | null
+  longitude?: number | null
+  categories?: any[]
 }
 
 export interface V2Quote {
@@ -97,6 +103,7 @@ export interface V2Job {
   reviews?: any
   companyAssignment?: V2CompanyAssignment | null
   acceptedQuote?: (V2Quote & { provider?: V2ProviderSummary | null }) | null
+  smartBooking?: any
 }
 
 export interface V2PaymentStatus {

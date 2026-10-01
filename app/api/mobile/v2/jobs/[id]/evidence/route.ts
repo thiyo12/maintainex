@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 
 export async function POST(
   request: NextRequest,
@@ -9,47 +9,92 @@ export async function POST(
   try {
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { id: jobId } = await params
-    const body = await request.json()
-    const { inspectionId, evidenceType, url, description, mimeType } = body
+    const body = await request.json().catch(() => ({}))
+    const inspectionId = typeof body?.inspectionId === 'string' ? body.inspectionId.trim().slice(0, 128) : ''
+    const evidenceType = typeof body?.evidenceType === 'string' ? body.evidenceType.trim().toUpperCase() : ''
+    const url = typeof body?.url === 'string' ? body.url.trim().slice(0, 2000) : ''
+    const description = typeof body?.description === 'string' ? body.description.trim().slice(0, 5000) : ''
+    const mimeType = typeof body?.mimeType === 'string' ? body.mimeType.trim().slice(0, 200) : ''
+    const validEvidenceTypes = new Set(['PHOTO', 'VIDEO', 'NOTE', 'MEASUREMENT', 'DIAGNOSTIC'])
 
-    if (!evidenceType) {
-      return NextResponse.json({ error: 'evidenceType required' }, { status: 400 })
+    if (!validEvidenceTypes.has(evidenceType)) {
+      return NextResponse.json({ error: 'Invalid evidenceType' }, { status: 400 })
+    }
+    if (!url && !description) {
+      return NextResponse.json({ error: 'Evidence must include a URL or description' }, { status: 400 })
+    }
+    if (url) {
+      const isAbsoluteHttp = /^https?:\/\//i.test(url)
+      const isTrustedLocalPath =
+        !url.includes('..') &&
+        (
+          url.startsWith('/api/mobile/files/') ||
+          url.startsWith('/uploads/')
+        )
+
+      if (!isAbsoluteHttp && !isTrustedLocalPath) {
+        return NextResponse.json(
+          { error: 'Evidence URL must be an uploaded MaintainEX path or http(s) URL' },
+          { status: 400 }
+        )
+      }
     }
 
     // Verify job exists
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-    // Determine uploader type
     const isCustomer = job.customerId === user.id
     const uploaderType = isCustomer ? 'CUSTOMER' : 'PROVIDER'
 
-    // When no inspectionId, verify the user is a party to the job
-    if (!inspectionId && !isCustomer) {
-      const hasAcceptedQuote = await prisma.jobQuote.findFirst({
-        where: { jobId, providerId: user.id, status: 'ACCEPTED' },
+    const acceptedQuote = !isCustomer
+      ? await prisma.jobQuote.findFirst({
+          where: { jobId, status: 'ACCEPTED' },
+          select: { providerId: true, providerType: true },
+        })
+      : null
+
+    let authorizedProvider = false
+    if (!isCustomer && acceptedQuote?.providerType === 'INDIVIDUAL') {
+      authorizedProvider = acceptedQuote.providerId === user.id
+    } else if (!isCustomer && acceptedQuote?.providerType === 'COMPANY') {
+      const assignment = await prisma.companyJobAssignment.findFirst({
+        where: {
+          jobId,
+          companyId: acceptedQuote.providerId,
+          workerUserId: user.id,
+          status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
+        },
+        select: { id: true },
       })
-      if (!hasAcceptedQuote) {
-        return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 })
-      }
+      authorizedProvider = Boolean(assignment)
     }
 
-    // If uploading to an inspection, verify the user is the assigned provider or customer
+    if (!isCustomer && !authorizedProvider) {
+      return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 })
+    }
+
     if (inspectionId) {
       const inspection = await prisma.jobInspection.findUnique({ where: { id: inspectionId } })
-      if (!inspection) return NextResponse.json({ error: 'Inspection not found' }, { status: 404 })
-      if (inspection.jobId !== jobId) {
-        return NextResponse.json({ error: 'Inspection does not belong to this job' }, { status: 400 })
+      if (!inspection || inspection.jobId !== jobId) {
+        return NextResponse.json({ error: 'Inspection not found for this job' }, { status: 404 })
       }
 
-      // Verify provider ownership
-      if (uploaderType === 'PROVIDER') {
+      if (!isCustomer) {
         if (inspection.taskerId && inspection.taskerId !== user.id) {
           return NextResponse.json({ error: 'Not the assigned provider' }, { status: 403 })
         }
-        if (inspection.companyId && inspection.companyId !== user.id) {
+        if (
+          inspection.companyId &&
+          (
+            acceptedQuote?.providerType !== 'COMPANY' ||
+            inspection.companyId !== acceptedQuote.providerId
+          )
+        ) {
           return NextResponse.json({ error: 'Not the assigned company' }, { status: 403 })
         }
       }
@@ -58,13 +103,13 @@ export async function POST(
     const evidence = await prisma.jobEvidence.create({
       data: {
         jobId,
-        inspectionId: inspectionId ?? null,
+        inspectionId: inspectionId || null,
         uploaderId: user.id,
         uploaderType,
         evidenceType,
-        url: url ?? null,
-        description: description ?? null,
-        mimeType: mimeType ?? null,
+        url: url || null,
+        description: description || null,
+        mimeType: mimeType || null,
       },
     })
 

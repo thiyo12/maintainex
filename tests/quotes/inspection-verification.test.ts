@@ -14,6 +14,7 @@ function mockPrisma(overrides: Record<string, any> = {}) {
         job: { customerId: 'customer-1' },
       }),
       update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     marketplaceJob: {
       findUnique: vi.fn().mockResolvedValue(overrides.job ?? {
@@ -75,13 +76,36 @@ describe('Inspection arrival verification', () => {
         userId: 'provider-1',
         toStatus: 'ARRIVED',
       })
-      expect(prisma.jobInspection.update).toHaveBeenCalledWith({
-        where: { id: 'insp-1' },
+      expect(prisma.jobInspection.updateMany).toHaveBeenCalledWith({
+        where: { id: 'insp-1', status: 'EN_ROUTE' },
         data: expect.objectContaining({
           verifiedByCustomer: false,
           verifiedAt: null,
         }),
       })
+    })
+
+    it('blocks ARRIVED -> IN_PROGRESS until the customer verifies arrival', async () => {
+      const prisma = mockPrisma({
+        inspection: {
+          id: 'insp-1',
+          status: 'ARRIVED',
+          taskerId: 'provider-1',
+          companyId: null,
+          jobId: 'job-1',
+          verifiedByCustomer: false,
+        },
+      })
+      const result = await transitionInspection(prisma, {
+        inspectionId: 'insp-1',
+        userId: 'provider-1',
+        toStatus: 'IN_PROGRESS',
+      })
+      expect(result).toEqual({
+        success: false,
+        error: 'Customer arrival verification is required before inspection starts',
+      })
+      expect(prisma.jobInspection.updateMany).not.toHaveBeenCalled()
     })
   })
 })

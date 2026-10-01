@@ -26,8 +26,8 @@ export default function MyProfileScreen() {
     : 'N/A'
 
   const roleLabel =
-    user.role === 'customer' ? t('profile.customer') :
-    user.role === 'tasker' ? t('profile.tasker') :
+    user.role === 'CUSTOMER' ? t('profile.customer') :
+    user.role === 'TASKER' ? t('profile.tasker') :
     t('profile.company')
 
   const fields = [

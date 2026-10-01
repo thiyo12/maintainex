@@ -5,11 +5,12 @@ import {
   createChangeOrder,
   transitionChangeOrder,
   calculateFinalAuthorizedAmount,
+  approveChangeOrder,
 } from '@/lib/domain/change-order'
 
 function mockPrisma(overrides: Record<string, any> = {}) {
   const allChangeOrders = overrides.approvedOrders ?? []
-  return {
+  const client: any = {
     marketplaceJob: {
       findUnique: vi.fn().mockResolvedValue(overrides.job ?? {
         id: 'job-1',
@@ -18,6 +19,7 @@ function mockPrisma(overrides: Record<string, any> = {}) {
         approvedQuoteId: 'quote-accepted',
         finalAuthorizedAmountCents: null,
       }),
+      update: vi.fn().mockResolvedValue({}),
     },
     jobQuote: {
       findUnique: vi.fn().mockResolvedValue(overrides.quote ?? {
@@ -26,6 +28,7 @@ function mockPrisma(overrides: Record<string, any> = {}) {
         status: 'ACCEPTED',
         providerId: 'provider-1',
         price: 50000n,
+        totalCents: null,
         revisionNumber: 1,
         createdAt: new Date('2026-09-10'),
       }),
@@ -46,12 +49,43 @@ function mockPrisma(overrides: Record<string, any> = {}) {
         return Promise.resolve(allChangeOrders)
       }),
       update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     jobChangeOrderLineItem: {
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    jobEscrow: {
+      findFirst: vi.fn().mockResolvedValue(overrides.escrow ?? {
+        id: 'escrow-1',
+        jobId: 'job-1',
+        amount: 50000n,
+        serviceFee: 5000n,
+        totalAmount: 55000n,
+        currency: 'LKR',
+        status: 'PENDING_PAYMENT',
+        createdAt: new Date('2026-09-10'),
+      }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    paymentIntent: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    marketConfig: {
+      findUnique: vi.fn().mockResolvedValue({
+        countryCode: 'LK',
+        defaultCurrency: 'LKR',
+        commissionRateBps: 1000,
+      }),
+    },
+    idempotencyRecord: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      update: vi.fn().mockResolvedValue({}),
+      create: vi.fn().mockResolvedValue({}),
+    },
     ...overrides,
-  } as any
+  }
+  client.$transaction = vi.fn(async (fn: any) => fn(client))
+  return client as any
 }
 
 describe('Phase 10.4 — Change Order Lifecycle', () => {
@@ -210,6 +244,39 @@ describe('Phase 10.4 — Change Order Lifecycle', () => {
       expect(result.error).toContain('does not own the base quote')
     })
 
+    it('supports a negative price delta for a scope reduction', async () => {
+      const client = mockPrisma()
+      const result = await createChangeOrder(client, {
+        jobId: 'job-1',
+        baseQuoteId: 'quote-accepted',
+        providerType: 'INDIVIDUAL',
+        taskerId: 'provider-1',
+        reason: 'Remove one room from the scope',
+        scopeDelta: 'Customer removed one room',
+        amountDeltaCents: -5000n,
+        createdBy: 'provider-1',
+      })
+      expect(result.success).toBe(true)
+      expect(client.jobChangeOrder.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ amountDeltaCents: -5000n }),
+      })
+    })
+
+    it('rejects a zero-effect change order', async () => {
+      const client = mockPrisma()
+      const result = await createChangeOrder(client, {
+        jobId: 'job-1',
+        baseQuoteId: 'quote-accepted',
+        providerType: 'INDIVIDUAL',
+        taskerId: 'provider-1',
+        reason: 'No actual change',
+        amountDeltaCents: 0n,
+        createdBy: 'provider-1',
+      })
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Change order must modify price or scope')
+    })
+
     it('increments revision number', async () => {
       const client = mockPrisma({ lastOrder: { revisionNumber: 3 } })
       const result = await createChangeOrder(client, {
@@ -326,6 +393,154 @@ describe('Phase 10.4 — Change Order Lifecycle', () => {
     })
   })
 
+  describe('approveChangeOrder', () => {
+    function approvalClient(overrides: Record<string, any> = {}) {
+      const client = mockPrisma({
+        foundOrder: {
+          id: 'co-1',
+          status: 'APPROVED',
+          createdBy: 'provider-1',
+          jobId: 'job-1',
+          amountDeltaCents: overrides.delta ?? 5000n,
+          baseQuoteId: 'quote-accepted',
+        },
+        approvedOrders: overrides.approvedOrders ?? [
+          { id: 'co-1', status: 'APPROVED', amountDeltaCents: overrides.delta ?? 5000n },
+        ],
+      })
+      client.jobChangeOrder.findUnique
+        .mockResolvedValueOnce({
+          id: 'co-1',
+          status: 'SUBMITTED',
+          jobId: 'job-1',
+          amountDeltaCents: overrides.delta ?? 5000n,
+          baseQuoteId: 'quote-accepted',
+          job: {
+            customerId: 'customer-1',
+            finalAuthorizedAmountCents: 50000n,
+            countryCode: 'LK',
+            status: 'QUOTE_ACCEPTED',
+          },
+        })
+        .mockResolvedValue({
+          id: 'co-1',
+          status: 'APPROVED',
+          jobId: 'job-1',
+          amountDeltaCents: overrides.delta ?? 5000n,
+          baseQuoteId: 'quote-accepted',
+        })
+      if (overrides.transitionCount !== undefined) {
+        client.jobChangeOrder.updateMany.mockResolvedValue({ count: overrides.transitionCount })
+      }
+      return client
+    }
+
+    it('approves once and recalculates the final authorized amount', async () => {
+      const client = approvalClient()
+      const result = await approveChangeOrder(client, 'co-1', 'customer-1')
+      expect(result.success).toBe(true)
+      expect(result.finalAuthorizedAmountCents).toBe(55000n)
+      expect(client.jobChangeOrder.updateMany).toHaveBeenCalledWith({
+        where: { id: 'co-1', status: 'SUBMITTED' },
+        data: expect.objectContaining({ status: 'APPROVED' }),
+      })
+    })
+
+    it('reprices pending escrow and invalidates stale payment intents', async () => {
+      const client = approvalClient()
+      const result = await approveChangeOrder(client, 'co-1', 'customer-1')
+
+      expect(result.success).toBe(true)
+      expect(client.jobEscrow.updateMany).toHaveBeenCalledWith({
+        where: { id: 'escrow-1', status: 'PENDING_PAYMENT' },
+        data: {
+          amount: 55000n,
+          serviceFee: 5500n,
+          totalAmount: 60500n,
+        },
+      })
+      expect(client.paymentIntent.updateMany).toHaveBeenCalledWith({
+        where: {
+          jobId: 'job-1',
+          status: { in: ['CREATED', 'PENDING'] },
+        },
+        data: { status: 'CANCELLED' },
+      })
+    })
+
+    it('reprices a customer-approved cash change order without creating a funded top-up', async () => {
+      const client = approvalClient()
+      client.jobEscrow.findFirst.mockResolvedValue({
+        id: 'escrow-1',
+        jobId: 'job-1',
+        amount: 50000n,
+        serviceFee: 5000n,
+        totalAmount: 55000n,
+        currency: 'LKR',
+        paymentMethod: 'CASH',
+        status: 'CASH_CONFIRMED',
+        createdAt: new Date('2026-09-10'),
+      })
+
+      const result = await approveChangeOrder(client, 'co-1', 'customer-1')
+
+      expect(result.success).toBe(true)
+      expect(client.jobEscrow.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'escrow-1',
+          status: 'CASH_CONFIRMED',
+          paymentMethod: 'CASH',
+        },
+        data: {
+          amount: 55000n,
+          serviceFee: 5500n,
+          totalAmount: 60500n,
+        },
+      })
+      expect(client.paymentIntent.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('rejects a price-changing approval after escrow is already funded', async () => {
+      const client = approvalClient()
+      client.jobEscrow.findFirst.mockResolvedValue({
+        id: 'escrow-1',
+        jobId: 'job-1',
+        amount: 50000n,
+        serviceFee: 5000n,
+        totalAmount: 55000n,
+        currency: 'LKR',
+        status: 'PROTECTED',
+        createdAt: new Date('2026-09-10'),
+      })
+
+      const result = await approveChangeOrder(client, 'co-1', 'customer-1')
+
+      expect(result).toEqual({
+        success: false,
+        error: 'CHANGE_ORDER_TOPUP_NOT_SUPPORTED_AFTER_FUNDING',
+      })
+      expect(client.marketplaceJob.update).not.toHaveBeenCalled()
+    })
+
+    it('rejects a concurrent second approval', async () => {
+      const client = approvalClient({ transitionCount: 0 })
+      const result = await approveChangeOrder(client, 'co-1', 'customer-1')
+      expect(result).toEqual({ success: false, error: 'CONCURRENT_APPROVAL' })
+    })
+
+    it('rolls back an approval that would make the final authorized amount non-positive', async () => {
+      const client = approvalClient({
+        delta: -50000n,
+        approvedOrders: [{ id: 'co-1', status: 'APPROVED', amountDeltaCents: -50000n }],
+      })
+      const result = await approveChangeOrder(client, 'co-1', 'customer-1')
+      expect(result).toEqual({
+        success: false,
+        error: 'FINAL_AUTHORIZED_AMOUNT_MUST_BE_POSITIVE',
+      })
+    })
+  })
+
   describe('calculateFinalAuthorizedAmount', () => {
     it('calculates base + approved change orders', async () => {
       const client = mockPrisma({
@@ -341,6 +556,26 @@ describe('Phase 10.4 — Change Order Lifecycle', () => {
       expect(result.finalAmountCents).toBe(70000n)
     })
 
+    it('uses totalCents from the accepted quote when itemized pricing is present', async () => {
+      const client = mockPrisma({
+        quote: {
+          id: 'quote-accepted',
+          jobId: 'job-1',
+          status: 'ACCEPTED',
+          providerId: 'provider-1',
+          price: 50000n,
+          totalCents: 57500n,
+          revisionNumber: 1,
+          createdAt: new Date('2026-09-10'),
+        },
+        approvedOrders: [],
+      })
+      const result = await calculateFinalAuthorizedAmount(client, 'job-1')
+      expect(result.success).toBe(true)
+      expect(result.baseAmountCents).toBe(57500n)
+      expect(result.finalAmountCents).toBe(57500n)
+    })
+
     it('excludes non-approved change orders', async () => {
       const client = mockPrisma({
         approvedOrders: [
@@ -353,6 +588,19 @@ describe('Phase 10.4 — Change Order Lifecycle', () => {
       expect(result.success).toBe(true)
       expect(result.changeOrderDeltaCents).toBe(15000n)
       expect(result.finalAmountCents).toBe(65000n)
+    })
+
+    it('supports approved price reductions while keeping a positive final amount', async () => {
+      const client = mockPrisma({
+        approvedOrders: [
+          { amountDeltaCents: -10000n, status: 'APPROVED' },
+          { amountDeltaCents: 5000n, status: 'APPROVED' },
+        ],
+      })
+      const result = await calculateFinalAuthorizedAmount(client, 'job-1')
+      expect(result.success).toBe(true)
+      expect(result.changeOrderDeltaCents).toBe(-5000n)
+      expect(result.finalAmountCents).toBe(45000n)
     })
 
     it('returns error if no approved quote', async () => {

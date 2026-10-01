@@ -61,16 +61,38 @@ export async function PATCH(
 
     const body = await request.json()
     const progressStatus = body.progressStatus as WorkspaceStatus
-    const validStatuses: WorkspaceStatus[] = ['ACCEPTED', 'IN_PROGRESS', 'WAITING_CUSTOMER', 'COMPLETION_REQUESTED', 'COMPLETED', 'DISPUTED']
+    const validStatuses: WorkspaceStatus[] = ['IN_PROGRESS', 'WAITING_CUSTOMER']
     if (!progressStatus || !validStatuses.includes(progressStatus)) {
-      return NextResponse.json({ error: 'Invalid progressStatus' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'This workspace endpoint only supports WAITING_CUSTOMER and resume to IN_PROGRESS' },
+        { status: 400 }
+      )
     }
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    if (job.status !== 'IN_PROGRESS') {
+      return NextResponse.json(
+        { error: 'Workspace pause/resume is only available after work has started' },
+        { status: 409 }
+      )
+    }
 
     const actorType = await resolveJobActor(job.id, job.customerId, user.id)
     if (!actorType) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+
+    if (progressStatus === 'WAITING_CUSTOMER' && actorType === 'CUSTOMER') {
+      return NextResponse.json(
+        { error: 'Only the assigned provider can mark the job as waiting for the customer' },
+        { status: 403 }
+      )
+    }
+    if (progressStatus === 'IN_PROGRESS' && actorType !== 'CUSTOMER') {
+      return NextResponse.json(
+        { error: 'Only the customer can resume a job that is waiting for customer input' },
+        { status: 403 }
+      )
+    }
 
     const updated = await transitionJobWorkspace(
       { jobId: job.id, actorId: user.id, actorType },
@@ -81,7 +103,14 @@ export async function PATCH(
   } catch (error: any) {
     console.error('Update workspace error:', error)
     const message = error?.message || 'Server error'
-    if (message.includes('cannot transition') || message.includes('Cannot transition') || message.includes('Actor type')) {
+    if (
+      message.includes('cannot transition') ||
+      message.includes('Cannot transition') ||
+      message.includes('Actor type') ||
+      message.includes('requires PIN verification') ||
+      message.includes('must use the escrow release flow') ||
+      message.includes('must use the canonical dispute flow')
+    ) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
     if (message.includes('not found')) return NextResponse.json({ error: message }, { status: 404 })

@@ -3,6 +3,8 @@ import { checkIndividualProviderEligibility, checkCompanyEligibility, checkWorke
 import { resolveJobRequirements, hasCapabilityMatch, hasRelationalCapability } from '@/lib/matching'
 import { calculatePrice } from '@/lib/pricing/engine'
 import { createNotification } from '@/lib/notifications'
+import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
+import { readStoredList } from '@/lib/db-utils'
 
 export interface BookNowInput {
   customerId: string
@@ -29,6 +31,48 @@ function parseLegacyCapabilities(value: string | null): string[] {
   }
 }
 
+function normalizeToken(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function serviceAreaAllows(serviceAreas: string | null | undefined, district: string): boolean {
+  const configured = readStoredList(serviceAreas)
+    .map(normalizeToken)
+    .filter(Boolean)
+  if (configured.length === 0) return true
+
+  const target = normalizeToken(district)
+  return configured.some(area => area === target || target.includes(area) || area.includes(target))
+}
+
+function parseClockMinutes(value: string): number | null {
+  const match = value.match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null
+  return hour * 60 + minute
+}
+
+function slotWindow(slot: string): { start: number; end: number } | null {
+  if (slot === 'morning') return { start: 8 * 60, end: 12 * 60 }
+  if (slot === 'afternoon') return { start: 12 * 60, end: 17 * 60 }
+  if (slot === 'evening') return { start: 17 * 60, end: 21 * 60 }
+  return null
+}
+
+function isDateInsideVacation(date: Date, start: Date | null, end: Date | null): boolean {
+  if (!start || !end) return false
+  const check = new Date(date)
+  check.setHours(12, 0, 0, 0)
+  const from = new Date(start)
+  const to = new Date(end)
+  from.setHours(0, 0, 0, 0)
+  to.setHours(23, 59, 59, 999)
+  return check >= from && check <= to
+}
+
+
 export async function createBookNowJob(input: BookNowInput) {
   const templateJob = await prisma.templateJob.findUnique({
     where: { id: input.templateJobId },
@@ -46,7 +90,8 @@ export async function createBookNowJob(input: BookNowInput) {
 
   const finalCountryCode = typeof input.countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(input.countryCode)
     ? input.countryCode.toUpperCase()
-    : 'LK'
+    : ''
+  if (!finalCountryCode) throw new Error('Booking country is required')
 
   const linkedServiceTemplate = await prisma.serviceTemplate.findFirst({
     where: {
@@ -68,13 +113,26 @@ export async function createBookNowJob(input: BookNowInput) {
   let resolvedProviderUserId: string
   let resolvedProviderEntityId: string
   let resolvedNotificationUserId: string
+  let resolvedServiceAreas: string | null = null
 
   if (resolvedProviderType === 'COMPANY') {
     const company = await prisma.companyProfile.findUnique({
       where: { id: input.providerId },
-      select: { id: true, userId: true, companyName: true },
+      select: {
+        id: true,
+        userId: true,
+        companyName: true,
+        countryCode: true,
+        serviceAreas: true,
+        user: { select: { countryCode: true } },
+      },
     })
     if (!company) throw new Error('Company not found')
+    if (company.userId === input.customerId) throw new Error('Cannot book your own company')
+    const companyCountry = company.countryCode || company.user?.countryCode
+    if (companyCountry !== finalCountryCode) {
+      throw new Error('Provider country does not match booking country')
+    }
 
     const eligibility = await checkCompanyEligibility(company.id)
     if (!eligibility.eligible) {
@@ -91,8 +149,13 @@ export async function createBookNowJob(input: BookNowInput) {
       if (!catSpecialty) throw new Error('Company lacks required capability for this booking')
     }
 
+    if (!serviceAreaAllows(company.serviceAreas, input.district)) {
+      throw new Error('Provider does not serve the requested district')
+    }
+
     resolvedProviderUserId = company.userId
     resolvedProviderEntityId = company.id
+    resolvedServiceAreas = company.serviceAreas
 
     const owner = await prisma.teamMember.findFirst({
       where: { companyId: company.id, role: 'COMPANY_OWNER', status: 'ACTIVE' },
@@ -111,12 +174,18 @@ export async function createBookNowJob(input: BookNowInput) {
         id: true,
         userId: true,
         skills: true,
+        serviceAreas: true,
         taskerSkills: { select: { jobId: true } },
-        user: { select: { name: true } },
+        countryCode: true,
+        user: { select: { name: true, countryCode: true } },
       },
     })
     if (!provider) throw new Error('Provider not found')
     if (provider.userId === input.customerId) throw new Error('Cannot book yourself')
+    const providerCountry = provider.countryCode || provider.user?.countryCode
+    if (providerCountry !== finalCountryCode) {
+      throw new Error('Provider country does not match booking country')
+    }
 
     const eligibility = await checkIndividualProviderEligibility(provider.userId)
     if (!eligibility.eligible) {
@@ -132,9 +201,43 @@ export async function createBookNowJob(input: BookNowInput) {
       throw new Error('Provider lacks required capability for this booking')
     }
 
+    if (!serviceAreaAllows(provider.serviceAreas, input.district)) {
+      throw new Error('Provider does not serve the requested district')
+    }
+
     resolvedProviderUserId = provider.userId
     resolvedProviderEntityId = provider.userId
     resolvedNotificationUserId = provider.userId
+    resolvedServiceAreas = provider.serviceAreas
+  }
+
+  const availability = await prisma.providerAvailability.findUnique({
+    where: { providerId: resolvedProviderEntityId },
+  })
+  if (availability) {
+    if (!availability.isAvailable) {
+      throw new Error('Provider is currently unavailable')
+    }
+    if (isDateInsideVacation(input.scheduledDate, availability.vacationStart, availability.vacationEnd)) {
+      throw new Error('Provider is unavailable on the requested date')
+    }
+
+    const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+    const dayKey = dayKeys[input.scheduledDate.getDay()]
+    if (!availability[dayKey]) {
+      throw new Error('Provider is unavailable on the requested day')
+    }
+
+    const workStart = parseClockMinutes(availability.startTime)
+    const workEnd = parseClockMinutes(availability.endTime)
+    if (workStart === null || workEnd === null || workEnd <= workStart) {
+      throw new Error('Provider availability configuration is invalid')
+    }
+
+    const requestedWindow = slotWindow(input.timeSlot)
+    if (requestedWindow && !(requestedWindow.start < workEnd && workStart < requestedWindow.end)) {
+      throw new Error('Requested time slot is outside provider working hours')
+    }
   }
 
   const pricing = await calculatePrice(prisma, {
@@ -151,11 +254,66 @@ export async function createBookNowJob(input: BookNowInput) {
 
   const smartBooking = JSON.stringify({
     district: input.district,
+    serviceAreasChecked: Boolean(resolvedServiceAreas),
     timeSlot: input.timeSlot,
     countryCode: finalCountryCode,
   })
 
   const result = await prisma.$transaction(async (tx) => {
+    await lockAndAssertProviderAvailable(
+      tx,
+      resolvedProviderType,
+      resolvedProviderEntityId,
+      'Provider is no longer available for direct booking',
+    )
+
+    const dayStart = new Date(input.scheduledDate)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+
+    const conflicts = resolvedProviderType === 'INDIVIDUAL'
+      ? await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT mj.id
+          FROM "MarketplaceJob" mj
+          JOIN "JobQuote" jq ON jq."jobId" = mj.id
+          WHERE jq."providerId" = ${resolvedProviderEntityId}
+            AND jq."providerType" = 'INDIVIDUAL'
+            AND jq.status = 'ACCEPTED'
+            AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+            AND mj."preferredDate" >= ${dayStart}
+            AND mj."preferredDate" < ${dayEnd}
+            AND (
+              ${input.timeSlot} = 'anytime'
+              OR mj."preferredTimeSlot" IS NULL
+              OR mj."preferredTimeSlot" = 'anytime'
+              OR mj."preferredTimeSlot" = ${input.timeSlot}
+            )
+          LIMIT 1
+        `
+      : await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT mj.id
+          FROM "MarketplaceJob" mj
+          JOIN "JobQuote" jq ON jq."jobId" = mj.id
+          WHERE jq."providerId" = ${resolvedProviderEntityId}
+            AND jq."providerType" = 'COMPANY'
+            AND jq.status = 'ACCEPTED'
+            AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+            AND mj."preferredDate" >= ${dayStart}
+            AND mj."preferredDate" < ${dayEnd}
+            AND (
+              ${input.timeSlot} = 'anytime'
+              OR mj."preferredTimeSlot" IS NULL
+              OR mj."preferredTimeSlot" = 'anytime'
+              OR mj."preferredTimeSlot" = ${input.timeSlot}
+            )
+          LIMIT 1
+        `
+
+    if (conflicts.length > 0) {
+      throw new Error('Provider already has an overlapping active booking')
+    }
+
     const job = await tx.marketplaceJob.create({
       data: {
         customerId: input.customerId,
@@ -190,7 +348,7 @@ export async function createBookNowJob(input: BookNowInput) {
         workersCount: 1,
         materialHandling: 'tasker_brings',
         countryCode: finalCountryCode,
-        targetTaskerId: resolvedProviderUserId,
+        targetTaskerId: resolvedProviderEntityId,
       },
     })
 
@@ -200,6 +358,8 @@ export async function createBookNowJob(input: BookNowInput) {
         providerId: resolvedProviderEntityId,
         providerType: resolvedProviderType,
         price: pricing.providerGross,
+        currency: pricing.currency,
+        totalCents: pricing.providerGross,
         estimatedCompletionTime: '1-2 hours',
         message: input.notes || 'BOOK_NOW instant booking',
         attachments: '[]',

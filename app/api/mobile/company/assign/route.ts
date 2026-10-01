@@ -57,7 +57,21 @@ export async function POST(request: NextRequest) {
     }
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error, reasons: result.reasons }, { status: 400 })
+      const message = result.error || 'Worker assignment failed'
+      const isConflict =
+        message.includes('concurrently') ||
+        message.includes('scheduling conflict') ||
+        message.includes('changed before reassignment') ||
+        message.includes('already has an active assignment') ||
+        message.includes('already assigned') ||
+        message.includes('already the active assignee') ||
+        message.includes('No active worker assignment exists') ||
+        message.includes('Cannot reassign')
+
+      return NextResponse.json(
+        { error: message, reasons: result.reasons },
+        { status: isConflict ? 409 : 400 }
+      )
     }
 
     return NextResponse.json({ success: true, assignmentId: result.assignmentId, assignedTo: workerUserId })

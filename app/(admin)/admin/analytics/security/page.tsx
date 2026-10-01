@@ -6,7 +6,6 @@ import {
   FiShield, FiSearch, FiFilter, FiClock, FiUser, FiGlobe,
   FiAlertTriangle, FiInfo, FiChevronLeft, FiChevronRight
 } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface AuditLog {
   id: string
@@ -92,7 +91,7 @@ export default function SecurityLogs() {
     })
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Security Logs</h1>
@@ -260,6 +259,6 @@ export default function SecurityLogs() {
           </>
         ) : null}
       </div>
-    </AdminLayout>
+    </>
   )
 }

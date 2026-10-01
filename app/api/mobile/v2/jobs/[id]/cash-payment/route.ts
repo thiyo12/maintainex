@@ -1,20 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
+import { confirmCashPayment } from '@/lib/finance/escrow/escrow-service'
+import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
+import { createNotification } from '@/lib/notifications'
+import { minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
 
-/**
- * Cash settlement is intentionally disabled until MaintainEX has a dedicated
- * accounting flow for off-platform cash, platform fees and commission
- * receivables. Treating an unfunded CASH escrow as a funded ledger balance
- * would manufacture provider wallet money.
- */
-export async function POST(request: NextRequest) {
-  const user = await authenticateRequest(request)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const blocked = assertNotSuspended(user)
-  if (blocked) return blocked
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const user = await authenticateRequest(request)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
-  return NextResponse.json({
-    error: 'Cash settlement is temporarily disabled. Use a funded payment method.',
-    code: 'CASH_PAYMENT_DISABLED',
-  }, { status: 503 })
+    const rateLimitResponse = await requireFinancialRateLimit(request, 'cash-payment')
+    if (rateLimitResponse) return rateLimitResponse
+
+    const result = await confirmCashPayment(
+      {
+        jobId: id,
+        actorId: user.id,
+        actorType: 'CUSTOMER',
+      },
+      id,
+    )
+
+    const accepted = await prisma.jobQuote.findFirst({
+      where: { jobId: id, status: 'ACCEPTED' },
+      select: { providerId: true, providerType: true },
+    })
+
+    let providerUserId: string | null = null
+    if (accepted?.providerType === 'INDIVIDUAL') {
+      providerUserId = accepted.providerId
+    } else if (accepted?.providerType === 'COMPANY') {
+      providerUserId = (
+        await prisma.companyProfile.findUnique({
+          where: { id: accepted.providerId },
+          select: { userId: true },
+        })
+      )?.userId ?? null
+    }
+
+    if (providerUserId && !result.alreadyConfirmed) {
+      await createNotification({
+        userId: providerUserId,
+        title: 'Cash payment selected',
+        body: 'The customer selected cash. No funds are held by MaintainEX; platform commission will be recorded when the job is completed.',
+        referenceType: 'JOB',
+        referenceId: id,
+      })
+    }
+
+    const currency = result.currency as Currency
+    return NextResponse.json({
+      success: true,
+      escrowId: result.escrowId,
+      paymentMethod: 'CASH',
+      status: 'CASH_CONFIRMED',
+      amountDueMinor: result.amountDue.toString(),
+      amountDue: minorUnitsToMajorUnits(result.amountDue, currency),
+      currency,
+      alreadyConfirmed: result.alreadyConfirmed,
+    })
+  } catch (error) {
+    console.error('Cash payment selection error:', error)
+    const message = error instanceof Error ? error.message : 'Cash payment selection failed'
+
+    if (message.includes('Only the customer')) {
+      return NextResponse.json({ error: message }, { status: 403 })
+    }
+    if (message.includes('not found') || message.includes('not initialized')) {
+      return NextResponse.json({ error: message }, { status: 404 })
+    }
+    if (
+      message.includes('not ready') ||
+      message.includes('can no longer be changed') ||
+      message.includes('concurrently') ||
+      message.includes('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
+    ) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
+
+    return NextResponse.json({ error: 'Cash payment selection failed' }, { status: 500 })
+  }
 }

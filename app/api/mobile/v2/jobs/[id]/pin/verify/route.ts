@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { verifyJobPin } from '@/lib/domain/job-pin'
 import { prisma } from '@/lib/prisma'
 import { notifyJobStarted } from '@/lib/notifications'
@@ -10,6 +10,8 @@ export async function POST(
 ) {
   const auth = await authenticateRequest(request)
   if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const blocked = assertNotSuspended(auth)
+  if (blocked) return blocked
 
   const { id: jobId } = await params
 

@@ -1,33 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
-import { ROLE_PERMISSIONS } from '@/lib/admin-types'
-import { reviewCredential } from '@/lib/domain/credential-review'
-import { getIp } from '@/lib/auth/authorization/admin-rbac'
+import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
+import { reviewCredential, type CredentialReviewStatus } from '@/lib/domain/credential-review'
+import type { AdminSession } from '@/lib/admin-types'
 
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'USER_MANAGEMENT', 'MANAGER']
+const VALID_STATUSES: CredentialReviewStatus[] = ['VERIFIED', 'REJECTED', 'EXPIRED']
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const guard = await guardCrmRequest(request, {
+      permission: 'credentials:write',
+      level: 'sensitive',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
+
     const { id } = await params
-    const session = await getAdminSession(request)
-    if (!session || !ALLOWED_ROLES.includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!id || id.length > 128) {
+      return NextResponse.json({ error: 'Invalid credential ID' }, { status: 400 })
     }
 
-    const permissions = ROLE_PERMISSIONS[session.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('credentials:write')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    const body = await request.json().catch(() => ({}))
+    const status = typeof body?.status === 'string'
+      ? body.status.toUpperCase() as CredentialReviewStatus
+      : '' as CredentialReviewStatus
+    const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 2000) : undefined
 
-    const body = await request.json()
-    const { status, reason } = body
-
-    if (!status || !['VERIFIED', 'REJECTED', 'EXPIRED'].includes(status)) {
+    if (!VALID_STATUSES.includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+    }
+
+    const credential = await prisma.certification.findUnique({
+      where: { id },
+      select: { id: true, holderType: true, holderId: true },
+    })
+    if (!credential) {
+      return NextResponse.json({ error: 'Credential not found' }, { status: 404 })
+    }
+
+    let countryCode: string | null = null
+    if (credential.holderType === 'INDIVIDUAL') {
+      const holder = await prisma.user.findUnique({
+        where: { id: credential.holderId },
+        select: { countryCode: true },
+      })
+      countryCode = holder?.countryCode || null
+    } else if (credential.holderType === 'COMPANY') {
+      const holder = await prisma.companyProfile.findUnique({
+        where: { id: credential.holderId },
+        select: { countryCode: true },
+      })
+      countryCode = holder?.countryCode || null
+    }
+
+    if (!assertCrmCountryAllowed(security, countryCode)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const session: AdminSession = {
+      id: security.adminId,
+      email: security.email,
+      role: security.role,
+      firstName: '',
+      lastName: '',
+      assignedCountries: security.assignedCountries,
+      authType: 'adminUser',
     }
 
     const result = await reviewCredential(prisma, {
@@ -35,10 +76,14 @@ export async function PATCH(
       status,
       reason,
       session,
-      ipAddress: getIp(request),
+      ipAddress: security.ipAddress,
     })
 
-    return NextResponse.json({ success: true, credential: result.credential, newStatus: result.newStatus })
+    return NextResponse.json({
+      success: true,
+      credential: result.credential,
+      newStatus: result.newStatus,
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error'
     if (message.includes('already in terminal state')) {
@@ -50,7 +95,7 @@ export async function PATCH(
     if (message.includes('Rejection reason')) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
-    console.error('Credential review error:', error)
+    console.error('CRM credential review error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

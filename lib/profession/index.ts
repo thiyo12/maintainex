@@ -354,12 +354,22 @@ export async function setServiceSkillRequirement(
   client: PrismaClient,
   input: ServiceSkillRequirementInput,
 ) {
-  const skill = await client.professionSkill.findUnique({
-    where: { id: input.professionSkillId },
-    select: { id: true, isActive: true },
-  })
+  const [skill, serviceRequirement] = await Promise.all([
+    client.professionSkill.findUnique({
+      where: { id: input.professionSkillId },
+      select: { id: true, isActive: true, professionId: true },
+    }),
+    client.serviceProfessionRequirement.findUnique({
+      where: { id: input.serviceProfessionReqId },
+      select: { id: true, professionId: true },
+    }),
+  ])
   if (!skill) throw new Error('Profession skill not found')
   if (!skill.isActive) throw new Error('Cannot require inactive skill')
+  if (!serviceRequirement) throw new Error('Service profession requirement not found')
+  if (skill.professionId !== serviceRequirement.professionId) {
+    throw new Error('Skill does not belong to the required profession')
+  }
 
   return client.serviceSkillRequirement.upsert({
     where: {

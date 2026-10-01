@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
+import { getCurrencyForCountry } from '@/lib/shared/money/money'
 
 const COMPANY_ONLY = ['landscaping', 'moving-truck', 'roofing-large']
 
@@ -107,7 +108,37 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Too many services' }, { status: 400 })
     }
 
-    const jobIds = [...new Set(skills.map(s => s.jobId))]
+    for (const skill of skills) {
+      if (!skill || typeof skill.jobId !== 'string' || !skill.jobId.trim()) {
+        return NextResponse.json({ error: 'Each service requires a valid jobId' }, { status: 400 })
+      }
+      for (const [field, value] of [
+        ['hourlyRate', skill.hourlyRate],
+        ['fixedRate', skill.fixedRate],
+      ] as const) {
+        if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
+          return NextResponse.json({ error: `${field} must be a non-negative number` }, { status: 400 })
+        }
+      }
+      if (
+        skill.experienceYears !== undefined &&
+        (!Number.isInteger(Number(skill.experienceYears)) ||
+          Number(skill.experienceYears) < 0 ||
+          Number(skill.experienceYears) > 80)
+      ) {
+        return NextResponse.json({ error: 'experienceYears must be an integer from 0 to 80' }, { status: 400 })
+      }
+      if (
+        skill.experienceLevel !== undefined &&
+        (!Number.isInteger(Number(skill.experienceLevel)) ||
+          Number(skill.experienceLevel) < 1 ||
+          Number(skill.experienceLevel) > 5)
+      ) {
+        return NextResponse.json({ error: 'experienceLevel must be an integer from 1 to 5' }, { status: 400 })
+      }
+    }
+
+    const jobIds = [...new Set(skills.map(s => s.jobId.trim()))]
     if (jobIds.length === 0) {
       await prisma.taskerSkill.deleteMany({ where: { taskerId: tasker.id } })
       await prisma.taskerProfile.update({ where: { id: tasker.id }, data: { skills: '[]' } })
@@ -120,8 +151,8 @@ export async function PUT(request: NextRequest) {
     })
     const allowedIds = new Set(jobs.filter(j => !j.isCompanyOnly).map(j => j.id))
 
-    const toSave = skills.filter(s => allowedIds.has(s.jobId))
-    const saveIds = toSave.map(s => s.jobId)
+    const toSave = skills.filter(s => allowedIds.has(s.jobId.trim()))
+    const saveIds = toSave.map(s => s.jobId.trim())
 
     // Remove selections the tasker removed
     await prisma.taskerSkill.deleteMany({
@@ -132,22 +163,23 @@ export async function PUT(request: NextRequest) {
     for (const s of toSave) {
       await prisma.taskerSkill.upsert({
         where: {
-          taskerId_jobId: { taskerId: tasker.id, jobId: s.jobId },
+          taskerId_jobId: { taskerId: tasker.id, jobId: s.jobId.trim() },
         },
         update: {
-          hourlyRate: s.hourlyRate != null ? s.hourlyRate : undefined,
-          fixedRate: s.fixedRate != null ? s.fixedRate : undefined,
-          experienceYears: s.experienceYears != null ? s.experienceYears : undefined,
-          experienceLevel: s.experienceLevel != null ? s.experienceLevel : undefined,
+          hourlyRate: s.hourlyRate != null ? Number(s.hourlyRate) : undefined,
+          fixedRate: s.fixedRate != null ? Number(s.fixedRate) : undefined,
+          experienceYears: s.experienceYears != null ? Number(s.experienceYears) : undefined,
+          experienceLevel: s.experienceLevel != null ? Number(s.experienceLevel) : undefined,
+          currency: getCurrencyForCountry(user.countryCode),
         },
         create: {
           taskerId: tasker.id,
-          jobId: s.jobId,
-          hourlyRate: s.hourlyRate ?? 0,
-          fixedRate: s.fixedRate ?? 0,
-          experienceYears: s.experienceYears ?? 0,
-          experienceLevel: s.experienceLevel ?? 1,
-          currency: 'LKR',
+          jobId: s.jobId.trim(),
+          hourlyRate: Number(s.hourlyRate ?? 0),
+          fixedRate: Number(s.fixedRate ?? 0),
+          experienceYears: Number(s.experienceYears ?? 0),
+          experienceLevel: Number(s.experienceLevel ?? 1),
+          currency: getCurrencyForCountry(user.countryCode),
         },
       })
       saved++

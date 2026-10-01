@@ -20,7 +20,7 @@ import { registerForPushNotifications, addNotificationListeners, getLastNotifica
 SplashScreen.preventAutoHideAsync()
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: any }> {
-  state = { error: null }
+  state: { error: any } = { error: null }
   static getDerivedStateFromError(error: any) { return { error } }
   render() {
     if (this.state.error) {
@@ -138,8 +138,9 @@ export default function RootLayout() {
     return null
   }
 
-  if (!Text.defaultProps) Text.defaultProps = {} as any
-  Text.defaultProps.style = { fontFamily: 'Outfit_400Regular' }
+  const DefaultText = Text as any
+  if (!DefaultText.defaultProps) DefaultText.defaultProps = {}
+  DefaultText.defaultProps.style = { fontFamily: 'Outfit_400Regular' }
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#0D0D0D' }}>

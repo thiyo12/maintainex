@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiFileText, FiRefreshCw, FiSearch, FiFilter } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface AuditLog {
   id: string
@@ -35,7 +34,7 @@ const ACTION_COLORS: Record<string, string> = {
 }
 
 export default function AuditLogPage() {
-  return <AdminLayout><AuditLogContent /></AdminLayout>
+  return <><AuditLogContent /></>
 }
 
 function AuditLogContent() {

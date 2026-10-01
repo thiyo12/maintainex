@@ -28,14 +28,32 @@ export async function POST(
       where: { jobId: id, status: 'ACCEPTED' },
       select: { providerId: true, providerType: true },
     })
-    const providerUserId = accepted
-      ? accepted.providerType === 'INDIVIDUAL'
-        ? accepted.providerId
-        : (await prisma.companyProfile.findUnique({
-            where: { id: accepted.providerId },
-            select: { userId: true },
-          }))?.userId ?? null
-      : null
+
+    let providerRecipientIds: string[] = []
+    if (accepted?.providerType === 'INDIVIDUAL') {
+      providerRecipientIds = [accepted.providerId]
+    } else if (accepted?.providerType === 'COMPANY') {
+      const [company, assignments] = await Promise.all([
+        prisma.companyProfile.findUnique({
+          where: { id: accepted.providerId },
+          select: { userId: true },
+        }),
+        prisma.companyJobAssignment.findMany({
+          where: {
+            jobId: id,
+            companyId: accepted.providerId,
+            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+          },
+          select: { workerUserId: true },
+        }),
+      ])
+      providerRecipientIds = [...new Set(
+        [
+          company?.userId ?? null,
+          ...assignments.map(assignment => assignment.workerUserId),
+        ].filter((value): value is string => Boolean(value))
+      )]
+    }
 
     const result = await refundEscrow(
       {
@@ -47,20 +65,50 @@ export async function POST(
       id
     )
 
-    if (providerUserId) {
-      await notifyJobCancelled(id, providerUserId, job.title, 'customer', 'Escrow refunded')
-    }
+    const pendingExternal = result.refundPendingExternal === true
+    const cashCancelled = 'cashCancelled' in result && result.cashCancelled === true
+
+    await Promise.all(
+      providerRecipientIds.map(recipientId =>
+        notifyJobCancelled(
+          id,
+          recipientId,
+          job.title,
+          'customer',
+          pendingExternal
+            ? 'External payment refund requested'
+            : cashCancelled
+              ? 'Cash booking cancelled; MaintainEX held no cash to refund'
+              : 'Escrow refunded'
+        )
+      )
+    )
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: id } })
-    auditEscrowRefund({
-      jobId: id,
-      escrowId: escrow?.id ?? id,
-      actorId: user.id,
-      refundAmount: result.refundAmount,
-      currency: escrow?.currency ?? 'LKR',
-    })
+    if (!pendingExternal && !cashCancelled) {
+      auditEscrowRefund({
+        jobId: id,
+        escrowId: escrow?.id ?? id,
+        actorId: user.id,
+        refundAmount: result.refundAmount,
+        currency: escrow?.currency ?? 'LKR',
+      })
+    }
 
-    return NextResponse.json({ success: true, message: 'Escrow refunded', refundAmount: result.refundAmount })
+    return NextResponse.json(
+      {
+        success: true,
+        message: pendingExternal
+          ? 'Refund requested. PayHere confirmation is pending.'
+          : cashCancelled
+            ? 'Cash booking cancelled. MaintainEX held no cash, so no platform refund was created.'
+            : 'Escrow refunded',
+        refundAmount: result.refundAmount,
+        refundStatus: pendingExternal ? 'REFUND_REQUIRED' : cashCancelled ? 'CANCELLED' : 'REFUNDED',
+        fundingSource: result.fundingSource,
+      },
+      { status: pendingExternal ? 202 : 200 }
+    )
   } catch (error: any) {
     console.error('Refund escrow error:', error)
     const message = error?.message || 'Failed to process refund'
@@ -73,6 +121,15 @@ export async function POST(
     }
     if (message.includes('already refunded') || message.includes('state changed')) {
       return NextResponse.json({ error: message }, { status: 409 })
+    }
+    if (
+      message.includes('PAYHERE_REFUND_PAYMENT_NOT_FOUND') ||
+      message.includes('REFUND_FUNDING_SOURCE_UNKNOWN')
+    ) {
+      return NextResponse.json(
+        { error: 'Refund requires finance review before funds can be moved.' },
+        { status: 409 }
+      )
     }
     return NextResponse.json({ error: message }, { status: 500 })
   }

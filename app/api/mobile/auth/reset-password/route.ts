@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { revokeAllUserSessions } from '@/lib/auth/sessions'
-import { hashPassword } from '@/lib/security/password'
+import { checkPasswordStrength, hashPassword } from '@/lib/security/password'
 import { isTestOtpAllowed } from '@/lib/test-cert'
 
 export async function POST(request: NextRequest) {
@@ -13,11 +13,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email, code, and new password are required' }, { status: 400 })
     }
 
-    if (typeof newPassword !== 'string' || newPassword.length < 8) {
-      return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+    if (typeof newPassword !== 'string') {
+      return NextResponse.json({ error: 'Password is required' }, { status: 400 })
+    }
+    const strength = checkPasswordStrength(newPassword)
+    if (!strength.valid) {
+      return NextResponse.json(
+        { error: 'Password does not meet security requirements', details: strength.errors },
+        { status: 400 }
+      )
     }
 
-    const user = await prisma.user.findUnique({ where: { email } })
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
+    const user = normalizedEmail
+      ? await prisma.user.findUnique({ where: { email: normalizedEmail } })
+      : null
     if (!user) {
       return NextResponse.json({
         success: true,
@@ -58,10 +68,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid code' }, { status: 400 })
       }
 
-      await prisma.oTP.update({
-        where: { id: otpRecord.id },
+      const consumed = await prisma.oTP.updateMany({
+        where: { id: otpRecord.id, isUsed: false },
         data: { isUsed: true },
       })
+      if (consumed.count !== 1) {
+        return NextResponse.json({ error: 'This reset code was already used.' }, { status: 409 })
+      }
     } else {
       const otpRecord = await prisma.oTP.findFirst({
         where: {
@@ -73,15 +86,31 @@ export async function POST(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
       })
       if (otpRecord) {
-        await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
+        const consumed = await prisma.oTP.updateMany({
+          where: { id: otpRecord.id, isUsed: false },
+          data: { isUsed: true },
+        })
+        if (consumed.count !== 1) {
+          return NextResponse.json({ error: 'This reset code was already used.' }, { status: 409 })
+        }
       }
     }
 
     const passwordHash = await hashPassword(newPassword)
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash },
-    })
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash },
+      }),
+      prisma.oTP.updateMany({
+        where: {
+          userId: user.id,
+          purpose: 'PASSWORD_RESET',
+          isUsed: false,
+        },
+        data: { isUsed: true },
+      }),
+    ])
 
     await revokeAllUserSessions(user.id, 'password_reset')
 

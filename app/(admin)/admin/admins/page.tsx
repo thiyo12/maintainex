@@ -8,7 +8,7 @@ import {
   FiShield, FiClock, FiMail, FiUser, FiActivity
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import AdminLayout from '@/components/admin/AdminLayout'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface AdminUser {
   id: string
@@ -25,6 +25,7 @@ interface AdminUser {
   actionsToday: number
   lastActiveAt: string | null
   isOnline: boolean
+  assignedCountries: string[]
 }
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -40,6 +41,12 @@ const ROLES = ['SUPER_ADMIN', 'MANAGER', 'FINANCE', 'SUPPORT', 'USER_MANAGEMENT'
 
 export default function AdminManagement() {
   const { user } = useAdminSession()
+  const role = (user?.role || 'SUPPORT') as AdminRole
+  const permissions = ROLE_PERMISSIONS[role] || []
+  const canView = permissions.includes('admins:view')
+  const canCreate = permissions.includes('admins:create')
+  const canEdit = permissions.includes('admins:edit')
+  const canDelete = permissions.includes('admins:delete')
   const [admins, setAdmins] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -57,6 +64,10 @@ export default function AdminManagement() {
   })
 
   const fetchAdmins = useCallback(async () => {
+    if (!canView) {
+      setLoading(false)
+      return
+    }
     try {
       const res = await fetch('/api/admin/admins', { headers: { } })
       if (res.status === 401) { window.location.href = '/admin/login'; return }
@@ -67,7 +78,7 @@ export default function AdminManagement() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [canView])
 
   useEffect(() => { fetchAdmins() }, [fetchAdmins])
 
@@ -82,12 +93,14 @@ export default function AdminManagement() {
   })
 
   const openCreateModal = () => {
+    if (!canCreate) return
     setEditingAdmin(null)
     setForm({ email: '', firstName: '', lastName: '', role: 'SUPPORT', password: '', assignedCountries: '' })
     setShowModal(true)
   }
 
   const openEditModal = (admin: AdminUser) => {
+    if (!canEdit) return
     setEditingAdmin(admin)
     setForm({
       email: admin.email,
@@ -95,7 +108,7 @@ export default function AdminManagement() {
       lastName: admin.lastName,
       role: admin.role,
       password: '',
-      assignedCountries: '',
+      assignedCountries: (admin.assignedCountries || []).join(', '),
     })
     setShowModal(true)
   }
@@ -105,14 +118,23 @@ export default function AdminManagement() {
     setSaving(true)
     try {
       if (editingAdmin) {
+        if (!canEdit) throw new Error('You do not have permission to edit staff')
         const res = await fetch('/api/admin/admins', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editingAdmin.id, role: form.role }),
+          body: JSON.stringify({
+            id: editingAdmin.id,
+            role: form.role,
+            assignedCountries: form.assignedCountries,
+          }),
         })
-        if (!res.ok) throw new Error()
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || 'Failed to update admin')
+        }
         toast.success('Admin updated')
       } else {
+        if (!canCreate) throw new Error('You do not have permission to create staff')
         const res = await fetch('/api/admin/admins', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -134,32 +156,40 @@ export default function AdminManagement() {
   }
 
   const handleToggleActive = async (admin: AdminUser) => {
+    if (!canEdit) return
     try {
       const res = await fetch('/api/admin/admins', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: admin.id, isActive: !admin.isActive }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to update admin')
+      }
       toast.success(admin.isActive ? 'Admin deactivated' : 'Admin activated')
       fetchAdmins()
-    } catch {
-      toast.error('Failed to update admin')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update admin')
     }
   }
 
   const handleDelete = async (admin: AdminUser) => {
+    if (!canDelete) return
     if (!confirm(`Soft delete ${admin.firstName} ${admin.lastName}?`)) return
     try {
       const res = await fetch(`/api/admin/admins?id=${admin.id}`, {
         method: 'DELETE',
         headers: { },
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to remove admin')
+      }
       toast.success('Admin removed')
       fetchAdmins()
-    } catch {
-      toast.error('Failed to remove admin')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to remove admin')
     }
   }
 
@@ -170,9 +200,9 @@ export default function AdminManagement() {
     })
   }
 
-  if (user?.role !== 'SUPER_ADMIN') {
+  if (!canView) {
     return (
-      <AdminLayout>
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="text-center p-8 bg-[#15161E] rounded-xl border border-white/5">
             <FiShield className="w-12 h-12 text-red-500 mx-auto mb-3" />
@@ -180,12 +210,12 @@ export default function AdminManagement() {
             <p className="text-gray-400 text-sm">Super Admin privileges required.</p>
           </div>
         </div>
-      </AdminLayout>
+      </>
     )
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -200,13 +230,13 @@ export default function AdminManagement() {
               <FiActivity size={16} />
               Staff Activity
             </Link>
-            <button
+            {canCreate && (<button
               onClick={openCreateModal}
               className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-[#0B0C12] rounded-lg font-medium text-sm hover:bg-amber-400 transition-colors"
             >
               <FiPlus size={16} />
               Add New Admin
-            </button>
+            </button>)}
           </div>
         </div>
 
@@ -372,14 +402,14 @@ export default function AdminManagement() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1">
-                              <button
+                              {canEdit && (<button
                                 onClick={() => openEditModal(admin)}
                                 className="p-1.5 rounded-lg text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
                                 title="Edit role"
                               >
                                 <FiEdit2 size={14} />
-                              </button>
-                              <button
+                              </button>)}
+                              {canEdit && (<button
                                 onClick={() => handleToggleActive(admin)}
                                 className={`p-1.5 rounded-lg transition-colors ${
                                   admin.isActive
@@ -389,14 +419,14 @@ export default function AdminManagement() {
                                 title={admin.isActive ? 'Deactivate' : 'Activate'}
                               >
                                 <FiUserCheck size={14} />
-                              </button>
-                              <button
+                              </button>)}
+                              {canDelete && (<button
                                 onClick={() => handleDelete(admin)}
                                 className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                                 title="Remove"
                               >
                                 <FiTrash2 size={14} />
-                              </button>
+                              </button>)}
                             </div>
                           </td>
                         </tr>
@@ -482,6 +512,24 @@ export default function AdminManagement() {
                     ))}
                   </select>
                 </div>
+                {form.role !== 'SUPER_ADMIN' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1">
+                      Assigned countries
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={form.assignedCountries}
+                      onChange={(e) => setForm({ ...form, assignedCountries: e.target.value.toUpperCase() })}
+                      placeholder="LK, CA"
+                      className="w-full px-3 py-2 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
+                    />
+                    <p className="mt-1.5 text-[11px] text-gray-500">
+                      ISO 2-letter country codes separated by commas. Example: LK, CA
+                    </p>
+                  </div>
+                )}
                 <div className="flex justify-end gap-3 pt-2">
                   <button
                     type="button"
@@ -503,6 +551,6 @@ export default function AdminManagement() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
+import { checkIndividualProviderEligibility } from '@/lib/phase6/provider-eligibility'
+
+function legacyMarketplaceWriteDisabled() {
+  return process.env.ALLOW_LEGACY_MARKETPLACE_WRITES !== 'true'
+}
+
+function legacyMarketplaceWriteResponse() {
+  return NextResponse.json(
+    {
+      error: 'Legacy marketplace writes are disabled. Use the V2 marketplace flow.',
+      code: 'LEGACY_MARKETPLACE_WRITE_DISABLED',
+    },
+    { status: 410, headers: { 'Cache-Control': 'no-store' } },
+  )
+}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (legacyMarketplaceWriteDisabled()) return legacyMarketplaceWriteResponse()
+
   try {
     const { id } = await params
     const user = await authenticateRequest(request)
@@ -12,9 +29,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
+    if (user.role !== 'TASKER') {
+      return NextResponse.json({ error: 'Only taskers can bid on legacy jobs' }, { status: 403 })
+    }
+
     const tasker = await prisma.taskerProfile.findUnique({ where: { userId: user.id } })
     if (!tasker) {
       return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
+    }
+
+    const eligibility = await checkIndividualProviderEligibility(user.id)
+    if (!eligibility.eligible) {
+      return NextResponse.json(
+        { error: 'Tasker is not eligible to bid', reasons: eligibility.reasons },
+        { status: 403 }
+      )
     }
 
     const job = await prisma.jobPosting.findUnique({ where: { id } })

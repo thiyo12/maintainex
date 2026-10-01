@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiAlertTriangle, FiCheck, FiX, FiArrowUp, FiRefreshCw, FiMinus } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface RiskEvent {
   id: string
@@ -34,10 +35,14 @@ const RESOLUTION_COLORS: Record<string, string> = {
 }
 
 export default function RiskEventsPage() {
-  return <AdminLayout><RiskEventsContent /></AdminLayout>
+  return <><RiskEventsContent /></>
 }
 
 function RiskEventsContent() {
+  const { user: admin } = useAdminSession()
+  const role = (admin?.role || 'SUPPORT') as AdminRole
+  const permissions = ROLE_PERMISSIONS[role] || []
+  const canResolve = permissions.includes('risk_events:resolve')
   const [events, setEvents] = useState<RiskEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('pending')
@@ -63,6 +68,7 @@ function RiskEventsContent() {
   useEffect(() => { fetchEvents() }, [fetchEvents])
 
   const handleReview = async (eventId: string, resolution: string, reason?: string) => {
+    if (!canResolve) return
     setActionLoading(eventId)
     try {
       const body: Record<string, string> = { resolution }
@@ -84,7 +90,7 @@ function RiskEventsContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center space-x-3">
           <FiAlertTriangle className="w-6 h-6 text-orange-500" />
           <h1 className="text-2xl font-bold text-white">Risk Events</h1>
@@ -94,7 +100,7 @@ function RiskEventsContent() {
         </button>
       </div>
 
-      <div className="flex space-x-1 bg-[#15161E] rounded-lg p-1">
+      <div className="flex space-x-1 bg-[#15161E] rounded-lg p-1 overflow-x-auto">
         {[{ key: 'pending', label: 'Pending Review' }, { key: 'reviewed', label: 'Reviewed' }, { key: 'all', label: 'All' }].map(f => (
           <button key={f.key} onClick={() => { setStatusFilter(f.key); setPage(1) }}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${statusFilter === f.key ? 'bg-amber-500 text-[#0B0C12]' : 'text-gray-400 hover:text-white'}`}>
@@ -103,8 +109,8 @@ function RiskEventsContent() {
         ))}
       </div>
 
-      <div className="bg-[#15161E] rounded-xl overflow-hidden">
-        <table className="w-full">
+      <div className="bg-[#15161E] rounded-xl overflow-x-auto">
+        <table className="w-full min-w-[860px]">
           <thead><tr className="border-b border-gray-800">
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Type</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Severity</th>
@@ -138,7 +144,7 @@ function RiskEventsContent() {
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-400">{new Date(e.createdAt).toLocaleDateString()}</td>
                 <td className="px-4 py-3">
-                  {!e.reviewedAt && (
+                  {!e.reviewedAt && canResolve && (
                     <div className="flex items-center space-x-1">
                       <button onClick={() => handleReview(e.id, 'CONFIRMED', 'Confirmed by admin')} disabled={actionLoading === e.id}
                         className="flex items-center space-x-1 px-2 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 disabled:opacity-50 text-xs" title="Confirm">
@@ -154,6 +160,7 @@ function RiskEventsContent() {
                       </button>
                     </div>
                   )}
+                  {!e.reviewedAt && !canResolve && <span className="text-xs text-gray-600">Read only</span>}
                 </td>
               </tr>
             ))}
@@ -162,7 +169,7 @@ function RiskEventsContent() {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-gray-400">{total} total</span>
           <div className="flex items-center space-x-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}

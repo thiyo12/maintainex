@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { createPaymentIntent } from '@/lib/payment/payment-service'
+import { resolvePaymentPublicOrigin } from '@/lib/finance/payments/public-origin'
 
 export async function POST(
   request: NextRequest,
@@ -17,11 +18,13 @@ export async function POST(
     const rateLimitResponse = await requireFinancialRateLimit(request, 'payment-create')
     if (rateLimitResponse) return rateLimitResponse
 
-    const forwardedHost = request.headers.get('x-forwarded-host')
-    const forwardedProto = request.headers.get('x-forwarded-proto')
-    const host = forwardedHost || request.headers.get('host') || 'localhost'
-    const protocol = forwardedProto || (host.includes('localhost') ? 'http' : 'https')
-    const baseUrl = `${protocol}://${host}`
+    const baseUrl = resolvePaymentPublicOrigin(request.url)
+    if (!baseUrl) {
+      return NextResponse.json(
+        { error: 'Payment public URL is not configured', code: 'PAYMENT_ORIGIN_NOT_CONFIGURED' },
+        { status: 503 }
+      )
+    }
 
     const result = await createPaymentIntent({
       jobId: id,
@@ -30,21 +33,16 @@ export async function POST(
     })
 
     if (!result.success) {
-      const statusCode = result.code === 'UNAUTHORIZED' ? 403
-        : result.code === 'JOB_NOT_FOUND' ? 404
-        : result.code === 'ESCROW_NOT_INITIALIZED' ? 400
-        : result.code === 'ESCROW_NOT_FUNDABLE' ? 409
-        : result.code === 'PAYHERE_NOT_CONFIGURED' ? 501
-        : 400
-      return NextResponse.json({ error: result.error, code: result.code }, { status: statusCode })
+      const statusCode =
+        result.code === 'UNAUTHORIZED' ? 403 :
+        result.code === 'JOB_NOT_FOUND' ? 404 :
+        result.code === 'PAYHERE_NOT_CONFIGURED' ? 503 :
+        result.code === 'CUSTOMER_PAYMENT_DETAILS_REQUIRED' ? 400 :
+        409
+      return NextResponse.json(result, { status: statusCode })
     }
 
-    return NextResponse.json({
-      success: true,
-      checkoutUrl: result.checkoutUrl,
-      merchantOrderId: result.merchantOrderId,
-      paymentIntentId: result.paymentIntentId,
-    })
+    return NextResponse.json(result, { status: 201 })
   } catch (error) {
     console.error('Payment creation error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

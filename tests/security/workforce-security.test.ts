@@ -303,6 +303,55 @@ describe('Phase 10.7 — Concurrency Protection', () => {
     expect(second.error).toContain('active assignment')
   })
 
+  it('Can reassign back to a previously revoked worker without violating the unique job/worker key', async () => {
+    const first = await createAssignment({
+      companyId: companyAId,
+      jobId: jobAId,
+      workerUserId: workerAUserId,
+      assignedByUserId: ownerAUserId,
+      actorRole: 'COMPANY_OWNER',
+    })
+    expect(first.success).toBe(true)
+
+    const toWorkerB = await reassignWorker(
+      companyAId, jobAId, workerBUserId, ownerAUserId, 'COMPANY_OWNER', 'Rotate worker'
+    )
+    expect(toWorkerB.success).toBe(true)
+
+    const backToWorkerA = await reassignWorker(
+      companyAId, jobAId, workerAUserId, ownerAUserId, 'COMPANY_OWNER', 'Original worker available again'
+    )
+    expect(backToWorkerA.success).toBe(true)
+    expect(backToWorkerA.assignmentId).toBe(first.assignmentId)
+
+    const assignmentA = await prisma.companyJobAssignment.findUnique({
+      where: { id: first.assignmentId! },
+    })
+    expect(assignmentA?.status).toBe('ASSIGNED')
+    expect(assignmentA?.revokedAt).toBeNull()
+    expect(assignmentA?.revokedReason).toBeNull()
+
+    const job = await prisma.marketplaceJob.findUnique({ where: { id: jobAId } })
+    expect(job?.targetTaskerId).toBe(workerAUserId)
+  })
+
+  it('Rejects a no-op reassignment to the already active worker', async () => {
+    const first = await createAssignment({
+      companyId: companyAId,
+      jobId: jobAId,
+      workerUserId: workerAUserId,
+      assignedByUserId: ownerAUserId,
+      actorRole: 'COMPANY_OWNER',
+    })
+    expect(first.success).toBe(true)
+
+    const result = await reassignWorker(
+      companyAId, jobAId, workerAUserId, ownerAUserId, 'COMPANY_OWNER', 'No change'
+    )
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('already the active assignee')
+  })
+
   it('Reassignment revokes old and creates new', async () => {
     const first = await createAssignment({
       companyId: companyAId,

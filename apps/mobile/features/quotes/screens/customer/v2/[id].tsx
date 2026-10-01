@@ -4,7 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Timer, Star, CheckCircle, User, XCircle, MapPin, Wrench } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { ReanimatedSwipeable } from 'react-native-gesture-handler/ReanimatedSwipeable'
+import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable'
 
 import { v2Jobs, v2JobActions, v2Match } from '@/api/v2-jobs'
 import { V2Job, V2Quote } from '@/api/v2-types'
@@ -83,7 +83,7 @@ function QuoteCardItem({
               <View style={styles.ratingRow}>
                 <Star size={14} color={colors.accent} weight="fill" />
                 <Text style={styles.ratingText}>{rating ? rating.toFixed(1) : '—'}</Text>
-                {completed > 0 ? <Text style={styles.jobsText}>({completed} jobs)</Text> : null}
+                {(completed || 0) > 0 ? <Text style={styles.jobsText}>({completed} jobs)</Text> : null}
               </View>
             </View>
             <Text style={styles.price}>{q.price.toLocaleString()}</Text>

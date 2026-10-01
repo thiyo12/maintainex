@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
+import { guardCrmRequest } from '@/lib/crm/security'
 import { safeParseJsonArr } from '@/lib/db-utils'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const plans = await prisma.subscriptionPlan.findMany({
       where: { isActive: true },
@@ -11,12 +11,12 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json(
-      plans.map(p => ({
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        description: p.description,
-        features: safeParseJsonArr(p.features),
+      plans.map(plan => ({
+        id: plan.id,
+        name: plan.name,
+        price: plan.price,
+        description: plan.description,
+        features: safeParseJsonArr(plan.features),
       }))
     )
   } catch (error) {
@@ -27,14 +27,30 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
-    if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'settings:edit',
+      allowedRoles: ['SUPER_ADMIN'],
+      level: 'sensitive',
+    })
+    if (!guard.ok) return guard.response
 
-    const { name, price, description, features } = await request.json()
-    if (!name || price === undefined) {
-      return NextResponse.json({ error: 'Name and price are required' }, { status: 400 })
+    const body = await request.json().catch(() => ({}))
+    const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : ''
+    const price = typeof body.price === 'number' ? body.price : Number(body.price)
+    const description =
+      typeof body.description === 'string'
+        ? body.description.trim().slice(0, 2000)
+        : null
+    const features = Array.isArray(body.features)
+      ? body.features
+          .filter((item: unknown): item is string => typeof item === 'string')
+          .map((item: string) => item.trim().slice(0, 240))
+          .filter(Boolean)
+          .slice(0, 50)
+      : []
+
+    if (!name || !Number.isFinite(price) || price < 0 || price > 100000000) {
+      return NextResponse.json({ error: 'Valid name and non-negative price are required' }, { status: 400 })
     }
 
     const plan = await prisma.subscriptionPlan.create({
@@ -42,7 +58,7 @@ export async function POST(request: NextRequest) {
         name,
         price,
         description,
-        features: JSON.stringify(features || []),
+        features: JSON.stringify(features),
       },
     })
 

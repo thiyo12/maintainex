@@ -24,6 +24,7 @@ function mockPrisma(overrides: Record<string, any> = {}) {
       findFirst: vi.fn().mockResolvedValue(overrides.existingInspection ?? null),
       findUnique: vi.fn().mockResolvedValue(overrides.foundInspection ?? null),
       update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     ...overrides,
   } as any

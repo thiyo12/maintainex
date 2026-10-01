@@ -14,36 +14,47 @@ export interface QualityResult {
 }
 
 export async function calculateProviderQuality(providerId: string): Promise<QualityResult> {
-  const [reviews, completedJobs, totalJobs, disputedJobs, providerResponses] = await Promise.all([
-    prisma.jobReview.findMany({ where: { providerId }, select: { quality: true, communication: true, timeliness: true } }),
-    prisma.marketplaceJob.count({ where: { status: 'COMPLETED' } }),
-    prisma.marketplaceJob.findMany({ where: { customerId: providerId }, select: { id: true, status: true, preferredDate: true } }),
-    prisma.marketplaceJob.findMany({
-      where: { status: 'COMPLETED' },
-      select: { id: true },
+  const [reviews, providerResponses] = await Promise.all([
+    prisma.jobReview.findMany({
+      where: { providerId },
+      select: { quality: true, communication: true, timeliness: true },
     }),
-    prisma.providerJobResponse.findMany({ where: { providerId, completedAt: { not: null } } }),
+    prisma.providerJobResponse.findMany({
+      where: { providerId },
+      select: { jobId: true, completedAt: true, wasOnTime: true },
+    }),
   ])
 
   const avgReviewRating = reviews.length > 0
     ? reviews.reduce((s, r) => s + (r.quality + r.communication + r.timeliness) / 3, 0) / reviews.length
     : 0
 
-  const providerCompletedJobs = await prisma.marketplaceJob.count({
-    where: { id: { in: providerResponses.filter(r => r.completedAt).map(r => r.jobId) } },
-  })
-  const providerTotalJobs = providerResponses.length || 1
-  const completionRate = Math.min(100, (providerCompletedJobs / providerTotalJobs) * 100)
+  const providerCompletedJobs = providerResponses.filter(response => response.completedAt != null).length
+  const providerTotalJobs = providerResponses.length
+  const completionRate = providerTotalJobs > 0
+    ? Math.min(100, (providerCompletedJobs / providerTotalJobs) * 100)
+    : 100
 
-  const onTimeJobs = providerResponses.filter(r => r.wasOnTime).length
-  const onTimeRate = providerCompletedJobs > 0 ? (onTimeJobs / providerCompletedJobs) * 100 : 100
+  const onTimeJobs = providerResponses.filter(
+    response => response.completedAt != null && response.wasOnTime === true
+  ).length
+  const onTimeRate = providerCompletedJobs > 0
+    ? (onTimeJobs / providerCompletedJobs) * 100
+    : 100
 
-  const providerDisputedJobs = await prisma.marketplaceJob.count({
-    where: { id: { in: providerResponses.map(r => r.jobId) } },
-    // Note: disputes are V1 only, using a simplified check
-  })
+  const providerJobIds = [...new Set(providerResponses.map(response => response.jobId))]
+  const providerDisputedJobs = providerJobIds.length > 0
+    ? await prisma.jobWorkspace.count({
+        where: {
+          jobId: { in: providerJobIds },
+          progressStatus: 'DISPUTED',
+        },
+      })
+    : 0
 
-  const disputeRate = providerTotalJobs > 0 ? (providerDisputedJobs / providerTotalJobs) * 100 : 0
+  const disputeRate = providerTotalJobs > 0
+    ? (providerDisputedJobs / providerTotalJobs) * 100
+    : 0
 
   const warnings: string[] = []
   let isFlagged = false

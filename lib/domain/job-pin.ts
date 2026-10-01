@@ -46,11 +46,11 @@ export async function generateJobPin(
   if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
     throw new Error('PIN is only available for an accepted active booking')
   }
-  const protectedEscrow = await prisma.jobEscrow.findFirst({
-    where: { jobId, status: 'PROTECTED' },
-    select: { id: true },
+  const paymentReady = await prisma.jobEscrow.findFirst({
+    where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+    select: { id: true, paymentMethod: true },
   })
-  if (!protectedEscrow) throw new Error('Payment must be protected before generating a PIN')
+  if (!paymentReady) throw new Error('Payment method must be confirmed before generating a PIN')
 
   const existingActive = await prisma.jobVerificationPin.findFirst({
     where: { jobId, status: 'ACTIVE' },
@@ -105,11 +105,11 @@ export async function rotateJobPin(
   if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
     throw new Error('PIN is only available for an accepted active booking')
   }
-  const protectedEscrow = await prisma.jobEscrow.findFirst({
-    where: { jobId, status: 'PROTECTED' },
-    select: { id: true },
+  const paymentReady = await prisma.jobEscrow.findFirst({
+    where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+    select: { id: true, paymentMethod: true },
   })
-  if (!protectedEscrow) throw new Error('Payment must be protected before rotating a PIN')
+  if (!paymentReady) throw new Error('Payment method must be confirmed before rotating a PIN')
 
   const currentActive = await prisma.jobVerificationPin.findFirst({
     where: { jobId, status: 'ACTIVE' },
@@ -509,21 +509,21 @@ async function validatePurposeTx(
   if (!job) return false
 
   const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
-  const protectedEscrow = await tx.jobEscrow.findFirst({
-    where: { jobId, status: 'PROTECTED' },
-    select: { id: true },
+  const paymentReady = await tx.jobEscrow.findFirst({
+    where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+    select: { id: true, paymentMethod: true },
   })
 
   switch (purpose) {
     case 'ARRIVAL':
       return job.status === 'QUOTE_ACCEPTED' &&
         workspace?.progressStatus === 'ACCEPTED' &&
-        !!protectedEscrow
+        !!paymentReady
 
     case 'WORK_START': {
       if (job.status !== 'QUOTE_ACCEPTED') return false
       if (workspace?.progressStatus !== 'ACCEPTED') return false
-      if (!protectedEscrow) return false
+      if (!paymentReady) return false
 
       const activePin = await tx.jobVerificationPin.findFirst({
         where: { jobId, status: 'ACTIVE' },

@@ -1,22 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAccessToken } from '@/lib/auth/authentication/admin-jwt'
+import { guardCrmRequest } from '@/lib/crm/security'
 import { generateTotpSecret, generateTotpUri } from '@/lib/admin-2fa'
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, { level: 'sensitive' })
+    if (!guard.ok) return guard.response
 
-    const payload = verifyAccessToken(authHeader.slice(7))
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    const adminUser = await prisma.adminUser.findUnique({ where: { id: payload.sub } })
-    if (!adminUser || !adminUser.isActive) {
+    const adminUser = await prisma.adminUser.findUnique({ where: { id: guard.context.adminId } })
+    if (!adminUser || !adminUser.isActive || adminUser.deletedAt) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
     }
 

@@ -12,12 +12,16 @@ export async function PUT(request: NextRequest) {
     if (blocked) return blocked
 
     const { isOnline } = await request.json()
+    if (typeof isOnline !== 'boolean') {
+      return NextResponse.json({ error: 'isOnline must be a boolean' }, { status: 400 })
+    }
+
     await prisma.taskerProfile.update({
       where: { userId: user.id },
-      data: { isOnline: !!isOnline },
+      data: { isOnline },
     })
 
-    return NextResponse.json({ success: true, isOnline: !!isOnline })
+    return NextResponse.json({ success: true, isOnline })
   } catch (error) {
     console.error('Status update error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

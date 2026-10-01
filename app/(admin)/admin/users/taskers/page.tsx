@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import AdminLayout from '@/components/admin/AdminLayout'
+import Link from 'next/link'
 import {
   FiSearch, FiEye, FiUsers, FiRefreshCw, FiChevronLeft, FiChevronRight,
   FiChevronsLeft, FiChevronsRight, FiX, FiUserX, FiUserCheck, FiClock,
@@ -9,6 +9,8 @@ import {
   FiExternalLink, FiShield
 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface TaskerUser {
   id: string
@@ -53,6 +55,12 @@ type SortField = 'name' | 'email' | 'createdAt' | 'mxId' | 'rating'
 type SortDir = 'asc' | 'desc'
 
 function TaskerPageContent() {
+  const { user: admin } = useAdminSession()
+  const role = (admin?.role || 'SUPPORT') as AdminRole
+  const permissions = ROLE_PERMISSIONS[role] || []
+  const canVerify = permissions.includes('taskers:verify')
+  const canSuspend = permissions.includes('taskers:edit')
+  const canBan = permissions.includes('taskers:ban')
   const [taskers, setTaskers] = useState<TaskerUser[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -110,6 +118,21 @@ function TaskerPageContent() {
 
   const handleAction = async () => {
     if (!confirmAction) return
+    const isVerifyAction = confirmAction.action === 'verify_tasker' || confirmAction.action === 'reject_tasker'
+    const isSuspendAction = confirmAction.action === 'suspend' || confirmAction.action === 'unsuspend'
+    const isBanAction = confirmAction.action === 'ban' || confirmAction.action === 'unban'
+    if (
+      (isVerifyAction && !canVerify) ||
+      (isSuspendAction && !canSuspend) ||
+      (isBanAction && !canBan)
+    ) return
+    if (
+      ['suspend', 'ban', 'reject_tasker'].includes(confirmAction.action) &&
+      reason.trim().length < 3
+    ) {
+      toast.error('Please enter a reason of at least 3 characters')
+      return
+    }
     setActionLoading(confirmAction.userId)
     try {
       const res = await fetch('/api/admin/users', {
@@ -336,14 +359,14 @@ function TaskerPageContent() {
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setViewUser(tasker)}
+                            <Link
+                              href={`/admin/users/${tasker.id}`}
                               className="p-1.5 text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
-                              title="View Details"
+                              title="Open 360"
                             >
                               <FiEye size={16} />
-                            </button>
-                            {tasker.taskerProfile?.verificationStatus === 'PENDING' && (
+                            </Link>
+                            {canVerify && tasker.taskerProfile?.verificationStatus === 'PENDING' && (
                               <>
                                 <button
                                   onClick={() => setConfirmAction({ userId: tasker.id, action: 'verify_tasker', label: 'Verify' })}
@@ -361,7 +384,7 @@ function TaskerPageContent() {
                                 </button>
                               </>
                             )}
-                            {!tasker.isBanned && !tasker.isSuspended && (
+                            {canSuspend && !tasker.isBanned && !tasker.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: tasker.id, action: 'suspend', label: 'Suspend' })}
                                 className="p-1.5 text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 rounded-lg transition-colors"
@@ -370,7 +393,7 @@ function TaskerPageContent() {
                                 <FiClock size={16} />
                               </button>
                             )}
-                            {tasker.isSuspended && (
+                            {canSuspend && tasker.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: tasker.id, action: 'unsuspend', label: 'Unsuspend' })}
                                 className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
@@ -379,7 +402,7 @@ function TaskerPageContent() {
                                 <FiUserCheck size={16} />
                               </button>
                             )}
-                            {!tasker.isBanned && (
+                            {canBan && !tasker.isBanned && (
                               <button
                                 onClick={() => setConfirmAction({ userId: tasker.id, action: 'ban', label: 'Ban' })}
                                 className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -388,7 +411,7 @@ function TaskerPageContent() {
                                 <FiUserX size={16} />
                               </button>
                             )}
-                            {tasker.isBanned && (
+                            {canBan && tasker.isBanned && (
                               <button
                                 onClick={() => setConfirmAction({ userId: tasker.id, action: 'unban', label: 'Unban' })}
                                 className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
@@ -583,7 +606,7 @@ function TaskerPageContent() {
               </p>
               {(confirmAction.action === 'suspend' || confirmAction.action === 'ban' || confirmAction.action === 'reject_tasker') && (
                 <div className="mb-4">
-                  <label className="block text-gray-400 text-xs font-semibold mb-1.5">Reason (optional)</label>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1.5">Reason (required)</label>
                   <textarea
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
@@ -602,7 +625,7 @@ function TaskerPageContent() {
                 </button>
                 <button
                   onClick={handleAction}
-                  disabled={actionLoading === confirmAction.userId}
+                  disabled={actionLoading === confirmAction.userId || (['suspend', 'ban', 'reject_tasker'].includes(confirmAction.action) && reason.trim().length < 3)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     confirmAction.action === 'ban' || confirmAction.action === 'reject_tasker'
                       ? 'bg-red-500 hover:bg-red-600 text-white'
@@ -631,8 +654,8 @@ function TaskerPageContent() {
 
 export default function TaskersPage() {
   return (
-    <AdminLayout>
+    <>
       <TaskerPageContent />
-    </AdminLayout>
+    </>
   )
 }

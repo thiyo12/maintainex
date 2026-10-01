@@ -582,7 +582,6 @@ const si: Record<string, any> = {
     sampleSkill2: 'ආලෝකකරණය',
     sampleSkill3: 'ඉන්වර්ටර්',
     sampleSkill4: 'රැහැන් අලුත්වැඩියා',
-    reviews: 'සමාලෝචන',
     noReviewsYet: 'තවම සමාලෝචන නැත',
     sendEnquiry: 'විමසුමක් යවන්න',
     askQuote: 'උපුටා දැක්වීමක් ඉල්ලන්න',
@@ -676,6 +675,7 @@ const si: Record<string, any> = {
       confirmReject: 'මෙම පවරීම ප්රතික්ෂේප කිරීමට ඔබට අවශ්යද?',
       confirmDeactivate: 'මෙම කම්කරුවා අක්‍රීය කිරීමට ඔබට අවශ්යද? සක්‍රීය පවරීම් අවලංගු කරනු ලැබේ.',
     },
+  },
   postJob: {
     header: 'රැකියාවක් පළ කරන්න',
     step1: {
@@ -1095,7 +1095,6 @@ const si: Record<string, any> = {
     helpSupport: 'උදව් සහ සහාය',
     termsPrivacy: 'නියමයන් සහ රහස්‍යතාව',
     editProfileHeader: 'පැතිකඩ සංස්කරණය කරන්න',
-    fullName: 'සම්පූර්ණ නම',
     email: 'විද්යුත් තැපෑල',
     phone: 'දුරකථන',
     role: 'භූමිකාව',
@@ -1108,7 +1107,6 @@ const si: Record<string, any> = {
     noPaymentMethods: 'ගෙවීම් ක්‍රම නැත',
     addPaymentMethod: 'ආරම්භ කිරීමට එකක් එක් කරන්න',
     jobUpdates: 'රැකියා යාවත්කාල කිරීම්',
-    messages: 'පණිවිඩ',
     promotions: 'ප්‍රවර්ධන',
     faq: 'නිතර අසන පැණ',
     contactUs: 'අප අමතන්න',
@@ -1712,7 +1710,6 @@ const si: Record<string, any> = {
     adjustmentRequired: 'මිල සැකසුමක් ඇතුලත් කරන්න',
     noAcceptedQuote: 'මෙම රැකියාව සඳහා පිළිගත් මිල ගණන් නැත',
   },
-}
 }
 
 export default si

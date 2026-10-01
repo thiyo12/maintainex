@@ -36,6 +36,21 @@ export const lightColors = {
   error:      '#EF4444',
   dark:       '#FFFFFF',
   darkMid:    '#6B6B6B',
+  // Compatibility aliases for legacy and V3 screens.
+  accent: '#F5A623',
+  accentSoft: 'rgba(245,166,35,0.14)',
+  accentDim: '#D48900',
+  text: '#FFFFFF',
+  textPrimary: '#FFFFFF',
+  textSecond: '#B3B3B3',
+  textSecondary: '#B3B3B3',
+  surfaceHigh: '#2E2E2E',
+  successSoft: 'rgba(34,197,94,0.15)',
+  errorSoft: 'rgba(239,68,68,0.15)',
+  inkLight: '#B3B3B3',
+  primaryLight: '#FDE8B3',
+  taskerAccent: '#22C55E',
+
 }
 
 export const darkColors = {
@@ -76,6 +91,21 @@ export const darkColors = {
   error:      '#EF4444',
   dark:       '#FFFFFF',
   darkMid:    '#6B6B6B',
+  // Compatibility aliases for legacy and V3 screens.
+  accent: '#F5A623',
+  accentSoft: 'rgba(245,166,35,0.14)',
+  accentDim: '#D48900',
+  text: '#FFFFFF',
+  textPrimary: '#FFFFFF',
+  textSecond: '#B3B3B3',
+  textSecondary: '#B3B3B3',
+  surfaceHigh: '#2E2E2E',
+  successSoft: 'rgba(34,197,94,0.15)',
+  errorSoft: 'rgba(239,68,68,0.15)',
+  inkLight: '#B3B3B3',
+  primaryLight: 'rgba(245,166,35,0.14)',
+  taskerAccent: '#22C55E',
+
 }
 
 export const colors = darkColors

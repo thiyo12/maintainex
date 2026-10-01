@@ -15,11 +15,31 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Lift expired suspensions
+    const now = new Date()
+
+    // Advance unpaid weekly commission debt into OVERDUE. Suspension remains a
+    // deliberate finance/admin action, but overdue state must not depend on a
+    // CRM page being opened.
+    const overdueSettlements = await prisma.weeklySettlement.updateMany({
+      where: {
+        commissionPaid: false,
+        status: 'PENDING',
+        dueAt: { lt: now },
+      },
+      data: { status: 'OVERDUE' },
+    })
+
+    // Lift ordinary timed suspensions only. Commission-debt suspensions must
+    // remain in force until finance explicitly records payment or deliberately
+    // reactivates the provider while keeping the debt.
     const suspendedUsers = await prisma.user.findMany({
       where: {
         isSuspended: true,
-        suspendedUntil: { lte: new Date() },
+        suspendedUntil: { lte: now },
+        OR: [
+          { suspensionReason: null },
+          { suspensionReason: { not: 'Weekly commission not paid' } },
+        ],
       },
     })
 
@@ -81,6 +101,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      weeklySettlementsMarkedOverdue: overdueSettlements.count,
       suspensionsLifted: suspendedUsers.length,
       escrowTimeouts,
       payoutsProcessing: 0,

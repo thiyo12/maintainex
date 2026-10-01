@@ -44,21 +44,25 @@ export default function ConfirmCompleteScreen() {
   const serviceFee = Number(escrow?.serviceFee || 0)
   const totalAmount = Number(escrow?.totalAmount || providerAmount + serviceFee)
   const completionReady = job.workspace?.progressStatus === 'COMPLETION_REQUESTED'
+  const isCash = escrow?.status === 'CASH_CONFIRMED' || escrow?.paymentMethod === 'CASH'
 
-  const handleRelease = async () => {
-    if (!completionReady) {
-      Alert.alert('Not ready', 'The provider has not requested completion for this job.')
-      return
-    }
+  const submitCompletion = async (cashPaidConfirmed: boolean) => {
     setReleasing(true)
     try {
-      const result = await v2JobActions.complete(bookingId, 'APPROVE_COMPLETION')
+      const result = await v2JobActions.complete(
+        bookingId,
+        'APPROVE_COMPLETION',
+        undefined,
+        cashPaidConfirmed,
+      )
       const released = Number(result.netAmount ?? 0)
       Alert.alert(
         'Job completed',
-        released > 0
-          ? `${currency} ${released.toLocaleString()} was released to ${taskerName || 'the provider'}.`
-          : 'The job was completed and the protected payment was released.',
+        result.paymentMethod === 'CASH' || isCash
+          ? 'Completion is recorded. Your cash payment confirmation was recorded; MaintainEX did not hold or release this cash.'
+          : released > 0
+            ? `${currency} ${released.toLocaleString()} was released to ${taskerName || 'the provider'}.`
+            : 'The job was completed and the protected payment was released.',
         [
           {
             text: 'Leave a review',
@@ -71,6 +75,30 @@ export default function ConfirmCompleteScreen() {
     } finally {
       setReleasing(false)
     }
+  }
+
+  const handleRelease = () => {
+    if (!completionReady) {
+      Alert.alert('Not ready', 'The provider has not requested completion for this job.')
+      return
+    }
+
+    if (isCash) {
+      Alert.alert(
+        'Confirm Cash Paid',
+        `Confirm only after you paid ${currency} ${totalAmount.toLocaleString()} directly to ${taskerName || 'the provider'}.`,
+        [
+          { text: 'Not yet', style: 'cancel' },
+          {
+            text: 'Cash Paid · Complete Job',
+            onPress: () => { void submitCompletion(true) },
+          },
+        ],
+      )
+      return
+    }
+
+    void submitCompletion(false)
   }
 
   const handleDispute = () => {
@@ -110,7 +138,7 @@ export default function ConfirmCompleteScreen() {
             <Text style={styles.rowV}>{currency} {serviceFee.toLocaleString()}</Text>
           </View>
           <View style={styles.totalRow}>
-            <Text style={styles.totalL}>Protected total</Text>
+            <Text style={styles.totalL}>{isCash ? 'Cash amount due' : 'Protected total'}</Text>
             <Text style={styles.totalV}>{currency} {totalAmount.toLocaleString()}</Text>
           </View>
         </View>
@@ -118,7 +146,9 @@ export default function ConfirmCompleteScreen() {
         <View style={styles.infoCard}>
           <Ionicons name="shield-checkmark-outline" size={22} color={colors.amberDark} />
           <Text style={styles.infoText}>
-            Confirm only after you have checked the completed work. MaintainEX will calculate the provider payout and commission on the server.
+            {isCash
+              ? 'Confirm only after you have checked the completed work. Cash is paid directly to the provider; MaintainEX will record the provider platform amount separately.'
+              : 'Confirm only after you have checked the completed work. MaintainEX will calculate the provider payout and commission on the server.'}
           </Text>
         </View>
 
@@ -132,7 +162,9 @@ export default function ConfirmCompleteScreen() {
             ? <ActivityIndicator color="#FFFFFF" />
             : <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />}
           <Text style={styles.btnTxt}>
-            {releasing ? 'Releasing...' : 'Confirm Work & Release Payment'}
+            {releasing
+              ? (isCash ? 'Completing...' : 'Releasing...')
+              : (isCash ? 'Confirm Work + Cash Paid' : 'Confirm Work & Release Payment')}
           </Text>
         </TouchableOpacity>
 

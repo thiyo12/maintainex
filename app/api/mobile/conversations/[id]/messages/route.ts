@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { scanChatMessage } from '@/lib/fraud-detection'
-import { sendExpoPush } from '@/lib/push'
+import { createNotification } from '@/lib/notifications'
 
 const DAILY_MESSAGE_LIMIT = 50
 
@@ -17,8 +17,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (blocked) return blocked
 
     const { text } = await request.json()
-    if (!text?.trim()) {
+    if (typeof text !== 'string' || !text.trim()) {
       return NextResponse.json({ error: 'Message text required' }, { status: 400 })
+    }
+    const rawMessage = text.trim()
+    if (rawMessage.length > 4000) {
+      return NextResponse.json({ error: 'Message is too long' }, { status: 400 })
     }
 
     const conversation = await prisma.conversation.findFirst({
@@ -28,13 +32,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
       include: {
         participants: {
-          include: { user: { select: { id: true, name: true, pushToken: true, email: true } } },
+          include: { user: { select: { id: true, name: true, pushToken: true } } },
         },
       },
     })
 
     if (!conversation) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
+
+    if (conversation.jobId) {
+      const job = await prisma.marketplaceJob.findUnique({
+        where: { id: conversation.jobId },
+        select: { status: true },
+      })
+      if (job && ['COMPLETED', 'CANCELLED'].includes(job.status)) {
+        return NextResponse.json(
+          { error: 'This conversation is closed because the job is no longer active' },
+          { status: 409 }
+        )
+      }
     }
 
     // Rate limit: max 50 messages per conversation per day per user
@@ -53,8 +70,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Fraud scan: always runs, never blocks — sanitizes + flags
-    const scan = await scanChatMessage(text.trim(), user.id, id)
-    const messageText = scan.sanitizedText || text.trim()
+    const scan = await scanChatMessage(rawMessage, user.id, id)
+    const messageText = scan.sanitizedText || rawMessage
 
     const message = await prisma.message.create({
       data: {
@@ -69,16 +86,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       data: { updatedAt: new Date() },
     })
 
-    // Push notification to the other participant
-    const recipient = conversation.participants.find(p => p.userId !== user.id)
-    if (recipient?.user.pushToken) {
-      void sendExpoPush(
-        recipient.user.pushToken,
-        user.name || 'New message',
-        messageText.substring(0, 120),
-        { screen: '/(chat)/[id]', id }
+    // Persist an in-app notification and let the notification service
+    // deliver Expo push for offline/background/foreground recipients.
+    const recipients = conversation.participants.filter(p => p.userId !== user.id)
+    await Promise.all(
+      recipients.map(recipient =>
+        createNotification({
+          userId: recipient.userId,
+          title: user.name || 'New message',
+          body: messageText.substring(0, 120),
+          referenceType: 'CHAT',
+          referenceId: id,
+        })
       )
-    }
+    )
 
     return NextResponse.json({
       id: message.id,

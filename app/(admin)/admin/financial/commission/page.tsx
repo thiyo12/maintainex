@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiDollarSign, FiClock, FiAlertTriangle, FiCheckCircle, FiFilter, FiRefreshCw } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface Settlement {
   id: string
@@ -18,6 +19,8 @@ interface Settlement {
   paidAt?: string
   dueAt: string
   status: string
+  currency: string
+  countryCode: string
   suspendedAt?: string
   notes?: string
   provider?: {
@@ -27,28 +30,25 @@ interface Settlement {
   }
 }
 
-interface Summary {
+interface CurrencySummary {
+  currency: string
   totalCommissionOwed: number
   totalCommissionPaid: number
   pendingThisWeek: number
   overdueCount: number
+  suspendedCount: number
   pendingCount: number
   paidCount: number
 }
 
 export default function CommissionPage() {
+  const { user: admin } = useAdminSession()
+  const canManageCommission = !!admin && (ROLE_PERMISSIONS[admin.role as AdminRole] || []).includes('commission:manage')
   const [settlements, setSettlements] = useState<Settlement[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('ALL')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [summary, setSummary] = useState<Summary>({
-    totalCommissionOwed: 0,
-    totalCommissionPaid: 0,
-    pendingThisWeek: 0,
-    overdueCount: 0,
-    pendingCount: 0,
-    paidCount: 0
-  })
+  const [summaryByCurrency, setSummaryByCurrency] = useState<CurrencySummary[]>([])
 
   useEffect(() => {
     fetchSettlements()
@@ -70,14 +70,13 @@ export default function CommissionPage() {
         return
       }
       setSettlements(data.settlements || [])
-      setSummary(data.summary || {
-        totalCommissionOwed: 0,
-        totalCommissionPaid: 0,
-        pendingThisWeek: 0,
-        overdueCount: 0,
-        pendingCount: 0,
-        paidCount: 0
-      })
+      setSummaryByCurrency(
+        Array.isArray(data.summaryByCurrency)
+          ? data.summaryByCurrency
+          : data.summary
+            ? [data.summary]
+            : []
+      )
     } catch (error) {
       console.error('Failed to fetch settlements:', error)
       toast.error('Failed to load commission data')
@@ -87,6 +86,10 @@ export default function CommissionPage() {
   }
 
   const handleAction = async (settlementId: string, action: string) => {
+    if (!canManageCommission) {
+      toast.error('You do not have permission to manage commission settlements')
+      return
+    }
     setActionLoading(settlementId)
     try {
       const res = await fetch('/api/admin/financial/commission', {
@@ -109,11 +112,12 @@ export default function CommissionPage() {
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-LK', {
+  const formatCurrency = (amount: number, currency: string) => {
+    return new Intl.NumberFormat(currency === 'CAD' ? 'en-CA' : 'en-LK', {
       style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 0
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }).format(amount)
   }
 
@@ -137,43 +141,47 @@ export default function CommissionPage() {
     }
   }
 
-  const stats = [
+  const stats = summaryByCurrency.flatMap((summary) => [
     {
-      label: 'Total Commission Owed',
-      value: formatCurrency(summary.totalCommissionOwed),
+      key: `${summary.currency}-owed`,
+      label: `Commission Owed · ${summary.currency}`,
+      value: formatCurrency(summary.totalCommissionOwed, summary.currency),
       icon: FiDollarSign,
       color: 'bg-amber-500/20',
       iconColor: 'text-amber-400',
-      sub: `${summary.pendingCount} pending settlements`
+      sub: `${summary.pendingCount} pending · ${summary.overdueCount} overdue · ${summary.suspendedCount} suspended`,
     },
     {
-      label: 'Total Commission Paid',
-      value: formatCurrency(summary.totalCommissionPaid),
+      key: `${summary.currency}-paid`,
+      label: `Commission Paid · ${summary.currency}`,
+      value: formatCurrency(summary.totalCommissionPaid, summary.currency),
       icon: FiCheckCircle,
       color: 'bg-emerald-500/20',
       iconColor: 'text-emerald-400',
-      sub: `${summary.paidCount} settled`
+      sub: `${summary.paidCount} settled`,
     },
     {
-      label: 'Pending This Week',
-      value: formatCurrency(summary.pendingThisWeek),
+      key: `${summary.currency}-pending`,
+      label: `Pending This Week · ${summary.currency}`,
+      value: formatCurrency(summary.pendingThisWeek, summary.currency),
       icon: FiClock,
       color: 'bg-blue-500/20',
       iconColor: 'text-blue-400',
-      sub: 'Due this cycle'
+      sub: 'Due this cycle',
     },
     {
-      label: 'Overdue',
+      key: `${summary.currency}-overdue`,
+      label: `Overdue · ${summary.currency}`,
       value: summary.overdueCount.toString(),
       icon: FiAlertTriangle,
       color: 'bg-red-500/20',
       iconColor: 'text-red-400',
-      sub: 'Requires action'
-    }
-  ]
+      sub: 'Requires finance action',
+    },
+  ])
 
   return (
-    <AdminLayout>
+    <>
       <div className="p-4 md:p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -192,7 +200,7 @@ export default function CommissionPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => (
-            <div key={stat.label} className="bg-[#15161E] border border-white/5 rounded-xl p-5">
+            <div key={stat.key} className="bg-[#15161E] border border-white/5 rounded-xl p-5">
               <div className="flex items-center justify-between mb-3">
                 <div className={`w-10 h-10 ${stat.color} rounded-lg flex items-center justify-center`}>
                   <stat.icon className={`w-5 h-5 ${stat.iconColor}`} />
@@ -222,8 +230,8 @@ export default function CommissionPage() {
               </button>
             ))}
             <div className="ml-auto flex items-center gap-2 px-3">
-              <span className="text-xs text-gray-500">Rate:</span>
-              <span className="text-sm font-semibold text-amber-400">10%</span>
+              <span className="text-xs text-gray-500">Rates:</span>
+              <span className="text-sm font-semibold text-amber-400">Provider / market configured</span>
             </div>
           </div>
         </div>
@@ -251,7 +259,7 @@ export default function CommissionPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Commission</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Due Date</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">{canManageCommission ? 'Actions' : 'Access'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -274,9 +282,9 @@ export default function CommissionPage() {
                         <div className="text-sm text-gray-300">{formatDate(s.weekStart)}</div>
                         <div className="text-xs text-gray-500">to {formatDate(s.weekEnd)}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-300">{formatCurrency(s.totalEarnings)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-300">{formatCurrency(s.totalEarnings, s.currency)}</td>
                       <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-white">{formatCurrency(s.commissionOwed)}</div>
+                        <div className="text-sm font-medium text-white">{formatCurrency(s.commissionOwed, s.currency)}</div>
                         <div className="text-xs text-gray-500">{s.commissionRate}%</div>
                       </td>
                       <td className="px-4 py-3">
@@ -291,18 +299,19 @@ export default function CommissionPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
-                          {s.status === 'PENDING' && (
+                          {!canManageCommission && <span className="text-xs text-gray-500">Read only</span>}
+                          {canManageCommission && s.status === 'PENDING' && (
                             <>
                               <button
                                 onClick={() => handleAction(s.id, 'MARK_PAID')}
-                                disabled={actionLoading === s.id}
+                                disabled={!canManageCommission || actionLoading === s.id}
                                 className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50 font-medium"
                               >
                                 {actionLoading === s.id ? '...' : 'Mark Paid'}
                               </button>
                               <button
                                 onClick={() => handleAction(s.id, 'SEND_REMINDER')}
-                                disabled={actionLoading === s.id}
+                                disabled={!canManageCommission || actionLoading === s.id}
                                 className="px-3 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-lg hover:bg-blue-500/30 transition-colors disabled:opacity-50 font-medium"
                               >
                                 {actionLoading === s.id ? '...' : 'Remind'}
@@ -310,7 +319,7 @@ export default function CommissionPage() {
                               {isOverdue(s.dueAt) && (
                                 <button
                                   onClick={() => handleAction(s.id, 'SUSPEND')}
-                                  disabled={actionLoading === s.id}
+                                  disabled={!canManageCommission || actionLoading === s.id}
                                   className="px-3 py-1 bg-red-500/20 text-red-400 text-xs rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 font-medium"
                                 >
                                   {actionLoading === s.id ? '...' : 'Suspend'}
@@ -318,32 +327,43 @@ export default function CommissionPage() {
                               )}
                             </>
                           )}
-                          {s.status === 'OVERDUE' && (
+                          {canManageCommission && s.status === 'OVERDUE' && (
                             <>
                               <button
                                 onClick={() => handleAction(s.id, 'MARK_PAID')}
-                                disabled={actionLoading === s.id}
+                                disabled={!canManageCommission || actionLoading === s.id}
                                 className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50 font-medium"
                               >
                                 {actionLoading === s.id ? '...' : 'Mark Paid'}
                               </button>
                               <button
                                 onClick={() => handleAction(s.id, 'SUSPEND')}
-                                disabled={actionLoading === s.id}
+                                disabled={!canManageCommission || actionLoading === s.id}
                                 className="px-3 py-1 bg-red-500/20 text-red-400 text-xs rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 font-medium"
                               >
                                 {actionLoading === s.id ? '...' : 'Suspend'}
                               </button>
                             </>
                           )}
-                          {s.status === 'SUSPENDED' && (
-                            <button
-                              onClick={() => handleAction(s.id, 'UNSUSPEND')}
-                              disabled={actionLoading === s.id}
-                              className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50 font-medium"
-                            >
-                              {actionLoading === s.id ? '...' : 'Unsuspend'}
-                            </button>
+                          {canManageCommission && s.status === 'SUSPENDED' && (
+                            <>
+                              <button
+                                onClick={() => handleAction(s.id, 'MARK_PAID')}
+                                disabled={!canManageCommission || actionLoading === s.id}
+                                className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50 font-medium"
+                                title="Record commission payment and reactivate the provider if this settlement caused the suspension"
+                              >
+                                {actionLoading === s.id ? '...' : 'Mark Paid'}
+                              </button>
+                              <button
+                                onClick={() => handleAction(s.id, 'UNSUSPEND')}
+                                disabled={!canManageCommission || actionLoading === s.id}
+                                className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50 font-medium"
+                                title="Reactivate the provider without clearing the unpaid commission debt"
+                              >
+                                {actionLoading === s.id ? '...' : 'Reactivate · debt stays'}
+                              </button>
+                            </>
                           )}
                           {s.status === 'PAID' && (
                             <span className="text-xs text-gray-500">
@@ -360,6 +380,6 @@ export default function CommissionPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

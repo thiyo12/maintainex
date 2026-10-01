@@ -1,3 +1,16 @@
+export interface SeasonalOffer {
+  id: string
+  title: string
+  description?: string | null
+  season: string
+  country?: string | null
+  discountPercent?: number | null
+  badge?: string | null
+  image?: string | null
+  serviceIds?: string[]
+  [key: string]: unknown
+}
+
 export function getCurrentSeason(): string {
   const month = new Date().getMonth()
   if (month >= 2 && month <= 4) return 'spring'

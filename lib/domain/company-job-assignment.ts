@@ -31,6 +31,57 @@ export interface AssignmentResult {
   reasons?: string[]
 }
 
+async function lockAndAssertWorkerScheduleAvailable(
+  tx: PrismaClientOrTx,
+  workerUserId: string,
+  jobId: string,
+  preferredDate: Date | null,
+  preferredTimeSlot: string | null,
+): Promise<void> {
+  const lockedWorker = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT id
+    FROM "User"
+    WHERE id = ${workerUserId}
+    FOR UPDATE
+  `
+  if (lockedWorker.length !== 1) {
+    throw new Error('Worker account not found')
+  }
+  if (!preferredDate) return
+
+  const dayStart = new Date(preferredDate)
+  dayStart.setHours(0, 0, 0, 0)
+  const dayEnd = new Date(dayStart)
+  dayEnd.setDate(dayEnd.getDate() + 1)
+
+  const slotFilter =
+    preferredTimeSlot && preferredTimeSlot !== 'anytime'
+      ? {
+          OR: [
+            { preferredTimeSlot },
+            { preferredTimeSlot: 'anytime' },
+            { preferredTimeSlot: null },
+          ],
+        }
+      : {}
+
+  const conflict = await tx.companyJobAssignment.findFirst({
+    where: {
+      workerUserId,
+      jobId: { not: jobId },
+      status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+      job: {
+        preferredDate: { gte: dayStart, lt: dayEnd },
+        ...slotFilter,
+      },
+    },
+    select: { id: true, jobId: true },
+  })
+  if (conflict) {
+    throw new Error('Worker scheduling conflict changed concurrently')
+  }
+}
+
 export async function createAssignment(params: AssignmentCreateParams): Promise<AssignmentResult> {
   const { companyId, jobId, workerUserId, assignedByUserId, actorRole } = params
 
@@ -61,6 +112,12 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
   })
   if (!acceptedQuote) return { success: false, error: 'No accepted quote from this company on this job' }
 
+  const companyIdentity = await prisma.companyProfile.findUnique({
+    where: { id: companyId },
+    select: { userId: true },
+  })
+  if (!companyIdentity) return { success: false, error: 'Company not found' }
+
   const existingAssignment = await prisma.companyJobAssignment.findFirst({
     where: { jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
   })
@@ -71,13 +128,34 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
   const existingWorkerAssignment = await prisma.companyJobAssignment.findUnique({
     where: { jobId_workerUserId: { jobId, workerUserId } },
   })
-  if (existingWorkerAssignment) {
+  if (
+    existingWorkerAssignment &&
+    !['REJECTED', 'REVOKED'].includes(existingWorkerAssignment.status)
+  ) {
     return { success: false, error: 'This worker is already assigned to this job' }
   }
 
-  const assignment = await prisma.$transaction(async (tx) => {
-    const claimed = await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: 'QUOTE_ACCEPTED', targetTaskerId: null },
+  let assignment: { id: string }
+  try {
+    assignment = await prisma.$transaction(async (tx) => {
+      await lockAndAssertWorkerScheduleAvailable(
+        tx,
+        workerUserId,
+        jobId,
+        job.preferredDate,
+        job.preferredTimeSlot,
+      )
+
+      const claimed = await tx.marketplaceJob.updateMany({
+      where: {
+        id: jobId,
+        status: 'QUOTE_ACCEPTED',
+        OR: [
+          { targetTaskerId: null },
+          { targetTaskerId: companyId },
+          { targetTaskerId: companyIdentity.userId },
+        ],
+      },
       data: { targetTaskerId: workerUserId },
     })
     if (claimed.count !== 1) throw new Error('Job state changed concurrently')
@@ -88,15 +166,31 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
       update: { progressStatus: 'ACCEPTED', updatedAt: new Date() },
     })
 
-    const record = await tx.companyJobAssignment.create({
-      data: {
-        companyId,
-        jobId,
-        workerUserId,
-        assignedBy: assignedByUserId,
-        status: 'ASSIGNED',
-      },
-    })
+    const record = existingWorkerAssignment
+      ? await tx.companyJobAssignment.update({
+          where: { id: existingWorkerAssignment.id },
+          data: {
+            assignedBy: assignedByUserId,
+            status: 'ASSIGNED',
+            assignedAt: new Date(),
+            acceptedAt: null,
+            startedAt: null,
+            completedAt: null,
+            rejectedAt: null,
+            revokedAt: null,
+            revokedReason: null,
+            rejectReason: null,
+          },
+        })
+      : await tx.companyJobAssignment.create({
+          data: {
+            companyId,
+            jobId,
+            workerUserId,
+            assignedBy: assignedByUserId,
+            status: 'ASSIGNED',
+          },
+        })
 
     await writeCompanyAuditLog({
       companyId,
@@ -109,8 +203,21 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
       metadata: { workerUserId, jobId, assignmentId: record.id },
     }, tx)
 
-    return record
-  })
+      return record
+    })
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (
+        error.message.includes('concurrently') ||
+        error.message.includes('scheduling conflict') ||
+        error.message === 'Worker account not found'
+      )
+    ) {
+      return { success: false, error: error.message }
+    }
+    throw error
+  }
 
   const company = await prisma.companyProfile.findUnique({
     where: { id: companyId },
@@ -170,17 +277,61 @@ export async function reassignWorker(
   const currentAssignment = await prisma.companyJobAssignment.findFirst({
     where: { jobId, companyId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
   })
+  if (!currentAssignment) {
+    return { success: false, error: 'No active worker assignment exists to reassign' }
+  }
+  if (currentAssignment.status === 'IN_PROGRESS') {
+    return { success: false, error: 'Cannot reassign after the worker has started work' }
+  }
+  if (currentAssignment.workerUserId === newWorkerUserId) {
+    return { success: false, error: 'This worker is already the active assignee for this job' }
+  }
 
-  const assignment = await prisma.$transaction(async (tx) => {
-    if (currentAssignment) {
-      await tx.companyJobAssignment.update({
-        where: { id: currentAssignment.id },
+  const reusableAssignment = await prisma.companyJobAssignment.findUnique({
+    where: { jobId_workerUserId: { jobId, workerUserId: newWorkerUserId } },
+  })
+  if (
+    reusableAssignment &&
+    !['REJECTED', 'REVOKED'].includes(reusableAssignment.status)
+  ) {
+    return { success: false, error: 'This worker already has a non-terminal assignment for this job' }
+  }
+
+  let assignment: { id: string }
+  try {
+    assignment = await prisma.$transaction(async (tx) => {
+      await lockAndAssertWorkerScheduleAvailable(
+        tx,
+        newWorkerUserId,
+        jobId,
+        job.preferredDate,
+        job.preferredTimeSlot,
+      )
+
+      const claimed = await tx.marketplaceJob.updateMany({
+        where: {
+          id: jobId,
+          status: 'QUOTE_ACCEPTED',
+          targetTaskerId: currentAssignment.workerUserId,
+        },
+        data: { targetTaskerId: newWorkerUserId },
+      })
+      if (claimed.count !== 1) throw new Error('Job target changed before reassignment')
+
+      const revoked = await tx.companyJobAssignment.updateMany({
+        where: {
+          id: currentAssignment.id,
+          companyId,
+          workerUserId: currentAssignment.workerUserId,
+          status: { in: ['ASSIGNED', 'ACCEPTED'] },
+        },
         data: {
           status: 'REVOKED',
           revokedAt: new Date(),
           revokedReason: reason || 'Reassigned to another worker',
         },
       })
+      if (revoked.count !== 1) throw new Error('Assignment changed before reassignment')
 
       await writeCompanyAuditLog({
         companyId,
@@ -192,37 +343,59 @@ export async function reassignWorker(
         description: `Revoked assignment (worker ${currentAssignment.workerUserId}) from job ${jobId}`,
         metadata: { previousWorkerUserId: currentAssignment.workerUserId, reason },
       }, tx)
-    }
 
-    const claimed = await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: 'QUOTE_ACCEPTED' },
-      data: { targetTaskerId: newWorkerUserId },
-    })
-    if (claimed.count !== 1) throw new Error('Job state changed before reassignment')
+      const newRecord = reusableAssignment
+      ? await tx.companyJobAssignment.update({
+          where: { id: reusableAssignment.id },
+          data: {
+            assignedBy: actorUserId,
+            status: 'ASSIGNED',
+            assignedAt: new Date(),
+            acceptedAt: null,
+            startedAt: null,
+            completedAt: null,
+            rejectedAt: null,
+            revokedAt: null,
+            revokedReason: null,
+            rejectReason: null,
+          },
+        })
+      : await tx.companyJobAssignment.create({
+          data: {
+            companyId,
+            jobId,
+            workerUserId: newWorkerUserId,
+            assignedBy: actorUserId,
+            status: 'ASSIGNED',
+          },
+        })
 
-    const newRecord = await tx.companyJobAssignment.create({
-      data: {
+      await writeCompanyAuditLog({
         companyId,
-        jobId,
-        workerUserId: newWorkerUserId,
-        assignedBy: actorUserId,
-        status: 'ASSIGNED',
-      },
+        actorId: actorUserId,
+        actorRole,
+        action: 'WORKER_ASSIGN',
+        targetType: 'CompanyJobAssignment',
+        targetId: newRecord.id,
+        description: `Reassigned worker to job ${jobId}`,
+        metadata: { workerUserId: newWorkerUserId, jobId, assignmentId: newRecord.id },
+      }, tx)
+
+      return newRecord
     })
-
-    await writeCompanyAuditLog({
-      companyId,
-      actorId: actorUserId,
-      actorRole,
-      action: 'WORKER_ASSIGN',
-      targetType: 'CompanyJobAssignment',
-      targetId: newRecord.id,
-      description: `Reassigned worker to job ${jobId}`,
-      metadata: { workerUserId: newWorkerUserId, jobId, assignmentId: newRecord.id },
-    }, tx)
-
-    return newRecord
-  })
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (
+        error.message.includes('reassignment') ||
+        error.message.includes('scheduling conflict') ||
+        error.message === 'Worker account not found'
+      )
+    ) {
+      return { success: false, error: error.message }
+    }
+    throw error
+  }
 
   const company = await prisma.companyProfile.findUnique({
     where: { id: companyId },
@@ -280,10 +453,17 @@ export async function workerRejectAssignment(
     })
     if (claimed.count !== 1) throw new Error('Assignment changed before it could be rejected')
 
-    await tx.marketplaceJob.updateMany({
-      where: { id: assignment.jobId, targetTaskerId: workerUserId },
-      data: { targetTaskerId: null },
+    const targetRestored = await tx.marketplaceJob.updateMany({
+      where: {
+        id: assignment.jobId,
+        status: 'QUOTE_ACCEPTED',
+        targetTaskerId: workerUserId,
+      },
+      data: { targetTaskerId: assignment.companyId },
     })
+    if (targetRestored.count !== 1) {
+      throw new Error('Job target changed before assignment rejection')
+    }
 
     await writeCompanyAuditLog({
       companyId: assignment.companyId,
@@ -336,10 +516,17 @@ export async function revokeAssignment(
       data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: reason || undefined },
     })
 
-    await tx.marketplaceJob.update({
-      where: { id: assignment.jobId },
-      data: { targetTaskerId: null },
+    const targetRestored = await tx.marketplaceJob.updateMany({
+      where: {
+        id: assignment.jobId,
+        status: 'QUOTE_ACCEPTED',
+        targetTaskerId: assignment.workerUserId,
+      },
+      data: { targetTaskerId: companyId },
     })
+    if (targetRestored.count !== 1) {
+      throw new Error('Job target changed before assignment revocation')
+    }
 
     await writeCompanyAuditLog({
       companyId,

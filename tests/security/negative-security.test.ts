@@ -92,9 +92,12 @@ describe('Part W — Negative Security Tests', () => {
       expect(rbac).toContain('assignedCountries.length === 0')
     })
 
-    it('admin users route checks for __NONE__ and returns empty', () => {
+    it('admin users route uses the fail-closed CRM country filter', () => {
       const route = readFile('app/api/admin/users/route.ts')
-      expect(route).toContain('__NONE__')
+      const security = readFile('lib/crm/security.ts')
+      expect(route).toContain('requireCountryScope: true')
+      expect(route).toContain('getCrmCountryFilter(security)')
+      expect(security).toContain("return { id: '__NONE__' }")
     })
   })
 
@@ -106,22 +109,22 @@ describe('Part W — Negative Security Tests', () => {
 
     it('admin disputes PATCH checks dispute country', () => {
       const route = readFile('app/api/admin/disputes/route.ts')
-      expect(route).toContain('Forbidden: dispute belongs to a different country')
+      expect(route).toContain('assertCrmCountryAllowed(security, marketplaceDispute.countryCode')
     })
 
     it('admin KYC PATCH checks document country', () => {
       const route = readFile('app/api/admin/kyc/route.ts')
-      expect(route).toContain('Forbidden: document belongs to a different country')
+      expect(route).toContain('assertCrmCountryAllowed(security, document.countryCode)')
     })
 
     it('admin commission PUT checks settlement country', () => {
-      const route = readFile('app/api/admin/commission/route.ts')
-      expect(route).toContain('Forbidden: settlement belongs to a different country')
+      const route = readFile('app/api/admin/financial/commission/route.ts')
+      expect(route).toContain('assertCrmCountryAllowed(security, settlement.countryCode)')
     })
 
     it('admin companies verification checks company country', () => {
       const route = readFile('app/api/admin/companies/[id]/verification/route.ts')
-      expect(route).toContain('Forbidden: company belongs to a different country')
+      expect(route).toContain('assertCrmCountryAllowed(security, company.countryCode)')
     })
   })
 

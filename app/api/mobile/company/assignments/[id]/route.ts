@@ -19,6 +19,8 @@ export async function GET(
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const assignment = await prisma.companyJobAssignment.findUnique({
       where: { id },
@@ -42,7 +44,12 @@ export async function GET(
           select: { role: true },
         })
 
-    if (!isWorker && !isOwner && !membership) {
+    const canReadAssignment =
+      isWorker ||
+      isOwner ||
+      (!!membership && hasCompanyPermission(membership.role as CompanyRole, 'workers:read'))
+
+    if (!canReadAssignment) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -69,6 +76,7 @@ export async function GET(
       company: assignment.company,
       capabilities: {
         isAssignedWorker: isWorker,
+        canReadAssignment,
         canManageAssignment,
       },
     })

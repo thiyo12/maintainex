@@ -1,29 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateStaffRequest } from '@/lib/auth/staff-sessions'
-import { ROLE_PERMISSIONS } from '@/lib/admin-types'
-import { createProfession, listActiveProfessions } from '@/lib/profession'
+import { guardCrmRequest } from '@/lib/crm/security'
+import { createAuditLog } from '@/lib/crm/audit'
+import { createProfession } from '@/lib/profession'
 
-// GET: List all professions (active + inactive for admin)
+function cleanSlug(value: unknown): string {
+  return typeof value === 'string'
+    ? value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 120)
+    : ''
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const principal = await authenticateStaffRequest(request)
-    if (!principal) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
-    }
-
-    const adminUser = await prisma.adminUser.findUnique({
-      where: { id: principal.adminUserId },
-      select: { id: true, role: true, isActive: true, deletedAt: true },
+    const guard = await guardCrmRequest(request, {
+      permission: 'professions:read',
+      level: 'read',
     })
-    if (!adminUser || !adminUser.isActive || adminUser.deletedAt) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
-    }
-
-    const permissions = ROLE_PERMISSIONS[adminUser.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('professions:read')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    if (!guard.ok) return guard.response
 
     const professions = await prisma.profession.findMany({
       orderBy: { sortOrder: 'asc' },
@@ -42,38 +35,36 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ professions })
+    return NextResponse.json(
+      { professions },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
-    console.error('Admin professions list error:', error)
+    console.error('CRM professions list error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
 
-// POST: Create a new profession
 export async function POST(request: NextRequest) {
   try {
-    const principal = await authenticateStaffRequest(request)
-    if (!principal) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
-    }
-
-    const adminUser = await prisma.adminUser.findUnique({
-      where: { id: principal.adminUserId },
-      select: { id: true, role: true, isActive: true, deletedAt: true },
+    const guard = await guardCrmRequest(request, {
+      permission: 'professions:write',
+      level: 'sensitive',
     })
-    if (!adminUser || !adminUser.isActive || adminUser.deletedAt) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
-    }
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
-    const permissions = ROLE_PERMISSIONS[adminUser.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('professions:write')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    const body = await request.json().catch(() => ({}))
+    const slug = cleanSlug(body?.slug)
+    const i18nKey = typeof body?.i18nKey === 'string' ? body.i18nKey.trim().slice(0, 200) : ''
+    const description = typeof body?.description === 'string' ? body.description.trim().slice(0, 2000) : undefined
+    const sortOrder = body?.sortOrder === undefined ? 0 : Number(body.sortOrder)
 
-    const body = await request.json()
-    const { slug, i18nKey, description, sortOrder } = body
     if (!slug || !i18nKey) {
       return NextResponse.json({ error: 'slug and i18nKey required' }, { status: 400 })
+    }
+    if (!Number.isInteger(sortOrder) || sortOrder < -100000 || sortOrder > 100000) {
+      return NextResponse.json({ error: 'Invalid sortOrder' }, { status: 400 })
     }
 
     const profession = await createProfession(prisma, {
@@ -83,13 +74,29 @@ export async function POST(request: NextRequest) {
       sortOrder,
     })
 
+    await createAuditLog({
+      action: 'CREATE',
+      category: 'SYSTEM',
+      userId: security.adminId,
+      userEmail: security.email,
+      userRole: security.role,
+      entityType: 'Profession',
+      entityId: profession.id,
+      entityName: profession.slug,
+      description: 'CRM profession created',
+      newValue: profession,
+      ipAddress: security.ipAddress,
+      userAgent: security.userAgent || undefined,
+      riskLevel: 'MEDIUM',
+    })
+
     return NextResponse.json({ profession }, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error'
     if (message.includes('Unique constraint')) {
       return NextResponse.json({ error: 'Profession with this slug or i18nKey already exists' }, { status: 409 })
     }
-    console.error('Admin profession create error:', error)
+    console.error('CRM profession create error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

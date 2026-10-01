@@ -3,10 +3,14 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiAlertTriangle, FiEye, FiCheck, FiX, FiSearch } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface Dispute {
   id: string
+  source?: 'MARKETPLACE' | 'LEGACY'
+  escrowId?: string | null
+  resolutionAction?: string | null
   jobId: string
   raisedById: string
   reason: string
@@ -32,6 +36,7 @@ const TABS = [
   { key: 'ALL', label: 'All' },
   { key: 'OPEN', label: 'Open' },
   { key: 'UNDER_REVIEW', label: 'Under Review' },
+  { key: 'RESOLVING', label: 'Resolving' },
   { key: 'RESOLVED', label: 'Resolved' },
   { key: 'DISMISSED', label: 'Dismissed' },
 ] as const
@@ -41,11 +46,14 @@ type TabKey = typeof TABS[number]['key']
 const STATUS_STYLES: Record<string, string> = {
   OPEN: 'bg-red-500/20 text-red-400 border-red-500/30',
   UNDER_REVIEW: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  RESOLVING: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   RESOLVED: 'bg-green-500/20 text-green-400 border-green-500/30',
   DISMISSED: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
 }
 
 export default function DisputesPage() {
+  const { user: admin } = useAdminSession()
+  const canResolveDisputes = !!admin && (ROLE_PERMISSIONS[admin.role as AdminRole] || []).includes('disputes:resolve')
   const [disputes, setDisputes] = useState<Dispute[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('ALL')
@@ -74,7 +82,14 @@ export default function DisputesPage() {
     }
   }
 
-  const handleResolve = async (disputeId: string) => {
+  const handleResolve = async (
+    disputeId: string,
+    resolutionAction?: 'RELEASE_PROVIDER' | 'REFUND_CUSTOMER'
+  ) => {
+    if (!canResolveDisputes) {
+      toast.error('You do not have permission to resolve disputes')
+      return
+    }
     if (!resolveNotes.trim()) {
       toast.error('Please provide resolution notes')
       return
@@ -84,21 +99,41 @@ export default function DisputesPage() {
       const res = await fetch('/api/admin/disputes', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ disputeId, status: 'RESOLVED', resolution: resolveNotes }),
+        body: JSON.stringify({
+          disputeId,
+          status: 'RESOLVED',
+          resolution: resolveNotes,
+          ...(resolutionAction ? { resolutionAction } : {}),
+        }),
       })
-      if (!res.ok) throw new Error('Failed')
-      toast.success('Dispute resolved')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to resolve dispute')
+
+      if (res.status === 202) {
+        toast.success(data?.message || 'Refund queued for reconciliation')
+      } else if (resolutionAction === 'RELEASE_PROVIDER') {
+        toast.success('Dispute resolved — escrow released to provider')
+      } else if (resolutionAction === 'REFUND_CUSTOMER') {
+        toast.success('Dispute resolved — customer refund completed')
+      } else {
+        toast.success('Dispute resolved')
+      }
+
       setDetailModal(null)
       setResolveNotes('')
       fetchDisputes()
-    } catch {
-      toast.error('Failed to resolve dispute')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to resolve dispute')
     } finally {
       setActionLoading(false)
     }
   }
 
   const handleDismiss = async (disputeId: string) => {
+    if (!canResolveDisputes) {
+      toast.error('You do not have permission to resolve disputes')
+      return
+    }
     setActionLoading(true)
     try {
       const res = await fetch('/api/admin/disputes', {
@@ -118,6 +153,10 @@ export default function DisputesPage() {
   }
 
   const handleUnderReview = async (disputeId: string) => {
+    if (!canResolveDisputes) {
+      toast.error('You do not have permission to resolve disputes')
+      return
+    }
     setActionLoading(true)
     try {
       const res = await fetch('/api/admin/disputes', {
@@ -140,7 +179,7 @@ export default function DisputesPage() {
     new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
   return (
-    <AdminLayout>
+    <>
       <div className="p-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -196,6 +235,11 @@ export default function DisputesPage() {
                       <td className="px-4 py-3">
                         <div className="text-white font-medium max-w-[180px] truncate">{dispute.job.title}</div>
                         <div className="text-gray-500 text-xs font-mono">{dispute.jobId.slice(0, 10)}...</div>
+                        {dispute.source === 'MARKETPLACE' && (
+                          <span className="inline-flex mt-1 text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                            Marketplace escrow
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-gray-300">{dispute.raisedBy.name}</div>
@@ -278,7 +322,7 @@ export default function DisputesPage() {
                   </div>
                 )}
 
-                {detailModal.status !== 'RESOLVED' && detailModal.status !== 'DISMISSED' && (
+                {canResolveDisputes && detailModal.status !== 'RESOLVED' && detailModal.status !== 'DISMISSED' && detailModal.status !== 'RESOLVING' && (
                   <div>
                     <div className="text-xs text-gray-500 mb-1">Resolution Notes</div>
                     <textarea
@@ -293,7 +337,8 @@ export default function DisputesPage() {
               </div>
 
               <div className="p-6 border-t border-white/5 flex flex-wrap gap-2">
-                {detailModal.status === 'OPEN' && (
+                {!canResolveDisputes && <span className="text-xs text-gray-500 self-center mr-auto">Read-only access</span>}
+                {canResolveDisputes && detailModal.status === 'OPEN' && (
                   <>
                     <button
                       onClick={() => handleUnderReview(detailModal.id)}
@@ -302,16 +347,36 @@ export default function DisputesPage() {
                     >
                       Mark Under Review
                     </button>
+                    {detailModal.source !== 'MARKETPLACE' && (
+                      <button
+                        onClick={() => handleDismiss(detailModal.id)}
+                        disabled={actionLoading}
+                        className="px-4 py-2 bg-gray-500/10 text-gray-400 rounded-lg hover:bg-gray-500/20 disabled:opacity-50 transition font-medium text-sm"
+                      >
+                        Dismiss
+                      </button>
+                    )}
+                  </>
+                )}
+                {canResolveDisputes && detailModal.status === 'UNDER_REVIEW' && detailModal.source === 'MARKETPLACE' && (
+                  <>
                     <button
-                      onClick={() => handleDismiss(detailModal.id)}
-                      disabled={actionLoading}
-                      className="px-4 py-2 bg-gray-500/10 text-gray-400 rounded-lg hover:bg-gray-500/20 disabled:opacity-50 transition font-medium text-sm"
+                      onClick={() => handleResolve(detailModal.id, 'RELEASE_PROVIDER')}
+                      disabled={actionLoading || !resolveNotes.trim()}
+                      className="px-4 py-2 bg-green-500 text-[#0B0C12] rounded-lg hover:bg-green-400 disabled:opacity-50 transition font-medium text-sm"
                     >
-                      Dismiss
+                      {actionLoading ? 'Resolving...' : 'Release to provider'}
+                    </button>
+                    <button
+                      onClick={() => handleResolve(detailModal.id, 'REFUND_CUSTOMER')}
+                      disabled={actionLoading || !resolveNotes.trim()}
+                      className="px-4 py-2 bg-red-500/15 text-red-300 border border-red-500/30 rounded-lg hover:bg-red-500/25 disabled:opacity-50 transition font-medium text-sm"
+                    >
+                      {actionLoading ? 'Resolving...' : 'Refund customer'}
                     </button>
                   </>
                 )}
-                {detailModal.status === 'UNDER_REVIEW' && (
+                {canResolveDisputes && detailModal.status === 'UNDER_REVIEW' && detailModal.source !== 'MARKETPLACE' && (
                   <>
                     <button
                       onClick={() => handleResolve(detailModal.id)}
@@ -329,6 +394,11 @@ export default function DisputesPage() {
                     </button>
                   </>
                 )}
+                {detailModal.status === 'RESOLVING' && (
+                  <span className="text-xs text-blue-400 self-center mr-auto">
+                    Financial action is being reconciled. Do not submit a second payout/refund.
+                  </span>
+                )}
                 <button
                   onClick={() => setDetailModal(null)}
                   className="px-4 py-2 bg-white/5 text-gray-400 rounded-lg hover:bg-white/10 transition text-sm"
@@ -340,6 +410,6 @@ export default function DisputesPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

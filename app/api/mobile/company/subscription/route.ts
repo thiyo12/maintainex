@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
         subscriptionStatus: true,
         subscriptionExpiresAt: true,
         subscriptions: {
+          where: { status: 'ACTIVE' },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: { plan: true },
@@ -72,6 +73,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or inactive plan' }, { status: 400 })
     }
 
+    if (Number(plan.price) > 0) {
+      return NextResponse.json(
+        {
+          error: 'Paid company subscriptions require verified billing before activation.',
+          code: 'SUBSCRIPTION_BILLING_REQUIRED',
+        },
+        { status: 503 }
+      )
+    }
+
     const profile = await prisma.companyProfile.findUnique({
       where: { userId: user.id },
       select: { id: true },
@@ -84,25 +95,42 @@ export async function POST(request: NextRequest) {
     const endDate = new Date(startDate)
     endDate.setMonth(endDate.getMonth() + 1)
 
-    const [subscription] = await prisma.$transaction([
-      prisma.companySubscription.create({
+    const subscription = await prisma.$transaction(async tx => {
+      const lockedProfiles = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id
+        FROM "CompanyProfile"
+        WHERE id = ${profile.id}
+        FOR UPDATE
+      `
+      if (lockedProfiles.length !== 1) throw new Error('COMPANY_PROFILE_NOT_FOUND')
+
+      const existingActive = await tx.companySubscription.findFirst({
+        where: { companyId: profile.id, status: 'ACTIVE' },
+        select: { id: true },
+      })
+      if (existingActive) throw new Error('ACTIVE_SUBSCRIPTION_EXISTS')
+
+      const created = await tx.companySubscription.create({
         data: {
           companyId: profile.id,
           planId,
           status: 'ACTIVE',
           startDate,
           endDate,
-          autoRenew: autoRenew ?? true,
+          autoRenew: typeof autoRenew === 'boolean' ? autoRenew : true,
         },
-      }),
-      prisma.companyProfile.update({
+      })
+
+      await tx.companyProfile.update({
         where: { id: profile.id },
         data: {
           subscriptionStatus: 'ACTIVE',
           subscriptionExpiresAt: endDate,
         },
-      }),
-    ])
+      })
+
+      return created
+    })
 
     return NextResponse.json({
       success: true,
@@ -116,6 +144,14 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'ACTIVE_SUBSCRIPTION_EXISTS') {
+        return NextResponse.json({ error: 'Company already has an active subscription' }, { status: 409 })
+      }
+      if (error.message === 'COMPANY_PROFILE_NOT_FOUND') {
+        return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
+      }
+    }
     console.error('Company subscription create error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
@@ -138,18 +174,34 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
     }
 
-    await prisma.companySubscription.updateMany({
-      where: { companyId: profile.id, status: 'ACTIVE' },
-      data: { status: 'CANCELLED', autoRenew: false },
-    })
+    await prisma.$transaction(async tx => {
+      const lockedProfiles = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id
+        FROM "CompanyProfile"
+        WHERE id = ${profile.id}
+        FOR UPDATE
+      `
+      if (lockedProfiles.length !== 1) throw new Error('COMPANY_PROFILE_NOT_FOUND')
 
-    await prisma.companyProfile.update({
-      where: { id: profile.id },
-      data: { subscriptionStatus: 'CANCELLED' },
+      await tx.companySubscription.updateMany({
+        where: { companyId: profile.id, status: 'ACTIVE' },
+        data: { status: 'CANCELLED', autoRenew: false },
+      })
+
+      await tx.companyProfile.update({
+        where: { id: profile.id },
+        data: {
+          subscriptionStatus: 'CANCELLED',
+          subscriptionExpiresAt: null,
+        },
+      })
     })
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error instanceof Error && error.message === 'COMPANY_PROFILE_NOT_FOUND') {
+      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
+    }
     console.error('Company subscription cancel error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }

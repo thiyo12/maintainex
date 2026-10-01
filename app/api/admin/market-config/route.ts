@@ -1,78 +1,97 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
-import { ROLE_PERMISSIONS } from '@/lib/admin-types'
 import { updateMarketConfig } from '@/lib/domain/market-config'
-import { getIp } from '@/lib/auth/authorization/admin-rbac'
+import { assertCrmCountryAllowed, guardCrmRequest, type CrmSecurityContext } from '@/lib/crm/security'
+import type { AdminSession } from '@/lib/admin-types'
 
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'FINANCE']
+function sessionFromGuard(context: CrmSecurityContext): AdminSession {
+  return {
+    id: context.adminId,
+    email: context.email,
+    role: context.role,
+    firstName: '',
+    lastName: '',
+    assignedCountries: context.assignedCountries,
+    authType: 'adminUser',
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !ALLOWED_ROLES.includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const permissions = ROLE_PERMISSIONS[session.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('market_config:read')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'market_config:read',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const { searchParams } = new URL(request.url)
-    const countryCode = searchParams.get('countryCode') || 'GLOBAL'
+    const countryCode = (searchParams.get('countryCode') || 'GLOBAL').trim().toUpperCase()
 
-    const config = await prisma.marketConfig.findUnique({
-      where: { countryCode },
-    })
+    if (countryCode !== 'GLOBAL' && !assertCrmCountryAllowed(security, countryCode)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    if (countryCode === 'GLOBAL' && !security.isSuperAdmin) {
+      return NextResponse.json({ error: 'SUPER_ADMIN required for GLOBAL market config' }, { status: 403 })
+    }
 
-    return NextResponse.json({ config })
+    const config = await prisma.marketConfig.findUnique({ where: { countryCode } })
+    return NextResponse.json({ config }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('Market config GET error:', error)
+    console.error('CRM market config GET error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !ALLOWED_ROLES.includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'market_config:write',
+      level: 'sensitive',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
-    const permissions = ROLE_PERMISSIONS[session.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('market_config:write')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
-
-    const body = await request.json()
-    const { countryCode, reason, ...changes } = body
+    const body = await request.json().catch(() => ({}))
+    const countryCode = typeof body?.countryCode === 'string'
+      ? body.countryCode.trim().toUpperCase()
+      : ''
+    const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 2000) : undefined
+    const { countryCode: _countryCode, reason: _reason, ...changes } = body || {}
 
     if (!countryCode) {
       return NextResponse.json({ error: 'countryCode is required' }, { status: 400 })
+    }
+    if (countryCode === 'GLOBAL' && !security.isSuperAdmin) {
+      return NextResponse.json({ error: 'SUPER_ADMIN required for GLOBAL market config' }, { status: 403 })
+    }
+    if (countryCode !== 'GLOBAL' && !assertCrmCountryAllowed(security, countryCode)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const result = await updateMarketConfig(prisma, {
       countryCode,
       changes,
       reason,
-      session,
-      ipAddress: getIp(request),
+      session: sessionFromGuard(security),
+      ipAddress: security.ipAddress,
     })
 
     return NextResponse.json({ success: true, config: result.config })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error'
-    if (message.includes('Validation failed')) {
+    if (message.includes('Validation failed') || message.includes('No valid fields')) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
     if (message.includes('not found')) {
       return NextResponse.json({ error: message }, { status: 404 })
     }
-    if (message.includes('No valid fields')) {
-      return NextResponse.json({ error: message }, { status: 400 })
+    if (message.includes('Concurrent modification')) {
+      return NextResponse.json({ error: message }, { status: 409 })
     }
-    console.error('Market config PATCH error:', error)
+    console.error('CRM market config PATCH error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

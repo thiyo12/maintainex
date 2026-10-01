@@ -25,7 +25,16 @@ export interface MatchCandidate {
     longitude: number | null
     serviceRadius: number | null
     compositeScore: number
-    user: { id: string; name: string | null; email: string; pushToken: string | null; isSuspended: boolean }
+    user: {
+      id: string
+      name: string | null
+      email: string
+      pushToken: string | null
+      isActive: boolean
+      isSuspended: boolean
+      suspendedUntil: Date | null
+      isBanned: boolean
+    }
   }
   skills: string[]
   distanceKm: number | undefined
@@ -64,6 +73,7 @@ interface MatchInput {
   lng?: number | null
   radiusKm?: number
   targetTaskerId?: string
+  countryCode?: string
   maxResults?: number
 }
 
@@ -86,9 +96,30 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
 
   const allProfiles = await prisma.taskerProfile.findMany({
     where: targeted
-      ? { userId: input.targetTaskerId! }
-      : { isOnline: true, isVerified: true },
-    include: { user: { select: { id: true, name: true, email: true, pushToken: true, isSuspended: true } } },
+      ? {
+          userId: input.targetTaskerId!,
+          isVerified: true,
+          ...(input.countryCode ? { countryCode: input.countryCode } : {}),
+        }
+      : {
+          isOnline: true,
+          isVerified: true,
+          ...(input.countryCode ? { countryCode: input.countryCode } : {}),
+        },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          pushToken: true,
+          isActive: true,
+          isSuspended: true,
+          suspendedUntil: true,
+          isBanned: true,
+        },
+      },
+    },
   })
 
   const busy = await busyProviderIds()
@@ -97,7 +128,8 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
   const candidates: MatchCandidate[] = []
 
   for (const p of allProfiles) {
-    if (p.user.isSuspended) continue
+    if (!p.user.isActive || p.user.isBanned) continue
+    if (p.user.isSuspended && (!p.user.suspendedUntil || p.user.suspendedUntil > new Date())) continue
     if (process.env.ALLOW_TEST_OTP !== 'true' && p.user.email.endsWith('@maintainex-test.lk')) continue
     if (!targeted && busy.has(p.userId)) continue
 

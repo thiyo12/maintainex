@@ -197,7 +197,81 @@ describe('PayHere payment-to-work lifecycle', () => {
         }),
       })
     )
-    expect(mocks.postLedgerTransaction).not.toHaveBeenCalled()
+    expect(mocks.postLedgerTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entries: [
+          expect.objectContaining({
+            accountId: 'external:payhere',
+            accountType: 'EXTERNAL_PAYOUT',
+            entryType: 'DEBIT',
+            amount: 10000n,
+          }),
+          expect.objectContaining({
+            accountId: 'refund-suspense:pi-1',
+            accountType: 'REFUND_SUSPENSE',
+            entryType: 'CREDIT',
+            amount: 10000n,
+          }),
+        ],
+        referenceType: 'PAYMENT_REFUND_SUSPENSE',
+        referenceId: 'pi-1',
+      }),
+      mocks.tx,
+    )
+  })
+
+  it('records a captured payment as REFUND_REQUIRED when escrow binding drifts', async () => {
+    const { processPaymentSuccess } = await import('@/lib/payment/payment-service')
+
+    mocks.jobEscrowFindUnique.mockResolvedValue({
+      id: 'escrow-1',
+      jobId: 'job-1',
+      customerId: 'different-customer',
+      providerId: 'provider-1',
+      amount: 10000n,
+      serviceFee: 0n,
+      totalAmount: 10000n,
+      currency: 'LKR',
+      status: 'PENDING_PAYMENT',
+    })
+
+    const result = await processPaymentSuccess(notification({ payment_id: 'captured-mismatch-1' }))
+
+    expect(result).toEqual({ success: true })
+    expect(mocks.tx.paymentIntent.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 'pi-1' }),
+        data: expect.objectContaining({
+          status: 'REFUND_REQUIRED',
+          paymentId: 'captured-mismatch-1',
+        }),
+      })
+    )
+    expect(mocks.tx.marketplaceRiskEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          jobId: 'job-1',
+          eventType: 'LATE_PAYMENT_REFUND_REQUIRED',
+          severity: 'CRITICAL',
+        }),
+      })
+    )
+    expect(mocks.postLedgerTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entries: expect.arrayContaining([
+          expect.objectContaining({
+            accountId: 'refund-suspense:pi-1',
+            accountType: 'REFUND_SUSPENSE',
+            entryType: 'CREDIT',
+            amount: 10000n,
+          }),
+        ]),
+        referenceType: 'PAYMENT_REFUND_SUSPENSE',
+        referenceId: 'pi-1',
+      }),
+      mocks.tx,
+    )
+    expect(mocks.notifyEscrowDeposited).not.toHaveBeenCalled()
   })
 
   it('does not send a duplicate funded notification for a repeated SUCCESS callback', async () => {

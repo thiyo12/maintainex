@@ -29,19 +29,45 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
   let companyCandidates = result.candidates.filter((candidate) => candidate.providerType === 'COMPANY')
 
   if (job.targetTaskerId) {
-    const target = await prisma.taskerProfile.findFirst({
-      where: {
-        OR: [
-          { id: job.targetTaskerId },
-          { userId: job.targetTaskerId },
-        ],
-      },
-      select: { userId: true },
-    })
-    individualCandidates = target
-      ? individualCandidates.filter((candidate) => candidate.userId === target.userId)
-      : []
-    companyCandidates = []
+    const [targetTasker, targetCompany] = await Promise.all([
+      prisma.taskerProfile.findFirst({
+        where: {
+          OR: [
+            { id: job.targetTaskerId },
+            { userId: job.targetTaskerId },
+          ],
+        },
+        select: { id: true, userId: true },
+      }),
+      prisma.companyProfile.findFirst({
+        where: {
+          OR: [
+            { id: job.targetTaskerId },
+            { userId: job.targetTaskerId },
+          ],
+        },
+        select: { id: true, userId: true },
+      }),
+    ])
+
+    if (targetTasker) {
+      individualCandidates = individualCandidates.filter((candidate) =>
+        candidate.userId === targetTasker.userId ||
+        candidate.providerId === targetTasker.userId ||
+        candidate.providerId === targetTasker.id
+      )
+      companyCandidates = []
+    } else if (targetCompany) {
+      individualCandidates = []
+      companyCandidates = companyCandidates.filter((candidate) =>
+        candidate.companyId === targetCompany.id ||
+        candidate.providerId === targetCompany.id ||
+        candidate.userId === targetCompany.userId
+      )
+    } else {
+      individualCandidates = []
+      companyCandidates = []
+    }
   }
 
   const individualUserIds = individualCandidates.map((candidate) => candidate.userId || candidate.providerId)

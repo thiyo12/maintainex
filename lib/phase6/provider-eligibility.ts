@@ -172,14 +172,30 @@ export async function checkWorkerEligibility(
       }
 
       if (job.preferredDate) {
+        const dayStart = new Date(job.preferredDate)
+        dayStart.setHours(0, 0, 0, 0)
+        const dayEnd = new Date(dayStart)
+        dayEnd.setDate(dayEnd.getDate() + 1)
+
+        const slotFilter =
+          job.preferredTimeSlot && job.preferredTimeSlot !== 'anytime'
+            ? {
+                OR: [
+                  { preferredTimeSlot: job.preferredTimeSlot },
+                  { preferredTimeSlot: 'anytime' },
+                  { preferredTimeSlot: null },
+                ],
+              }
+            : {}
+
         const conflictingAssignments = await prisma.companyJobAssignment.findMany({
           where: {
             workerUserId: userId,
             status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
             jobId: { not: requiredJobId },
             job: {
-              preferredDate: job.preferredDate,
-              preferredTimeSlot: job.preferredTimeSlot || undefined,
+              preferredDate: { gte: dayStart, lt: dayEnd },
+              ...slotFilter,
             },
           },
           select: { id: true, jobId: true },

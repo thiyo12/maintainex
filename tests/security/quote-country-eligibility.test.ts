@@ -37,7 +37,7 @@ describe('Gate 4 — Quote Country Eligibility (Server-Side Enforcement)', () =>
 
     it('Country check occurs BEFORE quote creation', () => {
       const countryCheckIdx = routeSource.indexOf("providerCountry !== jobCountry")
-      const quoteCreateIdx = routeSource.indexOf("prisma.jobQuote.create")
+      const quoteCreateIdx = routeSource.indexOf("tx.jobQuote.create")
       expect(countryCheckIdx).toBeGreaterThan(0)
       expect(quoteCreateIdx).toBeGreaterThan(countryCheckIdx)
     })
@@ -95,7 +95,7 @@ describe('Gate 4 — Quote Country Eligibility (Server-Side Enforcement)', () =>
     it('Country check returns 403 before any DB write', () => {
       expect(routeSource).toContain("status: 403")
       const countryCheckIdx = routeSource.indexOf("PROVIDER_COUNTRY_MISMATCH")
-      const quoteCreateIdx = routeSource.indexOf("prisma.jobQuote.create")
+      const quoteCreateIdx = routeSource.indexOf("tx.jobQuote.create")
       expect(countryCheckIdx).toBeLessThan(quoteCreateIdx)
     })
 

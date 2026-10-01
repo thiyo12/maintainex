@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { hasCompanyPermission, type CompanyRole } from '@/lib/phase6/rbac'
+import { scanChatMessage } from '@/lib/fraud-detection'
+import { createNotification } from '@/lib/notifications'
 
 async function companyIdsForMessaging(userId: string): Promise<string[]> {
   const [ownedCompany, memberships] = await Promise.all([
@@ -27,10 +29,14 @@ async function canStartConversationForJob(userId: string, participantId: string,
   if (userId === participantId) return false
 
   const [job, participant] = await Promise.all([
-    prisma.marketplaceJob.findUnique({ where: { id: jobId }, select: { customerId: true } }),
+    prisma.marketplaceJob.findUnique({
+      where: { id: jobId },
+      select: { customerId: true, status: true },
+    }),
     prisma.user.findUnique({ where: { id: participantId }, select: { id: true } }),
   ])
   if (!job || !participant) return false
+  if (['COMPLETED', 'CANCELLED'].includes(job.status)) return false
 
   if (userId === job.customerId) {
     const individualQuote = await prisma.jobQuote.findFirst({
@@ -138,6 +144,15 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const { participantId, jobId, initialMessage } = await request.json()
+    if (initialMessage != null && typeof initialMessage !== 'string') {
+      return NextResponse.json({ error: 'initialMessage must be text' }, { status: 400 })
+    }
+    const rawInitialMessage =
+      typeof initialMessage === 'string' ? initialMessage.trim().slice(0, 4000) : ''
+    if (initialMessage != null && !rawInitialMessage) {
+      return NextResponse.json({ error: 'initialMessage cannot be empty' }, { status: 400 })
+    }
+
     if (!participantId) {
       return NextResponse.json({ error: 'participantId required' }, { status: 400 })
     }
@@ -153,7 +168,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Dedup scoped to job + the same two participants
+    const scannedInitialMessage = rawInitialMessage
+      ? await scanChatMessage(rawInitialMessage, user.id, `new:${jobId}:${participantId}`)
+      : null
+    const safeInitialMessage = scannedInitialMessage
+      ? (scannedInitialMessage.sanitizedText || rawInitialMessage)
+      : ''
+
+    // Dedup scoped to job + the same two participants. If the chat already
+    // exists, preserve the user's typed opener instead of silently dropping it.
     const existingConversation = await prisma.conversation.findFirst({
       where: {
         AND: [
@@ -166,7 +189,50 @@ export async function POST(request: NextRequest) {
     })
 
     if (existingConversation) {
-      return NextResponse.json({ id: existingConversation.id, existing: true })
+      if (safeInitialMessage) {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
+        const sentToday = await prisma.message.count({
+          where: {
+            conversationId: existingConversation.id,
+            senderId: user.id,
+            createdAt: { gte: since },
+          },
+        })
+        if (sentToday >= 50) {
+          return NextResponse.json(
+            { error: 'Daily message limit reached. Please continue using Maintainex for safe communication.' },
+            { status: 429 }
+          )
+        }
+
+        await prisma.$transaction(async tx => {
+          await tx.message.create({
+            data: {
+              conversationId: existingConversation.id,
+              senderId: user.id,
+              text: safeInitialMessage,
+            },
+          })
+          await tx.conversation.update({
+            where: { id: existingConversation.id },
+            data: { updatedAt: new Date() },
+          })
+        })
+
+        await createNotification({
+          userId: participantId,
+          title: user.name || 'New message',
+          body: safeInitialMessage.slice(0, 120),
+          referenceType: 'CHAT',
+          referenceId: existingConversation.id,
+        })
+      }
+
+      return NextResponse.json({
+        id: existingConversation.id,
+        existing: true,
+        messageSent: Boolean(safeInitialMessage),
+      })
     }
 
     const conversation = await prisma.conversation.create({
@@ -178,11 +244,11 @@ export async function POST(request: NextRequest) {
             { userId: participantId },
           ],
         },
-        ...(initialMessage ? {
+        ...(safeInitialMessage ? {
           messages: {
             create: {
               senderId: user.id,
-              text: initialMessage,
+              text: safeInitialMessage,
             },
           },
         } : {}),
@@ -197,10 +263,21 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    if (safeInitialMessage) {
+      await createNotification({
+        userId: participantId,
+        title: user.name || 'New message',
+        body: safeInitialMessage.slice(0, 120),
+        referenceType: 'CHAT',
+        referenceId: conversation.id,
+      })
+    }
+
     return NextResponse.json({
       id: conversation.id,
       jobId: conversation.jobId,
       participants: conversation.participants.map(p => ({ id: p.user.id, name: p.user.name, profileImage: p.user.taskerProfile?.profileImage })),
+      messageSent: Boolean(safeInitialMessage),
     })
   } catch (error) {
     console.error('Conversation create error:', error)

@@ -1,26 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { prisma } from '@/lib/prisma'
+import { guardCrmRequest } from '@/lib/crm/security'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession(request)
-    if (!session) {
+    const guard = await guardCrmRequest(request, { level: 'read' })
+    if (!guard.ok) return guard.response
+
+    const adminUser = await prisma.adminUser.findUnique({
+      where: { id: guard.context.adminId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+      },
+    })
+    if (!adminUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    return NextResponse.json({
-      user: {
-        id: session.id,
-        email: session.email,
-        role: session.role,
-        name: session.name,
-        branchId: session.branchId || null,
-        province: session.province || null,
-        region: session.region || null,
-        canEditServices: session.canEditServices || false,
-      }
-    })
-  } catch (error) {
+    const assignedCountries = guard.context.assignedCountries
+    const name = [adminUser.firstName, adminUser.lastName].filter(Boolean).join(' ') || null
+
+    return NextResponse.json(
+      {
+        user: {
+          id: adminUser.id,
+          email: adminUser.email,
+          role: guard.context.role,
+          firstName: adminUser.firstName || '',
+          lastName: adminUser.lastName || '',
+          name,
+          assignedCountries,
+          region: guard.context.isSuperAdmin
+            ? 'All markets'
+            : assignedCountries.join(', ') || null,
+          branchId: null,
+          province: null,
+          canEditServices: false,
+        },
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
+  } catch {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 }

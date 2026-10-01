@@ -166,6 +166,34 @@ export default function V2JobDetailScreen() {
     router.push(`/(customer)/jobs/v2/confirm/${id}`)
   }
 
+  const handleCashPayment = () => {
+    Alert.alert(
+      'Use Cash Payment?',
+      'MaintainEX will not hold cash for this booking. Pay the provider directly as agreed after the work. The provider remains responsible for MaintainEX platform commission.',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: 'Use Cash',
+          onPress: async () => {
+            setActionLoading('cash')
+            try {
+              const result = await v2JobActions.confirmCashPayment(id)
+              Alert.alert(
+                'Cash Selected',
+                `Cash amount due: ${result.currency} ${Number(result.amountDue || 0).toLocaleString()}. Use the verification PIN before work starts.`,
+              )
+              await loadJob()
+            } catch (e: any) {
+              Alert.alert(t('common.error'), e?.message || 'Could not select cash payment.')
+            } finally {
+              setActionLoading('')
+            }
+          },
+        },
+      ],
+    )
+  }
+
   const handleShareAddress = async () => {
     setActionLoading('address')
     try { await v2JobActions.shareAddress(id, { street: addressStreet, building: addressBuilding, apartment: addressApartment, landmark: addressLandmark }); Alert.alert(t('common.done'), t('jobDetail.addressShared')); loadJob(); setShowAddressForm(false) }
@@ -334,7 +362,7 @@ export default function V2JobDetailScreen() {
                     style={[styles.messageRow, { borderTopColor: colors.border }]}
                     onPress={() => {
                       setMsgPrefill(`Hi ${q.provider?.name || ''}, I'm interested in your service for "${job?.title || 'this job'}".`)
-                      setMsgRecipient({ id: q.provider.id, name: q.provider.name || 'Provider' })
+                      setMsgRecipient({ id: q.provider!.id, name: q.provider?.name || 'Provider' })
                     }}
                   >
                     <ChatCircle size={16} color={colors.amber} weight="fill" />
@@ -403,13 +431,14 @@ export default function V2JobDetailScreen() {
             <Lock size={32} color={colors.ink} weight="fill" />
             <Text style={styles.actionCardTitle}>Secure Payment</Text>
             <Text style={styles.actionCardDesc}>
-              Secure {escrow?.currency || 'LKR'} {(escrow?.totalAmount || escrow?.amount || job.budgetAmount || 0).toLocaleString()} through PayHere before work starts.
+              Choose secure online payment or cash. Online payment is protected by MaintainEX. Cash is paid directly to the provider and is not held by MaintainEX.
             </Text>
             <ActionBtn label="Pay Securely" loadingKey="escrow" onPress={handleDepositEscrow} />
+            <ActionBtn label="Use Cash" loadingKey="cash" onPress={handleCashPayment} outline />
           </View>
         ) : null}
 
-        {escrow && escrow.status === 'PROTECTED' && !job.addressSharedAt && (
+        {escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) && !job.addressSharedAt && (
           <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
             <MapPin size={28} color={colors.amber} weight="fill" />
             <Text style={styles.actionCardTitle}>Share Address</Text>
@@ -428,7 +457,7 @@ export default function V2JobDetailScreen() {
           </View>
         )}
 
-        {workspace?.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && (
+        {workspace?.progressStatus === 'ACCEPTED' && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) && (
           <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
             <ShieldCheck size={28} color={colors.amber} weight="fill" />
             <Text style={styles.actionCardTitle}>Arrival & Work Start Verification</Text>
@@ -447,23 +476,38 @@ export default function V2JobDetailScreen() {
           <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.success }]}>
             <CheckCircle size={32} color={colors.success} weight="fill" />
             <Text style={styles.actionCardTitle}>Job Complete?</Text>
-            <Text style={styles.actionCardDesc}>Your hero says they're done. Check the work and release payment</Text>
-            <ActionBtn label="Approve & Release" loadingKey="approve" onPress={handleApproveCompletion} color={colors.success} />
+            <Text style={styles.actionCardDesc}>
+              {escrow?.status === 'CASH_CONFIRMED'
+                ? 'Your provider says the work is complete. Approve completion to close the job and record the provider platform settlement.'
+                : 'Your hero says they are done. Check the work and release the protected payment.'}
+            </Text>
+            <ActionBtn
+              label={escrow?.status === 'CASH_CONFIRMED' ? 'Approve Completion' : 'Approve & Release'}
+              loadingKey="approve"
+              onPress={handleApproveCompletion}
+              color={colors.success}
+            />
           </View>
         )}
 
         {/* ─── Escrow Status ─── */}
-        {escrow && escrow.status === 'PROTECTED' && (
+        {escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) && (
           <View style={[styles.escrowCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
             <View style={styles.escrowHeader}>
               <Text style={[styles.escrowTitle, { color: colors.ink }]}>Escrow</Text>
-              <View style={styles.escrowBadge}><Text style={styles.escrowBadgeText}>Protected</Text></View>
+              <View style={styles.escrowBadge}>
+                <Text style={styles.escrowBadgeText}>
+                  {escrow.status === 'CASH_CONFIRMED' ? 'Cash selected' : 'Protected'}
+                </Text>
+              </View>
             </View>
             <Text style={[styles.escrowAmount, { color: colors.ink }]}>
               {escrow.currency || 'LKR'} {Number(escrow.totalAmount || escrow.amount || 0).toLocaleString()}
             </Text>
             <Text style={[styles.actionCardDesc, { marginBottom: 0 }]}>
-              Payment stays protected until you approve completed work. Before work starts, use the booking cancellation action above.
+              {escrow.status === 'CASH_CONFIRMED'
+                ? 'Cash is paid directly to the provider and is not held by MaintainEX. Use the verification PIN before work begins.'
+                : 'Payment stays protected until you approve completed work. Before work starts, use the booking cancellation action above.'}
             </Text>
           </View>
         )}

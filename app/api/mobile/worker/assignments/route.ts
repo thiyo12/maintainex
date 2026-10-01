@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { prisma } from '@/lib/prisma'
 import { getWorkerActiveAssignments } from '@/lib/domain/company-job-assignment'
 
@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { searchParams } = new URL(request.url)
     const companyId = searchParams.get('companyId')

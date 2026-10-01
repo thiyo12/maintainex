@@ -36,7 +36,7 @@ export default function RealEstateList() {
       if (search) params.q = search
       params.sortBy = sortBy
       const res = await realEstate.list(params)
-      const data = res?.data || res || []
+      const data = Array.isArray(res) ? res : ((res as any)?.data || [])
       setProperties(data)
     } catch (e) {
       console.error('Load real estate error:', e)

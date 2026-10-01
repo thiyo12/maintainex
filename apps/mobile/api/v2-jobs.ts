@@ -38,25 +38,42 @@ export const v2JobActions = {
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`),
   updateProgress: (jobId: string, progressStatus: string) =>
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`, { method: 'PATCH', body: JSON.stringify({ progressStatus }) }),
-  complete: (jobId: string, action: string, reason?: string) =>
+  complete: (jobId: string, action: string, reason?: string, cashPaidConfirmed?: boolean) =>
     v2Request<{
       success: boolean
       message: string
+      paymentMethod?: 'CARD' | 'CASH'
       commission?: number
       netAmount?: number
-    }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
-  releaseEscrow: (jobId: string) =>
-    v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, { method: 'POST' }),
+      platformDue?: number
+    }>(`/api/mobile/v2/jobs/${jobId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ action, reason, cashPaidConfirmed }),
+    }),
+  releaseEscrow: (jobId: string, cashPaidConfirmed?: boolean) =>
+    v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, {
+      method: 'POST',
+      body: JSON.stringify({ cashPaidConfirmed }),
+    }),
   confirmCashPayment: (jobId: string) =>
-    v2Request<{ success: boolean; commission: number; netAmount: number }>(`/api/mobile/v2/jobs/${jobId}/cash-payment`, { method: 'POST' }),
+    v2Request<{
+      success: boolean
+      escrowId: string
+      paymentMethod: 'CASH'
+      status: 'CASH_CONFIRMED'
+      amountDueMinor: string
+      amountDue: number
+      currency: string
+      alreadyConfirmed: boolean
+    }>(`/api/mobile/v2/jobs/${jobId}/cash-payment`, { method: 'POST' }),
   createReview: (jobId: string, data: any) =>
     v2Request<{ review: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
   getReviews: (jobId: string) =>
     v2Request<{ reviews: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`),
-  dispute: (jobId: string, reason?: string) =>
-    v2Request<{ success: boolean; message: string }>(
+  dispute: (jobId: string, reason?: string, description?: string) =>
+    v2Request<{ success: boolean; message: string; disputeId?: string }>(
       `/api/mobile/v2/jobs/${jobId}/complete`,
-      { method: 'POST', body: JSON.stringify({ action: 'DISPUTE', reason }) },
+      { method: 'POST', body: JSON.stringify({ action: 'DISPUTE', reason, description }) },
     ),
   getPinState: (jobId: string) =>
     v2Request<{

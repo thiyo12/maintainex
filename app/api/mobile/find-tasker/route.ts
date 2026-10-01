@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const latParam = searchParams.get('latitude')
     const lngParam = searchParams.get('longitude')
     const maxDistParam = searchParams.get('maxDistance')
+    const countryParam = searchParams.get('country')
 
     if (!jobId) {
       return NextResponse.json({ error: 'jobId is required' }, { status: 400 })
@@ -32,11 +33,34 @@ export async function GET(request: NextRequest) {
 
     const { keys } = await resolveJobCategoryKeys(templateJob.category.id)
 
-    const lat = latParam ? parseFloat(latParam) : null
-    const lng = lngParam ? parseFloat(lngParam) : null
-    const radiusKm = maxDistParam ? parseFloat(maxDistParam) : await getSetting('matching.radius_km', 50)
+    const lat = latParam ? Number(latParam) : null
+    const lng = lngParam ? Number(lngParam) : null
+    if (
+      (lat !== null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) ||
+      (lng !== null && (!Number.isFinite(lng) || lng < -180 || lng > 180))
+    ) {
+      return NextResponse.json({ error: 'Invalid latitude or longitude' }, { status: 400 })
+    }
 
-    const candidates = await matchTaskerCandidates({ matchKeys: keys, lat, lng, radiusKm })
+    const configuredRadius = await getSetting('matching.radius_km', 50)
+    const requestedRadius = maxDistParam ? Number(maxDistParam) : configuredRadius
+    if (!Number.isFinite(requestedRadius) || requestedRadius <= 0) {
+      return NextResponse.json({ error: 'Invalid maxDistance' }, { status: 400 })
+    }
+    const radiusKm = Math.min(requestedRadius, 100)
+
+    const requestedCountry =
+      typeof countryParam === 'string' && /^[A-Za-z]{2,3}$/.test(countryParam)
+        ? countryParam.toUpperCase()
+        : user.countryCode
+
+    const candidates = await matchTaskerCandidates({
+      matchKeys: keys,
+      lat,
+      lng,
+      radiusKm,
+      countryCode: requestedCountry,
+    })
 
     return NextResponse.json(
       candidates.map((c) => ({
@@ -49,8 +73,6 @@ export async function GET(request: NextRequest) {
         isVerified: c.profile.isVerified,
         isOnline: c.profile.isOnline,
         profileImage: c.profile.profileImage,
-        latitude: c.profile.latitude,
-        longitude: c.profile.longitude,
         distance: c.distanceKm,
         score: Math.round(c.score * 100),
         skills: c.skills,

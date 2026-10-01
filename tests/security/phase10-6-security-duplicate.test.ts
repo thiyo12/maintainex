@@ -6,15 +6,19 @@ import { PrismaClient } from '@prisma/client'
 import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 
-const API_BASE = 'http://147.93.106.54:3000'
-const DB_URL = 'postgresql://postgres:ba29bc6e06e48c5b702d0f4a8b224a6d088be43ec949c8e3@147.93.106.54:15432/maintainex_staging'
+const API_BASE = process.env.PHASE10_TEST_API_BASE || ''
+const DB_URL = process.env.DATABASE_URL || ''
+const TEST_PASSWORD = process.env.PHASE10_TEST_PASSWORD || 'ci-only-phase10-password'
+const TEST_PEPPER = process.env.PASSWORD_PEPPER || ''
+const PHASE10_INTEGRATION_ENABLED = Boolean(
+  process.env.PHASE10_TEST_API_BASE && DB_URL && TEST_PEPPER
+)
+const describePhase10 = PHASE10_INTEGRATION_ENABLED ? describe : describe.skip
 
 const prisma = new PrismaClient({
   datasources: { db: { url: DB_URL } },
 })
 
-const TEST_PASSWORD = 'TestP@ss106!Sec'
-const STAGING_PEPPER = 'e94928014ab437f7f04585547b009730d3b76ddd3552a7715ee5fbe44f7a6763'
 const TS = Date.now()
 
 let customerToken: string
@@ -57,7 +61,7 @@ async function createTestUser(
   role: string,
 ): Promise<{ id: string; email: string; token: string }> {
   const email = `${emailPrefix}-${TS}@p106sec.com`
-  const pepper = crypto.createHash('sha256').update(TEST_PASSWORD + STAGING_PEPPER).digest('hex')
+  const pepper = crypto.createHash('sha256').update(TEST_PASSWORD + TEST_PEPPER).digest('hex')
   const passwordHash = await bcrypt.hash(pepper, 14)
   const user = await prisma.user.create({
     data: {
@@ -76,6 +80,7 @@ async function createTestUser(
 }
 
 beforeAll(async () => {
+  if (!PHASE10_INTEGRATION_ENABLED) return
   await prisma.$connect()
 
   const cat = await prisma.jobCategory.findFirst()
@@ -222,6 +227,7 @@ beforeAll(async () => {
 }, 90000)
 
 afterAll(async () => {
+  if (!PHASE10_INTEGRATION_ENABLED) return
   for (const id of createdEvidenceIds) {
     await prisma.jobEvidence.delete({ where: { id } }).catch(() => {})
   }
@@ -245,7 +251,7 @@ afterAll(async () => {
   await prisma.$disconnect()
 }, 30000)
 
-describe('Phase 10.6 — Availability Authorization', () => {
+describePhase10('Phase 10.6 — Availability Authorization', () => {
   it('unauthenticated GET rejected (no token → 401)', async () => {
     const res = await fetch(`${API_BASE}/api/mobile/v2/availability`)
     expect(res.status).toBe(401)
@@ -305,7 +311,7 @@ describe('Phase 10.6 — Availability Authorization', () => {
   })
 })
 
-describe('Phase 10.6 — Inspection Authorization', () => {
+describePhase10('Phase 10.6 — Inspection Authorization', () => {
   it('authorized provider (accepted quote) may create inspection', async () => {
     const res = await fetch(`${API_BASE}/api/mobile/v2/jobs/${inspectionJobId}/inspection`, {
       method: 'POST',
@@ -365,7 +371,7 @@ describe('Phase 10.6 — Inspection Authorization', () => {
   })
 })
 
-describe('Phase 10.6 — Evidence Authorization', () => {
+describePhase10('Phase 10.6 — Evidence Authorization', () => {
   it('authorized job participant (customer) allowed without inspectionId', async () => {
     const res = await fetch(`${API_BASE}/api/mobile/v2/jobs/${evidenceJobId}/evidence`, {
       method: 'POST',
@@ -441,7 +447,7 @@ describe('Phase 10.6 — Evidence Authorization', () => {
   })
 })
 
-describe('Phase 10.6 — Change Order Authorization', () => {
+describePhase10('Phase 10.6 — Change Order Authorization', () => {
   let coAcceptedQuoteId: string
 
   beforeAll(async () => {
@@ -546,7 +552,7 @@ describe('Phase 10.6 — Change Order Authorization', () => {
   })
 })
 
-describe('Phase 10.6 — Company Boundary', () => {
+describePhase10('Phase 10.6 — Company Boundary', () => {
   let companyOwnerId: string
   let companyOwnerToken: string
   let companyWorkerId: string

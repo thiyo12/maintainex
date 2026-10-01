@@ -2189,6 +2189,7 @@ model MarketplaceJob {
   verificationPins  JobVerificationPin[]
   assignments       CompanyJobAssignment[]
   lifecycleEvents   JobLifecycleEvent[]
+  marketplaceDisputes MarketplaceDispute[]
 
   @@index([customerId])
   @@index([categoryId])
@@ -2232,6 +2233,30 @@ model JobQuote {
   @@index([parentQuoteId])
 }
 
+model MarketplaceDispute {
+  id               String         @id @default(cuid())
+  jobId            String         @unique
+  job              MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  escrowId         String
+  raisedById       String
+  actorType        String
+  reason           String
+  description      String?
+  status           String         @default("OPEN") // OPEN, UNDER_REVIEW, RESOLVING, RESOLVED
+  resolution       String?
+  resolutionAction String?        // RELEASE_PROVIDER, REFUND_CUSTOMER
+  resolvedBy       String?
+  resolvedAt       DateTime?
+  countryCode      String         @default("LK")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([status, createdAt])
+  @@index([countryCode, status])
+  @@index([raisedById])
+  @@index([escrowId])
+}
+
 model JobEscrow {
   id              String    @id @default(cuid())
   jobId           String
@@ -2243,7 +2268,7 @@ model JobEscrow {
   totalAmount     BigInt // amount + fee in cents
   paymentMethod   String    @default("CARD") // CARD, CASH
   currency        String    @default("LKR")
-  status          String    @default("PENDING") // PENDING, PROTECTED, ON_HOLD, RELEASED, REFUNDED
+  status          String    @default("PENDING") // PENDING, PENDING_PAYMENT, PROTECTED, ON_HOLD, RELEASED, REFUNDED, CANCELLED
   heldAt          DateTime?
   releasedAt      DateTime?
   refundedAt      DateTime?
@@ -3404,7 +3429,7 @@ model PaymentIntent {
   paymentId       String?
   amount          BigInt
   currency        String    @default("LKR")
-  status          String    @default("CREATED") // CREATED, PENDING, SUCCESS, FAILED, CANCELLED, EXPIRED, REFUND_REQUIRED, CHARGEDBACK
+  status          String    @default("CREATED") // CREATED, PENDING, SUCCESS, FAILED, CANCELLED, EXPIRED, REFUND_REQUIRED, REFUND_PROCESSING, REFUNDED, CHARGEDBACK
   gatewayResponse String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

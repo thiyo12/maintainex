@@ -6,6 +6,8 @@ import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { resolveProviderActor } from '@/lib/domain/job-actors'
 import { fundEscrow, releaseEscrow, refundEscrow, expirePendingEscrow, completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
+import { evaluateEligibility } from '@/lib/matching/eligibility'
+import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 
 
 export type JobStatus = 'OPEN' | 'QUOTE_ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
@@ -78,7 +80,7 @@ const WORKSPACE_TRANSITIONS: Record<WorkspaceStatus, WorkspaceStatus[]> = {
   DISPUTED: [],
 }
 
-const PROVIDER_ONLY_WORKSPACE: WorkspaceStatus[] = ['COMPLETION_REQUESTED']
+const PROVIDER_ONLY_WORKSPACE: WorkspaceStatus[] = ['WAITING_CUSTOMER', 'COMPLETION_REQUESTED']
 const CUSTOMER_ONLY_WORKSPACE: WorkspaceStatus[] = ['IN_PROGRESS']
 
 export function isValidJobTransition(from: JobStatus, to: JobStatus): boolean {
@@ -155,6 +157,21 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
 
     const workspace = await tx.jobWorkspace.findUnique({ where: { jobId: ctx.jobId } })
     if (!workspace) throw new Error('Workspace not found')
+
+    // Security boundary: work start is exclusively performed by verifyJobPin(),
+    // completion is coupled to escrow release, and disputes must atomically hold
+    // escrow. The generic workspace transition helper must never bypass those
+    // canonical money/PIN state machines.
+    if (targetStatus === 'IN_PROGRESS' && workspace.progressStatus === 'ACCEPTED') {
+      throw new Error('Work start requires PIN verification')
+    }
+    if (targetStatus === 'COMPLETED') {
+      throw new Error('Completion must use the escrow release flow')
+    }
+    if (targetStatus === 'DISPUTED') {
+      throw new Error('Disputes must use the canonical dispute flow')
+    }
+
     if (!isValidWorkspaceTransition(workspace.progressStatus as WorkspaceStatus, targetStatus)) {
       throw new Error(`Cannot transition workspace from ${workspace.progressStatus} to ${targetStatus}`)
     }
@@ -167,13 +184,6 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
       },
     })
     if (changed.count !== 1) throw new Error('Workspace state changed concurrently')
-
-    if (targetStatus === 'COMPLETED') {
-      await tx.marketplaceJob.updateMany({
-        where: { id: ctx.jobId, status: 'IN_PROGRESS' },
-        data: { status: 'COMPLETED' },
-      })
-    }
 
     await recordJobLifecycleEvent(tx, {
       jobId: ctx.jobId,
@@ -244,11 +254,11 @@ export async function cancelJob(
     }
 
     if (lockedJob.status === 'QUOTE_ACCEPTED') {
-      const protectedEscrow = await tx.jobEscrow.findFirst({
-        where: { jobId: ctx.jobId, status: 'PROTECTED' },
+      const paymentCommitment = await tx.jobEscrow.findFirst({
+        where: { jobId: ctx.jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
         select: { id: true },
       })
-      if (protectedEscrow) {
+      if (paymentCommitment) {
         return { needsRefund: true, previousStatus: lockedJob.status }
       }
     }
@@ -316,6 +326,30 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
   if (!quote || quote.jobId !== ctx.jobId) throw new Error('Quote not found for this job')
   if (quote.status !== 'PENDING') throw new Error('Quote is not in PENDING status')
   if (quote.price <= 0n) throw new Error('Quote price must be positive')
+  if (quote.providerType !== 'INDIVIDUAL' && quote.providerType !== 'COMPANY') {
+    throw new Error('Quote provider is no longer available')
+  }
+
+  const eligibility = await evaluateEligibility({
+    providerType: quote.providerType,
+    providerId: quote.providerId,
+    job: {
+      jobId: job.id,
+      userId: job.customerId,
+      jobMode: job.budgetType === 'REQUEST_QUOTES' ? 'QUOTE' : 'BOOK_NOW',
+      urgency: (job.urgency?.toUpperCase() || 'NORMAL') as 'NORMAL' | 'URGENT' | 'EMERGENCY',
+      categoryId: job.categoryId,
+      serviceTemplateId: job.serviceTemplateId || undefined,
+      latitude: job.latitude,
+      longitude: job.longitude,
+      countryCode: job.countryCode || 'GLOBAL',
+      preferredDate: job.preferredDate,
+    },
+    client: prisma,
+  })
+  if (!eligibility.eligible) {
+    throw new Error('Quote provider is no longer available')
+  }
 
   const jobCountry = job.countryCode || 'GLOBAL'
   const pricingConfig = await resolvePricingConfig(prisma, jobCountry)
@@ -325,17 +359,42 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
       `PRICING_COUNTRY_MISMATCH: job country=${jobCountry} but resolved pricing config country=${pricingConfig.countryCode}. Refusing to proceed.`
     )
   }
+  if (quote.currency !== pricingConfig.defaultCurrency) {
+    throw new Error('Quote is no longer available because its currency does not match the job market')
+  }
 
-  const serviceFee = (quote.price * BigInt(pricingConfig.commissionRateBps)) / 10000n
-  const totalAmount = quote.price + serviceFee
-  const existingEscrow = await prisma.jobEscrow.findFirst({
-    where: { jobId: ctx.jobId, status: { in: ['CANCELLED', 'PENDING_PAYMENT'] } },
-  })
+  const acceptedAmount = quote.totalCents ?? quote.price
+  if (acceptedAmount <= 0n) throw new Error('Quote total must be positive')
+
+  const serviceFee = (acceptedAmount * BigInt(pricingConfig.commissionRateBps)) / 10000n
+  const totalAmount = acceptedAmount + serviceFee
+
+  if (quote.providerType !== 'INDIVIDUAL' && quote.providerType !== 'COMPANY') {
+    throw new Error('Quote provider type is invalid')
+  }
+  const providerType = quote.providerType
 
   await prisma.$transaction(async (tx) => {
+    await lockAndAssertProviderAvailable(
+      tx,
+      providerType,
+      quote.providerId,
+      'Quote provider is no longer available',
+    )
+
+    const existingEscrow = await tx.jobEscrow.findFirst({
+      where: { jobId: ctx.jobId, status: { in: ['CANCELLED', 'PENDING_PAYMENT'] } },
+      orderBy: { createdAt: 'desc' },
+    })
+
     const jobClaim = await tx.marketplaceJob.updateMany({
       where: { id: ctx.jobId, status: 'OPEN' },
-      data: { status: 'QUOTE_ACCEPTED', approvedQuoteId: quoteId },
+      data: {
+        status: 'QUOTE_ACCEPTED',
+        approvedQuoteId: quoteId,
+        approvedQuoteVersion: quote.revisionNumber,
+        finalAuthorizedAmountCents: acceptedAmount,
+      },
     })
     if (jobClaim.count !== 1) throw new Error('Job already has an accepted quote')
 
@@ -362,7 +421,7 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
         data: {
           quoteId: quote.id,
           providerId: quote.providerId,
-          amount: quote.price,
+          amount: acceptedAmount,
           serviceFee,
           totalAmount,
           currency: pricingConfig.defaultCurrency as Currency,
@@ -381,7 +440,7 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
           quoteId: quote.id,
           customerId: job.customerId,
           providerId: quote.providerId,
-          amount: quote.price,
+          amount: acceptedAmount,
           serviceFee,
           totalAmount,
           currency: pricingConfig.defaultCurrency as Currency,
@@ -402,7 +461,8 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
         quoteId,
         providerId: quote.providerId,
         providerType: quote.providerType,
-        quoteAmountMinor: quote.price,
+        quoteAmountMinor: acceptedAmount,
+        quoteRevisionNumber: quote.revisionNumber,
         serviceFeeMinor: serviceFee,
         totalAmountMinor: totalAmount,
         currency: pricingConfig.defaultCurrency,
@@ -456,7 +516,7 @@ export async function holdEscrowForDispute(ctx: TransitionContext, jobId: string
 export async function raiseJobDispute(
   ctx: TransitionContext,
   jobId: string
-): Promise<{ escrowId: string; workspaceStatus: string }> {
+): Promise<{ escrowId: string; workspaceStatus: string; disputeId: string }> {
   return prisma.$transaction(async (tx) => {
     const job = await tx.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) throw new Error('Job not found')
@@ -472,12 +532,17 @@ export async function raiseJobDispute(
       throw new Error(`Cannot dispute from workspace state ${workspace.progressStatus}`)
     }
 
-    const escrow = await tx.jobEscrow.findFirst({ where: { jobId, status: 'PROTECTED' } })
-    if (!escrow) throw new Error('No protected escrow found')
-    if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
+    const escrow = await tx.jobEscrow.findFirst({
+      where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+    })
+    if (!escrow) throw new Error('No payment commitment available for dispute')
 
     const escrowClaimed = await tx.jobEscrow.updateMany({
-      where: { id: escrow.id, status: 'PROTECTED' },
+      where: {
+        id: escrow.id,
+        status: escrow.status,
+        paymentMethod: escrow.paymentMethod,
+      },
       data: { status: 'ON_HOLD' },
     })
     if (escrowClaimed.count !== 1) throw new Error('Escrow state changed concurrently')
@@ -488,6 +553,24 @@ export async function raiseJobDispute(
     })
     if (wsClaimed.count !== 1) throw new Error('Workspace state changed concurrently')
 
+    const metadataDescription =
+      typeof ctx.metadata?.description === 'string'
+        ? ctx.metadata.description.trim().slice(0, 5000)
+        : null
+    const reason = ctx.reason?.trim().slice(0, 1000) || 'Dispute raised'
+
+    const dispute = await tx.marketplaceDispute.create({
+      data: {
+        jobId,
+        escrowId: escrow.id,
+        raisedById: ctx.actorId,
+        actorType: ctx.actorType,
+        reason,
+        description: metadataDescription || null,
+        countryCode: job.countryCode || 'LK',
+      },
+    })
+
     await recordJobLifecycleEvent(tx, {
       jobId,
       actorId: ctx.actorId,
@@ -496,13 +579,17 @@ export async function raiseJobDispute(
       fromState: workspace.progressStatus,
       toState: 'DISPUTED',
       metadata: {
-        reason: ctx.reason ?? null,
+        reason,
+        description: metadataDescription,
+        disputeId: dispute.id,
         escrowId: escrow.id,
-        escrowFromState: 'PROTECTED',
+        escrowFromState: escrow.status,
         escrowToState: 'ON_HOLD',
+        paymentMethod: escrow.paymentMethod,
+        cashNoPlatformFunds: escrow.paymentMethod === 'CASH',
       },
     })
 
-    return { escrowId: escrow.id, workspaceStatus: 'DISPUTED' }
+    return { escrowId: escrow.id, workspaceStatus: 'DISPUTED', disputeId: dispute.id }
   })
 }

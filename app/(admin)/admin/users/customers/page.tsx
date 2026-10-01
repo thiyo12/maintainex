@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import AdminLayout from '@/components/admin/AdminLayout'
+import Link from 'next/link'
 import {
   FiSearch, FiEye, FiUsers, FiRefreshCw, FiChevronLeft, FiChevronRight,
   FiChevronsLeft, FiChevronsRight, FiX, FiUserX, FiUserCheck, FiClock,
   FiFilter, FiArrowDown, FiArrowUp
 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface CustomerUser {
   id: string
@@ -45,6 +47,11 @@ type SortField = 'name' | 'email' | 'createdAt' | 'mxId'
 type SortDir = 'asc' | 'desc'
 
 function CustomerPageContent() {
+  const { user: admin } = useAdminSession()
+  const role = (admin?.role || 'SUPPORT') as AdminRole
+  const permissions = ROLE_PERMISSIONS[role] || []
+  const canSuspend = permissions.includes('users:suspend')
+  const canBan = permissions.includes('users:ban')
   const [customers, setCustomers] = useState<CustomerUser[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -102,6 +109,13 @@ function CustomerPageContent() {
 
   const handleAction = async () => {
     if (!confirmAction) return
+    const isSuspendAction = confirmAction.action === 'suspend' || confirmAction.action === 'unsuspend'
+    const isBanAction = confirmAction.action === 'ban' || confirmAction.action === 'unban'
+    if ((isSuspendAction && !canSuspend) || (isBanAction && !canBan)) return
+    if ((confirmAction.action === 'suspend' || confirmAction.action === 'ban') && reason.trim().length < 3) {
+      toast.error('Please enter a reason of at least 3 characters')
+      return
+    }
     setActionLoading(confirmAction.userId)
     try {
       const res = await fetch('/api/admin/users', {
@@ -313,14 +327,14 @@ function CustomerPageContent() {
                         <td className="px-6 py-4 text-gray-400 text-sm">{formatDate(customer.createdAt)}</td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setViewUser(customer)}
+                            <Link
+                              href={`/admin/users/${customer.id}`}
                               className="p-1.5 text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
-                              title="View Details"
+                              title="Open 360"
                             >
                               <FiEye size={16} />
-                            </button>
-                            {!customer.isBanned && !customer.isSuspended && (
+                            </Link>
+                            {canSuspend && !customer.isBanned && !customer.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: customer.id, action: 'suspend', label: 'Suspend' })}
                                 className="p-1.5 text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 rounded-lg transition-colors"
@@ -329,7 +343,7 @@ function CustomerPageContent() {
                                 <FiClock size={16} />
                               </button>
                             )}
-                            {customer.isSuspended && (
+                            {canSuspend && customer.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: customer.id, action: 'unsuspend', label: 'Unsuspend' })}
                                 className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
@@ -338,7 +352,7 @@ function CustomerPageContent() {
                                 <FiUserCheck size={16} />
                               </button>
                             )}
-                            {!customer.isBanned && (
+                            {canBan && !customer.isBanned && (
                               <button
                                 onClick={() => setConfirmAction({ userId: customer.id, action: 'ban', label: 'Ban' })}
                                 className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -347,7 +361,7 @@ function CustomerPageContent() {
                                 <FiUserX size={16} />
                               </button>
                             )}
-                            {customer.isBanned && (
+                            {canBan && customer.isBanned && (
                               <button
                                 onClick={() => setConfirmAction({ userId: customer.id, action: 'unban', label: 'Unban' })}
                                 className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
@@ -489,7 +503,7 @@ function CustomerPageContent() {
               </p>
               {(confirmAction.action === 'suspend' || confirmAction.action === 'ban') && (
                 <div className="mb-4">
-                  <label className="block text-gray-400 text-xs font-semibold mb-1.5">Reason (optional)</label>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1.5">Reason (required)</label>
                   <textarea
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
@@ -508,7 +522,7 @@ function CustomerPageContent() {
                 </button>
                 <button
                   onClick={handleAction}
-                  disabled={actionLoading === confirmAction.userId}
+                  disabled={actionLoading === confirmAction.userId || ((confirmAction.action === 'suspend' || confirmAction.action === 'ban') && reason.trim().length < 3)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     confirmAction.action === 'ban'
                       ? 'bg-red-500 hover:bg-red-600 text-white'
@@ -537,8 +551,8 @@ function CustomerPageContent() {
 
 export default function CustomersPage() {
   return (
-    <AdminLayout>
+    <>
       <CustomerPageContent />
-    </AdminLayout>
+    </>
   )
 }

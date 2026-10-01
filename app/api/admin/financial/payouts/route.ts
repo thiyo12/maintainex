@@ -1,71 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
-import { getCountryFilter } from '@/lib/auth/authorization/admin-rbac'
+import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'FINANCE']
-
-// GET: List payout withdrawal requests with stats for admin approval workflow.
 export async function GET(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !ALLOWED_ROLES.includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'wallets:view',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200)
+    const status = (searchParams.get('status') || '').trim().toUpperCase()
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') || '50')))
     const skip = (page - 1) * limit
 
-    const countryFilter = getCountryFilter(session)
+    const countryFilter = getCrmCountryFilter(security)
+    const where: any = { ...countryFilter }
+    if (status && status !== 'ALL') where.status = status
 
-    const where: Record<string, unknown> = { ...countryFilter }
-    if (status && status !== 'ALL') {
-      where.status = status
-    }
+    const [payouts, total, stats] = await Promise.all([
+      prisma.payout.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.payout.count({ where }),
+      prisma.payout.groupBy({
+        by: ['status'],
+        where: countryFilter,
+        _count: { _all: true },
+        _sum: { amount: true },
+      }),
+    ])
 
-    const payouts = await prisma.payout.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit,
-    })
+    const userIds = [...new Set(payouts.map(payout => payout.userId))]
+    const users = userIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true, email: true, mxId: true },
+        })
+      : []
+    const userMap = new Map(users.map(user => [user.id, user]))
 
-    const total = await prisma.payout.count({ where })
-
-    const userIds = [...new Set(payouts.map(p => p.userId))]
-    const users = await prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, name: true, email: true, mxId: true },
-    })
-    const userMap = new Map(users.map(u => [u.id, u]))
-
-    const stats = await prisma.payout.groupBy({
-      by: ['status'],
-      where: countryFilter as never,
-      _count: { _all: true },
-      _sum: { amount: true },
-    })
-
-    return NextResponse.json({
-      payouts: payouts.map(p => ({
-        ...p,
-        amount: p.amount.toString(),
-        provider: userMap.get(p.userId) || null,
-      })),
-      total,
-      page,
-      limit,
-      stats: stats.map(s => ({
-        status: s.status,
-        count: s._count._all,
-        amount: s._sum.amount?.toString() ?? '0',
-      })),
-    })
+    return NextResponse.json(
+      {
+        payouts: payouts.map(payout => ({
+          ...payout,
+          amount: payout.amount.toString(),
+          bankDetails: payout.bankDetails ? '[REDACTED]' : null,
+          provider: userMap.get(payout.userId) || null,
+        })),
+        total,
+        page,
+        limit,
+        stats: stats.map(row => ({
+          status: row.status,
+          count: row._count._all,
+          amount: row._sum.amount?.toString() ?? '0',
+        })),
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
-    console.error('Payout list error:', error)
+    console.error('CRM payout list error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

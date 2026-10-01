@@ -7,7 +7,10 @@ interface AdminUser {
   id: string
   email: string
   role: string
+  firstName?: string
+  lastName?: string
   name: string | null
+  assignedCountries?: string[]
   branchId: string | null
   province: string | null
   region: string | null

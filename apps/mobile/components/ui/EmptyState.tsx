@@ -5,6 +5,8 @@ import { Icon } from 'phosphor-react-native'
 import PressableScale from './PressableScale'
 import { colors, radius, spacing, typography } from '../../lib/design'
 
+const LottieAnimation = LottieView as any
+
 interface Props {
   lottieUrl?: string | null
   title: string
@@ -44,8 +46,8 @@ export default function EmptyState({
           </View>
         ) : null}
         {lottieUrl && !failed ? (
-          <LottieView
-            source={{ uri: lottieUrl }}
+          <LottieAnimation
+            source={{ uri: lottieUrl } as any}
             style={styles.lottie}
             autoPlay
             loop
@@ -70,7 +72,7 @@ export default function EmptyState({
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', paddingVertical: spacing.xl, paddingHorizontal: spacing.lg, gap: spacing.sm },
   animBox: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
-  fallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  fallback: { ...(StyleSheet.absoluteFill as any), alignItems: 'center', justifyContent: 'center' },
   lottie: { width: 140, height: 140 },
   title: { ...typography.h3, textAlign: 'center' },
   subtitle: { ...typography.bodyMuted, textAlign: 'center' },

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking, AppState } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking, AppState } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -39,12 +39,6 @@ export default function V2ConfirmBookingScreen() {
   }, [id, paymentStatus])
 
   useEffect(() => {
-    if (!scheduleDate) {
-      setScheduleDate(new Date().toISOString().split('T')[0])
-    }
-  }, [])
-
-  useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') loadData()
     })
@@ -75,16 +69,8 @@ export default function V2ConfirmBookingScreen() {
   }
 
   const handleDeposit = async () => {
-    if (!scheduleSlot) {
-      Alert.alert(t('booking.timeSlot'), t('components.selectTime'))
-      return
-    }
     setActionLoading('escrow')
     try {
-      await v2JobActions.update(id, {
-        preferredDate: scheduleDate,
-        preferredTimeSlot: scheduleSlot,
-      })
       const payment = await v2Payments.start(id)
       if (!payment.checkoutUrl) throw new Error('Secure checkout is not available')
       setPaymentStatus('PENDING')
@@ -96,6 +82,30 @@ export default function V2ConfirmBookingScreen() {
     }
   }
 
+  const handleCash = () => {
+    Alert.alert(
+      'Use Cash Payment?',
+      'Cash is paid directly to the provider and is not held by MaintainEX. The provider platform amount is recorded separately after completion.',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: 'Use Cash',
+          onPress: async () => {
+            setActionLoading('cash')
+            try {
+              await v2JobActions.confirmCashPayment(id)
+              await loadData()
+            } catch (e: any) {
+              Alert.alert(t('common.error'), e?.message || 'Could not select cash payment.')
+            } finally {
+              setActionLoading('')
+            }
+          },
+        },
+      ],
+    )
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -105,7 +115,7 @@ export default function V2ConfirmBookingScreen() {
   }
 
   const steps = [
-    { label: t('booking.paymentSecured'), done: escrow?.status === 'PROTECTED' },
+    { label: escrow?.status === 'CASH_CONFIRMED' ? 'Cash payment selected' : t('booking.paymentSecured'), done: ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) },
     { label: t('tracking.inProgress'), done: job?.status === 'IN_PROGRESS' || job?.status === 'COMPLETED' },
     { label: t('booking.confirmComplete'), done: job?.workspace?.progressStatus === 'COMPLETION_REQUESTED' || job?.status === 'COMPLETED' },
     { label: t('tracking.completed'), done: job?.status === 'COMPLETED' },
@@ -138,7 +148,7 @@ export default function V2ConfirmBookingScreen() {
                 <Text style={styles.providerName}>{acceptedQuote.provider?.name || t('jobDetail.provider')}</Text>
                 <Text style={styles.providerType}>{acceptedQuote.providerType}</Text>
               </View>
-              <Text style={styles.providerPrice}>LKR {acceptedQuote.price.toLocaleString()}</Text>
+              <Text style={styles.providerPrice}>{escrow?.currency || acceptedQuote.currency || 'LKR'} {acceptedQuote.price.toLocaleString()}</Text>
             </View>
           </View>
         )}
@@ -151,38 +161,22 @@ export default function V2ConfirmBookingScreen() {
           </View>
         )}
 
-        {/* Schedule Selection */}
-        {escrow?.status === 'PENDING_PAYMENT' && (
+        {/* Accepted booking schedule is locked. Rescheduling uses a dedicated workflow, not generic job PATCH. */}
         <View style={styles.scheduleSection}>
-          <Text style={styles.sectionLabel}>{t('booking.selectDate')}</Text>
-          <TextInput
-            style={styles.dateInput}
-            value={scheduleDate}
-            onChangeText={setScheduleDate}
-            placeholder={t('booking.datePlaceholder')}
-            placeholderTextColor={colors.muted}
-          />
-          <Text style={[styles.sectionLabel, { marginTop: 12 }]}>{t('booking.timeSlot')}</Text>
-          <View style={styles.timeGrid}>
-            {TIME_SLOTS.map((slot) => (
-              <TouchableOpacity
-                key={slot.value}
-                style={[
-                  styles.timeChip,
-                  scheduleSlot === slot.value && { backgroundColor: colors.amberBg, borderColor: colors.amber },
-                  { borderColor: colors.border, backgroundColor: colors.white },
-                ]}
-                onPress={() => setScheduleSlot(slot.value)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.timeText, scheduleSlot === slot.value && { color: colors.amberDark, fontFamily: fonts.bodyMedium }]}>
-                  {slot.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={styles.sectionLabel}>Scheduled service</Text>
+          <View style={[styles.providerRow, { alignItems: 'flex-start' }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowL}>Date</Text>
+              <Text style={styles.rowV}>{scheduleDate || 'Not specified'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowL}>Time</Text>
+              <Text style={styles.rowV}>
+                {TIME_SLOTS.find(slot => slot.value === scheduleSlot)?.label || scheduleSlot || 'Not specified'}
+              </Text>
+            </View>
           </View>
         </View>
-        )}
 
         {/* Payment Freeze Card */}
         <View style={styles.freezeCard}>
@@ -194,7 +188,9 @@ export default function V2ConfirmBookingScreen() {
             {escrow?.currency || 'LKR'} {(escrow?.totalAmount || acceptedQuote?.price || job?.budgetAmount || 0).toLocaleString()}
           </Text>
           <Text style={styles.freezeDesc}>
-            {t('booking.escrowInfo')}
+            {escrow?.status === 'CASH_CONFIRMED'
+              ? 'Cash is paid directly to the provider. MaintainEX does not hold these funds.'
+              : t('booking.escrowInfo')}
           </Text>
           {escrow?.status === 'PENDING_PAYMENT' && !['REFUND_REQUIRED', 'CHARGEDBACK'].includes(paymentStatus || '') && (
             <TouchableOpacity
@@ -209,10 +205,23 @@ export default function V2ConfirmBookingScreen() {
               )}
             </TouchableOpacity>
           )}
-          {escrow && escrow.status === 'PROTECTED' && (
+          {escrow?.status === 'PENDING_PAYMENT' && !['REFUND_REQUIRED', 'CHARGEDBACK'].includes(paymentStatus || '') && (
+            <TouchableOpacity
+              style={[styles.depositBtn, { marginTop: 10, backgroundColor: colors.white }]}
+              onPress={handleCash}
+              disabled={actionLoading !== ''}
+            >
+              {actionLoading === 'cash'
+                ? <ActivityIndicator color={colors.ink} />
+                : <Text style={[styles.depositBtnText, { color: colors.ink }]}>Use Cash Instead</Text>}
+            </TouchableOpacity>
+          )}
+          {escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) && (
             <View style={styles.frozenBadge}>
               <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-              <Text style={styles.frozenBadgeText}>{t('booking.paymentSecured')}</Text>
+              <Text style={styles.frozenBadgeText}>
+                {escrow.status === 'CASH_CONFIRMED' ? 'Cash payment selected' : t('booking.paymentSecured')}
+              </Text>
             </View>
           )}
           {paymentStatus === 'REFUND_REQUIRED' && (
@@ -261,6 +270,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 20 },
 
   sectionLabel: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  rowL: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginBottom: 4 },
+  rowV: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink },
   providerSection: { marginTop: 16 },
   providerRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 14, padding: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   providerInfo: { flex: 1, marginLeft: 12 },

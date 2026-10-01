@@ -1,48 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
-import { ROLE_PERMISSIONS } from '@/lib/admin-types'
+import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
 import { reactivateUser } from '@/lib/domain/admin-suspension'
-import { getIp } from '@/lib/auth/authorization/admin-rbac'
+import type { AdminSession } from '@/lib/admin-types'
 
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'USER_MANAGEMENT', 'MANAGER']
+function adminSession(context: {
+  adminId: string
+  email: string
+  role: AdminSession['role']
+  assignedCountries: string[]
+}): AdminSession {
+  return {
+    id: context.adminId,
+    email: context.email,
+    role: context.role,
+    firstName: '',
+    lastName: '',
+    assignedCountries: context.assignedCountries,
+    authType: 'adminUser',
+  }
+}
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const session = await getAdminSession(request)
-    if (!session || !ALLOWED_ROLES.includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'taskers:edit',
+      level: 'sensitive',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
-    const permissions = ROLE_PERMISSIONS[session.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('users:suspend')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    const { id } = await params
+    if (!id || id.length > 128) return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 })
 
     const body = await request.json().catch(() => ({}))
-    const { reason = 'Reactivated by admin' } = body
+    const reason = typeof body?.reason === 'string'
+      ? body.reason.trim().slice(0, 1000)
+      : 'Reactivated by admin'
+
+    const target = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        role: true,
+        countryCode: true,
+        taskerProfile: { select: { id: true } },
+      },
+    })
+    if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (target.role !== 'TASKER' || !target.taskerProfile) {
+      return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
+    }
+    if (!assertCrmCountryAllowed(security, target.countryCode)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const result = await reactivateUser(prisma, {
       userId: id,
       reason,
-      session,
-      ipAddress: getIp(request),
+      session: adminSession(security),
+      ipAddress: security.ipAddress,
     })
 
-    return NextResponse.json({ success: true, user: { id: result.user.id, isSuspended: false } })
+    return NextResponse.json({
+      success: true,
+      user: { id: result.user.id, isSuspended: false },
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error'
-    if (message.includes('not suspended')) {
-      return NextResponse.json({ error: message }, { status: 409 })
-    }
-    if (message.includes('not found')) {
-      return NextResponse.json({ error: message }, { status: 404 })
-    }
-    console.error('Provider reactivate error:', error)
+    if (message.includes('not suspended')) return NextResponse.json({ error: message }, { status: 409 })
+    if (message.includes('not found')) return NextResponse.json({ error: message }, { status: 404 })
+    console.error('CRM provider reactivate error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

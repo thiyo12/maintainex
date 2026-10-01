@@ -582,7 +582,6 @@ const ta: Record<string, any> = {
     sampleSkill2: 'லைட்டிங்',
     sampleSkill3: 'இன்வெர்ட்டர்கள்',
     sampleSkill4: 'வயரிங் ரிப்பேர்',
-    reviews: 'மதிப்புரைகள்',
     noReviewsYet: 'இன்னும் மதிப்புரைகள் இல்லை',
     sendEnquiry: 'விசாரணை அனுப்புக',
     askQuote: 'மேற்கோள் கேளுங்கள்',
@@ -676,6 +675,7 @@ const ta: Record<string, any> = {
       confirmReject: 'இந்த நிலையை நிராகரிக்க விரும்புகிறீர்களா?',
       confirmDeactivate: 'இந்த பணியாளரை செயலிழக்கச் செய்ய விரும்புகிறீர்களா? செயலில் உள்ள நிலைகள் ரத்து செய்யப்படும்.',
     },
+  },
   postJob: {
     header: 'வேலை இடுக',
     step1: {
@@ -1095,7 +1095,6 @@ const ta: Record<string, any> = {
     helpSupport: 'உதவி & ஆதரவு',
     termsPrivacy: 'விதிமுறைகள் & தனியுரிமை',
     editProfileHeader: 'சுயவிவரத்தை திருத்து',
-    fullName: 'முழு பெயர்',
     email: 'மின்னஞ்சல்',
     phone: 'தொலைபேசி',
     role: 'பங்கு',
@@ -1108,7 +1107,6 @@ const ta: Record<string, any> = {
     noPaymentMethods: 'கட்டண முறைகள் இல்லை',
     addPaymentMethod: 'தொடங்க ஒன்றை சேர்க்கவும்',
     jobUpdates: 'வேலை புதுப்பிப்புகள்',
-    messages: 'செய்திகள்',
     promotions: 'விளம்பரங்கள்',
     faq: 'அடிக்கடி கேட்கப்படும் கேள்விகள்',
     contactUs: 'எங்களை தொடர்பு கொள்ள',
@@ -1712,7 +1710,6 @@ const ta: Record<string, any> = {
     adjustmentRequired: 'விலை சரிசெய்தலை உள்ளிடவும்',
     noAcceptedQuote: 'இந்த வேலைக்கு ஏற்றுக்கொள்ளப்பட்ட மேற்கோள் இல்லை',
   },
-}
 }
 
 export default ta

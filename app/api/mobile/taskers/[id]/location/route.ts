@@ -15,40 +15,84 @@ export async function GET(
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     const isCustomer = job.customerId === user.id
-    const hasQuote = !!(await prisma.jobQuote.findFirst({
-      where: { jobId: job.id, providerId: user.id },
-    }))
-    if (!isCustomer && !hasQuote) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: job.id } })
-    const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
-
     const quote = await prisma.jobQuote.findFirst({
       where: { jobId: job.id, status: 'ACCEPTED' },
+      select: { providerId: true, providerType: true },
     })
-    let location = null
-    if (quote) {
-      const taskerProfile = await prisma.taskerProfile.findUnique({
-        where: { userId: quote.providerId },
-        select: { latitude: true, longitude: true, locationUpdatedAt: true },
+    if (!quote) {
+      return NextResponse.json({ sharing: false, location: null })
+    }
+
+    let providerUserId: string | null = null
+    let isAcceptedProvider = false
+
+    if (quote.providerType === 'INDIVIDUAL') {
+      providerUserId = quote.providerId
+      isAcceptedProvider = user.id === quote.providerId
+    } else {
+      const assignment = await prisma.companyJobAssignment.findFirst({
+        where: {
+          jobId: job.id,
+          companyId: quote.providerId,
+          status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+        },
+        select: { workerUserId: true },
       })
-      if (taskerProfile) {
-        location = {
-          providerId: quote.providerId,
-          latitude: taskerProfile.latitude,
-          longitude: taskerProfile.longitude,
-          updatedAt: taskerProfile.locationUpdatedAt,
-        }
+      providerUserId = assignment?.workerUserId ?? null
+
+      if (providerUserId === user.id) {
+        isAcceptedProvider = true
+      } else {
+        const manager = await prisma.teamMember.findFirst({
+          where: {
+            companyId: quote.providerId,
+            userId: user.id,
+            status: 'ACTIVE',
+            role: { in: ['COMPANY_OWNER', 'MANAGER', 'DISPATCHER'] },
+          },
+          select: { id: true },
+        })
+        isAcceptedProvider = !!manager
       }
     }
 
+    if (!isCustomer && !isAcceptedProvider) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const [workspace, protectedEscrow] = await Promise.all([
+      prisma.jobWorkspace.findUnique({ where: { jobId: job.id } }),
+      prisma.jobEscrow.findFirst({
+        where: { jobId: job.id, status: 'PROTECTED' },
+        select: { id: true },
+      }),
+    ])
+
     const sharing =
-      workspace?.progressStatus === 'ACCEPTED' || workspace?.progressStatus === 'IN_PROGRESS'
+      !!protectedEscrow &&
+      (workspace?.progressStatus === 'ACCEPTED' || workspace?.progressStatus === 'IN_PROGRESS')
+
+    if (!sharing || !providerUserId) {
+      return NextResponse.json({ sharing: false, location: null })
+    }
+
+    const taskerProfile = await prisma.taskerProfile.findUnique({
+      where: { userId: providerUserId },
+      select: { latitude: true, longitude: true, locationUpdatedAt: true },
+    })
+
+    const location =
+      taskerProfile?.latitude != null && taskerProfile.longitude != null
+        ? {
+            providerId: providerUserId,
+            latitude: taskerProfile.latitude,
+            longitude: taskerProfile.longitude,
+            updatedAt: taskerProfile.locationUpdatedAt,
+          }
+        : null
 
     return NextResponse.json({
-      sharing: !!location && sharing,
+      sharing: !!location,
       location,
     })
   } catch (error) {

@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiShield, FiCheck, FiX, FiRefreshCw, FiUser, FiSearch } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface Credential {
   id: string
@@ -27,10 +28,12 @@ const STATUS_TABS = [
 ] as const
 
 export default function CredentialsPage() {
-  return <AdminLayout><CredentialsContent /></AdminLayout>
+  return <><CredentialsContent /></>
 }
 
 function CredentialsContent() {
+  const { user: admin } = useAdminSession()
+  const canReviewCredentials = !!admin && (ROLE_PERMISSIONS[admin.role as AdminRole] || []).includes('credentials:write')
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<string>('PENDING')
@@ -57,6 +60,10 @@ function CredentialsContent() {
   useEffect(() => { fetchCredentials() }, [fetchCredentials])
 
   const handleReview = async (id: string, status: string, reason?: string) => {
+    if (!canReviewCredentials) {
+      toast.error('You do not have permission to review credentials')
+      return
+    }
     setActionLoading(id)
     try {
       const body: Record<string, string> = { status }
@@ -78,7 +85,7 @@ function CredentialsContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center space-x-3">
           <FiShield className="w-6 h-6 text-amber-500" />
           <h1 className="text-2xl font-bold text-white">Credential Review</h1>
@@ -89,7 +96,7 @@ function CredentialsContent() {
         </button>
       </div>
 
-      <div className="flex space-x-1 bg-[#15161E] rounded-lg p-1">
+      <div className="flex space-x-1 bg-[#15161E] rounded-lg p-1 overflow-x-auto">
         {STATUS_TABS.map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); setPage(1) }}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === t.key ? 'bg-amber-500 text-[#0B0C12]' : 'text-gray-400 hover:text-white'}`}>
@@ -98,8 +105,8 @@ function CredentialsContent() {
         ))}
       </div>
 
-      <div className="bg-[#15161E] rounded-xl overflow-hidden">
-        <table className="w-full">
+      <div className="bg-[#15161E] rounded-xl overflow-x-auto">
+        <table className="w-full min-w-[760px]">
           <thead><tr className="border-b border-gray-800">
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Name</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Type</th>
@@ -130,7 +137,7 @@ function CredentialsContent() {
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</td>
                 <td className="px-4 py-3">
-                  {c.verificationStatus === 'PENDING' && (
+                  {canReviewCredentials && c.verificationStatus === 'PENDING' && (
                     <div className="flex items-center space-x-2">
                       <button onClick={() => handleReview(c.id, 'VERIFIED')} disabled={actionLoading === c.id}
                         className="flex items-center space-x-1 px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 disabled:opacity-50 text-xs">
@@ -142,6 +149,9 @@ function CredentialsContent() {
                       </button>
                     </div>
                   )}
+                  {!canReviewCredentials && c.verificationStatus === 'PENDING' && (
+                    <span className="text-xs text-gray-600">Read only</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -150,7 +160,7 @@ function CredentialsContent() {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-gray-400">{total} total</span>
           <div className="flex items-center space-x-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
@@ -162,7 +172,7 @@ function CredentialsContent() {
         </div>
       )}
 
-      {rejectModal && (
+      {canReviewCredentials && rejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-[#15161E] rounded-xl p-6 w-full max-w-md border border-gray-800">
             <h3 className="text-lg font-semibold text-white mb-4">Reject Credential</h3>

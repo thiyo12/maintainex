@@ -273,6 +273,7 @@ const styles = StyleSheet.create({
     fontSize: 12, fontFamily: 'Outfit_600SemiBold', textTransform: 'uppercase', letterSpacing: 1,
     color: colors.textSecondary, marginBottom: spacing.sm, marginTop: spacing.md,
   },
+  section: { marginBottom: spacing.sm },
 
   menuPress: { borderRadius: radius.md },
   menuRow: {

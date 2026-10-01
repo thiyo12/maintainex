@@ -19,6 +19,20 @@ export interface ReactivateUserInput {
   ipAddress: string
 }
 
+export interface BanUserInput {
+  userId: string
+  reason: string
+  session: AdminSession
+  ipAddress: string
+}
+
+export interface UnbanUserInput {
+  userId: string
+  reason: string
+  session: AdminSession
+  ipAddress: string
+}
+
 export interface SuspendCompanyInput {
   companyProfileId: string
   reason: string
@@ -44,59 +58,72 @@ export async function suspendUser(
     throw new Error('Suspension reason is required (minimum 3 characters)')
   }
 
-  const user = await tx.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true, email: true, name: true, role: true,
-      isSuspended: true, isBanned: true, countryCode: true,
-    },
-  })
+  return tx.$transaction(async (db) => {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, email: true, name: true, role: true,
+        isSuspended: true, isBanned: true, countryCode: true,
+        suspensionReason: true, suspendedUntil: true,
+      },
+    })
 
-  if (!user) throw new Error('User not found')
-  if (user.isSuspended) throw new Error('User is already suspended')
-  if (user.isBanned) throw new Error('User is banned — use unban first')
+    if (!user) throw new Error('User not found')
+    if (user.isSuspended) throw new Error('User is already suspended')
+    if (user.isBanned) throw new Error('User is banned — use unban first')
 
-  const oldValue = {
-    isSuspended: false,
-    suspensionReason: null,
-    suspendedUntil: null,
-  }
-  const newValue = {
-    isSuspended: true,
-    suspensionReason: reason,
-    suspendedUntil: expiresAt ?? null,
-    scope,
-  }
-
-  const updated = await tx.user.update({
-    where: { id: userId },
-    data: {
+    const oldValue = {
+      isSuspended: user.isSuspended,
+      suspensionReason: user.suspensionReason,
+      suspendedUntil: user.suspendedUntil,
+    }
+    const newValue = {
       isSuspended: true,
       suspensionReason: reason,
       suspendedUntil: expiresAt ?? null,
-    },
-    select: {
-      id: true, email: true, name: true, role: true,
-      isSuspended: true, isBanned: true, countryCode: true,
-    },
-  })
+      scope,
+    }
 
-  await tx.auditLog.create({
-    data: {
-      adminUserId: session.id,
-      adminEmail: session.email,
-      adminRole: session.role,
-      action: 'PROVIDER_SUSPEND' as AuditAction,
-      targetTable: 'User',
-      targetId: userId,
-      targetLabel: `${user.name} (${user.email})`,
-      oldValue: JSON.stringify(oldValue),
-      newValue: JSON.stringify(newValue),
-      ipAddress,
-    },
-  })
+    const updated = await db.user.update({
+      where: { id: userId },
+      data: {
+        isSuspended: true,
+        suspensionReason: reason,
+        suspendedUntil: expiresAt ?? null,
+      },
+      select: {
+        id: true, email: true, name: true, role: true,
+        isSuspended: true, isBanned: true, countryCode: true,
+        suspendedUntil: true,
+      },
+    })
 
-  return { success: true, userId, user: updated }
+    await db.userSession.updateMany({
+      where: { userId, isValid: true },
+      data: {
+        isValid: false,
+        revokedAt: new Date(),
+        revokeReason: 'ACCOUNT_SUSPENDED',
+      },
+    })
+
+    await db.auditLog.create({
+      data: {
+        adminUserId: session.id,
+        adminEmail: session.email,
+        adminRole: session.role,
+        action: user.role === 'CUSTOMER' ? 'SUSPEND' as AuditAction : 'PROVIDER_SUSPEND' as AuditAction,
+        targetTable: 'User',
+        targetId: userId,
+        targetLabel: `${user.name} (${user.email})`,
+        oldValue: JSON.stringify(oldValue),
+        newValue: JSON.stringify(newValue),
+        ipAddress,
+      },
+    })
+
+    return { success: true, userId, user: updated }
+  })
 }
 
 export async function reactivateUser(
@@ -105,57 +132,199 @@ export async function reactivateUser(
 ) {
   const { userId, reason, session, ipAddress } = input
 
-  const user = await tx.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true, email: true, name: true,
-      isSuspended: true, suspensionReason: true,
-    },
-  })
+  return tx.$transaction(async (db) => {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, email: true, name: true, role: true,
+        isSuspended: true, isBanned: true, suspensionReason: true,
+        suspendedUntil: true, countryCode: true,
+      },
+    })
 
-  if (!user) throw new Error('User not found')
-  if (!user.isSuspended) throw new Error('User is not suspended')
+    if (!user) throw new Error('User not found')
+    if (!user.isSuspended) throw new Error('User is not suspended')
 
-  const oldValue = {
-    isSuspended: true,
-    suspensionReason: user.suspensionReason,
-  }
-  const newValue = {
-    isSuspended: false,
-    suspensionReason: null,
-    suspendedUntil: null,
-    reason,
-  }
-
-  const updated = await tx.user.update({
-    where: { id: userId },
-    data: {
+    const oldValue = {
+      isSuspended: true,
+      suspensionReason: user.suspensionReason,
+      suspendedUntil: user.suspendedUntil,
+    }
+    const newValue = {
       isSuspended: false,
       suspensionReason: null,
       suspendedUntil: null,
-    },
-    select: {
-      id: true, email: true, name: true, role: true,
-      isSuspended: true, isBanned: true, countryCode: true,
-    },
-  })
+      reason,
+    }
 
-  await tx.auditLog.create({
-    data: {
-      adminUserId: session.id,
-      adminEmail: session.email,
-      adminRole: session.role,
-      action: 'PROVIDER_REACTIVATE' as AuditAction,
-      targetTable: 'User',
-      targetId: userId,
-      targetLabel: `${user.name} (${user.email})`,
-      oldValue: JSON.stringify(oldValue),
-      newValue: JSON.stringify(newValue),
-      ipAddress,
-    },
-  })
+    const updated = await db.user.update({
+      where: { id: userId },
+      data: {
+        isSuspended: false,
+        suspensionReason: null,
+        suspendedUntil: null,
+      },
+      select: {
+        id: true, email: true, name: true, role: true,
+        isSuspended: true, isBanned: true, countryCode: true,
+      },
+    })
 
-  return { success: true, userId, user: updated }
+    await db.auditLog.create({
+      data: {
+        adminUserId: session.id,
+        adminEmail: session.email,
+        adminRole: session.role,
+        action: user.role === 'CUSTOMER' ? 'UNSUSPEND' as AuditAction : 'PROVIDER_REACTIVATE' as AuditAction,
+        targetTable: 'User',
+        targetId: userId,
+        targetLabel: `${user.name} (${user.email})`,
+        oldValue: JSON.stringify(oldValue),
+        newValue: JSON.stringify(newValue),
+        ipAddress,
+      },
+    })
+
+    return { success: true, userId, user: updated }
+  })
+}
+
+export async function banUser(
+  tx: PrismaClient,
+  input: BanUserInput
+) {
+  const { userId, reason, session, ipAddress } = input
+
+  if (!reason || reason.trim().length < 3) {
+    throw new Error('Ban reason is required (minimum 3 characters)')
+  }
+
+  return tx.$transaction(async (db) => {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, email: true, name: true, role: true,
+        isActive: true, isSuspended: true, isBanned: true,
+        banReason: true, countryCode: true,
+      },
+    })
+
+    if (!user) throw new Error('User not found')
+    if (user.isBanned) throw new Error('User is already banned')
+
+    const updated = await db.user.update({
+      where: { id: userId },
+      data: {
+        isBanned: true,
+        banReason: reason,
+        isActive: false,
+      },
+      select: {
+        id: true, email: true, name: true, role: true,
+        isActive: true, isSuspended: true, isBanned: true,
+        countryCode: true,
+      },
+    })
+
+    await db.userSession.updateMany({
+      where: { userId, isValid: true },
+      data: {
+        isValid: false,
+        revokedAt: new Date(),
+        revokeReason: 'ACCOUNT_BANNED',
+      },
+    })
+
+    await db.auditLog.create({
+      data: {
+        adminUserId: session.id,
+        adminEmail: session.email,
+        adminRole: session.role,
+        action: 'BAN' as AuditAction,
+        targetTable: 'User',
+        targetId: userId,
+        targetLabel: `${user.name} (${user.email})`,
+        oldValue: JSON.stringify({
+          isActive: user.isActive,
+          isSuspended: user.isSuspended,
+          isBanned: user.isBanned,
+          banReason: user.banReason,
+        }),
+        newValue: JSON.stringify({
+          isActive: false,
+          isSuspended: user.isSuspended,
+          isBanned: true,
+          banReason: reason,
+        }),
+        ipAddress,
+      },
+    })
+
+    return { success: true, userId, user: updated }
+  })
+}
+
+export async function unbanUser(
+  tx: PrismaClient,
+  input: UnbanUserInput
+) {
+  const { userId, reason, session, ipAddress } = input
+
+  return tx.$transaction(async (db) => {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, email: true, name: true, role: true,
+        isActive: true, isSuspended: true, isBanned: true,
+        banReason: true, countryCode: true,
+      },
+    })
+
+    if (!user) throw new Error('User not found')
+    if (!user.isBanned) throw new Error('User is not banned')
+
+    const updated = await db.user.update({
+      where: { id: userId },
+      data: {
+        isBanned: false,
+        banReason: null,
+        isActive: true,
+      },
+      select: {
+        id: true, email: true, name: true, role: true,
+        isActive: true, isSuspended: true, isBanned: true,
+        countryCode: true,
+      },
+    })
+
+    await db.auditLog.create({
+      data: {
+        adminUserId: session.id,
+        adminEmail: session.email,
+        adminRole: session.role,
+        action: 'UNBAN' as AuditAction,
+        targetTable: 'User',
+        targetId: userId,
+        targetLabel: `${user.name} (${user.email})`,
+        oldValue: JSON.stringify({
+          isActive: user.isActive,
+          isSuspended: user.isSuspended,
+          isBanned: user.isBanned,
+          banReason: user.banReason,
+        }),
+        newValue: JSON.stringify({
+          isActive: true,
+          isSuspended: user.isSuspended,
+          isBanned: false,
+          banReason: null,
+          reason,
+        }),
+        ipAddress,
+      },
+    })
+
+    return { success: true, userId, user: updated }
+  })
 }
 
 export async function suspendCompany(
@@ -168,57 +337,72 @@ export async function suspendCompany(
     throw new Error('Suspension reason is required (minimum 3 characters)')
   }
 
-  const company = await tx.companyProfile.findUnique({
-    where: { id: companyProfileId },
-    select: {
-      id: true, companyName: true, userId: true,
-      verificationStatus: true,
-    },
-  })
-
-  if (!company) throw new Error('Company not found')
-
-  const user = await tx.user.findUnique({
-    where: { id: company.userId },
-    select: { id: true, isSuspended: true },
-  })
-
-  if (user?.isSuspended) throw new Error('Company owner is already suspended')
-
-  const oldValue = { verificationStatus: company.verificationStatus }
-  const newValue = { verificationStatus: 'SUSPENDED', reason, scope }
-
-  await tx.companyProfile.update({
-    where: { id: companyProfileId },
-    data: { verificationStatus: 'SUSPENDED' },
-  })
-
-  if (user) {
-    await tx.user.update({
-      where: { id: company.userId },
-      data: {
-        isSuspended: true,
-        suspensionReason: `Company suspended: ${reason}`,
+  return tx.$transaction(async (db) => {
+    const company = await db.companyProfile.findUnique({
+      where: { id: companyProfileId },
+      select: {
+        id: true, companyName: true, userId: true,
+        verificationStatus: true,
       },
     })
-  }
 
-  await tx.auditLog.create({
-    data: {
-      adminUserId: session.id,
-      adminEmail: session.email,
-      adminRole: session.role,
-      action: 'COMPANY_SUSPEND' as AuditAction,
-      targetTable: 'CompanyProfile',
-      targetId: companyProfileId,
-      targetLabel: company.companyName,
-      oldValue: JSON.stringify(oldValue),
-      newValue: JSON.stringify(newValue),
-      ipAddress,
-    },
+    if (!company) throw new Error('Company not found')
+    if (company.verificationStatus === 'SUSPENDED') {
+      throw new Error('Company is already suspended')
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: company.userId },
+      select: { id: true, isSuspended: true, suspensionReason: true },
+    })
+
+    if (user?.isSuspended) throw new Error('Company owner is already suspended')
+
+    const oldValue = { verificationStatus: company.verificationStatus }
+    const ownerSuspensionReason = `Company suspended [${companyProfileId}]: ${reason}`
+    const newValue = { verificationStatus: 'SUSPENDED', reason, scope }
+
+    await db.companyProfile.update({
+      where: { id: companyProfileId },
+      data: { verificationStatus: 'SUSPENDED' },
+    })
+
+    if (user) {
+      await db.user.update({
+        where: { id: company.userId },
+        data: {
+          isSuspended: true,
+          suspensionReason: ownerSuspensionReason,
+          suspendedUntil: null,
+        },
+      })
+      await db.userSession.updateMany({
+        where: { userId: company.userId, isValid: true },
+        data: {
+          isValid: false,
+          revokedAt: new Date(),
+          revokeReason: 'COMPANY_SUSPENDED',
+        },
+      })
+    }
+
+    await db.auditLog.create({
+      data: {
+        adminUserId: session.id,
+        adminEmail: session.email,
+        adminRole: session.role,
+        action: 'COMPANY_SUSPEND' as AuditAction,
+        targetTable: 'CompanyProfile',
+        targetId: companyProfileId,
+        targetLabel: company.companyName,
+        oldValue: JSON.stringify(oldValue),
+        newValue: JSON.stringify(newValue),
+        ipAddress,
+      },
+    })
+
+    return { success: true, companyProfileId, company }
   })
-
-  return { success: true, companyProfileId, company }
 }
 
 export async function reactivateCompany(
@@ -227,54 +411,90 @@ export async function reactivateCompany(
 ) {
   const { companyProfileId, reason, session, ipAddress } = input
 
-  const company = await tx.companyProfile.findUnique({
-    where: { id: companyProfileId },
-    select: {
-      id: true, companyName: true, userId: true,
-      verificationStatus: true,
-    },
-  })
-
-  if (!company) throw new Error('Company not found')
-  if (company.verificationStatus !== 'SUSPENDED') {
-    throw new Error('Company is not suspended')
-  }
-
-  const oldValue = { verificationStatus: 'SUSPENDED' }
-  const newValue = { verificationStatus: 'VERIFIED', reason }
-
-  await tx.companyProfile.update({
-    where: { id: companyProfileId },
-    data: { verificationStatus: 'VERIFIED' },
-  })
-
-  if (company.userId) {
-    await tx.user.update({
-      where: { id: company.userId },
-      data: {
-        isSuspended: false,
-        suspensionReason: null,
-        suspendedUntil: null,
+  return tx.$transaction(async (db) => {
+    const company = await db.companyProfile.findUnique({
+      where: { id: companyProfileId },
+      select: {
+        id: true, companyName: true, userId: true,
+        verificationStatus: true,
       },
     })
-  }
 
-  await tx.auditLog.create({
-    data: {
-      adminUserId: session.id,
-      adminEmail: session.email,
-      adminRole: session.role,
-      action: 'COMPANY_REACTIVATE' as AuditAction,
-      targetTable: 'CompanyProfile',
-      targetId: companyProfileId,
-      targetLabel: company.companyName,
-      oldValue: JSON.stringify(oldValue),
-      newValue: JSON.stringify(newValue),
-      ipAddress,
-    },
+    if (!company) throw new Error('Company not found')
+    if (company.verificationStatus !== 'SUSPENDED') {
+      throw new Error('Company is not suspended')
+    }
+
+    const owner = company.userId
+      ? await db.user.findUnique({
+          where: { id: company.userId },
+          select: {
+            id: true,
+            isSuspended: true,
+            isBanned: true,
+            suspensionReason: true,
+          },
+        })
+      : null
+
+    if (owner?.isBanned) {
+      throw new Error('Company owner is banned — unban before reactivating company')
+    }
+
+    const companySuspensionPrefix = `Company suspended [${companyProfileId}]:`
+    const isCompanySuspensionReason = (value: string | null) =>
+      Boolean(
+        value &&
+        (
+          value.startsWith(companySuspensionPrefix) ||
+          value.startsWith('Company suspended:')
+        )
+      )
+
+    if (
+      owner?.isSuspended &&
+      owner.suspensionReason &&
+      !isCompanySuspensionReason(owner.suspensionReason)
+    ) {
+      throw new Error('Company owner has a separate account suspension that must be resolved independently')
+    }
+
+    const oldValue = { verificationStatus: 'SUSPENDED' }
+    const newValue = { verificationStatus: 'VERIFIED', reason }
+
+    await db.companyProfile.update({
+      where: { id: companyProfileId },
+      data: { verificationStatus: 'VERIFIED' },
+    })
+
+    if (owner?.isSuspended && isCompanySuspensionReason(owner.suspensionReason)) {
+      await db.user.update({
+        where: { id: company.userId },
+        data: {
+          isSuspended: false,
+          suspensionReason: null,
+          suspendedUntil: null,
+        },
+      })
+    }
+
+    await db.auditLog.create({
+      data: {
+        adminUserId: session.id,
+        adminEmail: session.email,
+        adminRole: session.role,
+        action: 'COMPANY_REACTIVATE' as AuditAction,
+        targetTable: 'CompanyProfile',
+        targetId: companyProfileId,
+        targetLabel: company.companyName,
+        oldValue: JSON.stringify(oldValue),
+        newValue: JSON.stringify(newValue),
+        ipAddress,
+      },
+    })
+
+    return { success: true, companyProfileId, company }
   })
-
-  return { success: true, companyProfileId, company }
 }
 
 export async function isUserSuspended(

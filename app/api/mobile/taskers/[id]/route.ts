@@ -45,8 +45,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         isOnline: resolved.isOnline,
         completionRate: resolved.completionRate,
         avgResponseMin: resolved.avgResponseMin,
-        latitude: resolved.latitude,
-        longitude: resolved.longitude,
         profileImage: resolved.profileImage,
         user: resolved.user,
         reviews: resolved.reviews.map(r => ({
@@ -72,8 +70,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       isOnline: tasker.isOnline,
       completionRate: tasker.completionRate,
       avgResponseMin: tasker.avgResponseMin,
-      latitude: tasker.latitude,
-      longitude: tasker.longitude,
       profileImage: tasker.profileImage,
       user: tasker.user,
       reviews: tasker.reviews.map(r => ({

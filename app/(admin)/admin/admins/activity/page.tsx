@@ -7,7 +7,6 @@ import {
   FiEye, FiArrowRight, FiCircle, FiSearch, FiCalendar, FiChevronDown,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface StaffMember {
   id: string
@@ -166,7 +165,7 @@ export default function StaffActivityMonitor() {
 
   if (user?.role !== 'SUPER_ADMIN') {
     return (
-      <AdminLayout>
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="text-center p-8 bg-[#15161E] rounded-xl border border-white/5">
             <FiShield className="w-12 h-12 text-red-500 mx-auto mb-3" />
@@ -174,12 +173,12 @@ export default function StaffActivityMonitor() {
             <p className="text-gray-400 text-sm">Super Admin privileges required.</p>
           </div>
         </div>
-      </AdminLayout>
+      </>
     )
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -552,6 +551,6 @@ export default function StaffActivityMonitor() {
           </>
         ) : null}
       </div>
-    </AdminLayout>
+    </>
   )
 }

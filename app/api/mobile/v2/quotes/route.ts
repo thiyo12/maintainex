@@ -9,6 +9,7 @@ import { findCandidates } from '@/lib/matching'
 import { validateQuotePrice } from '@/lib/pricing/engine'
 import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
 import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/shared/money/money'
+import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,6 +39,8 @@ export async function POST(request: NextRequest) {
     let resolvedProviderType: 'INDIVIDUAL' | 'COMPANY' = 'INDIVIDUAL'
     let actorUserId: string | null = null
     let actorRole: string | null = null
+    let providerProfileId: string | null = null
+    let companyOwnerUserId: string | null = null
 
     if (providerType === 'COMPANY') {
       if (!companyId) {
@@ -54,6 +57,7 @@ export async function POST(request: NextRequest) {
       if (!profile) {
         return NextResponse.json({ error: 'You must have a provider profile to submit quotes' }, { status: 403 })
       }
+      providerProfileId = profile.id
     }
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
@@ -73,9 +77,10 @@ export async function POST(request: NextRequest) {
     if (resolvedProviderType === 'COMPANY') {
       const companyProfile = await prisma.companyProfile.findUnique({
         where: { id: resolvedProviderId },
-        select: { countryCode: true },
+        select: { countryCode: true, userId: true },
       })
       providerCountry = companyProfile?.countryCode || 'LK'
+      companyOwnerUserId = companyProfile?.userId ?? null
     } else {
       providerCountry = user.countryCode || 'LK'
     }
@@ -85,6 +90,23 @@ export async function POST(request: NextRequest) {
         error: 'Provider country does not match job country',
         code: 'PROVIDER_COUNTRY_MISMATCH',
       }, { status: 403 })
+    }
+
+    const allowedTargetIds = new Set(
+      [
+        resolvedProviderId,
+        providerProfileId,
+        companyOwnerUserId,
+      ].filter((value): value is string => Boolean(value))
+    )
+    if (job.targetTaskerId && !allowedTargetIds.has(job.targetTaskerId)) {
+      return NextResponse.json(
+        {
+          error: 'This direct booking is reserved for another provider',
+          code: 'TARGET_PROVIDER_MISMATCH',
+        },
+        { status: 403 }
+      )
     }
 
     const matching = await findCandidates(prisma, {
@@ -117,37 +139,87 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: priceCheck.error }, { status: 400 })
     }
 
-    const existing = await prisma.jobQuote.findFirst({
-      where: { jobId, providerId: resolvedProviderId },
-    })
-    if (existing) return NextResponse.json({ error: 'You already submitted a quote' }, { status: 409 })
+    const quote = await prisma.$transaction(async tx => {
+      await lockAndAssertProviderAvailable(
+        tx,
+        resolvedProviderType,
+        resolvedProviderId,
+        'Provider is no longer available to submit this quote',
+      )
 
-    const quote = await prisma.jobQuote.create({
-      data: {
-        jobId,
-        providerId: resolvedProviderId,
-        providerType: resolvedProviderType,
-        price: priceMinor,
-        currency,
-        actorUserId,
-        actorRole,
-        estimatedCompletionTime: typeof estimatedCompletionTime === 'string' ? estimatedCompletionTime.slice(0, 200) : '',
-        message: typeof message === 'string' ? message.slice(0, 5000) : '',
-        attachments: JSON.stringify(Array.isArray(attachments) ? attachments : []),
-      },
-    })
+      const lockedJobs = await tx.$queryRaw<Array<{ id: string; status: string; targetTaskerId: string | null }>>`
+        SELECT id, status, "targetTaskerId"
+        FROM "MarketplaceJob"
+        WHERE id = ${jobId}
+        FOR UPDATE
+      `
+      const lockedJob = lockedJobs[0]
+      if (!lockedJob) throw new Error('JOB_NOT_FOUND')
+      if (lockedJob.status !== 'OPEN') throw new Error('JOB_NO_LONGER_OPEN')
+      if (lockedJob.targetTaskerId && !allowedTargetIds.has(lockedJob.targetTaskerId)) {
+        throw new Error('TARGET_PROVIDER_MISMATCH')
+      }
 
-    if (job.responseState === 'awaiting') {
-      await prisma.marketplaceJob.updateMany({
-        where: { id: jobId, responseState: 'awaiting' },
-        data: { responseState: 'responded' },
+      const existing = await tx.jobQuote.findFirst({
+        where: {
+          jobId,
+          providerId: resolvedProviderId,
+          providerType: resolvedProviderType,
+          status: { in: ['PENDING', 'ACCEPTED'] },
+        },
+        select: { id: true },
       })
-    }
+      if (existing) {
+        throw new Error('ACTIVE_QUOTE_EXISTS')
+      }
+
+      const created = await tx.jobQuote.create({
+        data: {
+          jobId,
+          providerId: resolvedProviderId,
+          providerType: resolvedProviderType,
+          price: priceMinor,
+          currency,
+          actorUserId,
+          actorRole,
+          estimatedCompletionTime: typeof estimatedCompletionTime === 'string' ? estimatedCompletionTime.slice(0, 200) : '',
+          message: typeof message === 'string' ? message.slice(0, 5000) : '',
+          attachments: JSON.stringify(Array.isArray(attachments) ? attachments : []),
+        },
+      })
+
+      if (job.responseState === 'awaiting') {
+        await tx.marketplaceJob.updateMany({
+          where: { id: jobId, responseState: 'awaiting' },
+          data: { responseState: 'responded' },
+        })
+      }
+
+      return created
+    })
 
     await notifyQuoteSubmitted(jobId, job.customerId, user.name || 'A provider')
 
     return NextResponse.json({ quote: { ...quote, price: minorUnitsToMajorUnits(quote.price, currency) } }, { status: 201 })
   } catch (error) {
+    if (error instanceof Error && error.message === 'ACTIVE_QUOTE_EXISTS') {
+      return NextResponse.json({ error: 'You already have an active quote for this job' }, { status: 409 })
+    }
+    if (error instanceof Error && error.message === 'JOB_NOT_FOUND') {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    }
+    if (error instanceof Error && error.message === 'JOB_NO_LONGER_OPEN') {
+      return NextResponse.json({ error: 'Job is no longer accepting quotes' }, { status: 409 })
+    }
+    if (error instanceof Error && error.message === 'TARGET_PROVIDER_MISMATCH') {
+      return NextResponse.json(
+        { error: 'This direct booking is reserved for another provider', code: 'TARGET_PROVIDER_MISMATCH' },
+        { status: 403 }
+      )
+    }
+    if (error instanceof Error && error.message.includes('Provider is no longer available')) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ error: 'You already have an active quote for this job' }, { status: 409 })
     }

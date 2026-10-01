@@ -16,6 +16,8 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
   let techAdminId: string
   let financeToken: string
   let techToken: string
+  let financeSessionId: string
+  let techSessionId: string
   let providerUserId: string
   let providerWalletId: string
 
@@ -36,6 +38,14 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
       },
     })
     financeAdminId = financeAdmin.id
+    const financeSession = await prisma.adminSession.create({
+      data: {
+        adminUserId: financeAdmin.id,
+        refreshTokenHash: `payout-finance-refresh-${ts}`,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    })
+    financeSessionId = financeSession.id
     financeToken = signAccessToken({
       id: financeAdmin.id,
       email: financeAdmin.email,
@@ -43,6 +53,7 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
       firstName: 'Fin',
       lastName: 'PayoutApi',
       assignedCountries: ['LK'],
+      sessionId: financeSession.id,
     })
 
     const techAdmin = await prisma.adminUser.create({
@@ -57,6 +68,14 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
       },
     })
     techAdminId = techAdmin.id
+    const techSession = await prisma.adminSession.create({
+      data: {
+        adminUserId: techAdmin.id,
+        refreshTokenHash: `payout-technical-refresh-${ts}`,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    })
+    techSessionId = techSession.id
     techToken = signAccessToken({
       id: techAdmin.id,
       email: techAdmin.email,
@@ -64,6 +83,7 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
       firstName: 'Tech',
       lastName: 'PayoutApi',
       assignedCountries: ['LK'],
+      sessionId: techSession.id,
     })
 
     const provider = await prisma.user.create({
@@ -122,6 +142,7 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
     await prisma.walletBalance.deleteMany({ where: { walletId: providerWalletId } }).catch(() => {})
     await prisma.providerWallet.delete({ where: { id: providerWalletId } }).catch(() => {})
     await prisma.user.delete({ where: { id: providerUserId } }).catch(() => {})
+    await prisma.adminSession.deleteMany({ where: { id: { in: [financeSessionId, techSessionId] } } }).catch(() => {})
     await prisma.adminUser.deleteMany({ where: { id: { in: [financeAdminId, techAdminId] } } }).catch(() => {})
     await prisma.$disconnect()
   })
@@ -147,7 +168,7 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
     const ok = await GET(makeGet(financeToken))
     expect(ok.status).toBe(200)
     const denied = await GET(makeGet(techToken))
-    expect(denied.status).toBe(401)
+    expect(denied.status).toBe(403)
   })
 
   it('FINANCE admin approves RESERVED payout to SUCCEEDED (one-click, auto PROCESSING)', async () => {

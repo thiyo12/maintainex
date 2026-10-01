@@ -9,6 +9,7 @@ import { auth } from '@/api/auth'
 import { resolveImageUri } from '@/api/client'
 import { useTheme } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
+import { addNotificationListeners } from '@/features/notifications/platform'
 
 const CLOSED_STATUSES = ['COMPLETED', 'CANCELLED', 'REJECTED']
 const CLIENT_CONTACT = /\+?\d[\d\s\-.]{6,}\d|[\w.+-]+@[\w-]+\.[\w.-]{2,}/g
@@ -89,6 +90,18 @@ export default function ChatDetailScreen() {
       const interval = setInterval(fetchMessages, 5000)
       return () => clearInterval(interval)
     }, [fetchMessages, userId])
+  )
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isDemo) return
+      return addNotificationListeners((notification: any) => {
+        const data = notification?.request?.content?.data || {}
+        if (data.referenceType === 'CHAT' && data.referenceId === id) {
+          fetchMessages()
+        }
+      })
+    }, [fetchMessages, id, isDemo])
   )
 
   useFocusEffect(
@@ -223,7 +236,7 @@ export default function ChatDetailScreen() {
                     onPress={() => router.push(`/(customer)/jobs/v2/${job.id}`)}
                   >
                     {job.photos?.length ? (
-                      <Image source={{ uri: resolveImageUri(job.photos[0]) }} style={styles.jobCardImg} />
+                      <Image source={{ uri: resolveImageUri(job.photos[0]) || '' }} style={styles.jobCardImg} />
                     ) : (
                       <View style={[styles.jobCardImg, styles.jobCardImgPlaceholder, { backgroundColor: colors.amberBg }]}>
                         <Ionicons name="build-outline" size={20} color={colors.amber} />

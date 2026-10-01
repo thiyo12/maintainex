@@ -4,8 +4,45 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibilit
 import { transitionJobWorkspace, raiseJobDispute, cancelJob, type ActorType } from '@/lib/domain/job-lifecycle'
 import { completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { resolveProviderActor } from '@/lib/domain/job-actors'
-import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyJobCancelled, notifyDisputeRaised } from '@/lib/notifications'
+import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyCashJobCompleted, notifyJobCancelled, notifyDisputeRaised } from '@/lib/notifications'
 import { getCurrencyForCountry } from '@/lib/shared/money/money'
+import { notifyAllAdmins } from '@/lib/admin-notifications'
+import { createWorkItem } from '@/lib/work-queue'
+import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
+
+async function getAcceptedProviderRecipientIds(jobId: string): Promise<string[]> {
+  const accepted = await prisma.jobQuote.findFirst({
+    where: { jobId, status: 'ACCEPTED' },
+    select: { providerId: true, providerType: true },
+  })
+  if (!accepted) return []
+
+  if (accepted.providerType === 'INDIVIDUAL') {
+    return [accepted.providerId]
+  }
+
+  const [company, assignments] = await Promise.all([
+    prisma.companyProfile.findUnique({
+      where: { id: accepted.providerId },
+      select: { userId: true },
+    }),
+    prisma.companyJobAssignment.findMany({
+      where: {
+        jobId,
+        companyId: accepted.providerId,
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+      },
+      select: { workerUserId: true },
+    }),
+  ])
+
+  return [...new Set(
+    [
+      company?.userId ?? null,
+      ...assignments.map(assignment => assignment.workerUserId),
+    ].filter((value): value is string => Boolean(value))
+  )]
+}
 
 export async function POST(
   request: NextRequest,
@@ -63,25 +100,73 @@ export async function POST(
     }
 
     if (action === 'APPROVE_COMPLETION') {
+      if (job.customerId !== user.id) {
+        return NextResponse.json({ error: 'Only the customer can approve completion' }, { status: 403 })
+      }
+      if (job.status === 'COMPLETED') {
+        return NextResponse.json({
+          success: true,
+          replayed: true,
+          message: 'Job was already completed.',
+        })
+      }
+
+      const rateLimitResponse = await requireFinancialRateLimit(request, 'complete-job')
+      if (rateLimitResponse) return rateLimitResponse
+
+      const paymentState = await prisma.jobEscrow.findFirst({
+        where: { jobId: job.id, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+        select: { paymentMethod: true, status: true },
+      })
+      if (
+        paymentState?.paymentMethod === 'CASH' &&
+        paymentState.status === 'CASH_CONFIRMED' &&
+        body.cashPaidConfirmed !== true
+      ) {
+        return NextResponse.json(
+          {
+            error: 'Confirm that cash was paid to the provider before approving completion.',
+            code: 'CASH_PAYMENT_CONFIRMATION_REQUIRED',
+          },
+          { status: 400 }
+        )
+      }
+
       const result = await completeAndReleaseEscrow(
         { jobId: job.id, actorId: user.id, actorType: 'CUSTOMER' },
         job.id
       )
 
-      await notifyPaymentReleased(
-        job.id,
-        result.providerId,
-        job.title,
-        result.netAmount,
-        getCurrencyForCountry(job.countryCode),
-        job.countryCode,
-      )
+      if (result.paymentMethod === 'CASH') {
+        await notifyCashJobCompleted(
+          job.id,
+          result.providerId,
+          job.title,
+          result.platformDueCents,
+          getCurrencyForCountry(job.countryCode),
+        )
+      } else {
+        await notifyPaymentReleased(
+          job.id,
+          result.providerId,
+          job.title,
+          result.netAmount,
+          getCurrencyForCountry(job.countryCode),
+          job.countryCode,
+        )
+      }
       await notifyJobCompleted(job.id, job.customerId, job.title)
       return NextResponse.json({
         success: true,
-        message: 'Job completed, funds released',
+        message:
+          result.paymentMethod === 'CASH'
+            ? 'Job completed. Cash settlement recorded and platform amount added to the provider weekly settlement.'
+            : 'Job completed, funds released',
+        paymentMethod: result.paymentMethod,
         commission: result.commission,
         netAmount: result.netAmount,
+        platformDue: result.platformDue,
+        platformDueMinor: result.platformDueCents.toString(),
       })
     }
 
@@ -100,34 +185,51 @@ export async function POST(
           ? body.reason.trim().slice(0, 1000)
           : null
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
-      let disputeRecipientId: string | null = isCustomer ? null : job.customerId
+      const disputeRecipientIds = isCustomer
+        ? await getAcceptedProviderRecipientIds(job.id)
+        : [job.customerId]
 
-      if (isCustomer) {
-        const accepted = await prisma.jobQuote.findFirst({
-          where: { jobId: job.id, status: 'ACCEPTED' },
-          select: { providerId: true, providerType: true },
-        })
-        if (accepted) {
-          disputeRecipientId =
-            accepted.providerType === 'INDIVIDUAL'
-              ? accepted.providerId
-              : (await prisma.companyProfile.findUnique({
-                  where: { id: accepted.providerId },
-                  select: { userId: true },
-                }))?.userId ?? null
-        }
-      }
-
-      await raiseJobDispute(
-        { jobId: job.id, actorId: user.id, actorType, reason: reason || undefined },
+      const dispute = await raiseJobDispute(
+        {
+          jobId: job.id,
+          actorId: user.id,
+          actorType,
+          reason: reason || undefined,
+          metadata: {
+            description:
+              typeof body.description === 'string'
+                ? body.description.trim().slice(0, 5000)
+                : reason || 'Dispute raised',
+          },
+        },
         job.id
       )
 
-      if (disputeRecipientId) {
-        await notifyDisputeRaised(job.id, disputeRecipientId, job.title)
-      }
+      await Promise.all([
+        ...disputeRecipientIds.map(recipientId =>
+          notifyDisputeRaised(job.id, recipientId, job.title)
+        ),
+        notifyAllAdmins(
+          'dispute_raised',
+          `New Dispute: ${reason || 'Job dispute'}`,
+          `A marketplace dispute was raised on "${job.title}" and escrow is now on hold.`,
+          '/admin/jobs/disputes',
+        ),
+        createWorkItem({
+          category: 'dispute',
+          title: `Marketplace dispute: ${reason || job.title}`,
+          description: `Escrow is on hold for "${job.title}". Review the dispute and choose release-to-provider or refund-customer.`,
+          targetTable: 'MarketplaceDispute',
+          targetId: dispute.disputeId,
+          priority: 'high',
+        }),
+      ])
 
-      return NextResponse.json({ success: true, message: 'Dispute raised' })
+      return NextResponse.json({
+        success: true,
+        message: 'Dispute raised',
+        disputeId: dispute.disputeId,
+      })
     }
 
     if (action === 'CANCEL') {
@@ -150,29 +252,18 @@ export async function POST(
         typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim().slice(0, 300) : null
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
 
-      let providerUserId: string | null = null
-      if (isCustomer) {
-        const accepted = await prisma.jobQuote.findFirst({
-          where: { jobId: job.id, status: 'ACCEPTED' },
-          select: { providerId: true, providerType: true },
-        })
-        if (accepted) {
-          providerUserId =
-            accepted.providerType === 'INDIVIDUAL'
-              ? accepted.providerId
-              : (await prisma.companyProfile.findUnique({
-                  where: { id: accepted.providerId },
-                  select: { userId: true },
-                }))?.userId ?? null
-        }
-      }
+      const providerRecipientIds = isCustomer
+        ? await getAcceptedProviderRecipientIds(job.id)
+        : []
 
       await cancelJob({ jobId: job.id, actorId: user.id, actorType, reason: reason || undefined })
 
       if (isCustomer) {
-        if (providerUserId) {
-          await notifyJobCancelled(job.id, providerUserId, job.title, 'customer', reason)
-        }
+        await Promise.all(
+          providerRecipientIds.map(recipientId =>
+            notifyJobCancelled(job.id, recipientId, job.title, 'customer', reason)
+          )
+        )
       } else {
         await notifyJobCancelled(job.id, job.customerId, job.title, 'provider', reason)
       }
@@ -187,7 +278,11 @@ export async function POST(
     if (message.includes('Cannot transition') || message.includes('cannot transition') || message.includes('Actor type')) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
-    if (message.includes('already released') || message.includes('concurrently')) {
+    if (
+      message.includes('already released') ||
+      message.includes('concurrently') ||
+      message.includes('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
+    ) {
       return NextResponse.json({ error: message }, { status: 409 })
     }
     if (

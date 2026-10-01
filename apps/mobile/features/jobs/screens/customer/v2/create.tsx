@@ -12,7 +12,7 @@ class ErrorBoundary extends Component<{ children: any }, { error: Error | null }
   static getDerivedStateFromError(error: Error) { return { error } }
   componentDidCatch(error: Error, info: any) {
     const stack = info?.componentStack || ''
-    const lines = stack.split('\n').filter(l => l.trim()).slice(0, 5)
+    const lines = stack.split('\n').filter((l: string) => l.trim()).slice(0, 5)
     Alert.alert('Error', (error?.message || String(error)) + '\n\nIn:\n' + lines.join('\n'))
   }
   render() {
@@ -69,7 +69,7 @@ const FALLBACK_CATEGORIES: Category[] = [
   { id: 'cmtilkh6t00dd9z5qzge5lmnv', slug: 'curtains-blinds-and-upholstery', name: 'Curtains, Blinds and Upholstery' },
 ]
 
-const CAT_ICONS: Record<string, (props: any) => JSX.Element> = {
+const CAT_ICONS: Record<string, (props: any) => any> = {
   'electrical-works': Lightning,
   plumbing: Drop,
   'ac-and-refrigeration': Snowflake,
@@ -96,7 +96,7 @@ const CAT_ICONS: Record<string, (props: any) => JSX.Element> = {
   'curtains-blinds-and-upholstery': TShirt,
 }
 
-function categoryIcon(name?: string): (props: any) => JSX.Element {
+function categoryIcon(name?: string): (props: any) => any {
   if (!name) return WrenchFallback
   const key = name.toLowerCase()
   for (const [slug, icon] of Object.entries(CAT_ICONS)) {
@@ -1026,7 +1026,7 @@ function CreateJobScreenInner() {
             <View style={styles.photoRow}>
               {photos.map((p, i) => (
                 <View key={i} style={styles.photoCell}>
-                  <Image source={{ uri: resolveImageUri(p) }} style={styles.photoThumb} />
+                  <Image source={{ uri: resolveImageUri(p) || '' }} style={styles.photoThumb} />
                   <TouchableOpacity style={styles.photoRemove} onPress={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}>
                     <X size={12} color="#fff" weight="bold" />
                   </TouchableOpacity>

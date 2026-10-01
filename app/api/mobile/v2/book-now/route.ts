@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const body = await request.json()
-    const { templateJobId, providerId, date, timeSlot, address, district, notes, latitude, longitude, countryCode } = body
+    const { templateJobId, providerId, providerType, date, timeSlot, address, district, notes, latitude, longitude, countryCode } = body
 
     if (!templateJobId || !providerId || !date || !timeSlot || !address || !district) {
       return NextResponse.json({
@@ -21,6 +21,26 @@ export async function POST(request: NextRequest) {
     const scheduledDate = new Date(date)
     if (Number.isNaN(scheduledDate.getTime())) {
       return NextResponse.json({ error: 'Invalid booking date' }, { status: 400 })
+    }
+    const bookingDay = new Date(scheduledDate)
+    bookingDay.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (bookingDay < today) {
+      return NextResponse.json({ error: 'Booking date cannot be in the past' }, { status: 400 })
+    }
+
+    const normalizedTimeSlot = String(timeSlot).trim().toLowerCase()
+    if (!['morning', 'afternoon', 'evening', 'anytime'].includes(normalizedTimeSlot)) {
+      return NextResponse.json({ error: 'Invalid timeSlot' }, { status: 400 })
+    }
+
+    const normalizedProviderType =
+      providerType == null || providerType === ''
+        ? 'INDIVIDUAL'
+        : String(providerType).trim().toUpperCase()
+    if (!['INDIVIDUAL', 'COMPANY'].includes(normalizedProviderType)) {
+      return NextResponse.json({ error: 'providerType must be INDIVIDUAL or COMPANY' }, { status: 400 })
     }
 
     const requestedCountryCode = typeof countryCode === 'string' && countryCode.trim()
@@ -38,14 +58,15 @@ export async function POST(request: NextRequest) {
       customerId: user.id,
       templateJobId: String(templateJobId).trim(),
       providerId: String(providerId).trim(),
+      providerType: normalizedProviderType as 'INDIVIDUAL' | 'COMPANY',
       scheduledDate,
-      timeSlot: String(timeSlot).trim(),
+      timeSlot: normalizedTimeSlot,
       address: String(address).trim(),
       district: String(district).trim(),
       notes: typeof notes === 'string' ? notes.slice(0, 5000) : undefined,
       latitude: typeof latitude === 'number' ? latitude : undefined,
       longitude: typeof longitude === 'number' ? longitude : undefined,
-      countryCode: typeof countryCode === 'string' ? countryCode : undefined,
+      countryCode: requestedCountryCode,
     })
 
     return NextResponse.json({
@@ -62,9 +83,27 @@ export async function POST(request: NextRequest) {
       message.includes('not eligible') ||
       message.includes('lacks required capability') ||
       message.includes('Cannot book yourself') ||
-      message.includes('Invalid template/category')
+      message.includes('Cannot book your own company') ||
+      message.includes('Invalid template/category') ||
+      message.includes('does not match booking country') ||
+      message.includes('does not serve the requested district')
     ) {
       return NextResponse.json({ error: message }, { status: 403 })
+    }
+    if (
+      message.includes('overlapping active booking') ||
+      message.includes('no longer available for direct booking') ||
+      message.includes('currently unavailable') ||
+      message.includes('unavailable on the requested') ||
+      message.includes('outside provider working hours')
+    ) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
+    if (
+      message.includes('Booking country is required') ||
+      message.includes('availability configuration is invalid')
+    ) {
+      return NextResponse.json({ error: message }, { status: 400 })
     }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }

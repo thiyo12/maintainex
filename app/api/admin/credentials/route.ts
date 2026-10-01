@@ -1,32 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
-import { ROLE_PERMISSIONS } from '@/lib/admin-types'
-
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'USER_MANAGEMENT', 'MANAGER', 'FINANCE']
+import { guardCrmRequest } from '@/lib/crm/security'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !ALLOWED_ROLES.includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const permissions = ROLE_PERMISSIONS[session.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('credentials:read')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'credentials:read',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status') || 'PENDING'
-    const holderType = searchParams.get('holderType')
-    const page = parseInt(searchParams.get('page') || '1')
-    const pageSize = parseInt(searchParams.get('pageSize') || '20')
+    const status = (searchParams.get('status') || 'PENDING').toUpperCase()
+    const holderType = (searchParams.get('holderType') || '').toUpperCase()
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '20')))
     const skip = (page - 1) * pageSize
 
-    const where: Record<string, unknown> = {}
-    if (status && status !== 'ALL') where.verificationStatus = status
-    if (holderType) where.holderType = holderType
+    if (!['ALL', 'PENDING', 'VERIFIED', 'REJECTED', 'EXPIRED'].includes(status)) {
+      return NextResponse.json({ error: 'Invalid status filter' }, { status: 400 })
+    }
+    if (holderType && !['INDIVIDUAL', 'COMPANY'].includes(holderType)) {
+      return NextResponse.json({ error: 'Invalid holder type' }, { status: 400 })
+    }
+
+    const filters: any[] = []
+    if (status !== 'ALL') filters.push({ verificationStatus: status })
+    if (holderType) filters.push({ holderType })
+
+    if (!security.isSuperAdmin) {
+      const [users, companies] = await Promise.all([
+        prisma.user.findMany({
+          where: { countryCode: { in: security.assignedCountries } },
+          select: { id: true },
+        }),
+        prisma.companyProfile.findMany({
+          where: { countryCode: { in: security.assignedCountries } },
+          select: { id: true },
+        }),
+      ])
+
+      filters.push({
+        OR: [
+          { holderType: 'INDIVIDUAL', holderId: { in: users.map(user => user.id) } },
+          { holderType: 'COMPANY', holderId: { in: companies.map(company => company.id) } },
+        ],
+      })
+    }
+
+    const where: any = filters.length ? { AND: filters } : {}
 
     const [credentials, total] = await Promise.all([
       prisma.certification.findMany({
@@ -38,15 +62,18 @@ export async function GET(request: NextRequest) {
       prisma.certification.count({ where }),
     ])
 
-    return NextResponse.json({
-      credentials,
-      total,
-      page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
-    })
+    return NextResponse.json(
+      {
+        credentials,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
-    console.error('Credentials GET error:', error)
+    console.error('CRM credentials GET error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

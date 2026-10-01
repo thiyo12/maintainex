@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { transitionInspection, completeInspection, scheduleInspection, verifyInspectionArrival } from '@/lib/domain/inspection'
 import { notifyInspectionArrived, notifyInspectionCompleted } from '@/lib/notifications'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 export async function PATCH(
   request: NextRequest,
@@ -11,21 +12,46 @@ export async function PATCH(
   try {
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
-    const { inspectionId } = await params
-    const body = await request.json()
-    const { action } = body
+    const { id: jobId, inspectionId } = await params
+    const boundInspection = await prisma.jobInspection.findUnique({
+      where: { id: inspectionId },
+      select: { jobId: true },
+    })
+    if (!boundInspection || boundInspection.jobId !== jobId) {
+      return NextResponse.json({ error: 'Inspection not found for this job' }, { status: 404 })
+    }
+    const body = await request.json().catch(() => ({}))
+    const action = typeof body?.action === 'string' ? body.action.toLowerCase() : ''
 
     if (action === 'schedule') {
       if (!body.scheduledAt) {
         return NextResponse.json({ error: 'scheduledAt required' }, { status: 400 })
       }
+      const scheduledAt = new Date(body.scheduledAt)
+      if (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) {
+        return NextResponse.json({ error: 'scheduledAt must be a valid future date' }, { status: 400 })
+      }
+      const windowStart = typeof body?.windowStart === 'string' ? body.windowStart.trim().slice(0, 100) : undefined
+      const windowEnd = typeof body?.windowEnd === 'string' ? body.windowEnd.trim().slice(0, 100) : undefined
       const result = await scheduleInspection(prisma, {
         inspectionId,
         userId: user.id,
-        scheduledAt: new Date(body.scheduledAt),
-        windowStart: body.windowStart,
-        windowEnd: body.windowEnd,
+        scheduledAt,
+        windowStart,
+        windowEnd,
+      })
+      if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 })
+      return NextResponse.json({ success: true })
+    }
+
+    if (action === 'en_route') {
+      const result = await transitionInspection(prisma, {
+        inspectionId,
+        userId: user.id,
+        toStatus: 'EN_ROUTE',
       })
       if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 })
       return NextResponse.json({ success: true })
@@ -54,8 +80,11 @@ export async function PATCH(
           const tasker = await prisma.user.findUnique({ where: { id: inspection.taskerId }, select: { name: true } })
           providerName = tasker?.name || providerName
         } else if (inspection.companyId) {
-          const company = await prisma.user.findUnique({ where: { id: inspection.companyId }, select: { companyProfile: { select: { companyName: true } } } })
-          providerName = company?.companyProfile?.companyName || providerName
+          const company = await prisma.companyProfile.findUnique({
+            where: { id: inspection.companyId },
+            select: { companyName: true },
+          })
+          providerName = company?.companyName || providerName
         }
         await notifyInspectionArrived(job.id, job.customerId, providerName, job.title)
       }
@@ -74,17 +103,22 @@ export async function PATCH(
     }
 
     if (action === 'complete') {
-      if (!body.diagnosisSummary || !body.scopeSummary) {
-        return NextResponse.json({ error: 'diagnosisSummary and scopeSummary required' }, { status: 400 })
+      const diagnosisSummary = typeof body?.diagnosisSummary === 'string' ? body.diagnosisSummary.trim().slice(0, 5000) : ''
+      const scopeSummary = typeof body?.scopeSummary === 'string' ? body.scopeSummary.trim().slice(0, 5000) : ''
+      const materialsSummary = typeof body?.materialsSummary === 'string' ? body.materialsSummary.trim().slice(0, 5000) : undefined
+      const estimatedDuration = typeof body?.estimatedDuration === 'string' ? body.estimatedDuration.trim().slice(0, 500) : undefined
+      const risksAndLimitations = typeof body?.risksAndLimitations === 'string' ? body.risksAndLimitations.trim().slice(0, 5000) : undefined
+      if (diagnosisSummary.length < 3 || scopeSummary.length < 3) {
+        return NextResponse.json({ error: 'diagnosisSummary and scopeSummary are required' }, { status: 400 })
       }
       const result = await completeInspection(prisma, {
         inspectionId,
         providerId: user.id,
-        diagnosisSummary: body.diagnosisSummary,
-        scopeSummary: body.scopeSummary,
-        materialsSummary: body.materialsSummary,
-        estimatedDuration: body.estimatedDuration,
-        risksAndLimitations: body.risksAndLimitations,
+        diagnosisSummary,
+        scopeSummary,
+        materialsSummary,
+        estimatedDuration,
+        risksAndLimitations,
       })
       if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 })
 
@@ -103,8 +137,11 @@ export async function PATCH(
           const tasker = await prisma.user.findUnique({ where: { id: inspection.taskerId }, select: { name: true } })
           providerName = tasker?.name || providerName
         } else if (inspection.companyId) {
-          const company = await prisma.user.findUnique({ where: { id: inspection.companyId }, select: { companyProfile: { select: { companyName: true } } } })
-          providerName = company?.companyProfile?.companyName || providerName
+          const company = await prisma.companyProfile.findUnique({
+            where: { id: inspection.companyId },
+            select: { companyName: true },
+          })
+          providerName = company?.companyName || providerName
         }
         await notifyInspectionCompleted(job.id, job.customerId, providerName, job.title)
       }
@@ -148,16 +185,28 @@ export async function GET(
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { inspectionId } = await params
+    const { id: jobId, inspectionId } = await params
 
     const inspection = await prisma.jobInspection.findUnique({
       where: { id: inspectionId },
       include: {
         evidence: true,
+        job: { select: { customerId: true } },
       },
     })
 
-    if (!inspection) return NextResponse.json({ error: 'Inspection not found' }, { status: 404 })
+    if (!inspection || inspection.jobId !== jobId) {
+      return NextResponse.json({ error: 'Inspection not found for this job' }, { status: 404 })
+    }
+
+    let authorized = inspection.job.customerId === user.id || inspection.taskerId === user.id
+    if (!authorized && inspection.companyId) {
+      const { context } = await resolveCompanyContext(user.id, inspection.companyId, 'jobs:read')
+      authorized = Boolean(context)
+    }
+    if (!authorized) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     return NextResponse.json({ inspection })
   } catch (error) {
@@ -173,8 +222,17 @@ export async function POST(
   try {
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
-    const { inspectionId } = await params
+    const { id: jobId, inspectionId } = await params
+    const inspection = await prisma.jobInspection.findUnique({
+      where: { id: inspectionId },
+      select: { jobId: true },
+    })
+    if (!inspection || inspection.jobId !== jobId) {
+      return NextResponse.json({ error: 'Inspection not found for this job' }, { status: 404 })
+    }
     const body = await request.json()
 
     if (body.action === 'verify') {

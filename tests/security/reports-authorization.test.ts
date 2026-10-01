@@ -20,15 +20,26 @@ const CA_BRANCH = `qual-rep-ca-${STAMP}`
 
 let lkActivityId = ''
 let caActivityId = ''
+const adminIds: string[] = []
+const sessionIds: string[] = []
+const adminFixtures = new Map<string, { id: string; email: string; sessionId: string }>()
+
+function fixtureKey(role: AdminRole, assignedCountries: string[]) {
+  return `${role}:${assignedCountries.join(',') || 'NONE'}`
+}
 
 function token(role: AdminRole, assignedCountries: string[]) {
+  const fixture = adminFixtures.get(fixtureKey(role, assignedCountries))
+  if (!fixture) throw new Error(`Missing admin fixture for ${fixtureKey(role, assignedCountries)}`)
+
   return signAccessToken({
-    id: `qual-reports-${role.toLowerCase()}-${STAMP}`,
-    email: `qual-reports-${role.toLowerCase()}-${STAMP}@maintainex.test`,
+    id: fixture.id,
+    email: fixture.email,
     role,
     firstName: 'Qual',
     lastName: 'Reports',
     assignedCountries,
+    sessionId: fixture.sessionId,
   })
 }
 
@@ -52,6 +63,41 @@ function exportRequest(authToken: string, query = '') {
 describe.skipIf(!requiresPostgres())('Reports authorization — canonical admin country scoping', () => {
   beforeAll(async () => {
     process.env.JWT_SECRET = TEST_JWT_SECRET
+
+    const fixtures: Array<{ role: AdminRole; assignedCountries: string[]; suffix: string }> = [
+      { role: 'SUPER_ADMIN', assignedCountries: [], suffix: 'super' },
+      { role: 'MANAGER', assignedCountries: ['LK'], suffix: 'manager-lk' },
+      { role: 'MANAGER', assignedCountries: ['CA'], suffix: 'manager-ca' },
+      { role: 'MANAGER', assignedCountries: [], suffix: 'manager-none' },
+    ]
+
+    for (const fixture of fixtures) {
+      const admin = await prisma.adminUser.create({
+        data: {
+          email: `qual-reports-${fixture.suffix}-${STAMP}@maintainex.test`,
+          passwordHash: 'test',
+          role: fixture.role,
+          firstName: 'Qual',
+          lastName: 'Reports',
+          isActive: true,
+          assignedCountries: JSON.stringify(fixture.assignedCountries),
+        },
+      })
+      const session = await prisma.adminSession.create({
+        data: {
+          adminUserId: admin.id,
+          refreshTokenHash: `qual-reports-refresh-${fixture.suffix}-${STAMP}`,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      })
+      adminIds.push(admin.id)
+      sessionIds.push(session.id)
+      adminFixtures.set(fixtureKey(fixture.role, fixture.assignedCountries), {
+        id: admin.id,
+        email: admin.email,
+        sessionId: session.id,
+      })
+    }
 
     await prisma.branch.createMany({
       data: [
@@ -91,6 +137,12 @@ describe.skipIf(!requiresPostgres())('Reports authorization — canonical admin 
   afterAll(async () => {
     await prisma.activityLog.deleteMany({ where: { id: { in: [lkActivityId, caActivityId] } } })
     await prisma.branch.deleteMany({ where: { id: { in: [LK_BRANCH, LK_BRANCH_2, CA_BRANCH] } } })
+    if (sessionIds.length) {
+      await prisma.adminSession.deleteMany({ where: { id: { in: sessionIds } } })
+    }
+    if (adminIds.length) {
+      await prisma.adminUser.deleteMany({ where: { id: { in: adminIds } } })
+    }
     if (ORIGINAL_JWT_SECRET === undefined) delete process.env.JWT_SECRET
     else process.env.JWT_SECRET = ORIGINAL_JWT_SECRET
     await prisma.$disconnect()

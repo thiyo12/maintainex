@@ -64,14 +64,35 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (blocked) return blocked
 
     const { status, progress } = await request.json()
-    const updateData: any = {}
-    if (status) updateData.status = status
-    if (progress !== undefined) updateData.progress = progress
+    const updateData: { status?: string; progress?: number } = {}
+
+    if (status !== undefined) {
+      const normalizedStatus = typeof status === 'string' ? status.trim().toUpperCase() : ''
+      if (!['IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(normalizedStatus)) {
+        return NextResponse.json({ error: 'Invalid contract status' }, { status: 400 })
+      }
+      updateData.status = normalizedStatus
+    }
+
+    if (progress !== undefined) {
+      const normalizedProgress = Number(progress)
+      if (!Number.isInteger(normalizedProgress) || normalizedProgress < 0 || normalizedProgress > 100) {
+        return NextResponse.json({ error: 'progress must be an integer from 0 to 100' }, { status: 400 })
+      }
+      updateData.progress = normalizedProgress
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No valid updates provided' }, { status: 400 })
+    }
 
     const contract = await prisma.contract.updateMany({
       where: { id, company: { userId: user.id } },
       data: updateData,
     })
+    if (contract.count !== 1) {
+      return NextResponse.json({ error: 'Contract not found' }, { status: 404 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

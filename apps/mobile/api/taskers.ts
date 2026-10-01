@@ -18,7 +18,7 @@ export const taskers = {
     request<Review[]>(`/api/mobile/taskers/${taskerId}/reviews`),
 }
 export const skillsApi = {
-  list: () => request<any[]>('/api/mobile/taskers/skills'),
+  list: () => request<{ categories: any[] }>('/api/mobile/taskers/skills'),
   save: (data: any[]) =>
     request<{ saved: number }>('/api/mobile/taskers/skills', { method: 'PUT', body: JSON.stringify({ skills: data }) }),
 }

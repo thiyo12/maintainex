@@ -5,6 +5,9 @@ import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const { searchParams } = new URL(request.url)
     const providerId = searchParams.get('providerId') || user?.id
 

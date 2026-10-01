@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createPaymentIntent, getPaymentStatus } from '@/lib/payment/payment-service'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
+import { resolvePaymentPublicOrigin } from '@/lib/finance/payments/public-origin'
 
 export async function POST(
   request: NextRequest,
@@ -18,7 +19,14 @@ export async function POST(
     const rateLimitResponse = await requireFinancialRateLimit(request, 'payment-intent')
     if (rateLimitResponse) return rateLimitResponse
 
-    const baseUrl = process.env.NEXTAUTH_URL || new URL(request.url).origin
+    const baseUrl = resolvePaymentPublicOrigin(request.url)
+    if (!baseUrl) {
+      return NextResponse.json(
+        { error: 'Payment public URL is not configured', code: 'PAYMENT_ORIGIN_NOT_CONFIGURED' },
+        { status: 503 }
+      )
+    }
+
     const result = await createPaymentIntent({
       jobId: id,
       customerId: user.id,
@@ -30,6 +38,7 @@ export async function POST(
         result.code === 'UNAUTHORIZED' ? 403 :
         result.code === 'JOB_NOT_FOUND' ? 404 :
         result.code === 'PAYHERE_NOT_CONFIGURED' ? 503 :
+        result.code === 'CUSTOMER_PAYMENT_DETAILS_REQUIRED' ? 400 :
         409
       return NextResponse.json(result, { status })
     }

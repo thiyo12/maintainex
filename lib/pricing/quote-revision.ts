@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client'
+import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
+import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
 
 /**
  * Create a new revision of an existing quote.
@@ -21,6 +23,7 @@ export async function createQuoteRevision(
     totalCents?: bigint
     benchmarkClassification?: string
     benchmarkId?: string
+    lineItems?: Array<QuoteLineItemInput & { totalAmountCents: bigint; sortOrder: number }>
   },
 ): Promise<{ success: boolean; newQuoteId?: string; error?: string }> {
   try {
@@ -36,6 +39,28 @@ export async function createQuoteRevision(
       if (original.status === 'WITHDRAWN') return { success: false, error: 'Cannot revise a withdrawn quote' }
       if (original.status === 'SUPERSEDED') return { success: false, error: 'Cannot revise a superseded quote' }
       if (original.status !== 'PENDING') return { success: false, error: `Cannot revise quote in ${original.status} state` }
+      if (original.providerType !== 'INDIVIDUAL' && original.providerType !== 'COMPANY') {
+        return { success: false, error: 'Provider is no longer available' }
+      }
+
+      await lockAndAssertProviderAvailable(
+        tx,
+        original.providerType,
+        original.providerId,
+        'Provider is no longer available',
+      )
+
+      const lockedJobs = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+        SELECT id, status
+        FROM "MarketplaceJob"
+        WHERE id = ${original.jobId}
+        FOR UPDATE
+      `
+      const lockedJob = lockedJobs[0]
+      if (!lockedJob) return { success: false, error: 'Job not found' }
+      if (lockedJob.status !== 'OPEN') {
+        return { success: false, error: 'Quote revisions are only allowed while the job is open' }
+      }
 
       const claimed = await tx.jobQuote.updateMany({
         where: {
@@ -73,11 +98,33 @@ export async function createQuoteRevision(
         },
       })
 
+      if (params.lineItems?.length) {
+        for (const item of params.lineItems) {
+          await tx.quoteLineItem.create({
+            data: {
+              quoteId: newQuote.id,
+              type: item.type,
+              description: item.description,
+              quantity: item.quantity,
+              unit: item.unit ?? null,
+              unitAmountCents: item.unitAmountCents,
+              totalAmountCents: item.totalAmountCents,
+              currency: item.currency,
+              sortOrder: item.sortOrder,
+              metadata: item.metadata ?? null,
+            },
+          })
+        }
+      }
+
       return { success: true, newQuoteId: newQuote.id }
     })
   } catch (error: any) {
     if (error?.code === 'P2002') {
       return { success: false, error: 'A quote revision is already active for this job' }
+    }
+    if (error instanceof Error && error.message === 'Provider is no longer available') {
+      return { success: false, error: 'Provider is no longer available' }
     }
     throw error
   }

@@ -1,4 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client'
+import { resolvePricingConfig } from '@/lib/pricing/rules'
 
 function serializeBigInt(obj: unknown): string {
   return JSON.stringify(obj, (_key, value) =>
@@ -65,6 +66,9 @@ export async function createChangeOrder(
   if (!job) return { success: false, error: 'Job not found' }
   if (job.status === 'COMPLETED' || job.status === 'CANCELLED') {
     return { success: false, error: 'Cannot create change order on completed/cancelled job' }
+  }
+  if (input.amountDeltaCents === 0n && (!input.scopeDelta || input.scopeDelta.trim().length === 0)) {
+    return { success: false, error: 'Change order must modify price or scope' }
   }
 
   // Verify base quote exists and is accepted
@@ -234,6 +238,8 @@ export async function approveChangeOrder(
         select: {
           customerId: true,
           finalAuthorizedAmountCents: true,
+          countryCode: true,
+          status: true,
         },
       },
     },
@@ -242,6 +248,9 @@ export async function approveChangeOrder(
   if (!co) return { success: false, error: 'Change order not found' }
   if (co.job.customerId !== customerId) return { success: false, error: 'NOT_CUSTOMER' }
   if (co.status !== 'SUBMITTED') return { success: false, error: 'INVALID_STATUS' }
+  if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(co.job.status)) {
+    return { success: false, error: 'JOB_NOT_ACTIVE' }
+  }
 
   const requestFingerprint = `APPROVE:${changeOrderId}:${customerId}:${co.amountDeltaCents}:${co.baseQuoteId}`
 
@@ -261,62 +270,177 @@ export async function approveChangeOrder(
     }
   }
 
-  const result = await client.$transaction(async (tx) => {
-    const now = new Date()
+  try {
+    const result = await client.$transaction(async (tx) => {
+      const now = new Date()
 
-    const updatedCo = await tx.jobChangeOrder.update({
-      where: { id: changeOrderId },
-      data: {
-        status: 'APPROVED',
-        customerDecisionAt: now,
-        approvedByCustomerId: customerId,
-      },
-    })
-
-    const finalResult = await calculateFinalAuthorizedAmount(tx, co.jobId)
-    if (!finalResult.success) throw new Error(finalResult.error)
-    const newFinalAmount = finalResult.finalAmountCents!
-
-    await tx.marketplaceJob.update({
-      where: { id: co.jobId },
-      data: { finalAuthorizedAmountCents: newFinalAmount },
-    })
-
-    if (idempotencyKey) {
-      const expiresAt = new Date()
-      expiresAt.setHours(expiresAt.getHours() + 24)
-
-      const existingRecord = await tx.idempotencyRecord.findFirst({
-        where: { idempotencyKey, userId: customerId, operation: 'APPROVE_CHANGE_ORDER' },
+      const activeEscrow = await tx.jobEscrow.findFirst({
+        where: {
+          jobId: co.jobId,
+          status: { in: ['PENDING_PAYMENT', 'PROTECTED', 'ON_HOLD', 'CASH_CONFIRMED'] },
+        },
+        orderBy: { createdAt: 'desc' },
       })
 
-      if (existingRecord) {
-        await tx.idempotencyRecord.update({
-          where: { id: existingRecord.id },
-          data: {
-            status: 'COMPLETED',
-            resultPayload: serializeBigInt({ changeOrder: updatedCo, finalAuthorizedAmountCents: newFinalAmount }),
-          },
-        })
-      } else {
-        await tx.idempotencyRecord.create({
-          data: {
-            idempotencyKey,
-            userId: customerId,
-            operation: 'APPROVE_CHANGE_ORDER',
-            status: 'COMPLETED',
-            resultPayload: serializeBigInt({ changeOrder: updatedCo, finalAuthorizedAmountCents: newFinalAmount }),
-            requestFingerprint,
-            expiresAt,
-          },
-        })
+      if (co.amountDeltaCents !== 0n) {
+        if (!activeEscrow) {
+          throw new Error('CHANGE_ORDER_ESCROW_NOT_FOUND')
+        }
+        if (
+          activeEscrow.status !== 'PENDING_PAYMENT' &&
+          !(activeEscrow.status === 'CASH_CONFIRMED' && activeEscrow.paymentMethod === 'CASH')
+        ) {
+          throw new Error('CHANGE_ORDER_TOPUP_NOT_SUPPORTED_AFTER_FUNDING')
+        }
       }
+
+      const transition = await tx.jobChangeOrder.updateMany({
+        where: { id: changeOrderId, status: 'SUBMITTED' },
+        data: {
+          status: 'APPROVED',
+          customerDecisionAt: now,
+          approvedByCustomerId: customerId,
+        },
+      })
+      if (transition.count !== 1) {
+        throw new Error('CONCURRENT_APPROVAL')
+      }
+
+      const updatedCo = await tx.jobChangeOrder.findUnique({
+        where: { id: changeOrderId },
+      })
+      if (!updatedCo) {
+        throw new Error('Change order not found')
+      }
+
+      const finalResult = await calculateFinalAuthorizedAmount(tx, co.jobId)
+      if (!finalResult.success) throw new Error(finalResult.error)
+      const newFinalAmount = finalResult.finalAmountCents!
+      if (newFinalAmount <= 0n) {
+        throw new Error('FINAL_AUTHORIZED_AMOUNT_MUST_BE_POSITIVE')
+      }
+
+      if (activeEscrow && co.amountDeltaCents !== 0n) {
+        const pricingConfig = await resolvePricingConfig(tx, co.job.countryCode || 'GLOBAL')
+        if (activeEscrow.currency !== pricingConfig.defaultCurrency) {
+          throw new Error('CHANGE_ORDER_CURRENCY_MISMATCH')
+        }
+
+        const serviceFee =
+          (newFinalAmount * BigInt(pricingConfig.commissionRateBps)) / 10000n
+        const totalAmount = newFinalAmount + serviceFee
+
+        if (activeEscrow.status === 'PENDING_PAYMENT') {
+          const escrowClaim = await tx.jobEscrow.updateMany({
+            where: { id: activeEscrow.id, status: 'PENDING_PAYMENT' },
+            data: {
+              amount: newFinalAmount,
+              serviceFee,
+              totalAmount,
+            },
+          })
+          if (escrowClaim.count !== 1) {
+            throw new Error('CHANGE_ORDER_ESCROW_STATE_CHANGED')
+          }
+
+          // Existing hosted checkout sessions carry the previous amount.
+          // Invalidate them so the next payment intent is created from the
+          // newly authorized escrow total.
+          await tx.paymentIntent.updateMany({
+            where: {
+              jobId: co.jobId,
+              status: { in: ['CREATED', 'PENDING'] },
+            },
+            data: { status: 'CANCELLED' },
+          })
+        } else if (
+          activeEscrow.status === 'CASH_CONFIRMED' &&
+          activeEscrow.paymentMethod === 'CASH'
+        ) {
+          const escrowClaim = await tx.jobEscrow.updateMany({
+            where: {
+              id: activeEscrow.id,
+              status: 'CASH_CONFIRMED',
+              paymentMethod: 'CASH',
+            },
+            data: {
+              amount: newFinalAmount,
+              serviceFee,
+              totalAmount,
+            },
+          })
+          if (escrowClaim.count !== 1) {
+            throw new Error('CHANGE_ORDER_ESCROW_STATE_CHANGED')
+          }
+        }
+      }
+
+      await tx.marketplaceJob.update({
+        where: { id: co.jobId },
+        data: { finalAuthorizedAmountCents: newFinalAmount },
+      })
+
+      if (idempotencyKey) {
+        const expiresAt = new Date()
+        expiresAt.setHours(expiresAt.getHours() + 24)
+
+        const existingRecord = await tx.idempotencyRecord.findFirst({
+          where: { idempotencyKey, userId: customerId, operation: 'APPROVE_CHANGE_ORDER' },
+        })
+
+        if (existingRecord) {
+          await tx.idempotencyRecord.update({
+            where: { id: existingRecord.id },
+            data: {
+              status: 'COMPLETED',
+              requestFingerprint,
+              resultPayload: serializeBigInt({
+                changeOrder: updatedCo,
+                finalAuthorizedAmountCents: newFinalAmount,
+              }),
+            },
+          })
+        } else {
+          await tx.idempotencyRecord.create({
+            data: {
+              idempotencyKey,
+              userId: customerId,
+              operation: 'APPROVE_CHANGE_ORDER',
+              status: 'COMPLETED',
+              resultPayload: serializeBigInt({
+                changeOrder: updatedCo,
+                finalAuthorizedAmountCents: newFinalAmount,
+              }),
+              requestFingerprint,
+              expiresAt,
+            },
+          })
+        }
+      }
+
+      return { changeOrder: updatedCo, finalAuthorizedAmountCents: newFinalAmount }
+    })
+
+    return {
+      success: true,
+      changeOrder: result.changeOrder,
+      finalAuthorizedAmountCents: result.finalAuthorizedAmountCents,
     }
-
-    return { changeOrder: updatedCo, finalAuthorizedAmountCents: newFinalAmount }
-  })
-
-  return { success: true, changeOrder: result.changeOrder, finalAuthorizedAmountCents: result.finalAuthorizedAmountCents }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    if (
+      message === 'CONCURRENT_APPROVAL' ||
+      message === 'FINAL_AUTHORIZED_AMOUNT_MUST_BE_POSITIVE' ||
+      message === 'Change order not found' ||
+      message === 'CHANGE_ORDER_ESCROW_NOT_FOUND' ||
+      message === 'CHANGE_ORDER_TOPUP_NOT_SUPPORTED_AFTER_FUNDING' ||
+      message === 'CHANGE_ORDER_CURRENCY_MISMATCH' ||
+      message === 'CHANGE_ORDER_ESCROW_STATE_CHANGED'
+    ) {
+      return { success: false, error: message }
+    }
+    throw error
+  }
 }
 
 export async function rejectChangeOrder(
@@ -412,7 +536,7 @@ export async function calculateFinalAuthorizedAmount(
   const approvedQuote = await client.jobQuote.findUnique({ where: { id: job.approvedQuoteId } })
   if (!approvedQuote) return { success: false, error: 'Approved quote not found' }
 
-  const baseAmountCents = approvedQuote.price
+  const baseAmountCents = approvedQuote.totalCents ?? approvedQuote.price
 
   // Sum APPROVED change order deltas
   const approvedOrders = await client.jobChangeOrder.findMany({

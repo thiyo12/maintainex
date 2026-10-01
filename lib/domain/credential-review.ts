@@ -1,9 +1,11 @@
 import { PrismaClient } from '@prisma/client'
 import type { AdminSession, AuditAction } from '../admin-types'
 
+export type CredentialReviewStatus = 'VERIFIED' | 'REJECTED' | 'EXPIRED'
+
 export interface ReviewCredentialInput {
   credentialId: string
-  status: 'VERIFIED' | 'REJECTED' | 'EXPIRED'
+  status: CredentialReviewStatus
   reason?: string
   session: AdminSession
   ipAddress: string
