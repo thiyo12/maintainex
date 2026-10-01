@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { checkPasswordStrength, hashPassword } from '@/lib/security/password'
 import { ADMIN_ROLES, type AdminRole } from '@/lib/admin-types'
-import { guardCrmRequest } from '@/lib/crm/security'
+import { guardCrmAction, guardCrmRequest } from '@/lib/crm/security'
+import { consumeCrmStepUpFromHeader } from '@/lib/crm/governance/step-up'
 import { createAuditLog } from '@/lib/crm/audit'
 
 const VALID_ROLES = new Set(Object.keys(ADMIN_ROLES))
@@ -134,10 +135,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const guard = await guardCrmRequest(request, {
-      permission: 'admins:create',
-      level: 'sensitive',
-    })
+    const guard = await guardCrmAction(request, 'staff.create')
     if (!guard.ok) return guard.response
     const security = guard.context
 
@@ -175,6 +173,16 @@ export async function POST(request: NextRequest) {
     const existing = await prisma.adminUser.findUnique({ where: { email } })
     if (existing && !existing.deletedAt) {
       return NextResponse.json({ error: 'Email already in use' }, { status: 409 })
+    }
+
+    const stepUp = await consumeCrmStepUpFromHeader({
+      headerValue: request.headers.get('x-crm-step-up'),
+      adminUserId: security.adminId,
+      sessionId: security.sessionId,
+      actionId: 'staff.create',
+    })
+    if (!stepUp) {
+      return NextResponse.json({ error: 'Step-up authentication required' }, { status: 403 })
     }
 
     const passwordHash = await hashPassword(password)
@@ -244,10 +252,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const guard = await guardCrmRequest(request, {
-      permission: 'admins:edit',
-      level: 'sensitive',
-    })
+    const guard = await guardCrmAction(request, 'staff.account.update')
     if (!guard.ok) return guard.response
     const security = guard.context
 
@@ -337,6 +342,16 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
+    const stepUp = await consumeCrmStepUpFromHeader({
+      headerValue: request.headers.get('x-crm-step-up'),
+      adminUserId: security.adminId,
+      sessionId: security.sessionId,
+      actionId: 'staff.account.update',
+    })
+    if (!stepUp) {
+      return NextResponse.json({ error: 'Step-up authentication required' }, { status: 403 })
+    }
+
     const admin = await prisma.adminUser.update({
       where: { id },
       data: updateData,
@@ -396,10 +411,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const guard = await guardCrmRequest(request, {
-      permission: 'admins:delete',
-      level: 'sensitive',
-    })
+    const guard = await guardCrmAction(request, 'staff.delete')
     if (!guard.ok) return guard.response
     const security = guard.context
 
@@ -426,6 +438,16 @@ export async function DELETE(request: NextRequest) {
       (await activeSuperAdminCount()) <= 1
     ) {
       return NextResponse.json({ error: 'Cannot delete the last active SUPER_ADMIN' }, { status: 409 })
+    }
+
+    const stepUp = await consumeCrmStepUpFromHeader({
+      headerValue: request.headers.get('x-crm-step-up'),
+      adminUserId: security.adminId,
+      sessionId: security.sessionId,
+      actionId: 'staff.delete',
+    })
+    if (!stepUp) {
+      return NextResponse.json({ error: 'Step-up authentication required' }, { status: 403 })
     }
 
     await prisma.$transaction([
