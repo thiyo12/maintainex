@@ -43,6 +43,7 @@ export interface CreateCrmApprovalInput {
   reasonCode?: string
   note?: string
   idempotencyKey?: string
+  actionPayload?: Record<string, unknown>
   risk: Omit<RiskPolicyContext, 'actionId' | 'market' | 'amountMinor' | 'currency'>
 }
 
@@ -89,6 +90,15 @@ function eventMetadata(value: unknown): string {
   return JSON.stringify(value)
 }
 
+function serialiseActionPayload(value: Record<string, unknown> | undefined): string | null {
+  if (!value) return null
+  const text = JSON.stringify(value)
+  if (text.length > 4000) {
+    throw new CrmApprovalError('APPROVAL_PAYLOAD_TOO_LARGE', 'Approval action payload is too large.', 400)
+  }
+  return text
+}
+
 function isUniqueConflict(error: unknown): boolean {
   return Boolean(
     error &&
@@ -107,6 +117,7 @@ function approvalRequestMatchesInput(
     targetId: string
     amountMinor: bigint | null
     currency: string | null
+    actionPayload?: string | null
   },
   input: CreateCrmApprovalInput,
   market: string
@@ -121,7 +132,8 @@ function approvalRequestMatchesInput(
     existing.targetType === input.targetType &&
     existing.targetId === input.targetId &&
     existing.amountMinor === inputAmount &&
-    existing.currency === inputCurrency
+    existing.currency === inputCurrency &&
+    (existing.actionPayload ?? null) === serialiseActionPayload(input.actionPayload)
   )
 }
 
@@ -134,6 +146,7 @@ function assertApprovalIdempotencyMatch(
     targetId: string
     amountMinor: bigint | null
     currency: string | null
+    actionPayload?: string | null
   },
   input: CreateCrmApprovalInput,
   market: string
@@ -209,6 +222,7 @@ export async function createCrmApprovalRequest(input: CreateCrmApprovalInput) {
             reasons: plan.risk.reasons,
             holds: plan.risk.holdCodes,
           }),
+          actionPayload: serialiseActionPayload(input.actionPayload),
           policyVersion: plan.risk.policyVersion,
           idempotencyKey: input.idempotencyKey,
           requiredApprovers: requiredApproversJson(input.actionId, plan.tier),
