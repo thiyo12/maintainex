@@ -124,7 +124,7 @@ export default function AdminNotificationCentrePage() {
               App & Web
             </Link>
             <CrmBadge tone={unread > 0 ? 'warning' : 'success'} dot>
-              {unread > 0 ? \`\${unread} unread\` : 'Inbox clear'}
+              {unread > 0 ? `${unread} unread` : 'Inbox clear'}
             </CrmBadge>
           </>
         }
@@ -171,14 +171,14 @@ export default function AdminNotificationCentrePage() {
             {items.map(item => {
               const content = (
                 <div
-                  className={\`flex items-start gap-4 px-5 py-4 transition hover:bg-slate-50 \${item.read ? '' : 'bg-amber-50/40'}\`}
+                  className={`flex items-start gap-4 px-5 py-4 transition hover:bg-slate-50 ${item.read ? '' : 'bg-amber-50/40'}`}
                 >
                   <div
-                    className={\`grid h-10 w-10 shrink-0 place-items-center rounded-xl \${
+                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
                       item.read
                         ? 'bg-slate-100 text-slate-400'
                         : 'bg-[var(--crm-accent-soft)] text-amber-700'
-                    }\`}
+                    }`}
                   >
                     <FiBell size={17} />
                   </div>
