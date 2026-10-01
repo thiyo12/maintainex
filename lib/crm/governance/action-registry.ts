@@ -405,3 +405,54 @@ export function evaluateApprovalEligibility(input: ApprovalEligibilityInput): Ap
 
   return { allowed: true }
 }
+
+
+export type ApprovalSlot = readonly import('@/lib/admin-types').AdminRole[]
+
+export function getApprovalSlots(actionId: CrmActionId, tier: ApprovalTier): readonly ApprovalSlot[] {
+  if (tier === 'T0') return []
+
+  const action = getCrmAction(actionId)
+  const fallback = action.approverRoles[tier] || []
+
+  switch (actionId) {
+    case 'finance.refund':
+    case 'finance.escrow.manual_release':
+    case 'finance.wallet.adjust':
+    case 'finance.payout':
+    case 'finance.settlement': {
+      if (tier === 'T1') return [['FINANCE', 'SUPER_ADMIN']]
+      if (tier === 'T2') return [['FINANCE', 'MANAGER', 'SUPER_ADMIN']]
+      if (tier === 'T3' || tier === 'T4') {
+        return [
+          ['MANAGER', 'SUPER_ADMIN'],
+          ['SUPER_ADMIN'],
+        ]
+      }
+      break
+    }
+
+    case 'finance.payout_destination.change':
+      if (tier === 'T3' || tier === 'T4') {
+        return [
+          ['MANAGER', 'SUPER_ADMIN'],
+          ['SUPER_ADMIN'],
+        ]
+      }
+      break
+
+    case 'notifications.broadcast':
+      if (tier === 'T4') {
+        return [
+          ['MANAGER', 'SUPER_ADMIN'],
+          ['SUPER_ADMIN'],
+        ]
+      }
+      if (tier === 'T2' || tier === 'T3') {
+        return [['MANAGER', 'SUPER_ADMIN']]
+      }
+      break
+  }
+
+  return fallback.length ? [fallback] : []
+}
