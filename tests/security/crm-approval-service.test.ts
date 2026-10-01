@@ -84,6 +84,13 @@ describe('CRM V2 approval service security', () => {
     const existing = {
       id: 'approval-1',
       idempotencyKey: 'refund:payment-1:v1',
+      actionId: 'finance.refund',
+      initiatorAdminId: 'finance-1',
+      market: 'LK',
+      targetType: 'PaymentIntent',
+      targetId: 'payment-1',
+      amountMinor: lkr(10_000),
+      currency: 'LKR',
       status: 'PENDING_APPROVAL',
     }
     db.approvalFindUnique.mockResolvedValueOnce(existing)
