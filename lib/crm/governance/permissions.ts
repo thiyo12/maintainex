@@ -3,6 +3,47 @@ import type { PermissionClass } from './types'
 
 export type PermissionOverrideEffect = 'ALLOW' | 'DENY'
 
+const CRM_PERMISSION_LEGACY_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  'customers:view': ['users:view'],
+  'customers:edit': ['users:edit'],
+  'customers:status:manage': ['users:suspend', 'users:ban'],
+  'customers:sessions:revoke': ['users:edit'],
+  'taskers:status:manage': ['taskers:edit', 'taskers:ban'],
+  'companies:status:manage': ['companies:edit', 'companies:ban'],
+  'companies:workforce:manage': ['companies:edit'],
+  'kyc:review': ['kyc:view'],
+  'credentials:view': ['credentials:read'],
+  'credentials:manage': ['credentials:write'],
+  'quotes:view': ['jobs:view'],
+  'messages:view': ['support:view'],
+  'messages:respond': ['support:respond'],
+  'finance:payments:view': ['wallets:view', 'commission:view'],
+  'finance:escrow:view': ['wallets:view'],
+  'finance:wallets:view': ['wallets:view'],
+  'finance:payouts:view': ['wallets:view'],
+  'finance:commission:view': ['commission:view'],
+  'finance:settlements:view': ['commission:view'],
+  'disputes:manage': ['disputes:resolve'],
+  'risk:view': ['risk_events:read'],
+  'risk:resolve': ['risk_events:resolve'],
+  'catalog:view': ['professions:read'],
+  'catalog:edit': ['professions:write'],
+  'pricing:view': ['pricing_config:read'],
+  'pricing:manage': ['pricing_config:write'],
+  'markets:view': ['market_config:read'],
+  'markets:manage': ['market_config:write'],
+  'staff:view': ['admins:view'],
+  'audit:view': ['audit:read'],
+  'security:events:view': ['security:view'],
+  'health:view': ['security:view'],
+}
+
+function roleTemplateHasPermission(role: AdminRole, permission: string): boolean {
+  if (ROLE_PERMISSIONS[role]?.includes(permission)) return true
+  const aliases = CRM_PERMISSION_LEGACY_ALIASES[permission] || []
+  return aliases.some(alias => ROLE_PERMISSIONS[role]?.includes(alias))
+}
+
 export interface PermissionOverride {
   permission: string
   effect: PermissionOverrideEffect
@@ -42,7 +83,7 @@ export function evaluateEffectivePermission(input: EffectivePermissionInput): Ef
     return { allowed: true, source: 'EXPLICIT_ALLOW' }
   }
 
-  if (ROLE_PERMISSIONS[input.role]?.includes(input.permission)) {
+  if (roleTemplateHasPermission(input.role, input.permission)) {
     return { allowed: true, source: 'ROLE_TEMPLATE' }
   }
 

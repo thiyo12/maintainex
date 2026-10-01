@@ -182,6 +182,19 @@ export async function PATCH(
         })
       }
 
+      // Revoke all target staff sessions after any privilege change.
+      // Live guards already re-read permissions on every request, and this
+      // additionally forces a fresh authentication session.
+      await tx.adminSession.updateMany({
+        where: {
+          adminUserId: id,
+          isRevoked: false,
+        },
+        data: {
+          isRevoked: true,
+        },
+      })
+
       // Privilege changes are fail-closed on audit: a failed audit insert
       // rolls back the permission mutation in this same transaction.
       await tx.securityAudit.create({

@@ -56,4 +56,18 @@ describe('CRM V2 effective permissions', () => {
       { permission: 'jobs:view', effect: 'DENY' },
     ])).toEqual({ valid: false, reason: 'Duplicate permission override.' })
   })
+
+  it('maps canonical V2 read permissions to legacy role templates during migration', () => {
+    expect(evaluateEffectivePermission({
+      role: 'USER_MANAGEMENT',
+      permission: 'customers:view',
+      permissionClass: 'READ',
+    })).toEqual({ allowed: true, source: 'ROLE_TEMPLATE' })
+
+    expect(evaluateEffectivePermission({
+      role: 'TECHNICAL',
+      permission: 'customers:view',
+      permissionClass: 'READ',
+    }).allowed).toBe(false)
+  })
 })

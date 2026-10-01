@@ -206,7 +206,7 @@ jobs:
         if: always()
 
       - name: Phase 9 security tests
-        run: npx vitest run tests/security/crm-three-layer-security.test.ts tests/security/crm-governance-policy.test.ts tests/security/crm-approval-engine.test.ts tests/security/crm-approval-service.test.ts tests/security/crm-permission-overrides.test.ts tests/security/crm-permission-catalog.test.ts tests/security/admin-staff-password-hashing.test.ts tests/security/admin-login-identity-boundary.test.ts tests/security/admin-session-token-lifecycle.test.ts tests/security/marketplace-lifecycle-bypass-regression.test.ts tests/security/legacy-marketplace-route-security.test.ts tests/security/payment-public-origin.test.ts --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
+        run: npx vitest run tests/security/crm-three-layer-security.test.ts tests/security/crm-governance-policy.test.ts tests/security/crm-approval-engine.test.ts tests/security/crm-approval-service.test.ts tests/security/crm-permission-overrides.test.ts tests/security/crm-permission-catalog.test.ts tests/security/crm-staff-session-invalidation.test.ts tests/security/admin-staff-password-hashing.test.ts tests/security/admin-login-identity-boundary.test.ts tests/security/admin-session-token-lifecycle.test.ts tests/security/marketplace-lifecycle-bypass-regression.test.ts tests/security/legacy-marketplace-route-security.test.ts tests/security/payment-public-origin.test.ts --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
         if: always()
 
       - name: Upload Phase 9 security test diagnostics
