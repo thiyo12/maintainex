@@ -9,215 +9,279 @@ import {
   FiArrowUpRight,
   FiGlobe,
   FiGrid,
-  FiSave,
-  FiShield,
+  FiRefreshCw,
   FiTag,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmCard,
+  CrmMetricCard,
+  CrmPageHeader,
+  CrmState,
+} from '@/components/crm/v2/CrmPrimitives'
 
 interface Overview {
-  settings: Record<string, { value: unknown }>
   catalog: {
     categories: { active: number; inactive: number }
     services: { active: number; inactive: number; trending: number }
   }
-  offers: { activeSeasonal: number; activeFlash: number }
+  offers: {
+    activeSeasonal: number
+    activeFlash: number
+  }
+  scope: {
+    superAdmin: boolean
+    countries: string[]
+  }
 }
 
 export default function WebsiteManagementPage() {
   const { user } = useAdminSession()
-  const role = (user?.role || 'SUPPORT') as AdminRole
-  const canEdit = (ROLE_PERMISSIONS[role] || []).includes('settings:edit')
+  const canViewPlatform = Boolean(user?.permissions?.includes('platform:settings:view'))
+  const canViewCatalog = Boolean(user?.permissions?.includes('catalog:view'))
+  const canViewPromotions = Boolean(user?.permissions?.includes('promotions:view'))
+
   const [overview, setOverview] = useState<Overview | null>(null)
-  const [form, setForm] = useState({
-    platformName: 'MaintainEX',
-    supportEmail: 'support@maintainex.lk',
-    maintenanceMode: false,
-  })
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
+    if (!canViewPlatform) {
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
-    setLoadError(null)
     try {
-      const [overviewResponse, settingsResponse] = await Promise.all([
-        fetch('/api/admin/platform/overview', { credentials: 'include', cache: 'no-store' }),
-        fetch('/api/admin/settings', { credentials: 'include', cache: 'no-store' }),
-      ])
-      const overviewBody = await overviewResponse.json().catch(() => ({}))
-      const settingsBody = await settingsResponse.json().catch(() => ({}))
-      if (!overviewResponse.ok) throw new Error(overviewBody?.error || 'Unable to load website controls')
-      if (!settingsResponse.ok) throw new Error(settingsBody?.error || 'Unable to load settings')
-      setOverview(overviewBody)
-      setForm({
-        platformName: String(settingsBody.settings?.platformName || 'MaintainEX'),
-        supportEmail: String(settingsBody.settings?.supportEmail || 'support@maintainex.lk'),
-        maintenanceMode: Boolean(settingsBody.settings?.maintenanceMode),
+      const response = await fetch('/api/admin/platform/overview', {
+        credentials: 'include',
+        cache: 'no-store',
       })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body?.error || 'Unable to load website operations')
+      setOverview(body)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load website management'
+      toast.error(error instanceof Error ? error.message : 'Failed to load website operations')
       setOverview(null)
-      setLoadError(message)
-      toast.error(message)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [canViewPlatform])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
-  async function save() {
-    if (!canEdit || loadError || !overview) return
-    if (!window.confirm('Save these website/platform settings? The change will be audited.')) return
-    setSaving(true)
-    try {
-      const response = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: form }),
-      })
-      const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Failed to save settings')
-      toast.success('Website settings saved')
-      await load()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save settings')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (loading) return <div className="h-[500px] rounded-2xl border border-slate-200 bg-white animate-pulse" />
-
-  if (loadError || !overview) {
+  if (!canViewPlatform && user) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
-        <div className="flex items-start gap-3">
-          <FiAlertTriangle className="text-red-600 shrink-0 mt-0.5" />
-          <div className="min-w-0">
-            <h1 className="font-semibold text-red-900">Website management could not be loaded</h1>
-            <p className="mt-1 text-sm text-red-700">{loadError || 'Canonical website settings are unavailable.'}</p>
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="mt-4 h-10 rounded-xl bg-red-700 px-4 text-sm font-semibold text-white"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
+      <CrmState
+        type="permission"
+        title="Website operations access required"
+        description="Your current staff permissions do not allow the App & Web operational overview."
+      />
     )
   }
 
+  if (loading) {
+    return (
+      <CrmState
+        type="loading"
+        title="Loading website operations"
+        description="Loading real catalog and promotion state used by MaintainEX public surfaces."
+      />
+    )
+  }
+
+  if (!overview) {
+    return (
+      <CrmState
+        type="error"
+        title="Website operations unavailable"
+        description="The public-surface operational overview could not be loaded."
+        action={
+          <CrmButton variant="secondary" onClick={load}>
+            <FiRefreshCw size={14} />
+            Retry
+          </CrmButton>
+        }
+      />
+    )
+  }
+
+  const totalActive =
+    overview.catalog.categories.active +
+    overview.catalog.services.active +
+    overview.offers.activeSeasonal +
+    overview.offers.activeFlash
+
   return (
     <div className="space-y-5">
-      <div>
-        <Link href="/admin/platform" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900">
-          <FiArrowLeft size={15}/> Platform management
-        </Link>
-        <div className="mt-3 text-xs uppercase tracking-[0.16em] text-amber-600 font-semibold">Public surface</div>
-        <h1 className="mt-1 text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">Website Management</h1>
-        <p className="mt-1.5 text-sm text-slate-500">Manage real settings, public service inventory and promotional content used by the MaintainEX website.</p>
-      </div>
+      <CrmPageHeader
+        eyebrow="App & Web · Public surface"
+        title="Website management"
+        description="Operate public catalog and promotion data that the platform actually stores and serves. Unsupported runtime switches are intentionally excluded."
+        actions={
+          <CrmButton variant="secondary" onClick={load}>
+            <FiRefreshCw size={14} />
+            Refresh
+          </CrmButton>
+        }
+        context={
+          <>
+            <Link
+              href="/admin/platform"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900"
+            >
+              <FiArrowLeft size={12} />
+              App & Web
+            </Link>
+            <CrmBadge tone="success" dot>Real operational data</CrmBadge>
+            <CrmBadge tone="info">
+              {overview.scope.superAdmin
+                ? 'All markets'
+                : overview.scope.countries.join(', ') || 'No market scope'}
+            </CrmBadge>
+          </>
+        }
+      />
 
-      {form.maintenanceMode && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-start gap-3">
-          <FiAlertTriangle className="text-red-600 shrink-0 mt-0.5" />
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <CrmMetricCard
+          label="Active categories"
+          value={overview.catalog.categories.active.toLocaleString()}
+          helper={`${overview.catalog.categories.inactive} inactive`}
+          icon={<FiGrid size={16} />}
+          tone="info"
+        />
+        <CrmMetricCard
+          label="Active services"
+          value={overview.catalog.services.active.toLocaleString()}
+          helper={`${overview.catalog.services.trending} trending`}
+          icon={<FiGlobe size={16} />}
+          tone="success"
+        />
+        <CrmMetricCard
+          label="Seasonal offers"
+          value={overview.offers.activeSeasonal.toLocaleString()}
+          helper="Currently active"
+          icon={<FiTag size={16} />}
+          tone="amber"
+        />
+        <CrmMetricCard
+          label="Public active items"
+          value={totalActive.toLocaleString()}
+          helper={`${overview.offers.activeFlash} active flash offers`}
+          icon={<FiArrowUpRight size={16} />}
+          tone="neutral"
+        />
+      </section>
+
+      <section className="grid gap-5 lg:grid-cols-2">
+        <CrmCard
+          title="Services & categories"
+          description="Create drafts and publish market-scoped catalog entries through the governed catalog workspace."
+          action={<FiGrid size={18} className="text-amber-600" />}
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <Summary
+              label="Categories"
+              primary={overview.catalog.categories.active}
+              secondary={overview.catalog.categories.inactive}
+            />
+            <Summary
+              label="Services"
+              primary={overview.catalog.services.active}
+              secondary={overview.catalog.services.inactive}
+            />
+          </div>
+
+          {canViewCatalog && (
+            <Link
+              href="/admin/platform/catalog"
+              className="mt-4 inline-flex h-10 items-center gap-2 rounded-[11px] bg-[var(--crm-accent)] px-4 text-sm font-semibold text-[#151719] hover:bg-[#ffc84a]"
+            >
+              Open catalog
+              <FiArrowUpRight size={14} />
+            </Link>
+          )}
+        </CrmCard>
+
+        <CrmCard
+          title="Offers & promotions"
+          description="Manage real seasonal and flash promotion records with market and owner controls."
+          action={<FiTag size={18} className="text-amber-600" />}
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <Summary
+              label="Seasonal"
+              primary={overview.offers.activeSeasonal}
+              secondary={0}
+              secondaryLabel="active"
+            />
+            <Summary
+              label="Flash"
+              primary={overview.offers.activeFlash}
+              secondary={0}
+              secondaryLabel="live"
+            />
+          </div>
+
+          {canViewPromotions && (
+            <Link
+              href="/admin/platform/offers"
+              className="mt-4 inline-flex h-10 items-center gap-2 rounded-[11px] border border-[var(--crm-border)] bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Open promotions
+              <FiArrowUpRight size={14} />
+            </Link>
+          )}
+        </CrmCard>
+      </section>
+
+      <CrmCard
+        title="Website booking runtime boundary"
+        description="CRM controls are only exposed after the website runtime consumes the same canonical marketplace services."
+        action={<CrmBadge tone="warning">Phase 10</CrmBadge>}
+      >
+        <div className="flex gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--crm-warning-soft)] text-[var(--crm-warning)]">
+            <FiAlertTriangle size={18} />
+          </div>
           <div>
-            <div className="font-semibold text-red-800">Maintenance mode is enabled</div>
-            <div className="text-sm text-red-700 mt-1">Public access may be restricted by the existing maintenance setting.</div>
+            <div className="text-sm font-semibold text-slate-900">
+              No fake maintenance or website-booking switch
+            </div>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+              The current repository does not yet expose a dedicated website-booking runtime that consumes those settings. Catalog and promotions above are real controls; website booking availability, maintenance state and feature flags will be added only when the public runtime is wired to consume them.
+            </p>
           </div>
         </div>
-      )}
-
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="font-semibold text-slate-900">Public-site settings</h2>
-              <p className="text-xs text-slate-400 mt-1">These values are persisted in the canonical Settings table.</p>
-            </div>
-            <FiShield className="text-emerald-600" size={18}/>
-          </div>
-
-          <div className="mt-5 grid md:grid-cols-2 gap-4">
-            <label className="block">
-              <span className="text-xs font-medium text-slate-600">Platform name</span>
-              <input
-                disabled={!canEdit}
-                value={form.platformName}
-                onChange={e=>setForm(current=>({...current,platformName:e.target.value}))}
-                className="mt-1.5 w-full h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-amber-300 disabled:opacity-60"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-medium text-slate-600">Support email</span>
-              <input
-                disabled={!canEdit}
-                type="email"
-                value={form.supportEmail}
-                onChange={e=>setForm(current=>({...current,supportEmail:e.target.value}))}
-                className="mt-1.5 w-full h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-amber-300 disabled:opacity-60"
-              />
-            </label>
-          </div>
-
-          <label className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
-            <div>
-              <div className="text-sm font-semibold text-slate-800">Maintenance mode</div>
-              <div className="text-xs text-slate-400 mt-1">Use only for planned maintenance or an operational incident.</div>
-            </div>
-            <input
-              disabled={!canEdit}
-              type="checkbox"
-              checked={form.maintenanceMode}
-              onChange={e=>setForm(current=>({...current,maintenanceMode:e.target.checked}))}
-              className="w-5 h-5 accent-amber-500"
-            />
-          </label>
-
-          {canEdit ? (
-            <button onClick={save} disabled={saving} className="mt-5 inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-slate-950 text-white text-sm font-semibold disabled:opacity-50">
-              <FiSave size={15}/> {saving ? 'Saving…' : 'Save audited settings'}
-            </button>
-          ) : (
-            <div className="mt-5 text-xs text-slate-400">Your staff role has read-only website settings access.</div>
-          )}
-        </section>
-
-        <section className="rounded-2xl bg-[#10151d] text-white p-5">
-          <FiGlobe className="text-amber-300" size={20}/>
-          <h2 className="mt-4 font-semibold">Public content state</h2>
-          <div className="mt-5 space-y-3">
-            <KV label="Active categories" value={String(overview?.catalog.categories.active || 0)} />
-            <KV label="Active services" value={String(overview?.catalog.services.active || 0)} />
-            <KV label="Trending services" value={String(overview?.catalog.services.trending || 0)} />
-            <KV label="Seasonal offers" value={String(overview?.offers.activeSeasonal || 0)} />
-            <KV label="Flash offers" value={String(overview?.offers.activeFlash || 0)} />
-          </div>
-        </section>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <Module href="/admin/platform/catalog" icon={FiGrid} title="Services & categories" text="Create and safely activate/deactivate public catalog entries." />
-        <Module href="/admin/platform/offers" icon={FiTag} title="Offers & promotions" text="Manage seasonal and flash campaign visibility." />
-      </div>
+      </CrmCard>
     </div>
   )
 }
 
-function KV({label,value}:{label:string;value:string}) {
-  return <div className="flex items-center justify-between gap-4 text-sm"><span className="text-slate-400">{label}</span><span className="font-semibold text-white">{value}</span></div>
-}
-
-function Module({href,icon:Icon,title,text}:{href:string;icon:any;title:string;text:string}) {
-  return <Link href={href} className="rounded-2xl border border-slate-200 bg-white p-5 flex items-start justify-between gap-4 hover:bg-slate-50">
-    <div><Icon className="text-amber-600" size={18}/><h3 className="mt-3 font-semibold text-slate-900">{title}</h3><p className="mt-1 text-sm text-slate-500">{text}</p></div>
-    <FiArrowUpRight className="text-slate-400" />
-  </Link>
+function Summary({
+  label,
+  primary,
+  secondary,
+  secondaryLabel = 'inactive',
+}: {
+  label: string
+  primary: number
+  secondary: number
+  secondaryLabel?: string
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-4">
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+        {primary.toLocaleString()}
+      </div>
+      <div className="mt-1 text-[11px] text-slate-400">
+        {secondary.toLocaleString()} {secondaryLabel}
+      </div>
+    </div>
+  )
 }
