@@ -9,9 +9,20 @@ describe('CRM staff password hashing contract', () => {
       'utf8'
     )
 
-    expect(source).toContain("import { hashPassword } from '@/lib/security/password'")
+    expect(source).toContain("import { checkPasswordStrength, hashPassword } from '@/lib/security/password'")
     expect(source).not.toContain("from 'bcryptjs'")
     expect(source).toContain('const passwordHash = await hashPassword(password)')
     expect(source).toContain('updateData.passwordHash = await hashPassword(body.password)')
+  })
+
+  it('enforces the canonical staff password strength policy', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'app/api/admin/admins/route.ts'),
+      'utf8'
+    )
+
+    expect(source).toContain('checkPasswordStrength(password)')
+    expect(source).toContain('checkPasswordStrength(body.password)')
+    expect(source).toContain('Password does not meet staff security requirements')
   })
 })
