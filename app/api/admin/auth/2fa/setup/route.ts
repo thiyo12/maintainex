@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { generateTotpSecret, generateTotpUri } from '@/lib/admin-2fa'
+import { verifyPasswordWithMigration } from '@/lib/security/password'
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +19,25 @@ export async function POST(request: NextRequest) {
         { error: 'Two-factor authentication is already enabled.' },
         { status: 409 }
       )
+    }
+
+    const body = await request.json().catch(() => ({}))
+    const currentPassword =
+      typeof body?.currentPassword === 'string' ? body.currentPassword : ''
+
+    if (!currentPassword || currentPassword.length > 200) {
+      return NextResponse.json(
+        { error: 'Current password is required.' },
+        { status: 400 }
+      )
+    }
+
+    const passwordCheck = await verifyPasswordWithMigration(
+      currentPassword,
+      adminUser.passwordHash
+    )
+    if (!passwordCheck.valid) {
+      return NextResponse.json({ error: 'Current password is incorrect.' }, { status: 401 })
     }
 
     const secret = generateTotpSecret()
