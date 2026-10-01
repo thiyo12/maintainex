@@ -362,10 +362,6 @@ export async function decideCrmApprovalRequest(input: DecideCrmApprovalInput) {
     return { status: 'PENDING_APPROVAL' as const, retiered: true, tier: currentPlan.tier }
   }
 
-  if (isStepUpRequired(actionId, currentPlan.tier) && !isVerifiedCrmStepUp(input.stepUp)) {
-    throw new CrmApprovalError('STEP_UP_REQUIRED', 'Step-up authentication is required.', 403)
-  }
-
   const existingDecisions = decisionRecords(request.decisions)
   const eligibility = evaluateApprovalEligibility({
     actionId,
@@ -394,6 +390,10 @@ export async function decideCrmApprovalRequest(input: DecideCrmApprovalInput) {
       'This approver role cannot satisfy a remaining approval slot.',
       403
     )
+  }
+
+  if (isStepUpRequired(actionId, currentPlan.tier) && !isVerifiedCrmStepUp(input.stepUp)) {
+    throw new CrmApprovalError('STEP_UP_REQUIRED', 'Step-up authentication is required.', 403)
   }
 
   if (input.reason && input.reason.length > 2_000) {
