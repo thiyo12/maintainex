@@ -9,6 +9,7 @@ import {
   CrmButton,
   CrmCard,
   CrmState,
+  CrmTabs,
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmConfirmDialog } from '@/components/crm/v2/CrmOverlays'
@@ -303,9 +304,9 @@ export default function Job360Page() {
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">{job.title}</h1>
                 <StatusBadge value={job.status} />
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                <CrmBadge tone={payload.source === 'V2' ? 'amber' : 'neutral'}>
                   {payload.source === 'V2' ? 'Marketplace' : 'Classic'}
-                </span>
+                </CrmBadge>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
                 <button
@@ -350,26 +351,16 @@ export default function Job360Page() {
           </div>
         </div>
 
-        <div className="border-t border-slate-100 px-3 md:px-5 overflow-x-auto">
-          <div className="flex min-w-max">
-            {visibleTabs.map(tab => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={`px-3.5 py-3.5 text-sm font-medium border-b-2 transition ${
-                  activeTab === tab.key
-                    ? 'border-amber-400 text-slate-950'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                {tab.label}
-                {tab.key === 'dispute' && riskEvents.length > 0 && (
-                  <span className="ml-2 rounded-full bg-red-50 text-red-700 px-1.5 py-0.5 text-[10px]">{riskEvents.length}</span>
-                )}
-              </button>
-            ))}
-          </div>
+        <div className="border-t border-[var(--crm-border)] px-4 py-3">
+          <CrmTabs
+            items={visibleTabs.map(tab => ({
+              id: tab.key,
+              label: tab.label,
+              count: tab.key === 'dispute' && riskEvents.length > 0 ? riskEvents.length : undefined,
+            }))}
+            active={activeTab}
+            onChange={id => setActiveTab(id as TabKey)}
+          />
         </div>
       </section>
 
