@@ -51,7 +51,7 @@ async function getV2Job(id: string, request: NextRequest) {
 
   const currency = getCurrencyForCountry(job.countryCode)
   const { finance: canFinance, trust: canTrust, audit: canAudit } =
-    getCrmSectionAccess(security.role, security.isSuperAdmin)
+    getCrmSectionAccess(security.role, security.isSuperAdmin, security.permissionOverrides)
   const canCancel = evaluateActionInitiation({
     role: security.role,
     actionId: 'jobs.cancel',
@@ -482,7 +482,7 @@ async function getV1Job(id: string, request: NextRequest) {
   if (!guard.ok) return { response: guard.response }
   const security = guard.context
   const { finance: canFinance, trust: canTrust, audit: canAudit } =
-    getCrmSectionAccess(security.role, security.isSuperAdmin)
+    getCrmSectionAccess(security.role, security.isSuperAdmin, security.permissionOverrides)
   const canCancel = evaluateActionInitiation({
     role: security.role,
     actionId: 'jobs.cancel',
