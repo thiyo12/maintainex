@@ -28,6 +28,28 @@ describe('CRM V2 platform runtime controls', () => {
     expect(source).not.toContain('SECRET')
   })
 
+  it('guards mobile catalog endpoints with runtime and market availability', () => {
+    for (const path of [
+      'app/api/mobile/job-categories/route.ts',
+      'app/api/mobile/service-categories/route.ts',
+      'app/api/mobile/v2/service-templates/route.ts',
+    ]) {
+      const source = readFileSync(resolve(process.cwd(), path), 'utf8')
+      expect(source).toContain('getPlatformRuntimeConfig')
+      expect(source).toContain('runtime.maintenance.enabled')
+      expect(source).toContain('!runtime.channels.mobile')
+      expect(source).toContain('!runtime.catalog.visible')
+      expect(source).toContain('!runtime.market.available')
+    }
+
+    const serviceCategories = readFileSync(
+      resolve(process.cwd(), 'app/api/mobile/service-categories/route.ts'),
+      'utf8'
+    )
+    expect(serviceCategories).toContain('storedListIncludes(category.countries, country)')
+    expect(serviceCategories).toContain('storedListIncludes(job.countries, country)')
+  })
+
   it('protects runtime mutation with canonical CRM permission and audit', () => {
     const source = readFileSync(resolve(process.cwd(), 'app/api/admin/platform/runtime/route.ts'), 'utf8')
     expect(source).toContain("permission: 'platform:settings:manage'")
