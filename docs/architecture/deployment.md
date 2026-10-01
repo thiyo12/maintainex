@@ -118,9 +118,9 @@ services:
    find .next -name '._*' -type f -delete
    ```
 
-2. Switch Prisma to PostgreSQL:
+2. Verify Prisma remains PostgreSQL:
    ```bash
-   sed -i '' 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
+   grep 'provider = "postgresql"' prisma/schema.prisma
    ```
 
 3. Create build tarball:
@@ -158,18 +158,13 @@ services:
    docker service update --force --image maintainex-mx-vcaohy:prod-latest maintainex-mx-vcaohy
    ```
 
-5. Revert local schema to SQLite:
-   ```bash
-   sed -i '' 's/provider = "postgresql"/provider = "sqlite"/' prisma/schema.prisma
-   ```
-
 ---
 
 ## Critical Deployment Gotchas
 
 | Issue | Impact | Prevention |
 |---|---|---|
-| Tarball has `provider = "sqlite"` | New containers fail to connect to PostgreSQL | Always verify schema before tar |
+| Prisma provider differs from `postgresql` | New containers fail to connect to PostgreSQL | Treat `prisma/schema.prisma` as canonical PostgreSQL and validate before deploy |
 | `docker service update` without `--force` | Container not recreated, old code runs | Always use `--force` flag |
 | `docker cp` merges files | Old `.next` artifacts remain | Always `rm -rf /app/.next` first |
 | `docker restart` | Swarm recreates from old image | Use `docker commit` + `docker service update --image` |

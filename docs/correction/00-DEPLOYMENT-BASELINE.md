@@ -4,7 +4,7 @@
 
 | Method | Target | Trigger | Status |
 |---|---|---|---|
-| Dokploy/Nixpacks | VPS (147.93.106.54) | Git push to main | Active |
+| Dokploy/Nixpacks | VPS (`<VPS_HOST>`) | Git push to main | Active |
 | Docker manual | VPS | Manual build + push | Active |
 | Vercel | Web only | Git push | Active |
 | Expo/EAS | Mobile | Manual export | Not configured |
@@ -13,12 +13,12 @@
 
 | Component | Value |
 |---|---|
-| IP | `147.93.106.54` |
-| SSH key | `~/.ssh/id_ed25519_ssaaxcy` |
+| Host | `<VPS_HOST>` |
+| SSH key | `<SSH_KEY_PATH>` |
 | Container | `maintainex-mx-vcaohy:prod-slim7` |
 | Database container | `maintainex-db-maintainex-iwjbmo` |
-| DB password | `ba29bc6e06e48c5b702d0f4a8b224a6d088be43ec949c8e3` |
-| Known-good env | `/tmp/maint.service.env` |
+| DB credential | Stored only in the production secret/environment manager; rotate if previously exposed |
+| Production env | Managed outside the repository |
 | App URL | `https://maintainex.lk` |
 | Health check | `GET /api/health` → 200 OK |
 
@@ -56,7 +56,7 @@ docker run -d --name maintainex-mx-vcaohy --env-file /tmp/maint.service.env -p 3
 
 ## Known Deployment Issues
 
-1. **Dokploy env source unknown** — Why does Dokploy store wrong DB password?
+1. **Production credentials** — Store only in the deployment secret/environment manager; never document literal values in Git.
 2. ~~**Docker CMD runs `prisma db push` on every start** — Breaking schema change = service down~~ **RESOLVED** — CMD now uses `prisma migrate deploy`
 3. **No automated rollback** — Manual intervention required
 4. **No health check integration** — Docker healthcheck not configured

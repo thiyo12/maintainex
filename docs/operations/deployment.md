@@ -137,7 +137,7 @@ npx prisma migrate resolve --rolled-back <migration_name>
 - [ ] `DATABASE_URL` accessible from container network
 - [ ] `JWT_SECRET` / `NEXTAUTH_SECRET` set
 - [ ] `INTERNAL_SYNC_SECRET` set
-- [ ] Local schema has `provider = "postgresql"` (not `sqlite`)
+- [ ] Canonical schema remains `provider = "postgresql"`
 - [ ] `.next` directory cleaned of macOS resource forks: `find .next -name '._*' -type f -delete`
 - [ ] `npm run build` succeeds locally
 - [ ] `npx prisma generate` succeeds
@@ -149,10 +149,11 @@ npx prisma migrate resolve --rolled-back <migration_name>
 ## Deploy Script (`deploy-rsync.sh`)
 
 Automated deployment via rsync to VPS:
-1. Build locally
-2. Rsync artifacts to VPS
-3. Rebuild Docker image
-4. Update Swarm service
+1. Rsync source to VPS staging
+2. Copy source into the current app container
+3. Generate Prisma client and run the production build
+4. Commit the validated container and force-update the Swarm service
+5. Container startup runs `prisma migrate deploy` before `npm start`
 
 **Manual deployment steps** (per `AGENTS.md`):
 
@@ -160,8 +161,8 @@ Automated deployment via rsync to VPS:
 # 1. Clean macOS resource forks
 find .next -name '._*' -type f -delete
 
-# 2. Set schema provider
-sed -i '' 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
+# 2. Verify canonical PostgreSQL provider
+grep 'provider = "postgresql"' prisma/schema.prisma
 
 # 3. Package
 tar czf /tmp/maintainex-build.tar.gz .next package.json package-lock.json prisma public/
@@ -178,6 +179,4 @@ docker exec <container> npx prisma generate
 docker commit <container> maintainex-mx-vcaohy:prod-latest
 docker service update --force --image maintainex-mx-vcaohy:prod-latest maintainex-mx-vcaohy
 
-# 6. Revert schema locally
-sed -i '' 's/provider = "postgresql"/provider = "sqlite"/' prisma/schema.prisma
 ```
