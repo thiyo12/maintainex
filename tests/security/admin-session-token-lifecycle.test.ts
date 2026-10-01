@@ -128,4 +128,18 @@ describe('admin session-bound token lifecycle', () => {
     expect(middleware).toContain('if (!session.sessionId)')
     expect(middleware).toContain("'/admin/login?error=session_required'")
   })
+
+  it('uses one canonical active refresh-cookie path and expires the legacy narrow path', () => {
+    const files = [
+      read('app/api/admin/auth/login/route.ts'),
+      read('app/api/admin/auth/2fa/verify/route.ts'),
+      read('app/api/admin/auth/refresh/route.ts'),
+    ]
+
+    for (const source of files) {
+      expect(source).toContain("path: '/api/admin/auth'")
+      expect(source).toContain("path: '/api/admin/auth/refresh'")
+      expect(source).toContain('maxAge: 0')
+    }
+  })
 })
