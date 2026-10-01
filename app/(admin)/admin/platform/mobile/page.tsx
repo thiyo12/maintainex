@@ -233,7 +233,7 @@ export default function MobileManagementPage() {
 
                   <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
                     <Info label="Currency" value={config.currency} />
-                    <Info label="Commission" value={\`\${config.commissionBps / 100}%\`} />
+                    <Info label="Commission" value={`${config.commissionBps / 100}%`} />
                     <Info label="Minimum job" value={minor(config.minJobAmountCents, config.currency)} />
                     <Info label="Maximum job" value={minor(config.maxJobAmountCents, config.currency)} />
                   </div>
