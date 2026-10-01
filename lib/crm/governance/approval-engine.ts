@@ -72,39 +72,53 @@ function roleFits(role: AdminRole, slot: ApprovalSlot): boolean {
   return slot.includes(role)
 }
 
+export function countSatisfiedApprovalSlots(
+  slots: readonly ApprovalSlot[],
+  decisions: readonly ApprovalDecisionRecord[]
+): number {
+  if (slots.length === 0) return 0
+
+  const uniqueByAdmin = new Map<string, ApprovalDecisionRecord>()
+  for (const decision of decisions) {
+    if (decision.decision === 'APPROVE' && !uniqueByAdmin.has(decision.adminId)) {
+      uniqueByAdmin.set(decision.adminId, decision)
+    }
+  }
+  const approvals = [...uniqueByAdmin.values()]
+
+  const orderedSlots = slots
+    .map(slot => ({ slot }))
+    .sort((a, b) => a.slot.length - b.slot.length)
+
+  let best = 0
+  const used = new Set<number>()
+
+  function search(slotIndex: number, matched: number): void {
+    best = Math.max(best, matched)
+    if (slotIndex >= orderedSlots.length) return
+
+    // It is valid for a current decision set to leave this slot unsatisfied.
+    search(slotIndex + 1, matched)
+
+    const slot = orderedSlots[slotIndex].slot
+    for (let i = 0; i < approvals.length; i += 1) {
+      if (used.has(i)) continue
+      if (!roleFits(approvals[i].role, slot)) continue
+      used.add(i)
+      search(slotIndex + 1, matched + 1)
+      used.delete(i)
+    }
+  }
+
+  search(0, 0)
+  return best
+}
+
 export function areApprovalSlotsSatisfied(
   slots: readonly ApprovalSlot[],
   decisions: readonly ApprovalDecisionRecord[]
 ): boolean {
-  if (slots.length === 0) return true
-
-  const approvals = decisions.filter(decision => decision.decision === 'APPROVE')
-  if (approvals.length < slots.length) return false
-
-  // Match the most restrictive slot first so a SUPER_ADMIN-only slot cannot
-  // accidentally be consumed by a broader Manager/Super slot.
-  const orderedSlots = slots
-    .map((slot, originalIndex) => ({ slot, originalIndex }))
-    .sort((a, b) => a.slot.length - b.slot.length)
-
-  const used = new Set<number>()
-
-  function match(index: number): boolean {
-    if (index >= orderedSlots.length) return true
-    const slot = orderedSlots[index].slot
-
-    for (let i = 0; i < approvals.length; i += 1) {
-      if (used.has(i)) continue
-      if (!roleFits(approvals[i].role, slot)) continue
-
-      used.add(i)
-      if (match(index + 1)) return true
-      used.delete(i)
-    }
-    return false
-  }
-
-  return match(0)
+  return countSatisfiedApprovalSlots(slots, decisions) === slots.length
 }
 
 export function canRoleFillPendingApprovalSlot(
@@ -112,12 +126,13 @@ export function canRoleFillPendingApprovalSlot(
   slots: readonly ApprovalSlot[],
   decisions: readonly ApprovalDecisionRecord[]
 ): boolean {
+  const before = countSatisfiedApprovalSlots(slots, decisions)
   const hypothetical: ApprovalDecisionRecord = {
     adminId: '__candidate__',
     role,
     decision: 'APPROVE',
     decidedAt: new Date(0),
   }
-  return areApprovalSlotsSatisfied(slots, [...decisions, hypothetical]) ||
-    slots.some(slot => roleFits(role, slot))
+  const after = countSatisfiedApprovalSlots(slots, [...decisions, hypothetical])
+  return after > before
 }

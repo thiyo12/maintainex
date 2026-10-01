@@ -5,6 +5,7 @@ import {
   buildApprovalPlan,
   getApprovalSlots,
   isStepUpRequired,
+  canRoleFillPendingApprovalSlot,
 } from '@/lib/crm/governance'
 
 const lkr = (major: number) => BigInt(major) * 100n
@@ -31,6 +32,15 @@ describe('CRM V2 approval engine', () => {
       { adminId: 'mgr1', role: 'MANAGER', decision: 'APPROVE', decidedAt: new Date() },
       { adminId: 'mgr2', role: 'MANAGER', decision: 'APPROVE', decidedAt: new Date() },
     ])).toBe(false)
+  })
+
+  it('does not allow a second manager to fill the SUPER_ADMIN-only slot', () => {
+    const slots = getApprovalSlots('finance.payout', 'T3')
+    const decisions = [
+      { adminId: 'mgr-1', role: 'MANAGER' as const, decision: 'APPROVE' as const, decidedAt: new Date() },
+    ]
+    expect(canRoleFillPendingApprovalSlot('MANAGER', slots, decisions)).toBe(false)
+    expect(canRoleFillPendingApprovalSlot('SUPER_ADMIN', slots, decisions)).toBe(true)
   })
 
   it('requires distinct approval decisions for multiple slots', () => {
