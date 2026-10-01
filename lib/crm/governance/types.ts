@@ -55,6 +55,7 @@ export type CrmActionId =
   | 'finance.payout_destination.change'
   | 'finance.settlement'
   | 'finance.commission.publish'
+  | 'finance.commission.enforce'
   | 'platform.market.disable'
   | 'notifications.broadcast'
   | 'staff.create'
