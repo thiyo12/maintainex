@@ -154,7 +154,7 @@ export default function ReceiptScreen() {
             <Text style={styles.paymentLabel}>{t('receipt.paidOn')}</Text>
             <Text style={styles.paymentValue}>
               {job?.escrow?.releasedAt || job?.escrow?.heldAt
-                ? new Date(job.escrow.releasedAt || job.escrow.heldAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                ? new Date((job.escrow.releasedAt || job.escrow.heldAt) as string).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                 : '—'}
             </Text>
           </View>
