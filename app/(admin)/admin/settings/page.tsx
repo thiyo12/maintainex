@@ -1,55 +1,111 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
-  FiAlertTriangle,
   FiDollarSign,
   FiGlobe,
-  FiMail,
   FiRefreshCw,
-  FiSave,
   FiSettings,
   FiShield,
+  FiTool,
   FiUsers,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmCard,
+  CrmMetricCard,
+  CrmPageHeader,
+  CrmState,
+} from '@/components/crm/v2/CrmPrimitives'
 
-interface SettingsState {
-  platformName: string
-  supportEmail: string
-  currency: string
-  commissionRate: number
-  minTaskerStaff: number
-  weeklySettlementDay: string
-  autoApproveKyc: boolean
-  maintenanceMode: boolean
+interface SettingsPayload {
+  settings: Record<string, string | number | boolean>
+  definitions: Record<string, {
+    type?: string
+    label?: string
+    description?: string
+    groupName?: string
+    updatedBy?: string | null
+    updatedAt?: string | null
+  }>
 }
 
-const DEFAULTS: SettingsState = {
-  platformName: 'MaintainEX',
-  supportEmail: 'support@maintainex.lk',
-  currency: 'LKR',
-  commissionRate: 10,
-  minTaskerStaff: 3,
-  weeklySettlementDay: 'monday',
-  autoApproveKyc: false,
-  maintenanceMode: false,
+const OWNERSHIP: Record<string, {
+  owner: string
+  mode: 'metadata' | 'delegated'
+  href?: string
+  note: string
+}> = {
+  platformName: {
+    owner: 'Platform metadata',
+    mode: 'metadata',
+    note: 'Stored CRM metadata. Not presented as a runtime branding switch until a consumer is wired.',
+  },
+  supportEmail: {
+    owner: 'Platform metadata',
+    mode: 'metadata',
+    note: 'Stored support metadata. Public-surface wiring must be verified before treating it as runtime configuration.',
+  },
+  commissionRate: {
+    owner: 'Finance / Market policy',
+    mode: 'delegated',
+    href: '/admin/pricing/market-config',
+    note: 'Commission policy is governed through the canonical finance and market configuration path.',
+  },
+  currency: {
+    owner: 'Market policy',
+    mode: 'delegated',
+    href: '/admin/pricing/market-config',
+    note: 'Market currency belongs to canonical market configuration and financial snapshots.',
+  },
+  minTaskerStaff: {
+    owner: 'Company / Trust policy',
+    mode: 'delegated',
+    href: '/admin/users/companies',
+    note: 'Company eligibility belongs to company/KYC policy, not a generic settings toggle.',
+  },
+  weeklySettlementDay: {
+    owner: 'Finance',
+    mode: 'delegated',
+    href: '/admin/financial',
+    note: 'Settlement scheduling belongs to the canonical finance workflow.',
+  },
+  autoApproveKyc: {
+    owner: 'Trust & Safety',
+    mode: 'delegated',
+    href: '/admin/kyc',
+    note: 'KYC approval remains governed by the verification workflow. This stored legacy value is not a live bypass switch.',
+  },
+  maintenanceMode: {
+    owner: 'Website runtime',
+    mode: 'delegated',
+    href: '/admin/platform/website',
+    note: 'No runtime maintenance switch is exposed until the public website actually consumes one.',
+  },
 }
 
-const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday']
+function displayValue(value: string | number | boolean) {
+  if (typeof value === 'boolean') return value ? 'Enabled' : 'Disabled'
+  return String(value)
+}
 
 export default function AdminSettingsPage() {
   const { user } = useAdminSession()
-  const role = (user?.role || 'SUPPORT') as AdminRole
-  const canEdit = (ROLE_PERMISSIONS[role] || []).includes('settings:edit')
-  const [settings, setSettings] = useState<SettingsState>(DEFAULTS)
-  const [definitions, setDefinitions] = useState<Record<string, any>>({})
+  const canView = Boolean(user?.permissions?.includes('platform:settings:view'))
+
+  const [data, setData] = useState<SettingsPayload | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
+    if (!canView) {
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
       const response = await fetch('/api/admin/settings', {
@@ -57,160 +113,231 @@ export default function AdminSettingsPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load settings')
-      setSettings({ ...DEFAULTS, ...(body.settings || {}) })
-      setDefinitions(body.definitions || {})
+      if (!response.ok) throw new Error(body?.error || 'Unable to load settings registry')
+      setData({
+        settings: body.settings || {},
+        definitions: body.definitions || {},
+      })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load settings')
+      toast.error(error instanceof Error ? error.message : 'Failed to load settings registry')
+      setData(null)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [canView])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
-  async function save() {
-    if (!canEdit) return
-    if (settings.autoApproveKyc && !window.confirm('Auto-approve KYC reduces manual review. Confirm this setting change?')) return
-    if (settings.maintenanceMode && !window.confirm('Maintenance mode can restrict public access. Confirm this setting change?')) return
-
-    setSaving(true)
-    try {
-      const response = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings }),
-      })
-      const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Failed to save settings')
-      toast.success('Platform settings saved and audited')
-      await load()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save settings')
-    } finally {
-      setSaving(false)
+  const counts = useMemo(() => {
+    const keys = Object.keys(data?.settings || {})
+    return {
+      total: keys.length,
+      metadata: keys.filter(key => OWNERSHIP[key]?.mode === 'metadata').length,
+      delegated: keys.filter(key => OWNERSHIP[key]?.mode === 'delegated').length,
     }
-  }
+  }, [data])
 
-  function update<K extends keyof SettingsState>(key: K, value: SettingsState[K]) {
-    setSettings(current => ({ ...current, [key]: value }))
+  if (!canView && user) {
+    return (
+      <CrmState
+        type="permission"
+        title="Platform settings access required"
+        description="Your current staff permissions do not allow this configuration registry."
+      />
+    )
   }
 
   if (loading) {
-    return <div className="h-[560px] rounded-2xl border border-slate-200 bg-white animate-pulse" />
+    return (
+      <CrmState
+        type="loading"
+        title="Loading configuration registry"
+        description="Loading stored platform metadata and canonical ownership information."
+      />
+    )
+  }
+
+  if (!data) {
+    return (
+      <CrmState
+        type="error"
+        title="Configuration registry unavailable"
+        description="The settings registry could not be loaded for the current staff session."
+        action={
+          <CrmButton variant="secondary" onClick={load}>
+            <FiRefreshCw size={14} />
+            Retry
+          </CrmButton>
+        }
+      />
+    )
   }
 
   return (
     <div className="space-y-5">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-[0.16em] text-amber-600 font-semibold">Platform configuration</div>
-          <h1 className="mt-1 text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">Settings</h1>
-          <p className="mt-1.5 text-sm text-slate-500">Validated settings stored by MaintainEX. Sensitive changes are rate-limited and audited.</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={load} className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600">
-            <FiRefreshCw size={15}/> Refresh
-          </button>
-          {canEdit && (
-            <button disabled={saving} onClick={save} className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-slate-950 text-white text-sm font-semibold disabled:opacity-50">
-              <FiSave size={15}/> {saving ? 'Saving…' : 'Save changes'}
-            </button>
-          )}
-        </div>
+      <CrmPageHeader
+        eyebrow="Platform governance"
+        title="Settings registry"
+        description="See stored configuration values and the canonical module that owns each control. Generic settings are not allowed to bypass domain workflows."
+        actions={
+          <CrmButton variant="secondary" onClick={load}>
+            <FiRefreshCw size={14} />
+            Refresh
+          </CrmButton>
+        }
+        context={
+          <>
+            <CrmBadge tone="success" dot>Canonical ownership enforced</CrmBadge>
+            <CrmBadge tone="info">No fake runtime switches</CrmBadge>
+          </>
+        }
+      />
+
+      <section className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <CrmMetricCard
+          label="Stored keys"
+          value={counts.total.toLocaleString()}
+          helper="Known settings registry entries"
+          icon={<FiSettings size={16} />}
+          tone="info"
+        />
+        <CrmMetricCard
+          label="Metadata keys"
+          value={counts.metadata.toLocaleString()}
+          helper="Stored metadata, not runtime claims"
+          icon={<FiGlobe size={16} />}
+          tone="neutral"
+        />
+        <CrmMetricCard
+          label="Delegated controls"
+          value={counts.delegated.toLocaleString()}
+          helper="Owned by domain modules"
+          icon={<FiShield size={16} />}
+          tone="amber"
+        />
       </section>
 
-      {!canEdit && (
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-          Your staff role has read-only access to platform settings.
+      <CrmCard
+        title="Configuration ownership"
+        description="High-risk and runtime behavior belongs to canonical modules rather than one generic settings form."
+        padding="none"
+      >
+        <div className="divide-y divide-[var(--crm-border)]">
+          {Object.entries(data.settings).map(([key, value]) => {
+            const definition = data.definitions[key] || {}
+            const ownership = OWNERSHIP[key] || {
+              owner: 'Unclassified metadata',
+              mode: 'metadata' as const,
+              note: 'This key is stored but has no verified runtime-control contract.',
+            }
+
+            return (
+              <div
+                key={key}
+                className="grid gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1.4fr)_auto] lg:items-center"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-900">
+                    {definition.label || key}
+                  </div>
+                  <div className="mt-1 text-xs leading-5 text-slate-500">
+                    {definition.description || key}
+                  </div>
+                  <div className="mt-1 font-mono text-[10px] text-slate-400">{key}</div>
+                </div>
+
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                    Stored value
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-slate-800">
+                    {displayValue(value)}
+                  </div>
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CrmBadge tone={ownership.mode === 'delegated' ? 'amber' : 'neutral'}>
+                      {ownership.mode === 'delegated' ? 'DELEGATED' : 'METADATA'}
+                    </CrmBadge>
+                    <span className="text-xs font-semibold text-slate-700">{ownership.owner}</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">{ownership.note}</p>
+                </div>
+
+                <div className="lg:text-right">
+                  {ownership.href ? (
+                    <Link
+                      href={ownership.href}
+                      className="inline-flex h-9 items-center rounded-[10px] border border-[var(--crm-border)] bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Open owner
+                    </Link>
+                  ) : (
+                    <span className="text-[11px] text-slate-400">Registry only</span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
-      )}
+      </CrmCard>
 
-      <section className="grid xl:grid-cols-2 gap-5">
-        <Panel icon={FiGlobe} title="Platform identity" subtitle="Public platform and support defaults.">
-          <div className="grid md:grid-cols-2 gap-4">
-            <Input label="Platform name" value={settings.platformName} disabled={!canEdit} onChange={value => update('platformName', value)} />
-            <Input label="Support email" type="email" value={settings.supportEmail} disabled={!canEdit} onChange={value => update('supportEmail', value)} />
-            <Input label="Default currency" value={settings.currency} disabled={!canEdit} onChange={value => update('currency', value.toUpperCase().slice(0,3))} />
-            <Select label="Weekly settlement day" value={settings.weeklySettlementDay} options={DAYS} disabled={!canEdit} onChange={value => update('weeklySettlementDay', value)} />
-          </div>
-        </Panel>
-
-        <Panel icon={FiDollarSign} title="Marketplace economics" subtitle="Commission and company workforce defaults.">
-          <div className="grid md:grid-cols-2 gap-4">
-            <NumberInput label="Commission rate (%)" min={0} max={100} step={0.5} value={settings.commissionRate} disabled={!canEdit} onChange={value => update('commissionRate', value)} />
-            <NumberInput label="Minimum company staff" min={0} max={10000} step={1} value={settings.minTaskerStaff} disabled={!canEdit} onChange={value => update('minTaskerStaff', value)} />
-          </div>
-        </Panel>
-
-        <Panel icon={FiShield} title="Trust defaults" subtitle="High-impact settings require deliberate confirmation.">
-          <Toggle
-            label="Auto-approve KYC"
-            description="Stored platform setting for automatic KYC behavior. Keep disabled unless the runtime policy has been reviewed."
-            checked={settings.autoApproveKyc}
-            disabled={!canEdit}
-            onChange={value => update('autoApproveKyc', value)}
-            warning={settings.autoApproveKyc}
-          />
-        </Panel>
-
-        <Panel icon={FiSettings} title="Operational state" subtitle="Public-access configuration.">
-          <Toggle
-            label="Maintenance mode"
-            description="Stored maintenance-mode setting. Use only during planned maintenance or an operational incident."
-            checked={settings.maintenanceMode}
-            disabled={!canEdit}
-            onChange={value => update('maintenanceMode', value)}
-            warning={settings.maintenanceMode}
-          />
-        </Panel>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex items-start gap-3">
-          <FiAlertTriangle className="text-amber-600 mt-0.5 shrink-0" />
-          <div>
-            <h2 className="font-semibold text-slate-900">Runtime wiring note</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-500">
-              This page manages the canonical Settings records only. A setting affects customer/mobile behavior only where that runtime explicitly consumes the stored key. The CRM does not claim unsupported switches such as IP allowlists, session timeout, or push/email master toggles.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center gap-2"><FiUsers className="text-slate-400"/><h2 className="font-semibold text-slate-900">Last persisted metadata</h2></div>
-        <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-4 gap-3">
-          {Object.entries(definitions).map(([key, definition]) => (
-            <div key={key} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-              <div className="text-xs font-semibold text-slate-700">{definition.label || key}</div>
-              <div className="mt-1 text-[11px] text-slate-400">{definition.updatedAt ? new Date(definition.updatedAt).toLocaleString('en-LK') : 'Using default'}</div>
-              <div className="mt-1 text-[11px] text-slate-400 truncate">{definition.updatedBy || 'No updater recorded'}</div>
-            </div>
-          ))}
-        </div>
+      <section className="grid gap-5 lg:grid-cols-3">
+        <ControlCard
+          icon={<FiDollarSign size={17} />}
+          title="Finance & pricing"
+          description="Commission, currency, settlement and pricing controls belong to Finance and Market Configuration."
+          href="/admin/pricing/market-config"
+          label="Market configuration"
+        />
+        <ControlCard
+          icon={<FiUsers size={17} />}
+          title="Trust & company policy"
+          description="KYC and provider/company eligibility stay inside governed Trust and People workflows."
+          href="/admin/kyc"
+          label="KYC operations"
+        />
+        <ControlCard
+          icon={<FiTool size={17} />}
+          title="Public runtime"
+          description="Catalog and promotions are real public-surface controls. Website runtime switches are added only when consumed."
+          href="/admin/platform"
+          label="App & Web"
+        />
       </section>
     </div>
   )
 }
 
-function Panel({icon:Icon,title,subtitle,children}:{icon:any;title:string;subtitle:string;children:React.ReactNode}) {
-  return <section className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><Icon className="text-amber-600"/><h2 className="font-semibold text-slate-900">{title}</h2></div><p className="mt-1 mb-4 text-xs text-slate-400">{subtitle}</p>{children}</section>
-}
-
-function Input({label,value,onChange,disabled,type='text'}:{label:string;value:string;onChange:(value:string)=>void;disabled?:boolean;type?:string}) {
-  return <label className="block"><span className="text-xs font-medium text-slate-600">{label}</span><input type={type} value={value} disabled={disabled} onChange={e=>onChange(e.target.value)} className="mt-1.5 w-full h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-amber-300 disabled:opacity-60"/></label>
-}
-
-function NumberInput({label,value,onChange,disabled,min,max,step}:{label:string;value:number;onChange:(value:number)=>void;disabled?:boolean;min:number;max:number;step:number}) {
-  return <label className="block"><span className="text-xs font-medium text-slate-600">{label}</span><input type="number" value={value} min={min} max={max} step={step} disabled={disabled} onChange={e=>onChange(Number(e.target.value)||0)} className="mt-1.5 w-full h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-amber-300 disabled:opacity-60"/></label>
-}
-
-function Select({label,value,options,onChange,disabled}:{label:string;value:string;options:string[];onChange:(value:string)=>void;disabled?:boolean}) {
-  return <label className="block"><span className="text-xs font-medium text-slate-600">{label}</span><select value={value} disabled={disabled} onChange={e=>onChange(e.target.value)} className="mt-1.5 w-full h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm capitalize disabled:opacity-60">{options.map(option=><option key={option} value={option}>{option}</option>)}</select></label>
-}
-
-function Toggle({label,description,checked,onChange,disabled,warning}:{label:string;description:string;checked:boolean;onChange:(value:boolean)=>void;disabled?:boolean;warning?:boolean}) {
-  return <label className={`flex items-center justify-between gap-4 rounded-xl border p-4 ${warning?'border-amber-200 bg-amber-50':'border-slate-200'}`}><div><div className="text-sm font-semibold text-slate-800">{label}</div><div className="mt-1 text-xs leading-5 text-slate-500">{description}</div></div><input type="checkbox" checked={checked} disabled={disabled} onChange={e=>onChange(e.target.checked)} className="w-5 h-5 accent-amber-500"/></label>
+function ControlCard({
+  icon,
+  title,
+  description,
+  href,
+  label,
+}: {
+  icon: React.ReactNode
+  title: string
+  description: string
+  href: string
+  label: string
+}) {
+  return (
+    <CrmCard>
+      <div className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--crm-accent-soft)] text-amber-700">
+        {icon}
+      </div>
+      <h2 className="mt-4 text-sm font-semibold text-slate-900">{title}</h2>
+      <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+      <Link
+        href={href}
+        className="mt-4 inline-flex text-xs font-semibold text-amber-700 hover:text-amber-800"
+      >
+        {label}
+      </Link>
+    </CrmCard>
+  )
 }
