@@ -60,6 +60,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'audit:read',
     'subscriptions:view',
     'realestate:view', 'realestate:manage',
+    'health:view',
   ],
   FINANCE: [
     'dashboard:view',
@@ -75,6 +76,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'audit:read',
     'subscriptions:view',
     'realestate:view',
+    'health:view',
   ],
   USER_MANAGEMENT: [
     'dashboard:view',
@@ -90,6 +92,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'trust:view',
     'audit:read',
     'realestate:view',
+    'health:view',
   ],
   SUPPORT: [
     'dashboard:view',
@@ -105,6 +108,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'trust:view',
     'audit:read',
     'realestate:view',
+    'health:view',
   ],
   TECHNICAL: [
     'dashboard:view',
@@ -113,5 +117,6 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'queue:view',
     'analytics:view',
     'audit:read',
+    'health:view',
   ],
 }

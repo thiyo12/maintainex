@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
   FiActivity,
@@ -149,10 +150,15 @@ export default function AnalyticsOverview() {
         title="Analytics"
         description="Marketplace performance, people growth, finance position and recent operator activity in one consistent view."
         actions={
-          <CrmButton variant="secondary" onClick={fetchAnalytics}>
-            <FiRefreshCw size={14} />
-            Refresh
-          </CrmButton>
+          <>
+            <Link href="/admin/analytics/audit"><CrmButton variant="secondary">Audit</CrmButton></Link>
+            <Link href="/admin/analytics/security-monitor"><CrmButton variant="secondary">Security</CrmButton></Link>
+            <Link href="/admin/analytics/health"><CrmButton variant="secondary">System health</CrmButton></Link>
+            <CrmButton variant="secondary" onClick={fetchAnalytics}>
+              <FiRefreshCw size={14} />
+              Refresh
+            </CrmButton>
+          </>
         }
         context={
           <>

@@ -1,8 +1,21 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { FiFileText, FiRefreshCw, FiSearch, FiFilter } from 'react-icons/fi'
+import { FiChevronDown, FiChevronUp, FiRefreshCw, FiSearch } from 'react-icons/fi'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmFilterBar,
+  CrmPageHeader,
+  CrmState,
+  CrmTableFrame,
+  crmInputClass,
+  crmTableClass,
+  crmTdClass,
+  crmThClass,
+  type CrmTone,
+} from '@/components/crm/v2/CrmPrimitives'
 
 interface AuditLog {
   id: string
@@ -10,183 +23,115 @@ interface AuditLog {
   adminEmail: string
   adminRole: string
   action: string
-  targetTable?: string
-  targetId?: string
-  targetLabel?: string
-  oldValue?: string
-  newValue?: string
+  targetTable?: string | null
+  targetId?: string | null
+  targetLabel?: string | null
+  oldValue?: string | null
+  newValue?: string | null
   ipAddress: string
   createdAt: string
 }
 
-const ACTION_COLORS: Record<string, string> = {
-  PROVIDER_SUSPEND: 'bg-red-500/20 text-red-400',
-  PROVIDER_REACTIVATE: 'bg-green-500/20 text-green-400',
-  COMPANY_SUSPEND: 'bg-red-500/20 text-red-400',
-  COMPANY_REACTIVATE: 'bg-green-500/20 text-green-400',
-  CREDENTIAL_APPROVE: 'bg-green-500/20 text-green-400',
-  CREDENTIAL_REJECT: 'bg-red-500/20 text-red-400',
-  CREDENTIAL_EXPIRE: 'bg-gray-500/20 text-gray-400',
-  MARKET_CONFIG_UPDATE: 'bg-amber-500/20 text-amber-400',
-  RISK_EVENT_RESOLVE: 'bg-red-500/20 text-red-400',
-  RISK_EVENT_DISMISS: 'bg-green-500/20 text-green-400',
-  RISK_EVENT_ESCALATE: 'bg-orange-500/20 text-orange-400',
-}
-
 export default function AuditLogPage() {
-  return <><AuditLogContent /></>
-}
+  const [logs,setLogs]=useState<AuditLog[]>([])
+  const [loading,setLoading]=useState(true)
+  const [page,setPage]=useState(1)
+  const [total,setTotal]=useState(0)
+  const [totalPages,setTotalPages]=useState(1)
+  const [scope,setScope]=useState('')
+  const [expanded,setExpanded]=useState<string|null>(null)
+  const [action,setAction]=useState('')
+  const [adminUserId,setAdminUserId]=useState('')
+  const [target,setTarget]=useState('')
 
-function AuditLogContent() {
-  const [logs, setLogs] = useState<AuditLog[]>([])
-  const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [filters, setFilters] = useState({ action: '', adminUserId: '', dateFrom: '', dateTo: '' })
-  const [showFilters, setShowFilters] = useState(false)
-  const [expandedRow, setExpandedRow] = useState<string | null>(null)
-
-  const fetchLogs = useCallback(async () => {
+  const load=useCallback(async()=>{
     setLoading(true)
-    try {
-      const params = new URLSearchParams({ page: String(page), pageSize: '50' })
-      if (filters.action) params.set('action', filters.action)
-      if (filters.adminUserId) params.set('adminUserId', filters.adminUserId)
-      if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
-      if (filters.dateTo) params.set('dateTo', filters.dateTo)
-      const res = await fetch(`/api/admin/audit?${params}`, { credentials: 'include' })
-      if (res.status === 401) { window.location.href = '/admin/login'; return }
-      const data = await res.json()
-      setLogs(data.logs || [])
-      setTotal(data.total || 0)
-    } catch { toast.error('Failed to load audit logs') }
-    finally { setLoading(false) }
-  }, [page, filters])
+    try{
+      const params=new URLSearchParams({page:String(page),pageSize:'50'})
+      if(action.trim()) params.set('action',action.trim())
+      if(adminUserId.trim()) params.set('adminUserId',adminUserId.trim())
+      if(target.trim()) params.set('targetId',target.trim())
+      const response=await fetch(`/api/admin/audit?${params}`,{credentials:'include',cache:'no-store'})
+      const body=await response.json().catch(()=>({}))
+      if(!response.ok) throw new Error(body?.error||'Unable to load audit')
+      setLogs(body.logs||[])
+      setTotal(body.total||0)
+      setTotalPages(body.totalPages||1)
+      setScope(body.scope||'')
+    }catch(error){
+      toast.error(error instanceof Error?error.message:'Failed to load audit')
+    }finally{setLoading(false)}
+  },[action,adminUserId,page,target])
 
-  useEffect(() => { fetchLogs() }, [fetchLogs])
+  useEffect(()=>{load()},[load])
 
-  const totalPages = Math.ceil(total / 50)
+  if(loading&&logs.length===0){
+    return <CrmState type="loading" title="Loading audit history" description="Reading immutable operator audit entries."/>
+  }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <FiFileText className="w-6 h-6 text-blue-500" />
-          <h1 className="text-2xl font-bold text-white">Audit Log</h1>
-          <span className="text-sm text-gray-400">({total} entries)</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <button onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm ${showFilters ? 'bg-amber-500 text-[#0B0C12]' : 'bg-[#1A1B26] text-gray-300 hover:bg-[#24263a]'}`}>
-            <FiFilter className="w-4 h-4" /><span>Filters</span>
-          </button>
-          <button onClick={fetchLogs} className="flex items-center space-x-2 px-3 py-2 bg-[#1A1B26] text-gray-300 rounded-lg hover:bg-[#24263a]">
-            <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /><span>Refresh</span>
-          </button>
-        </div>
+  return <div className="space-y-5">
+    <CrmPageHeader
+      eyebrow="Intelligence · Audit"
+      title="Audit history"
+      description="Immutable CRM operator history with server-side secret redaction and permission-aware scope."
+      actions={<CrmButton variant="secondary" onClick={load}><FiRefreshCw size={14}/>Refresh</CrmButton>}
+      context={<><CrmBadge tone="success" dot>Immutable history</CrmBadge><CrmBadge tone="info">{scope||'Scoped'}</CrmBadge><CrmBadge tone="neutral">{total.toLocaleString()} entries</CrmBadge></>}
+    />
+
+    <CrmFilterBar>
+      <div className="relative min-w-0 flex-1">
+        <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14}/>
+        <input value={action} onChange={e=>{setAction(e.target.value);setPage(1)}} className={`${crmInputClass} pl-9`} placeholder="Action e.g. PROPERTY_APPROVE"/>
       </div>
+      <input value={adminUserId} onChange={e=>{setAdminUserId(e.target.value);setPage(1)}} className={`${crmInputClass} md:w-[220px]`} placeholder="Admin ID"/>
+      <input value={target} onChange={e=>{setTarget(e.target.value);setPage(1)}} className={`${crmInputClass} md:w-[220px]`} placeholder="Target ID"/>
+    </CrmFilterBar>
 
-      {showFilters && (
-        <div className="bg-[#15161E] rounded-xl p-4 border border-gray-800">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Action</label>
-              <input value={filters.action} onChange={e => setFilters(f => ({ ...f, action: e.target.value }))}
-                className="w-full bg-[#0B0C12] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" placeholder="e.g. PROVIDER_SUSPEND" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">Admin User ID</label>
-              <input value={filters.adminUserId} onChange={e => setFilters(f => ({ ...f, adminUserId: e.target.value }))}
-                className="w-full bg-[#0B0C12] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" placeholder="Admin ID" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">From Date</label>
-              <input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))}
-                className="w-full bg-[#0B0C12] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1">To Date</label>
-              <input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))}
-                className="w-full bg-[#0B0C12] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm" />
-            </div>
-          </div>
-          <div className="flex justify-end mt-3">
-            <button onClick={() => { setFilters({ action: '', adminUserId: '', dateFrom: '', dateTo: '' }); setPage(1) }}
-              className="text-sm text-gray-400 hover:text-white">Clear filters</button>
-          </div>
-        </div>
-      )}
+    <CrmTableFrame title="Operator audit" description="Old/new values are redacted by the server before this page receives them.">
+      <table className={`${crmTableClass} min-w-[1100px]`}>
+        <thead><tr>
+          <th className={crmThClass}>Time</th><th className={crmThClass}>Operator</th><th className={crmThClass}>Action</th>
+          <th className={crmThClass}>Target</th><th className={crmThClass}>Source</th><th className={crmThClass}>Details</th>
+        </tr></thead>
+        <tbody>
+          {logs.length===0?<tr><td colSpan={6} className={`${crmTdClass} text-center text-slate-400`}>No audit entries match this filter.</td></tr>:
+          logs.map(log=><>
+            <tr key={log.id}>
+              <td className={crmTdClass}><span className="text-xs text-slate-600">{formatDate(log.createdAt)}</span></td>
+              <td className={crmTdClass}><div className="text-xs font-semibold text-slate-800">{log.adminEmail}</div><div className="mt-0.5 text-[10px] text-slate-400">{log.adminRole}</div></td>
+              <td className={crmTdClass}><CrmBadge tone={auditTone(log.action)}>{log.action}</CrmBadge></td>
+              <td className={crmTdClass}><div className="max-w-[260px] truncate text-xs text-slate-700">{log.targetLabel||log.targetId||'—'}</div><div className="mt-0.5 text-[10px] uppercase tracking-[0.08em] text-slate-400">{log.targetTable||'—'}</div></td>
+              <td className={crmTdClass}><span className="font-mono text-[11px] text-slate-500">{maskIp(log.ipAddress)}</span></td>
+              <td className={crmTdClass}>{(log.oldValue||log.newValue)?<CrmButton size="sm" variant="ghost" onClick={()=>setExpanded(expanded===log.id?null:log.id)}>{expanded===log.id?<FiChevronUp/>:<FiChevronDown/>}{expanded===log.id?'Hide':'View'}</CrmButton>:<span className="text-xs text-slate-400">—</span>}</td>
+            </tr>
+            {expanded===log.id&&<tr key={`${log.id}-detail`}><td colSpan={6} className="border-b border-[var(--crm-border)] bg-[#fafbf9] px-4 py-4">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <AuditValue title="Previous" value={log.oldValue}/><AuditValue title="New" value={log.newValue}/>
+              </div>
+            </td></tr>}
+          </>)}
+        </tbody>
+      </table>
+    </CrmTableFrame>
 
-      <div className="bg-[#15161E] rounded-xl overflow-hidden">
-        <table className="w-full">
-          <thead><tr className="border-b border-gray-800">
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Time</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Admin</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Action</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Target</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">IP</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Details</th>
-          </tr></thead>
-          <tbody className="divide-y divide-gray-800">
-            {loading ? (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-500">
-                <div className="flex items-center justify-center space-x-2"><FiRefreshCw className="animate-spin" /><span>Loading...</span></div>
-              </td></tr>
-            ) : logs.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-500">No audit logs found</td></tr>
-            ) : logs.map(log => (
-              <>
-                <tr key={log.id} className="hover:bg-[#1A1B26]">
-                  <td className="px-4 py-3 text-sm text-gray-300 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td>
-                  <td className="px-4 py-3">
-                    <div className="text-sm text-white">{log.adminEmail}</div>
-                    <div className="text-xs text-gray-500">{log.adminRole}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${ACTION_COLORS[log.action] || 'bg-gray-500/20 text-gray-400'}`}>{log.action}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="text-sm text-gray-300">{log.targetTable || '-'}</div>
-                    {log.targetLabel && <div className="text-xs text-gray-500">{log.targetLabel}</div>}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-400 font-mono">{log.ipAddress}</td>
-                  <td className="px-4 py-3">
-                    {(log.oldValue || log.newValue) && (
-                      <button onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
-                        className="text-xs text-amber-400 hover:text-amber-300">
-                        {expandedRow === log.id ? 'Hide' : 'View'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-                {expandedRow === log.id && (
-                  <tr key={`${log.id}-detail`}>
-                    <td colSpan={6} className="px-4 py-3 bg-[#0B0C12]">
-                      <div className="grid grid-cols-2 gap-4 text-xs">
-                        {log.oldValue && <div><span className="text-gray-400">Old:</span> <pre className="text-gray-300 whitespace-pre-wrap mt-1">{log.oldValue}</pre></div>}
-                        {log.newValue && <div><span className="text-gray-400">New:</span> <pre className="text-gray-300 whitespace-pre-wrap mt-1">{log.newValue}</pre></div>}
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </>
-            ))}
-          </tbody>
-        </table>
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-slate-400">Page {page} of {totalPages}</span>
+      <div className="flex gap-2">
+        <CrmButton size="sm" variant="secondary" disabled={page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Previous</CrmButton>
+        <CrmButton size="sm" variant="secondary" disabled={page>=totalPages} onClick={()=>setPage(p=>Math.min(totalPages,p+1))}>Next</CrmButton>
       </div>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-400">{total} total</span>
-          <div className="flex items-center space-x-2">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              className="px-3 py-1.5 bg-[#1A1B26] text-gray-300 rounded-lg hover:bg-[#24263a] disabled:opacity-50 text-sm">Prev</button>
-            <span className="text-sm text-gray-400">Page {page} of {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              className="px-3 py-1.5 bg-[#1A1B26] text-gray-300 rounded-lg hover:bg-[#24263a] disabled:opacity-50 text-sm">Next</button>
-          </div>
-        </div>
-      )}
     </div>
-  )
+  </div>
 }
+
+function AuditValue({title,value}:{title:string;value?:string|null}){
+  return <div className="rounded-xl border border-[var(--crm-border)] bg-white p-3"><div className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">{title}</div><pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-slate-600">{value||'—'}</pre></div>
+}
+function auditTone(action:string):CrmTone{
+  if(/REJECT|DELETE|BAN|SUSPEND|REVOKE|FAIL/i.test(action)) return 'danger'
+  if(/APPROVE|CREATE|UNBAN|UNSUSPEND|SUCCESS/i.test(action)) return 'success'
+  if(/UPDATE|CHANGE|SETTINGS|ASSIGN/i.test(action)) return 'warning'
+  return 'neutral'
+}
+function formatDate(value:string){return new Date(value).toLocaleString('en-LK',{dateStyle:'medium',timeStyle:'short'})}
+function maskIp(value:string){const p=value?.split('.')||[];return p.length===4?`${p[0]}.${p[1]}.*.*`:(value?'masked':'—')}
