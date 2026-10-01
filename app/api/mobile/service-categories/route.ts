@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       include: {
         jobs: {
           where: { isActive: true },
-          select: { id: true, name: true, description: true, priceMin: true, priceMax: true, currency: true, isPopular: true },
+          select: { id: true, name: true, description: true, priceMin: true, priceMax: true, currency: true, isPopular: true, countries: true },
           orderBy: { name: 'asc' },
         },
       },
@@ -34,9 +34,12 @@ export async function GET(request: NextRequest) {
       .map(category => ({
         ...category,
         countries: safeParseJsonArr(category.countries),
-        jobs: category.jobs.filter(job =>
-          !('countries' in job) || !job.countries || storedListIncludes(String(job.countries), country)
-        ),
+        jobs: category.jobs
+          .filter(job => storedListIncludes(job.countries, country))
+          .map(job => ({
+            ...job,
+            countries: safeParseJsonArr(job.countries),
+          })),
       }))
 
     return NextResponse.json(categories, {
