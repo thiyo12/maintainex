@@ -1,8 +1,30 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { FiCalendar, FiDownload, FiRefreshCw, FiFilter } from 'react-icons/fi'
+import {
+  FiArrowLeft,
+  FiCalendar,
+  FiCheckCircle,
+  FiDownload,
+  FiRefreshCw,
+  FiSearch,
+} from 'react-icons/fi'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmFilterBar,
+  CrmMetricCard,
+  CrmPageHeader,
+  CrmState,
+  CrmTableFrame,
+  crmInputClass,
+  crmTableClass,
+  crmTdClass,
+  crmThClass,
+} from '@/components/crm/v2/CrmPrimitives'
+import { CrmPagination } from '@/components/crm/v2/CrmOperational'
 
 interface Settlement {
   id: string
@@ -14,284 +36,384 @@ interface Settlement {
   commissionRate: number
   commissionOwed: number
   commissionPaid: boolean
-  paidAt?: string
+  paidAt?: string | null
   dueAt: string
   status: string
   currency: string
   countryCode: string
   provider?: {
-    name: string
-    email: string
-    mxId?: string
+    entityId: string
+    userId: string
+    name?: string | null
+    mxId?: string | null
+    countryCode?: string | null
+  } | null
+}
+
+interface CurrencySummary {
+  currency: string
+  count: number
+  gross: number
+  commission: number
+  net: number
+}
+
+interface Payload {
+  settlements: Settlement[]
+  summaryByCurrency: CurrencySummary[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
   }
 }
 
-export default function SettlementsPage() {
-  const [settlements, setSettlements] = useState<Settlement[]>([])
-  const [loading, setLoading] = useState(true)
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [summary, setSummary] = useState<{
-    count: number
-    byCurrency: Array<{
-      currency: string
-      totalPaid: number
-      totalCommission: number
-      totalNet: number
-    }>
-  }>({
-    count: 0,
-    byCurrency: [],
+function money(amount: number, currency: string) {
+  return new Intl.NumberFormat(currency === 'CAD' ? 'en-CA' : 'en-LK', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(amount) ? amount : 0)
+}
+
+function date(value?: string | null) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('en-LK', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
   })
+}
 
-  useEffect(() => {
-    fetchSettlements()
-  }, [dateFrom, dateTo])
+function escapeCsv(value: unknown) {
+  const text = String(value ?? '')
+  return `"${text.replaceAll('"', '""')}"`
+}
 
-  const fetchSettlements = async () => {
+export default function SettlementsPage() {
+  const [payload, setPayload] = useState<Payload | null>(null)
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [providerType, setProviderType] = useState('ALL')
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ status: 'PAID' })
-      if (dateFrom) params.set('from', dateFrom)
-      if (dateTo) params.set('to', dateTo)
-      const res = await fetch(`/api/admin/financial/commission?${params}`, {
-        headers: { }
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: '30',
+        providerType,
       })
-      if (res.status === 401) {
+      if (from) params.set('from', from)
+      if (to) params.set('to', to)
+
+      const response = await fetch(
+        `/api/admin/financial/settlements?${params.toString()}`,
+        { credentials: 'include', cache: 'no-store' }
+      )
+      const body = await response.json().catch(() => ({}))
+
+      if (response.status === 401) {
         window.location.href = '/admin/login'
         return
       }
-      const data = await res.json()
-      if (data.error) {
-        toast.error(data.error)
-        return
-      }
-      const items: Settlement[] = data.settlements || []
-      setSettlements(items)
+      if (!response.ok) throw new Error(body?.error || 'Unable to load settlement history')
 
-      const byCurrency = new Map<string, { totalPaid: number; totalCommission: number }>()
-      for (const item of items) {
-        const currency = item.currency || 'LKR'
-        const current = byCurrency.get(currency) || { totalPaid: 0, totalCommission: 0 }
-        current.totalPaid += Number(item.totalEarnings || 0)
-        current.totalCommission += Number(item.commissionOwed || 0)
-        byCurrency.set(currency, current)
-      }
-
-      setSummary({
-        count: items.length,
-        byCurrency: [...byCurrency.entries()].map(([currency, values]) => ({
-          currency,
-          totalPaid: values.totalPaid,
-          totalCommission: values.totalCommission,
-          totalNet: values.totalPaid - values.totalCommission,
-        })),
-      })
+      setPayload(body)
     } catch (error) {
-      console.error('Failed to fetch settlements:', error)
-      toast.error('Failed to load settlements')
+      toast.error(error instanceof Error ? error.message : 'Failed to load settlement history')
     } finally {
       setLoading(false)
     }
-  }
+  }, [from, page, providerType, to])
 
-  const handleExport = () => {
-    if (!settlements.length) {
-      toast.error('No settlements to export')
+  useEffect(() => {
+    load()
+  }, [load])
+
+  useEffect(() => {
+    setPage(1)
+  }, [from, to, providerType])
+
+  const rows = useMemo(() => {
+    const data = payload?.settlements || []
+    const q = query.trim().toLowerCase()
+    if (!q) return data
+
+    return data.filter(item =>
+      [
+        item.id,
+        item.providerId,
+        item.provider?.name,
+        item.provider?.mxId,
+        item.providerType,
+        item.countryCode,
+        item.currency,
+      ].some(value => String(value || '').toLowerCase().includes(q))
+    )
+  }, [payload, query])
+
+  function exportCurrentPage() {
+    if (!rows.length) {
+      toast.error('No settlements on this page to export')
       return
     }
 
-    const escapeCsv = (value: unknown) => {
-      const text = String(value ?? '')
-      return `"${text.replaceAll('"', '""')}"`
-    }
-
-    const rows = [
-      ['Settlement ID', 'Week Start', 'Week End', 'Provider', 'MX ID', 'Provider Type', 'Country', 'Currency', 'Total Earnings', 'Commission', 'Net Payout', 'Paid At'],
-      ...settlements.map((s) => [
-        s.id,
-        s.weekStart,
-        s.weekEnd,
-        s.provider?.name || '',
-        s.provider?.mxId || '',
-        s.providerType,
-        s.countryCode,
-        s.currency,
-        s.totalEarnings,
-        s.commissionOwed,
-        Number(s.totalEarnings || 0) - Number(s.commissionOwed || 0),
-        s.paidAt || '',
+    const csvRows = [
+      [
+        'Settlement ID',
+        'Paid At',
+        'Week Start',
+        'Week End',
+        'Provider',
+        'MX ID',
+        'Provider Type',
+        'Country',
+        'Currency',
+        'Gross Earnings',
+        'Commission',
+        'Net',
+      ],
+      ...rows.map(item => [
+        item.id,
+        item.paidAt || '',
+        item.weekStart,
+        item.weekEnd,
+        item.provider?.name || item.providerId,
+        item.provider?.mxId || '',
+        item.providerType,
+        item.countryCode,
+        item.currency,
+        item.totalEarnings,
+        item.commissionOwed,
+        item.totalEarnings - item.commissionOwed,
       ]),
     ]
 
-    const csv = rows.map(row => row.map(escapeCsv).join(',')).join('\n')
+    const csv = csvRows.map(row => row.map(escapeCsv).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `maintainex-settlements-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `maintainex-settlement-history-${new Date().toISOString().slice(0, 10)}.csv`
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()
     URL.revokeObjectURL(url)
-    toast.success('Settlement CSV exported')
+    toast.success('Current page exported')
   }
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-LK', {
-      style: 'currency',
-      currency: currency || 'LKR',
-      minimumFractionDigits: 0
-    }).format(Number(amount || 0))
-  }
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric'
-    })
-  }
+  const summaries = payload?.summaryByCurrency || []
 
   return (
-    <>
-      <div className="p-4 md:p-6 space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Settlement History</h1>
-            <p className="text-gray-400 mt-1">Historical record of all completed provider settlements</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={fetchSettlements}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-[#15161E] border border-white/10 rounded-lg text-gray-300 hover:text-white hover:border-white/20 transition-colors disabled:opacity-50"
-            >
-              <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+    <div className="space-y-5">
+      <CrmPageHeader
+        eyebrow="Finance · Historical reconciliation"
+        title="Settlement History"
+        description="Read-only history of paid weekly commission obligations. Totals are currency-separated and scoped to the operator's allowed markets."
+        actions={
+          <>
+            <CrmButton variant="secondary" onClick={load} disabled={loading}>
+              <FiRefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               Refresh
-            </button>
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-[#0B0C12] rounded-lg font-medium hover:bg-amber-400 transition-colors"
-            >
-              <FiDownload className="w-4 h-4" />
-              Export CSV
-            </button>
-          </div>
-        </div>
+            </CrmButton>
+            <CrmButton variant="primary" onClick={exportCurrentPage} disabled={!rows.length}>
+              <FiDownload size={14} />
+              Export current page
+            </CrmButton>
+          </>
+        }
+      />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="bg-[#15161E] border border-white/5 rounded-xl p-5">
-            <div className="text-sm text-gray-400 mb-1">Total Settled</div>
-            <div className="text-2xl font-bold text-white">{summary.count}</div>
-            <div className="text-xs text-gray-500">settlements in current filter</div>
-          </div>
-          {summary.byCurrency.map((row) => (
-            <div key={row.currency} className="bg-[#15161E] border border-white/5 rounded-xl p-5">
-              <div className="text-sm text-gray-400 mb-1">{row.currency} settlement totals</div>
-              <div className="text-xl font-bold text-white">{formatCurrency(row.totalPaid, row.currency)}</div>
-              <div className="mt-2 text-xs text-amber-400">
-                Commission {formatCurrency(row.totalCommission, row.currency)}
-              </div>
-              <div className="text-xs text-emerald-400">
-                Net {formatCurrency(row.totalNet, row.currency)}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="bg-[#15161E] border border-white/5 rounded-xl p-4">
-          <div className="flex items-center gap-4 flex-wrap">
-            <FiFilter className="w-4 h-4 text-gray-500" />
-            <div className="flex items-center gap-2">
-              <FiCalendar className="w-4 h-4 text-gray-500" />
-              <label className="text-sm text-gray-400">From</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500/50"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-400">To</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-500/50"
-              />
-            </div>
-            {(dateFrom || dateTo) && (
-              <button
-                onClick={() => { setDateFrom(''); setDateTo('') }}
-                className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : settlements.length === 0 ? (
-          <div className="bg-[#15161E] border border-white/5 rounded-xl py-16 text-center">
-            <FiCalendar className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400 text-lg">No settlements found</p>
-            <p className="text-gray-600 text-sm mt-1">Adjust date filters or check back later</p>
-          </div>
-        ) : (
-          <div className="bg-[#15161E] border border-white/5 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/5">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Provider</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Amount</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Commission</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Net Payout</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {settlements.map((s) => (
-                    <tr key={s.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-300">{formatDate(s.weekStart)}</div>
-                        <div className="text-xs text-gray-500">to {formatDate(s.weekEnd)}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-white">{s.provider?.name || s.providerId.slice(0, 8)}</div>
-                        <div className="text-xs text-gray-500">{s.provider?.mxId || ''}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          s.providerType === 'COMPANY'
-                            ? 'bg-purple-500/20 text-purple-400'
-                            : 'bg-blue-500/20 text-blue-400'
-                        }`}>
-                          {s.providerType === 'COMPANY' ? 'Company' : 'Tasker'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-300">{formatCurrency(s.totalEarnings, s.currency)}</td>
-                      <td className="px-4 py-3 text-sm text-amber-400">{formatCurrency(s.commissionOwed, s.currency)}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-emerald-400">{formatCurrency(s.totalEarnings - s.commissionOwed, s.currency)}</td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">
-                          {s.paidAt ? `Paid ${formatDate(s.paidAt)}` : 'Paid'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+      <div>
+        <Link
+          href="/admin/financial"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-amber-700"
+        >
+          <FiArrowLeft size={13} />
+          Finance Control Centre
+        </Link>
       </div>
-    </>
+
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <CrmMetricCard
+          label="Paid settlements"
+          value={payload?.pagination.total || 0}
+          helper="Matching current server filters"
+          icon={<FiCheckCircle size={16} />}
+          tone="success"
+        />
+        {summaries.slice(0, 3).map(summary => (
+          <CrmMetricCard
+            key={summary.currency}
+            label={`${summary.currency} settled`}
+            value={money(summary.gross, summary.currency)}
+            helper={`Commission ${money(summary.commission, summary.currency)} · Net ${money(summary.net, summary.currency)}`}
+            icon={<FiCalendar size={16} />}
+            tone="neutral"
+          />
+        ))}
+      </section>
+
+      <CrmFilterBar>
+        <div className="relative min-w-0 flex-1">
+          <FiSearch
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            size={15}
+          />
+          <input
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="Search provider, MX ID, settlement, market…"
+            className={`${crmInputClass} pl-9`}
+          />
+        </div>
+
+        <select
+          value={providerType}
+          onChange={event => setProviderType(event.target.value)}
+          className={crmInputClass}
+          aria-label="Provider type"
+        >
+          <option value="ALL">All providers</option>
+          <option value="TASKER">Taskers</option>
+          <option value="COMPANY">Companies</option>
+        </select>
+
+        <input
+          type="date"
+          value={from}
+          onChange={event => setFrom(event.target.value)}
+          className={crmInputClass}
+          aria-label="Paid from"
+        />
+
+        <input
+          type="date"
+          value={to}
+          onChange={event => setTo(event.target.value)}
+          className={crmInputClass}
+          aria-label="Paid to"
+        />
+
+        {(from || to || providerType !== 'ALL') && (
+          <CrmButton
+            variant="ghost"
+            onClick={() => {
+              setFrom('')
+              setTo('')
+              setProviderType('ALL')
+            }}
+          >
+            Clear
+          </CrmButton>
+        )}
+      </CrmFilterBar>
+
+      {loading ? (
+        <CrmState
+          type="loading"
+          title="Loading settlement history"
+          description="Loading paid commission obligations from the allowed markets."
+        />
+      ) : rows.length === 0 ? (
+        <CrmState
+          type="empty"
+          title="No paid settlements match this view"
+          description="Adjust the paid-date, provider-type, or search filters."
+        />
+      ) : (
+        <CrmTableFrame
+          title="Paid weekly commission obligations"
+          description="Historical records are read-only here. Payment evidence and enforcement actions live in Commission Control."
+        >
+          <table className={`${crmTableClass} min-w-[1220px]`}>
+            <thead>
+              <tr>
+                <th className={crmThClass}>Paid</th>
+                <th className={crmThClass}>Provider</th>
+                <th className={crmThClass}>Type</th>
+                <th className={crmThClass}>Week</th>
+                <th className={crmThClass}>Gross</th>
+                <th className={crmThClass}>Commission</th>
+                <th className={crmThClass}>Net</th>
+                <th className={crmThClass}>Market</th>
+                <th className={crmThClass}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(item => (
+                <tr key={item.id} className="transition-colors hover:bg-[#fafbf9]">
+                  <td className={crmTdClass}>
+                    <div className="font-medium text-slate-800">{date(item.paidAt)}</div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <div className="font-semibold text-slate-900">
+                      {item.provider?.name || item.providerId}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-400">
+                      {item.provider?.mxId || item.providerId}
+                    </div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <CrmBadge tone={item.providerType === 'COMPANY' ? 'amber' : 'info'}>
+                      {item.providerType === 'COMPANY' ? 'Company' : 'Tasker'}
+                    </CrmBadge>
+                  </td>
+                  <td className={crmTdClass}>
+                    <div className="text-xs font-medium text-slate-700">{date(item.weekStart)}</div>
+                    <div className="mt-1 text-[10px] text-slate-400">to {date(item.weekEnd)}</div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <div className="font-semibold text-slate-900">
+                      {money(item.totalEarnings, item.currency)}
+                    </div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <div className="font-semibold text-amber-700">
+                      {money(item.commissionOwed, item.currency)}
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-400">{item.commissionRate}%</div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <div className="font-semibold text-emerald-700">
+                      {money(item.totalEarnings - item.commissionOwed, item.currency)}
+                    </div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <div className="text-xs font-semibold text-slate-700">{item.countryCode}</div>
+                    <div className="mt-1 text-[10px] text-slate-400">{item.currency}</div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <CrmBadge tone="success" dot>
+                      PAID
+                    </CrmBadge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <CrmPagination
+            page={payload?.pagination.page || page}
+            totalPages={payload?.pagination.pages || 1}
+            total={payload?.pagination.total || 0}
+            pageSize={payload?.pagination.limit || 30}
+            onPageChange={setPage}
+          />
+        </CrmTableFrame>
+      )}
+
+      <div className="rounded-2xl border border-[var(--crm-border)] bg-white p-4">
+        <p className="text-xs leading-5 text-slate-500">
+          This page is historical and read-only. It does not settle money, clear debt, or change provider access.
+          Use Commission Control for payment evidence and enforcement workflows.
+        </p>
+      </div>
+    </div>
   )
 }
