@@ -109,7 +109,7 @@ export default function CrmGlobalSearch({ market = 'ALL' }: { market?: string })
 
   return (
     <div ref={wrapperRef} className="relative w-full">
-      <div className="h-10 rounded-xl border border-slate-200 bg-slate-50 flex items-center px-3 gap-2 text-slate-400 focus-within:border-amber-300 focus-within:ring-2 focus-within:ring-amber-100 transition">
+      <div className="flex h-10 items-center gap-2 rounded-xl border border-[var(--crm-border)] bg-[var(--crm-surface-soft)] px-3 text-slate-400 transition focus-within:border-amber-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-amber-100">
         <FiSearch size={17} />
         <input
           aria-label="Global CRM search"
@@ -140,8 +140,8 @@ export default function CrmGlobalSearch({ market = 'ALL' }: { market?: string })
       </div>
 
       {open && query.trim().length >= 2 && (
-        <div className="absolute left-0 right-0 top-12 z-50 rounded-2xl border border-slate-200 bg-white shadow-[0_24px_70px_-20px_rgba(15,23,42,0.35)] overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+        <div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-[var(--crm-radius-lg)] border border-[var(--crm-border)] bg-white shadow-[var(--crm-shadow-float)]">
+          <div className="px-4 py-3 border-b border-[var(--crm-border)] flex items-center justify-between">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Global search</div>
               <div className="text-sm text-slate-700 mt-0.5">Results for “{query.trim()}”</div>
@@ -164,7 +164,7 @@ export default function CrmGlobalSearch({ market = 'ALL' }: { market?: string })
                       key={job.id}
                       href={`/admin/jobs/${job.id}`}
                       onClick={close}
-                      className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50"
+                      className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--crm-surface-soft)]"
                     >
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-slate-800 truncate">{job.title}</div>
@@ -183,7 +183,7 @@ export default function CrmGlobalSearch({ market = 'ALL' }: { market?: string })
                       key={user.id}
                       href={`/admin/users/${user.id}`}
                       onClick={close}
-                      className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50"
+                      className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[var(--crm-surface-soft)]"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
@@ -207,7 +207,7 @@ export default function CrmGlobalSearch({ market = 'ALL' }: { market?: string })
                       key={company.id}
                       href={`/admin/companies/${company.id}`}
                       onClick={close}
-                      className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50"
+                      className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[var(--crm-surface-soft)]"
                     >
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-slate-800 truncate">{company.companyName}</div>
