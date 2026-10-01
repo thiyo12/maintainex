@@ -1,11 +1,12 @@
 import { ROLE_PERMISSIONS } from '@/lib/admin-types'
 import { CRM_ACTIONS } from './action-registry'
+import { CRM_PERMISSION_LEGACY_ALIASES } from './permissions'
 import type { PermissionClass } from './types'
 
 export interface PermissionCatalogEntry {
   id: string
   class: PermissionClass
-  source: 'LEGACY_ROLE_TEMPLATE' | 'CRM_ACTION'
+  source: 'LEGACY_ROLE_TEMPLATE' | 'CANONICAL_V2' | 'CRM_ACTION'
 }
 
 const SENSITIVE_LEGACY = new Set([
@@ -35,6 +36,34 @@ const OWNER_ONLY_LEGACY = new Set([
   'admins:delete',
 ])
 
+const CANONICAL_SENSITIVE = new Set([
+  'customers:status:manage',
+  'customers:sessions:revoke',
+  'taskers:status:manage',
+  'companies:status:manage',
+  'companies:workforce:manage',
+  'kyc:review',
+  'credentials:view',
+  'credentials:manage',
+  'risk:resolve',
+  'pricing:manage',
+  'markets:manage',
+])
+
+const CANONICAL_NORMAL = new Set([
+  'customers:edit',
+  'messages:respond',
+  'disputes:manage',
+  'catalog:edit',
+])
+
+function canonicalAliasClass(permission: string): PermissionClass {
+  if (CANONICAL_SENSITIVE.has(permission)) return 'SENSITIVE'
+  if (CANONICAL_NORMAL.has(permission)) return 'NORMAL'
+  if (permission.endsWith(':view') || permission.endsWith(':read')) return 'READ'
+  return 'NORMAL'
+}
+
 function legacyClass(permission: string): PermissionClass {
   if (OWNER_ONLY_LEGACY.has(permission)) return 'OWNER_ONLY'
   if (SENSITIVE_LEGACY.has(permission)) return 'SENSITIVE'
@@ -55,6 +84,14 @@ export function getPermissionCatalog(): PermissionCatalogEntry[] {
         })
       }
     }
+  }
+
+  for (const permission of Object.keys(CRM_PERMISSION_LEGACY_ALIASES)) {
+    catalog.set(permission, {
+      id: permission,
+      class: canonicalAliasClass(permission),
+      source: 'CANONICAL_V2',
+    })
   }
 
   for (const action of Object.values(CRM_ACTIONS)) {
