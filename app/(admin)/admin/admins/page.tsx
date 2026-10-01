@@ -1,16 +1,45 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
-  FiUserCheck, FiPlus, FiEdit2, FiTrash2, FiX, FiSearch,
-  FiShield, FiClock, FiMail, FiUser, FiActivity
+  FiActivity,
+  FiEdit2,
+  FiKey,
+  FiLock,
+  FiPlus,
+  FiRefreshCw,
+  FiSearch,
+  FiShield,
+  FiTrash2,
+  FiUser,
+  FiUserCheck,
+  FiUsers,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmFilterBar,
+  CrmMetricCard,
+  CrmPageHeader,
+  CrmState,
+  CrmTableFrame,
+  crmInputClass,
+  crmTableClass,
+  crmTdClass,
+  crmThClass,
+  type CrmTone,
+} from '@/components/crm/v2/CrmPrimitives'
+import {
+  CrmConfirmDialog,
+  CrmDrawer,
+  CrmModal,
+} from '@/components/crm/v2/CrmOverlays'
+import { CrmStepUpModal } from '@/components/crm/v2/CrmStepUpModal'
 
-interface AdminUser {
+interface StaffUser {
   id: string
   email: string
   firstName: string
@@ -28,32 +57,86 @@ interface AdminUser {
   assignedCountries: string[]
 }
 
-const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  SUPER_ADMIN: { label: 'Super Admin', color: 'text-purple-400', bg: 'bg-purple-500/20 border-purple-500/30' },
-  MANAGER: { label: 'Manager', color: 'text-blue-400', bg: 'bg-blue-500/20 border-blue-500/30' },
-  FINANCE: { label: 'Finance', color: 'text-green-400', bg: 'bg-green-500/20 border-green-500/30' },
-  SUPPORT: { label: 'Support', color: 'text-yellow-400', bg: 'bg-yellow-500/20 border-yellow-500/30' },
-  USER_MANAGEMENT: { label: 'User Management', color: 'text-orange-400', bg: 'bg-orange-500/20 border-orange-500/30' },
-  TECHNICAL: { label: 'Technical', color: 'text-cyan-400', bg: 'bg-cyan-500/20 border-cyan-500/30' },
+interface StaffCapabilities {
+  create: boolean
+  edit: boolean
+  delete: boolean
+  permissions: boolean
 }
 
-const ROLES = ['SUPER_ADMIN', 'MANAGER', 'FINANCE', 'SUPPORT', 'USER_MANAGEMENT', 'TECHNICAL']
+interface PermissionRow {
+  permission: string
+  class: 'OWNER_ONLY' | 'SENSITIVE' | 'NORMAL' | 'READ' | 'SYSTEM_ONLY'
+  allowed: boolean
+  source: string
+}
 
-export default function AdminManagement() {
-  const { user } = useAdminSession()
-  const role = (user?.role || 'SUPPORT') as AdminRole
-  const permissions = ROLE_PERMISSIONS[role] || []
-  const canView = permissions.includes('admins:view')
-  const canCreate = permissions.includes('admins:create')
-  const canEdit = permissions.includes('admins:edit')
-  const canDelete = permissions.includes('admins:delete')
-  const [admins, setAdmins] = useState<AdminUser[]>([])
+interface PermissionOverrideRow {
+  permission: string
+  effect: 'ALLOW' | 'DENY'
+}
+
+type OverrideChoice = 'INHERIT' | 'ALLOW' | 'DENY'
+type StepUpAction =
+  | 'staff.create'
+  | 'staff.account.update'
+  | 'staff.delete'
+  | 'staff.permission.change'
+
+const ROLES = [
+  'SUPER_ADMIN',
+  'MANAGER',
+  'FINANCE',
+  'SUPPORT',
+  'USER_MANAGEMENT',
+  'TECHNICAL',
+]
+
+function roleLabel(role: string) {
+  return role.replaceAll('_', ' ')
+}
+
+function roleTone(role: string): CrmTone {
+  if (role === 'SUPER_ADMIN') return 'danger'
+  if (role === 'MANAGER') return 'info'
+  if (role === 'FINANCE') return 'success'
+  if (role === 'USER_MANAGEMENT') return 'amber'
+  if (role === 'TECHNICAL') return 'neutral'
+  return 'warning'
+}
+
+function formatDate(value: string | null) {
+  if (!value) return '—'
+  return new Date(value).toLocaleString('en-LK', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function permissionGroup(permission: string) {
+  const prefix = permission.split(':')[0] || 'other'
+  return prefix.replaceAll('_', ' ')
+}
+
+export default function StaffManagementPage() {
+  const { user: currentUser } = useAdminSession()
+
+  const [staff, setStaff] = useState<StaffUser[]>([])
+  const [capabilities, setCapabilities] = useState<StaffCapabilities>({
+    create: false,
+    edit: false,
+    delete: false,
+    permissions: false,
+  })
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showModal, setShowModal] = useState(false)
-  const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null)
-  const [saving, setSaving] = useState(false)
+  const [accessDenied, setAccessDenied] = useState(false)
+  const [search, setSearch] = useState('')
 
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<StaffUser | null>(null)
   const [form, setForm] = useState({
     email: '',
     firstName: '',
@@ -63,494 +146,801 @@ export default function AdminManagement() {
     assignedCountries: '',
   })
 
-  const fetchAdmins = useCallback(async () => {
-    if (!canView) {
-      setLoading(false)
-      return
-    }
+  const [deleteTarget, setDeleteTarget] = useState<StaffUser | null>(null)
+
+  const [permissionTarget, setPermissionTarget] = useState<StaffUser | null>(null)
+  const [permissionRows, setPermissionRows] = useState<PermissionRow[]>([])
+  const [permissionChoices, setPermissionChoices] = useState<Record<string, OverrideChoice>>({})
+  const [permissionLoading, setPermissionLoading] = useState(false)
+
+  const [stepUp, setStepUp] = useState<{
+    actionId: StepUpAction
+    title: string
+    execute: (proof: string) => Promise<void>
+  } | null>(null)
+
+  const fetchStaff = useCallback(async () => {
+    setLoading(true)
+    setAccessDenied(false)
     try {
-      const res = await fetch('/api/admin/admins', { headers: { } })
-      if (res.status === 401) { window.location.href = '/admin/login'; return }
-      const data = await res.json()
-      setAdmins(data.admins || [])
-    } catch {
-      toast.error('Failed to load admins')
+      const response = await fetch('/api/admin/admins', {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      const body = await response.json().catch(() => ({}))
+
+      if (response.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
+      if (response.status === 403) {
+        setAccessDenied(true)
+        setStaff([])
+        return
+      }
+      if (!response.ok) {
+        throw new Error(body?.error || 'Failed to load staff')
+      }
+
+      setStaff(body?.admins || [])
+      setCapabilities(body?.actions || {
+        create: false,
+        edit: false,
+        delete: false,
+        permissions: false,
+      })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load staff')
     } finally {
       setLoading(false)
     }
-  }, [canView])
+  }, [])
 
-  useEffect(() => { fetchAdmins() }, [fetchAdmins])
+  useEffect(() => {
+    fetchStaff()
+  }, [fetchStaff])
 
-  const filteredAdmins = admins.filter((a) => {
-    const q = searchQuery.toLowerCase()
-    return (
-      a.firstName.toLowerCase().includes(q) ||
-      a.lastName.toLowerCase().includes(q) ||
-      a.email.toLowerCase().includes(q) ||
-      a.role.toLowerCase().includes(q)
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return staff
+    return staff.filter(item =>
+      item.firstName.toLowerCase().includes(query) ||
+      item.lastName.toLowerCase().includes(query) ||
+      item.email.toLowerCase().includes(query) ||
+      item.role.toLowerCase().includes(query) ||
+      item.assignedCountries.some(country => country.toLowerCase().includes(query))
     )
-  })
+  }, [search, staff])
 
-  const openCreateModal = () => {
-    if (!canCreate) return
-    setEditingAdmin(null)
-    setForm({ email: '', firstName: '', lastName: '', role: 'SUPPORT', password: '', assignedCountries: '' })
-    setShowModal(true)
+  const metrics = useMemo(() => ({
+    active: staff.filter(item => item.isActive).length,
+    online: staff.filter(item => item.isOnline).length,
+    twoFactor: staff.filter(item => item.totpEnabled).length,
+  }), [staff])
+
+  function requestStepUp(
+    actionId: StepUpAction,
+    title: string,
+    execute: (proof: string) => Promise<void>
+  ) {
+    setStepUp({ actionId, title, execute })
   }
 
-  const openEditModal = (admin: AdminUser) => {
-    if (!canEdit) return
-    setEditingAdmin(admin)
+  async function runWithProof(proof: string) {
+    const operation = stepUp
+    if (!operation) return
+    await operation.execute(proof)
+    setStepUp(null)
+  }
+
+  function openCreate() {
+    setEditing(null)
     setForm({
-      email: admin.email,
-      firstName: admin.firstName,
-      lastName: admin.lastName,
-      role: admin.role,
+      email: '',
+      firstName: '',
+      lastName: '',
+      role: 'SUPPORT',
       password: '',
-      assignedCountries: (admin.assignedCountries || []).join(', '),
+      assignedCountries: '',
     })
-    setShowModal(true)
+    setFormOpen(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    try {
-      if (editingAdmin) {
-        if (!canEdit) throw new Error('You do not have permission to edit staff')
-        const res = await fetch('/api/admin/admins', {
+  function openEdit(item: StaffUser) {
+    setEditing(item)
+    setForm({
+      email: item.email,
+      firstName: item.firstName,
+      lastName: item.lastName,
+      role: item.role,
+      password: '',
+      assignedCountries: item.assignedCountries.join(', '),
+    })
+    setFormOpen(true)
+  }
+
+  function beginSaveStaff() {
+    if (editing) {
+      if (!capabilities.edit) return
+      requestStepUp(
+        'staff.account.update',
+        'Verify staff account change',
+        proof => saveStaff(proof)
+      )
+    } else {
+      if (!capabilities.create) return
+      requestStepUp(
+        'staff.create',
+        'Verify new staff account',
+        proof => saveStaff(proof)
+      )
+    }
+  }
+
+  async function saveStaff(proof: string) {
+    const assignedCountries = form.assignedCountries
+      .split(',')
+      .map(item => item.trim().toUpperCase())
+      .filter(Boolean)
+
+    const response = await fetch('/api/admin/admins', {
+      method: editing ? 'PATCH' : 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CRM-Step-Up': proof,
+      },
+      body: JSON.stringify(
+        editing
+          ? {
+              id: editing.id,
+              role: form.role,
+              assignedCountries,
+              ...(form.password ? { password: form.password } : {}),
+            }
+          : {
+              email: form.email.trim(),
+              firstName: form.firstName.trim(),
+              lastName: form.lastName.trim(),
+              role: form.role,
+              password: form.password,
+              assignedCountries,
+            }
+      ),
+    })
+
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      const details = Array.isArray(body?.details) ? ` · ${body.details.join(', ')}` : ''
+      throw new Error((body?.error || 'Staff update failed') + details)
+    }
+
+    toast.success(editing ? 'Staff account updated' : 'Staff account created')
+    setFormOpen(false)
+    setEditing(null)
+    setForm(current => ({ ...current, password: '' }))
+    await fetchStaff()
+  }
+
+  function beginToggle(item: StaffUser) {
+    if (!capabilities.edit || item.id === currentUser?.id) return
+    requestStepUp(
+      'staff.account.update',
+      item.isActive ? 'Verify staff deactivation' : 'Verify staff activation',
+      async proof => {
+        const response = await fetch('/api/admin/admins', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CRM-Step-Up': proof,
+          },
           body: JSON.stringify({
-            id: editingAdmin.id,
-            role: form.role,
-            assignedCountries: form.assignedCountries,
+            id: item.id,
+            isActive: !item.isActive,
           }),
         })
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}))
-          throw new Error(data.error || 'Failed to update admin')
-        }
-        toast.success('Admin updated')
-      } else {
-        if (!canCreate) throw new Error('You do not have permission to create staff')
-        const res = await fetch('/api/admin/admins', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
-        })
-        if (!res.ok) {
-          const data = await res.json()
-          throw new Error(data.error || 'Failed')
-        }
-        toast.success('Admin created')
+        const body = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(body?.error || 'Staff status update failed')
+        toast.success(item.isActive ? 'Staff account deactivated' : 'Staff account activated')
+        await fetchStaff()
       }
-      setShowModal(false)
-      fetchAdmins()
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to save admin')
-    } finally {
-      setSaving(false)
-    }
+    )
   }
 
-  const handleToggleActive = async (admin: AdminUser) => {
-    if (!canEdit) return
-    try {
-      const res = await fetch('/api/admin/admins', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: admin.id, isActive: !admin.isActive }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Failed to update admin')
-      }
-      toast.success(admin.isActive ? 'Admin deactivated' : 'Admin activated')
-      fetchAdmins()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update admin')
-    }
-  }
-
-  const handleDelete = async (admin: AdminUser) => {
-    if (!canDelete) return
-    if (!confirm(`Soft delete ${admin.firstName} ${admin.lastName}?`)) return
-    try {
-      const res = await fetch(`/api/admin/admins?id=${admin.id}`, {
-        method: 'DELETE',
-        headers: { },
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Failed to remove admin')
-      }
-      toast.success('Admin removed')
-      fetchAdmins()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to remove admin')
-    }
-  }
-
-  const formatDate = (d: string | null) => {
-    if (!d) return '—'
-    return new Date(d).toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  async function deleteStaff(proof: string, item: StaffUser) {
+    const response = await fetch(`/api/admin/admins?id=${encodeURIComponent(item.id)}`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'X-CRM-Step-Up': proof },
     })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(body?.error || 'Failed to remove staff account')
+
+    toast.success('Staff account removed')
+    setDeleteTarget(null)
+    await fetchStaff()
   }
 
-  if (!canView) {
+  async function openPermissions(item: StaffUser) {
+    if (!capabilities.permissions || item.id === currentUser?.id) return
+    setPermissionTarget(item)
+    setPermissionLoading(true)
+    setPermissionRows([])
+    setPermissionChoices({})
+
+    try {
+      const response = await fetch(`/api/admin/admins/${encodeURIComponent(item.id)}/permissions`, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body?.error || 'Failed to load staff permissions')
+
+      const rows: PermissionRow[] = body?.permissions || []
+      const overrides: PermissionOverrideRow[] = body?.overrides || []
+      const choices: Record<string, OverrideChoice> = {}
+      for (const override of overrides) {
+        choices[override.permission] = override.effect
+      }
+
+      setPermissionRows(rows)
+      setPermissionChoices(choices)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load permissions')
+      setPermissionTarget(null)
+    } finally {
+      setPermissionLoading(false)
+    }
+  }
+
+  function beginSavePermissions() {
+    if (!permissionTarget || !capabilities.permissions) return
+    requestStepUp(
+      'staff.permission.change',
+      'Verify permission change',
+      proof => savePermissions(proof)
+    )
+  }
+
+  async function savePermissions(proof: string) {
+    if (!permissionTarget) return
+
+    const overrides = Object.entries(permissionChoices)
+      .filter(([, effect]) => effect === 'ALLOW' || effect === 'DENY')
+      .map(([permission, effect]) => ({ permission, effect }))
+
+    const response = await fetch(
+      `/api/admin/admins/${encodeURIComponent(permissionTarget.id)}/permissions`,
+      {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CRM-Step-Up': proof,
+        },
+        body: JSON.stringify({ overrides }),
+      }
+    )
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(body?.error || 'Failed to update permissions')
+
+    toast.success('Staff permissions updated and active sessions revoked')
+    setPermissionTarget(null)
+    await fetchStaff()
+  }
+
+  const groupedPermissions = useMemo(() => {
+    const groups = new Map<string, PermissionRow[]>()
+    for (const row of permissionRows) {
+      const group = permissionGroup(row.permission)
+      const current = groups.get(group) || []
+      current.push(row)
+      groups.set(group, current)
+    }
+    return [...groups.entries()]
+      .map(([group, rows]) => ({
+        group,
+        rows: rows.sort((a, b) => a.permission.localeCompare(b.permission)),
+      }))
+      .sort((a, b) => a.group.localeCompare(b.group))
+  }, [permissionRows])
+
+  if (accessDenied) {
     return (
-      <>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center p-8 bg-[#15161E] rounded-xl border border-white/5">
-            <FiShield className="w-12 h-12 text-red-500 mx-auto mb-3" />
-            <h2 className="text-lg font-bold text-white mb-1">Access Denied</h2>
-            <p className="text-gray-400 text-sm">Super Admin privileges required.</p>
-          </div>
-        </div>
-      </>
+      <CrmState
+        type="permission"
+        title="Staff access is restricted"
+        description="Your current CRM role or permission overrides do not allow access to staff management."
+      />
     )
   }
 
   return (
-    <>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Admin Management</h1>
-            <p className="text-gray-400 text-sm mt-1">Manage admin users and their roles</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/admin/admins/activity"
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#15161E] border border-white/10 text-gray-300 rounded-lg font-medium text-sm hover:border-amber-500/50 hover:text-white transition-colors"
-            >
-              <FiActivity size={16} />
-              Staff Activity
+    <div className="space-y-5">
+      <CrmPageHeader
+        eyebrow="Governance"
+        title="Staff"
+        description="Manage CRM operators, market scope, two-factor protection and granular action permissions. Privileged changes require one-time step-up authentication."
+        actions={
+          <>
+            <Link href="/admin/admins/activity">
+              <CrmButton variant="secondary">
+                <FiActivity size={14} />
+                Staff activity
+              </CrmButton>
             </Link>
-            {canCreate && (<button
-              onClick={openCreateModal}
-              className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-[#0B0C12] rounded-lg font-medium text-sm hover:bg-amber-400 transition-colors"
-            >
-              <FiPlus size={16} />
-              Add New Admin
-            </button>)}
-          </div>
-        </div>
+            <CrmButton variant="secondary" onClick={fetchStaff} disabled={loading}>
+              <FiRefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </CrmButton>
+            {capabilities.create && (
+              <CrmButton variant="primary" onClick={openCreate}>
+                <FiPlus size={14} />
+                Add staff
+              </CrmButton>
+            )}
+          </>
+        }
+      />
 
-        {(() => {
-          const totalCount = filteredAdmins.length
-          const onlineCount = filteredAdmins.filter((a) => a.isOnline).length
-          const totalActionsToday = filteredAdmins.reduce((sum, a) => sum + a.actionsToday, 0)
-          const roleCounts = filteredAdmins.reduce<Record<string, number>>((acc, a) => {
-            const label = ROLE_CONFIG[a.role]?.label || a.role
-            acc[label] = (acc[label] || 0) + 1
-            return acc
-          }, {})
-          const roleDistribution = Object.entries(roleCounts)
-            .map(([role, count]) => `${count} ${role}`)
-            .join(', ')
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <CrmMetricCard
+          label="Staff accounts"
+          value={staff.length.toLocaleString()}
+          helper="Non-deleted CRM operators"
+          icon={<FiUsers size={16} />}
+          tone="neutral"
+        />
+        <CrmMetricCard
+          label="Active"
+          value={metrics.active.toLocaleString()}
+          helper="Can authenticate if not otherwise blocked"
+          icon={<FiUserCheck size={16} />}
+          tone="success"
+        />
+        <CrmMetricCard
+          label="Online"
+          value={metrics.online.toLocaleString()}
+          helper="Activity within the last five minutes"
+          icon={<FiActivity size={16} />}
+          tone="info"
+        />
+        <CrmMetricCard
+          label="2FA protected"
+          value={metrics.twoFactor.toLocaleString()}
+          helper="Authenticator enabled"
+          icon={<FiShield size={16} />}
+          tone={metrics.twoFactor === staff.length && staff.length > 0 ? 'success' : 'warning'}
+        />
+      </section>
 
-          return (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-[#15161E] border border-white/5 rounded-xl p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center">
-                    <FiUser size={18} className="text-amber-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-white">{totalCount}</p>
-                    <p className="text-xs text-gray-400">Total Staff</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-[#15161E] border border-white/5 rounded-xl p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-500/10 rounded-lg flex items-center justify-center">
-                    <FiActivity size={18} className="text-green-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-white">{onlineCount}</p>
-                    <p className="text-xs text-gray-400">Active (Online)</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-[#15161E] border border-white/5 rounded-xl p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
-                    <FiClock size={18} className="text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-white">{totalActionsToday}</p>
-                    <p className="text-xs text-gray-400">Actions Today</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-[#15161E] border border-white/5 rounded-xl p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center">
-                    <FiShield size={18} className="text-purple-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-gray-400 mb-0.5">Roles</p>
-                    <p className="text-sm font-medium text-white truncate" title={roleDistribution}>
-                      {roleDistribution || '—'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        })()}
-
-        <div className="relative">
-          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+      <CrmFilterBar>
+        <div className="relative min-w-0 flex-1">
+          <FiSearch
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            size={15}
+          />
           <input
-            type="text"
-            placeholder="Search admins by name, email, or role..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-[#15161E] border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 text-sm"
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="Search staff name, email, role or market..."
+            className={`${crmInputClass} pl-9`}
           />
         </div>
+      </CrmFilterBar>
 
-        {loading ? (
-          <div className="flex items-center justify-center h-48">
-            <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <div className="bg-[#15161E] rounded-xl border border-white/5 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/5">
-                    <th className="text-left px-4 py-3 text-gray-400 font-medium">Name</th>
-                    <th className="text-left px-4 py-3 text-gray-400 font-medium">Email</th>
-                    <th className="text-left px-4 py-3 text-gray-400 font-medium">Role</th>
-                    <th className="text-left px-4 py-3 text-gray-400 font-medium">Status</th>
-                    <th className="text-center px-4 py-3 text-gray-400 font-medium hidden lg:table-cell">Actions Today</th>
-                    <th className="text-left px-4 py-3 text-gray-400 font-medium hidden lg:table-cell">Last Active</th>
-                    <th className="text-left px-4 py-3 text-gray-400 font-medium hidden lg:table-cell">Last Login</th>
-                    <th className="text-left px-4 py-3 text-gray-400 font-medium hidden lg:table-cell">Created By</th>
-                    <th className="text-right px-4 py-3 text-gray-400 font-medium">Actions</th>
+      {loading ? (
+        <CrmState
+          type="loading"
+          title="Loading staff"
+          description="Loading live staff, activity and security state."
+        />
+      ) : filtered.length === 0 ? (
+        <CrmState
+          type="empty"
+          title="No staff match this view"
+          description="Change the search query to find another operator."
+        />
+      ) : (
+        <CrmTableFrame
+          title="CRM operators"
+          description="Role templates are combined with live per-staff ALLOW/DENY overrides and market scope on every guarded request."
+        >
+          <table className={`${crmTableClass} min-w-[1240px]`}>
+            <thead>
+              <tr>
+                <th className={crmThClass}>Staff member</th>
+                <th className={crmThClass}>Role</th>
+                <th className={crmThClass}>Markets</th>
+                <th className={crmThClass}>2FA</th>
+                <th className={crmThClass}>Status</th>
+                <th className={crmThClass}>Actions today</th>
+                <th className={crmThClass}>Last active</th>
+                <th className={`${crmThClass} text-right`}>Controls</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(item => {
+                const isSelf = item.id === currentUser?.id
+                return (
+                  <tr key={item.id} className="transition-colors hover:bg-[#fafbf9]">
+                    <td className={crmTdClass}>
+                      <div className="flex items-center gap-3">
+                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--crm-accent-soft)] text-xs font-bold text-amber-800">
+                          {(item.firstName?.[0] || 'S').toUpperCase()}
+                          {(item.lastName?.[0] || '').toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-slate-900">
+                              {item.firstName} {item.lastName}
+                            </span>
+                            {isSelf && <CrmBadge tone="amber">You</CrmBadge>}
+                          </div>
+                          <div className="mt-0.5 max-w-[260px] truncate text-xs text-slate-400">
+                            {item.email}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className={crmTdClass}>
+                      <CrmBadge tone={roleTone(item.role)} dot>
+                        {roleLabel(item.role)}
+                      </CrmBadge>
+                    </td>
+
+                    <td className={crmTdClass}>
+                      <div className="flex max-w-[220px] flex-wrap gap-1">
+                        {item.role === 'SUPER_ADMIN' ? (
+                          <CrmBadge tone="amber">All markets</CrmBadge>
+                        ) : item.assignedCountries.length ? (
+                          item.assignedCountries.map(country => (
+                            <CrmBadge key={country}>{country}</CrmBadge>
+                          ))
+                        ) : (
+                          <CrmBadge tone="danger">No market</CrmBadge>
+                        )}
+                      </div>
+                    </td>
+
+                    <td className={crmTdClass}>
+                      <CrmBadge tone={item.totpEnabled ? 'success' : 'warning'} dot>
+                        {item.totpEnabled ? 'Enabled' : 'Not enabled'}
+                      </CrmBadge>
+                    </td>
+
+                    <td className={crmTdClass}>
+                      <div className="space-y-1">
+                        <CrmBadge tone={item.isActive ? 'success' : 'danger'} dot>
+                          {item.isActive ? 'Active' : 'Inactive'}
+                        </CrmBadge>
+                        <div className="text-[10px] text-slate-400">
+                          {item.isOnline ? 'Online now' : 'Offline'}
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className={crmTdClass}>
+                      <span className="text-sm font-semibold text-slate-800">
+                        {Number(item.actionsToday || 0).toLocaleString()}
+                      </span>
+                    </td>
+
+                    <td className={crmTdClass}>
+                      <div className="text-xs text-slate-600">{formatDate(item.lastActiveAt)}</div>
+                      <div className="mt-0.5 text-[10px] text-slate-400">
+                        Login: {formatDate(item.lastLoginAt)}
+                      </div>
+                    </td>
+
+                    <td className={`${crmTdClass} text-right`}>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {capabilities.permissions && !isSelf && item.role !== 'SUPER_ADMIN' && (
+                          <button
+                            type="button"
+                            onClick={() => openPermissions(item)}
+                            className="grid h-8 w-8 place-items-center rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
+                            title="Granular permissions"
+                          >
+                            <FiKey size={14} />
+                          </button>
+                        )}
+
+                        {capabilities.edit && !isSelf && (
+                          <button
+                            type="button"
+                            onClick={() => openEdit(item)}
+                            className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--crm-border)] bg-white text-slate-500 hover:border-amber-300 hover:text-amber-700"
+                            title="Edit role, market or password"
+                          >
+                            <FiEdit2 size={14} />
+                          </button>
+                        )}
+
+                        {capabilities.edit && !isSelf && (
+                          <button
+                            type="button"
+                            onClick={() => beginToggle(item)}
+                            className={`grid h-8 w-8 place-items-center rounded-lg border ${
+                              item.isActive
+                                ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                            }`}
+                            title={item.isActive ? 'Deactivate' : 'Activate'}
+                          >
+                            <FiUserCheck size={14} />
+                          </button>
+                        )}
+
+                        {capabilities.delete && !isSelf && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(item)}
+                            className="grid h-8 w-8 place-items-center rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                            title="Remove staff account"
+                          >
+                            <FiTrash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredAdmins.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="text-center py-12 text-gray-500">
-                        No admins found
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredAdmins.map((admin) => {
-                      const roleCfg = ROLE_CONFIG[admin.role] || ROLE_CONFIG.SUPPORT
-                      return (
-                        <tr key={admin.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center">
-                                <span className="text-amber-400 font-semibold text-xs">
-                                  {admin.firstName[0]}{admin.lastName[0]}
-                                </span>
-                              </div>
-                              <span className="text-white font-medium">
-                                {admin.firstName} {admin.lastName}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-gray-300">{admin.email}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${roleCfg.bg} ${roleCfg.color}`}>
-                              <FiShield size={10} />
-                              {roleCfg.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                              admin.isActive
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                            }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${admin.isActive ? 'bg-green-400' : 'bg-red-400'}`} />
-                              {admin.isActive ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center hidden lg:table-cell">
-                            <span className="inline-flex items-center gap-1 text-sm text-gray-300">
-                              {admin.actionsToday}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 hidden lg:table-cell">
-                            <div className="flex items-center gap-2">
-                              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${admin.isOnline ? 'bg-green-400' : 'bg-red-400'}`} title={admin.isOnline ? 'Online' : 'Offline'} />
-                              <span className="text-gray-400 text-sm">
-                                {formatDate(admin.lastActiveAt)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-gray-400 hidden lg:table-cell">
-                            <div className="flex items-center gap-1">
-                              <FiClock size={12} />
-                              {formatDate(admin.lastLoginAt)}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-gray-400 hidden lg:table-cell">
-                            {admin.createdByName || '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-1">
-                              {canEdit && (<button
-                                onClick={() => openEditModal(admin)}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
-                                title="Edit role"
-                              >
-                                <FiEdit2 size={14} />
-                              </button>)}
-                              {canEdit && (<button
-                                onClick={() => handleToggleActive(admin)}
-                                className={`p-1.5 rounded-lg transition-colors ${
-                                  admin.isActive
-                                    ? 'text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10'
-                                    : 'text-gray-400 hover:text-green-400 hover:bg-green-500/10'
-                                }`}
-                                title={admin.isActive ? 'Deactivate' : 'Activate'}
-                              >
-                                <FiUserCheck size={14} />
-                              </button>)}
-                              {canDelete && (<button
-                                onClick={() => handleDelete(admin)}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                title="Remove"
-                              >
-                                <FiTrash2 size={14} />
-                              </button>)}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                )
+              })}
+            </tbody>
+          </table>
+        </CrmTableFrame>
+      )}
 
-        {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-            <div className="relative bg-[#15161E] border border-white/10 rounded-xl w-full max-w-md mx-4 p-6 shadow-2xl">
-              <button
-                onClick={() => setShowModal(false)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
-              >
-                <FiX size={20} />
-              </button>
-              <h3 className="text-lg font-bold text-white mb-4">
-                {editingAdmin ? 'Edit Admin Role' : 'Add New Admin'}
-              </h3>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {!editingAdmin && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1">Email</label>
-                      <input
-                        type="email"
-                        required
-                        value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                        className="w-full px-3 py-2 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-1">First Name</label>
-                        <input
-                          type="text"
-                          required
-                          value={form.firstName}
-                          onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                          className="w-full px-3 py-2 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-1">Last Name</label>
-                        <input
-                          type="text"
-                          required
-                          value={form.lastName}
-                          onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                          className="w-full px-3 py-2 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1">Password</label>
-                      <input
-                        type="password"
-                        required
-                        minLength={8}
-                        value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        className="w-full px-3 py-2 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
-                      />
-                    </div>
-                  </>
-                )}
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1">Role</label>
-                  <select
-                    value={form.role}
-                    onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>{ROLE_CONFIG[r]?.label || r}</option>
-                    ))}
-                  </select>
-                </div>
-                {form.role !== 'SUPER_ADMIN' && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1">
-                      Assigned countries
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={form.assignedCountries}
-                      onChange={(e) => setForm({ ...form, assignedCountries: e.target.value.toUpperCase() })}
-                      placeholder="LK, CA"
-                      className="w-full px-3 py-2 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
-                    />
-                    <p className="mt-1.5 text-[11px] text-gray-500">
-                      ISO 2-letter country codes separated by commas. Example: LK, CA
-                    </p>
-                  </div>
-                )}
-                <div className="flex justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    className="px-4 py-2 text-gray-400 hover:text-white text-sm transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="px-4 py-2 bg-amber-500 text-[#0B0C12] rounded-lg font-medium text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
-                  >
-                    {saving ? 'Saving...' : editingAdmin ? 'Update Role' : 'Create Admin'}
-                  </button>
-                </div>
-              </form>
+      <CrmModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={editing ? 'Edit staff account' : 'Create staff account'}
+        description={
+          editing
+            ? 'Changing role, market scope or password revokes active sessions and requires step-up authentication.'
+            : 'New CRM staff accounts require a strong password and one-time step-up authentication.'
+        }
+        maxWidth="max-w-lg"
+        footer={
+          <>
+            <CrmButton variant="secondary" onClick={() => setFormOpen(false)}>
+              Cancel
+            </CrmButton>
+            <CrmButton variant="primary" onClick={beginSaveStaff}>
+              <FiLock size={14} />
+              {editing ? 'Verify & save' : 'Verify & create'}
+            </CrmButton>
+          </>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          {!editing && (
+            <>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-700">First name</label>
+                <input
+                  value={form.firstName}
+                  onChange={event => setForm(current => ({ ...current, firstName: event.target.value }))}
+                  className={crmInputClass}
+                  maxLength={80}
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-700">Last name</label>
+                <input
+                  value={form.lastName}
+                  onChange={event => setForm(current => ({ ...current, lastName: event.target.value }))}
+                  className={crmInputClass}
+                  maxLength={80}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-xs font-semibold text-slate-700">Email</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={event => setForm(current => ({ ...current, email: event.target.value }))}
+                  className={crmInputClass}
+                />
+              </div>
+            </>
+          )}
+
+          {editing && (
+            <div className="sm:col-span-2 rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-3">
+              <div className="text-sm font-semibold text-slate-900">
+                {editing.firstName} {editing.lastName}
+              </div>
+              <div className="mt-1 text-xs text-slate-500">{editing.email}</div>
             </div>
+          )}
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-700">Role</label>
+            <select
+              value={form.role}
+              onChange={event => setForm(current => ({ ...current, role: event.target.value }))}
+              className={crmInputClass}
+            >
+              {ROLES.map(role => (
+                <option key={role} value={role}>{roleLabel(role)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-700">Markets</label>
+            <input
+              value={form.assignedCountries}
+              onChange={event => setForm(current => ({ ...current, assignedCountries: event.target.value }))}
+              className={crmInputClass}
+              placeholder="LK, CA"
+              disabled={form.role === 'SUPER_ADMIN'}
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+              {editing ? 'New password (optional)' : 'Initial password'}
+            </label>
+            <input
+              type="password"
+              value={form.password}
+              onChange={event => setForm(current => ({ ...current, password: event.target.value }))}
+              className={crmInputClass}
+              autoComplete="new-password"
+            />
+            <p className="mt-1.5 text-[11px] leading-5 text-slate-400">
+              MaintainEX enforces the canonical strong-password policy and peppered password hashing on the server.
+            </p>
+          </div>
+        </div>
+      </CrmModal>
+
+      <CrmDrawer
+        open={Boolean(permissionTarget)}
+        onClose={() => setPermissionTarget(null)}
+        title="Granular staff permissions"
+        description={
+          permissionTarget
+            ? `${permissionTarget.firstName} ${permissionTarget.lastName} · ${roleLabel(permissionTarget.role)}`
+            : undefined
+        }
+        width="max-w-3xl"
+        footer={
+          <>
+            <CrmButton variant="secondary" onClick={() => setPermissionTarget(null)}>
+              Cancel
+            </CrmButton>
+            <CrmButton
+              variant="primary"
+              onClick={beginSavePermissions}
+              disabled={permissionLoading || !permissionTarget}
+            >
+              <FiShield size={14} />
+              Verify & save permissions
+            </CrmButton>
+          </>
+        }
+      >
+        {permissionLoading ? (
+          <CrmState
+            type="loading"
+            title="Loading permissions"
+            description="Calculating role template, overrides and effective permission state."
+          />
+        ) : permissionTarget?.role === 'SUPER_ADMIN' ? (
+          <CrmState
+            type="permission"
+            title="Owner permissions are not overrideable"
+            description="SUPER_ADMIN capabilities are governed by the owner role and cannot be rewritten through staff overrides."
+          />
+        ) : (
+          <div className="space-y-5">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+              Explicit DENY wins over the role template. Explicit ALLOW is only accepted for delegable permissions. OWNER_ONLY and SYSTEM_ONLY capabilities cannot be overridden. Saving changes revokes this staff member&apos;s active CRM sessions.
+            </div>
+
+            {groupedPermissions.map(group => (
+              <section key={group.group} className="rounded-2xl border border-[var(--crm-border)] bg-white">
+                <div className="border-b border-[var(--crm-border)] px-4 py-3">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                    {group.group}
+                  </h3>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {group.rows.map(row => {
+                    const choice = permissionChoices[row.permission] || 'INHERIT'
+                    const locked = row.class === 'OWNER_ONLY' || row.class === 'SYSTEM_ONLY'
+                    return (
+                      <div
+                        key={row.permission}
+                        className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_160px]"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs font-semibold text-slate-800">
+                              {row.permission}
+                            </span>
+                            <CrmBadge
+                              tone={
+                                row.class === 'OWNER_ONLY' || row.class === 'SYSTEM_ONLY'
+                                  ? 'danger'
+                                  : row.class === 'SENSITIVE'
+                                    ? 'warning'
+                                    : row.class === 'READ'
+                                      ? 'info'
+                                      : 'neutral'
+                              }
+                            >
+                              {row.class}
+                            </CrmBadge>
+                            <CrmBadge tone={row.allowed ? 'success' : 'neutral'} dot>
+                              {row.allowed ? 'Effective allow' : 'Effective deny'}
+                            </CrmBadge>
+                          </div>
+                          <div className="mt-1 text-[10px] uppercase tracking-[0.08em] text-slate-400">
+                            Source: {row.source.replaceAll('_', ' ')}
+                          </div>
+                        </div>
+
+                        <select
+                          value={choice}
+                          onChange={event => setPermissionChoices(current => ({
+                            ...current,
+                            [row.permission]: event.target.value as OverrideChoice,
+                          }))}
+                          className={crmInputClass}
+                          disabled={locked}
+                          aria-label={`Override ${row.permission}`}
+                        >
+                          <option value="INHERIT">Inherit role</option>
+                          <option value="ALLOW">Explicit allow</option>
+                          <option value="DENY">Explicit deny</option>
+                        </select>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         )}
-      </div>
-    </>
+      </CrmDrawer>
+
+      <CrmConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return
+          const target = deleteTarget
+          setDeleteTarget(null)
+          requestStepUp(
+            'staff.delete',
+            'Verify staff removal',
+            proof => deleteStaff(proof, target)
+          )
+        }}
+        title="Remove this staff account?"
+        description={
+          deleteTarget
+            ? `${deleteTarget.firstName} ${deleteTarget.lastName} will be soft-deleted and all active CRM sessions will be revoked. Audit history is preserved.`
+            : ''
+        }
+        confirmLabel="Continue to verification"
+        dangerous
+      />
+
+      <CrmStepUpModal
+        open={Boolean(stepUp)}
+        actionId={stepUp?.actionId || 'staff.account.update'}
+        title={stepUp?.title}
+        onClose={() => setStepUp(null)}
+        onVerified={runWithProof}
+      />
+    </div>
   )
 }
