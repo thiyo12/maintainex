@@ -38,6 +38,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'market_config:read', 'market_config:write',
     'audit:read',
     'subscriptions:view', 'subscriptions:manage',
+    'real_estate:view', 'real_estate:manage',
   ],
   MANAGER: [
     'dashboard:view',
@@ -56,6 +57,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'trust:view',
     'audit:read',
     'subscriptions:view',
+    'real_estate:view', 'real_estate:manage',
   ],
   FINANCE: [
     'dashboard:view',
@@ -84,6 +86,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'risk_events:read', 'risk_events:resolve',
     'trust:view',
     'audit:read',
+    'real_estate:view',
   ],
   SUPPORT: [
     'dashboard:view',
@@ -98,6 +101,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'risk_events:read',
     'trust:view',
     'audit:read',
+    'real_estate:view',
   ],
   TECHNICAL: [
     'dashboard:view',
