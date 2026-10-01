@@ -19,23 +19,28 @@ export default async function PublicLayout({ children }: { children: React.React
   const headersList = await headers()
   const host = headersList.get('host') || ''
   const region = getRegionFromHost(host)
-  const runtime = await getPlatformRuntimeConfig(region)
+  const runtime = await getPlatformRuntimeConfig(region).catch(() => null)
 
   if (
-    runtime.maintenance.enabled ||
-    !runtime.channels.website ||
-    !runtime.market.available
+    runtime &&
+    (
+      runtime.maintenance.enabled ||
+      !runtime.channels.website ||
+      !runtime.market.available
+    )
   ) {
     redirect('/maintenance')
   }
 
   return (
     <>
-      <PublicRuntimeBanner
-        enabled={runtime.banner.enabled}
-        message={runtime.banner.message}
-        severity={runtime.banner.severity}
-      />
+      {runtime && (
+        <PublicRuntimeBanner
+          enabled={runtime.banner.enabled}
+          message={runtime.banner.message}
+          severity={runtime.banner.severity}
+        />
+      )}
       {children}
     </>
   )
