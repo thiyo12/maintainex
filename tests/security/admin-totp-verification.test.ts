@@ -15,4 +15,29 @@ describe('Admin TOTP verification safety', () => {
       source.indexOf('prisma.adminSession.create')
     )
   })
+
+  it('requires password reauthentication before generating a new TOTP secret', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'app/api/admin/auth/2fa/setup/route.ts'),
+      'utf8'
+    )
+
+    expect(source).toContain('currentPassword')
+    expect(source).toContain('verifyPasswordWithMigration')
+    expect(source).toContain('Two-factor authentication is already enabled.')
+    expect(source).toContain('totpVerifiedAt: null')
+  })
+
+  it('confirms enrollment with awaited TOTP verification and revokes other sessions', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'app/api/admin/auth/2fa/confirm/route.ts'),
+      'utf8'
+    )
+
+    expect(source).toContain('await verifyTotp(totpCode, adminUser.totpSecret)')
+    expect(source).toContain('totpEnabled: true')
+    expect(source).toContain('id: { not: security.sessionId }')
+    expect(source).toContain('isRevoked: true')
+    expect(source).toContain("action: '2FA_ENABLED'")
+  })
 })
