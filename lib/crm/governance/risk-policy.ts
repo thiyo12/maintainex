@@ -127,6 +127,7 @@ export function evaluateCrmRiskPolicy(
         tier = maxTier(tier, 'T3')
         reasons.push('Manual refund after release requires T3 minimum.')
       }
+      if (context.activeDispute) holdCodes.push('ACTIVE_DISPUTE')
       if (context.activeChargeback) holdCodes.push('ACTIVE_CHARGEBACK')
       break
     }
