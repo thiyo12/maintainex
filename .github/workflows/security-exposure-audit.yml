@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/crm-job360
+      - feature/crm-v2-rebuild
   workflow_dispatch:
 
 permissions:
