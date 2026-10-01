@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { guardCrmRequest } from '@/lib/crm/security'
+import { guardCrmRequest, type CrmSecurityContext } from '@/lib/crm/security'
+import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 import { createAuditLog } from '@/lib/crm/audit'
 import { createProfession } from '@/lib/profession'
+
+function canPublishCatalog(security: CrmSecurityContext): boolean {
+  const entry = getPermissionCatalogEntry('catalog:publish')
+  return evaluateEffectivePermission({
+    role: security.role,
+    permission: 'catalog:publish',
+    permissionClass: entry?.class,
+    overrides: security.permissionOverrides,
+  }).allowed
+}
 
 function cleanSlug(value: unknown): string {
   return typeof value === 'string'
@@ -13,7 +24,7 @@ function cleanSlug(value: unknown): string {
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'professions:read',
+      permission: 'catalog:view',
       level: 'read',
     })
     if (!guard.ok) return guard.response
@@ -48,7 +59,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'professions:write',
+      permission: 'catalog:edit',
       level: 'sensitive',
     })
     if (!guard.ok) return guard.response
@@ -59,6 +70,14 @@ export async function POST(request: NextRequest) {
     const i18nKey = typeof body?.i18nKey === 'string' ? body.i18nKey.trim().slice(0, 200) : ''
     const description = typeof body?.description === 'string' ? body.description.trim().slice(0, 2000) : undefined
     const sortOrder = body?.sortOrder === undefined ? 0 : Number(body.sortOrder)
+    const requestedActive = body?.isActive === true
+
+    if (requestedActive && !canPublishCatalog(security)) {
+      return NextResponse.json(
+        { error: 'catalog:publish is required to create an active profession' },
+        { status: 403 }
+      )
+    }
 
     if (!slug || !i18nKey) {
       return NextResponse.json({ error: 'slug and i18nKey required' }, { status: 400 })
@@ -72,6 +91,7 @@ export async function POST(request: NextRequest) {
       i18nKey,
       description,
       sortOrder,
+      isActive: requestedActive,
     })
 
     await createAuditLog({
