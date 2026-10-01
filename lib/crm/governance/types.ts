@@ -115,6 +115,8 @@ export interface RiskPolicyContext {
   selfEscalationAttempt?: boolean
   lastActiveSuperAdminRemoval?: boolean
   requiredTotpMissing?: boolean
+  jobStatus?: string
+  hasFinancialImpact?: boolean
 }
 
 export interface RiskPolicyResult {
