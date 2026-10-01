@@ -53,35 +53,9 @@ export default function AdminLogin() {
         return
       }
 
-      // Fallback to website admin auth
-      const webRes = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-      const webData = await webRes.json()
-
-      if (!webRes.ok) {
-        toast.error(webData.error || 'Invalid credentials')
-        setIsLoading(false)
-        return
-      }
-
-      if (webData.success && webData.user) {
-        useAuthStore.getState().setAdminUser({
-          id: webData.user.id,
-          email: webData.user.email,
-          role: webData.user.role,
-          firstName: webData.user.name?.split(' ')[0] || '',
-          lastName: webData.user.name?.split(' ').slice(1).join('') || '',
-          assignedCountries: [],
-          authType: webData.user.authType,
-        })
-        toast.success('Login successful!')
-        window.location.href = webData.user.authType === 'adminUser'
-          ? '/admin/marketplace/dashboard'
-          : '/admin/dashboard'
-      }
+      toast.error(mpData.error || 'Invalid credentials')
+      setIsLoading(false)
+      return
     } catch {
       toast.error('Something went wrong')
       setIsLoading(false)
