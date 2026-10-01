@@ -12,6 +12,7 @@ import {
   FiRefreshCw,
   FiSearch,
   FiTool,
+  FiUsers,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import {
@@ -330,6 +331,13 @@ export default function CatalogManagementPage() {
               <FiRefreshCw size={14} />
               Refresh
             </CrmButton>
+            <Link
+              href="/admin/platform/professions"
+              className="inline-flex h-10 items-center gap-2 rounded-[11px] border border-[var(--crm-border)] bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <FiUsers size={14} />
+              Professions & skills
+            </Link>
             {canEdit && (
               <CrmButton variant="primary" onClick={openCreate}>
                 <FiPlus size={14} />
