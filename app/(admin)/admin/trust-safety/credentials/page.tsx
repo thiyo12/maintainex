@@ -230,7 +230,7 @@ function CredentialsContent() {
           className={`${crmInputClass} h-auto min-h-[108px] resize-y py-2.5`}
           placeholder="Rejection reason (required)…"
         />
-      </CrmModal>}
+      </CrmModal>
     </div>
   )
 }
