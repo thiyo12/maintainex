@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import {
   FiArrowUpRight,
   FiBell,
+  FiCreditCard,
   FiGrid,
   FiMonitor,
   FiMapPin,
@@ -81,6 +82,7 @@ export default function PlatformManagementPage() {
       { title: 'Mobile app management', description: 'Marketplace templates, market configuration and mobile footprint.', icon: FiSmartphone, href: '/admin/platform/mobile', detail: `${data?.catalog.serviceTemplates.active || 0} active templates · ${deviceCount} devices` },
       { title: 'Services & catalog', description: 'Canonical service categories, templates, skills and channel visibility.', icon: FiGrid, href: '/admin/platform/catalog', detail: `${data?.catalog.services.active || 0} services · ${data?.catalog.categories.active || 0} categories` },
       { title: 'Offers & promotions', description: 'Seasonal and flash campaigns with market/channel controls.', icon: FiTag, href: '/admin/platform/offers', detail: `${data?.offers.activeSeasonal || 0} seasonal · ${data?.offers.activeFlash || 0} flash` },
+      { title: 'Subscriptions', description: 'Market-scoped company plans, lifecycle visibility and immutable price snapshots.', icon: FiCreditCard, href: '/admin/platform/subscriptions', detail: 'Company subscription control' },
       { title: 'Notifications', description: 'Operational alerts, user messaging and controlled broadcasts.', icon: FiBell, href: '/admin/platform/notifications', detail: 'Notification operations' },
       { title: 'Market & pricing', description: 'Country availability, currencies, limits and pricing configuration.', icon: FiSliders, href: '/admin/pricing/market-config', detail: `${data?.mobile.marketConfigs.length || 0} market configs` },
       { title: 'Locations & coverage', description: 'Canonical countries, provinces, cities and service areas used by booking.', icon: FiMapPin, href: '/admin/platform/locations', detail: 'Database-backed location hierarchy' },
