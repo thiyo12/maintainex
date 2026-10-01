@@ -27,7 +27,6 @@ import {
   FiUsers,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 type TabKey = 'overview' | 'work' | 'finance' | 'trust' | 'activity'
 
@@ -153,8 +152,7 @@ export default function User360Page() {
   }, [load])
 
   const account = data?.user
-  const role = (admin?.role || 'SUPPORT') as AdminRole
-  const permissions = ROLE_PERMISSIONS[role] || []
+  const permissions = admin?.permissions || []
   const canSuspendAccount = account?.role === 'TASKER'
     ? permissions.includes('taskers:edit')
     : account?.role === 'COMPANY'
