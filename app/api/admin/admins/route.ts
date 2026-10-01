@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { hashPassword } from '@/lib/security/password'
+import { checkPasswordStrength, hashPassword } from '@/lib/security/password'
 import { ADMIN_ROLES, type AdminRole } from '@/lib/admin-types'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
@@ -158,8 +158,15 @@ export async function POST(request: NextRequest) {
     if (!VALID_ROLES.has(role)) {
       return NextResponse.json({ error: 'Invalid admin role' }, { status: 400 })
     }
-    if (password.length < 8 || password.length > 200) {
-      return NextResponse.json({ error: 'Password must be between 8 and 200 characters' }, { status: 400 })
+    if (password.length > 200) {
+      return NextResponse.json({ error: 'Password is too long' }, { status: 400 })
+    }
+    const passwordStrength = checkPasswordStrength(password)
+    if (!passwordStrength.valid) {
+      return NextResponse.json(
+        { error: 'Password does not meet staff security requirements', details: passwordStrength.errors },
+        { status: 400 }
+      )
     }
     if (role !== 'SUPER_ADMIN' && assignedCountries.length === 0) {
       return NextResponse.json({ error: 'At least one country assignment is required' }, { status: 400 })
@@ -286,8 +293,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (body?.password !== undefined) {
-      if (typeof body.password !== 'string' || body.password.length < 8 || body.password.length > 200) {
-        return NextResponse.json({ error: 'Password must be between 8 and 200 characters' }, { status: 400 })
+      if (typeof body.password !== 'string' || body.password.length > 200) {
+        return NextResponse.json({ error: 'Invalid password' }, { status: 400 })
+      }
+      const passwordStrength = checkPasswordStrength(body.password)
+      if (!passwordStrength.valid) {
+        return NextResponse.json(
+          { error: 'Password does not meet staff security requirements', details: passwordStrength.errors },
+          { status: 400 }
+        )
       }
       updateData.passwordHash = await hashPassword(body.password)
     }
@@ -313,13 +327,29 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'You cannot deactivate your own active session account' }, { status: 409 })
     }
 
+    if (
+      id === security.adminId &&
+      (body?.role !== undefined || body?.assignedCountries !== undefined)
+    ) {
+      return NextResponse.json(
+        { error: 'You cannot change your own role or country scope through staff management' },
+        { status: 409 }
+      )
+    }
+
     const admin = await prisma.adminUser.update({
       where: { id },
       data: updateData,
       select: safeAdminSelect(),
     })
 
-    if (nextActive === false) {
+    const securitySensitiveChange =
+      nextActive === false ||
+      body?.role !== undefined ||
+      body?.assignedCountries !== undefined ||
+      body?.password !== undefined
+
+    if (securitySensitiveChange) {
       await prisma.adminSession.updateMany({
         where: { adminUserId: id, isRevoked: false },
         data: { isRevoked: true, revokedAt: new Date() },
