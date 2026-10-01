@@ -7,6 +7,9 @@ import type { RateLimitPolicy } from '@/lib/shared/rate-limit/store'
 import { emitSecurityEvent } from '@/lib/security/events'
 import { getIp } from '@/lib/auth/authorization/admin-rbac'
 import { prisma } from '@/lib/prisma'
+import { evaluateActionInitiation, evaluateEffectivePermission, type PermissionOverride } from '@/lib/crm/governance/permissions'
+import { getCrmAction } from '@/lib/crm/governance/action-registry'
+import type { CrmActionId, PermissionClass } from '@/lib/crm/governance/types'
 
 export type CrmSecurityLevel = 'read' | 'mutation' | 'sensitive'
 
@@ -18,6 +21,7 @@ export interface CrmSecurityContext {
   isSuperAdmin: boolean
   ipAddress: string
   userAgent: string | null
+  permissionOverrides: PermissionOverride[]
 }
 
 export interface CrmGuardOptions {
@@ -25,6 +29,7 @@ export interface CrmGuardOptions {
   allowedRoles?: AdminRole[]
   level?: CrmSecurityLevel
   requireCountryScope?: boolean
+  permissionClass?: PermissionClass
 }
 
 export type CrmGuardResult =
@@ -279,6 +284,9 @@ export async function guardCrmRequest(
         deletedAt: true,
         lockedUntil: true,
         assignedCountries: true,
+        permissionOverrides: {
+          select: { permission: true, effect: true },
+        },
       },
     }),
     prisma.adminSession.findUnique({
@@ -321,11 +329,27 @@ export async function guardCrmRequest(
     })
   }
 
-  if (!crmHasPermission(role, options.permission)) {
-    return deny(403, 'CRM_PERMISSION_FORBIDDEN', 'Missing CRM permission.', request, {
+  const permissionOverrides: PermissionOverride[] = (liveAdmin.permissionOverrides || [])
+    .filter((item: { permission: string; effect: string }) => item.effect === 'ALLOW' || item.effect === 'DENY')
+    .map((item: { permission: string; effect: string }) => ({
+      permission: item.permission,
+      effect: item.effect as PermissionOverride['effect'],
+    }))
+
+  if (options.permission) {
+    const permission = evaluateEffectivePermission({
       role,
       permission: options.permission,
+      permissionClass: options.permissionClass,
+      overrides: permissionOverrides,
     })
+    if (!permission.allowed) {
+      return deny(403, 'CRM_PERMISSION_FORBIDDEN', 'Missing CRM permission.', request, {
+        role,
+        permission: options.permission,
+        source: permission.source,
+      })
+    }
   }
 
   // Layer 2C — fail closed on the live assigned-country scope.
@@ -351,6 +375,7 @@ export async function guardCrmRequest(
       isSuperAdmin,
       ipAddress: getIp(request),
       userAgent: request.headers.get('user-agent'),
+      permissionOverrides,
     },
   }
 }
@@ -373,4 +398,45 @@ export function assertCrmCountryAllowed(
   if (context.isSuperAdmin) return true
   if (!countryCode) return false
   return context.assignedCountries.includes(countryCode.toUpperCase())
+}
+
+
+export interface CrmActionGuardOptions {
+  level?: CrmSecurityLevel
+}
+
+export async function guardCrmAction(
+  request: NextRequest,
+  actionId: CrmActionId,
+  options: CrmActionGuardOptions = {}
+): Promise<CrmGuardResult> {
+  const action = getCrmAction(actionId)
+  const guard = await guardCrmRequest(request, {
+    level: options.level || 'sensitive',
+    requireCountryScope: action.requiresMarketScope,
+  })
+  if (!guard.ok) return guard
+
+  const access = evaluateActionInitiation({
+    role: guard.context.role,
+    actionId,
+    overrides: guard.context.permissionOverrides,
+  })
+
+  if (!access.allowed) {
+    return deny(
+      403,
+      'CRM_ACTION_FORBIDDEN',
+      'Staff account is not permitted to initiate this CRM action.',
+      request,
+      {
+        role: guard.context.role,
+        actionId,
+        permission: action.initiatePermission,
+        source: access.source,
+      }
+    )
+  }
+
+  return guard
 }

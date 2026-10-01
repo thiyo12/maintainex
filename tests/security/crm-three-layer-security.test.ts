@@ -56,6 +56,7 @@ function liveAdmin(overrides: Record<string, unknown> = {}) {
     deletedAt: null,
     lockedUntil: null,
     assignedCountries: JSON.stringify(['LK']),
+    permissionOverrides: [],
     ...overrides,
   }
 }
@@ -255,6 +256,38 @@ describe('CRM three-layer security', () => {
     )
     prismaMocks.adminSessionFindUnique.mockResolvedValueOnce(
       liveSession('admin-3', 'session-admin-3')
+    )
+
+    const result = await guardCrmRequest(request('GET'), {
+      permission: 'jobs:manage',
+      requireCountryScope: true,
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.response.status).toBe(403)
+  })
+
+  it('honors an explicit live permission DENY override', async () => {
+    mockedRateLimit.mockResolvedValueOnce({ allowed: true })
+    mockedSession.mockResolvedValueOnce({
+      sub: 'admin-deny',
+      sid: 'session-admin-deny',
+      email: 'manager@example.com',
+      role: 'MANAGER',
+      assignedCountries: ['LK'],
+      type: 'access',
+      firstName: 'Denied',
+      lastName: 'Manager',
+    } as any)
+    prismaMocks.adminFindUnique.mockResolvedValueOnce(
+      liveAdmin({
+        id: 'admin-deny',
+        role: 'MANAGER',
+        permissionOverrides: [{ permission: 'jobs:manage', effect: 'DENY' }],
+      })
+    )
+    prismaMocks.adminSessionFindUnique.mockResolvedValueOnce(
+      liveSession('admin-deny', 'session-admin-deny')
     )
 
     const result = await guardCrmRequest(request('GET'), {

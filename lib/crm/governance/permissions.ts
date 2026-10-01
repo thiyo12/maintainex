@@ -17,7 +17,7 @@ export interface EffectivePermissionInput {
 
 export interface EffectivePermissionResult {
   allowed: boolean
-  source: 'SYSTEM_ONLY' | 'OWNER_ONLY' | 'EXPLICIT_DENY' | 'EXPLICIT_ALLOW' | 'ROLE_TEMPLATE' | 'NONE'
+  source: 'SYSTEM_ONLY' | 'OWNER_ONLY' | 'EXPLICIT_DENY' | 'EXPLICIT_ALLOW' | 'ROLE_TEMPLATE' | 'ACTION_ROLE_TEMPLATE' | 'NONE'
 }
 
 export function evaluateEffectivePermission(input: EffectivePermissionInput): EffectivePermissionResult {
@@ -75,4 +75,39 @@ export function validatePermissionOverrides(
   }
 
   return { valid: true }
+}
+
+import { getCrmAction } from './action-registry'
+import type { CrmActionId } from './types'
+
+export function evaluateActionInitiation(input: {
+  role: AdminRole
+  actionId: CrmActionId
+  overrides?: readonly PermissionOverride[]
+}): EffectivePermissionResult {
+  const action = getCrmAction(input.actionId)
+
+  if (action.permissionClass === 'SYSTEM_ONLY') {
+    return { allowed: false, source: 'SYSTEM_ONLY' }
+  }
+
+  if (action.permissionClass === 'OWNER_ONLY') {
+    return input.role === 'SUPER_ADMIN'
+      ? { allowed: true, source: 'OWNER_ONLY' }
+      : { allowed: false, source: 'OWNER_ONLY' }
+  }
+
+  const exactOverride = input.overrides?.find(item => item.permission === action.initiatePermission)
+  if (exactOverride?.effect === 'DENY') {
+    return { allowed: false, source: 'EXPLICIT_DENY' }
+  }
+  if (exactOverride?.effect === 'ALLOW') {
+    return { allowed: true, source: 'EXPLICIT_ALLOW' }
+  }
+
+  if (action.initiatorRoles.includes(input.role)) {
+    return { allowed: true, source: 'ACTION_ROLE_TEMPLATE' }
+  }
+
+  return { allowed: false, source: 'NONE' }
 }
