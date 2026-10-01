@@ -1858,6 +1858,8 @@ model SubscriptionPlan {
   id          String   @id @default(cuid())
   name        String
   price       Float
+  currency    String   @default("LKR")
+  countryCode String   @default("LK")
   description String?
   features    String
   isActive    Boolean  @default(true)
@@ -1865,20 +1867,25 @@ model SubscriptionPlan {
   updatedAt   DateTime @updatedAt
 
   subscriptions CompanySubscription[]
+
+  @@index([countryCode, isActive])
 }
 
 model CompanySubscription {
-  id        String           @id @default(cuid())
-  companyId String
-  company   CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  planId    String
-  plan      SubscriptionPlan @relation(fields: [planId], references: [id])
-  status    String           @default("ACTIVE") // ACTIVE, PAST_DUE, CANCELLED, EXPIRED
-  startDate DateTime         @default(now())
-  endDate   DateTime?
-  autoRenew Boolean          @default(false)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id               String           @id @default(cuid())
+  companyId        String
+  company          CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  planId           String
+  plan             SubscriptionPlan @relation(fields: [planId], references: [id])
+  status           String           @default("ACTIVE") // ACTIVE, PAST_DUE, CANCELLED, EXPIRED
+  startDate        DateTime         @default(now())
+  endDate          DateTime?
+  autoRenew        Boolean          @default(false)
+  priceSnapshot    Float?
+  currency         String           @default("LKR")
+  planNameSnapshot String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([companyId])
   @@index([planId])
