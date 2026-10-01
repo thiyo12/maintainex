@@ -1,32 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { createAuditLog } from '@/lib/auth/authorization/admin-rbac'
-import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
-import type { AdminSession } from '@/lib/admin-types'
+import { assertCrmCountryAllowed, guardCrmAction } from '@/lib/crm/security'
+import { createAuditLog } from '@/lib/crm/audit'
 import {
-  markProcessing,
-  markSucceeded,
+  createCrmApprovalRequest,
+} from '@/lib/crm/governance'
+import { resolveCurrentApprovalRisk } from '@/lib/crm/governance/current-risk'
+import { consumeCrmStepUpFromHeader } from '@/lib/crm/governance/step-up'
+import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
+import {
   markFailed,
   cancelPayout,
 } from '@/lib/finance/payouts/payout-engine'
 
-const VALID_ACTIONS = ['PROCESSING', 'SUCCEEDED', 'FAILED', 'CANCELLED'] as const
+const VALID_ACTIONS = ['CONFIRM_EXTERNAL', 'FAILED', 'CANCELLED'] as const
 
-function sessionFromGuard(context: {
-  adminId: string
-  email: string
-  role: AdminSession['role']
-  assignedCountries: string[]
-}): AdminSession {
-  return {
-    id: context.adminId,
-    email: context.email,
-    role: context.role,
-    firstName: '',
-    lastName: '',
-    assignedCountries: context.assignedCountries,
-    authType: 'adminUser',
-  }
+function financialErrorStatus(code?: string) {
+  if (code === 'NOT_FOUND') return 404
+  if (code === 'INVALID_TRANSITION' || code === 'PAYOUTS_FROZEN') return 409
+  return 400
 }
 
 export async function PATCH(
@@ -34,13 +26,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const guard = await guardCrmRequest(request, {
-      permission: 'wallets:manage',
-      level: 'sensitive',
-      requireCountryScope: true,
-    })
+    const guard = await guardCrmAction(request, 'finance.payout')
     if (!guard.ok) return guard.response
     const security = guard.context
+
+    const rateLimit = await requireFinancialRateLimit(request, 'payout-admin-action')
+    if (rateLimit) return rateLimit
 
     const { id } = await params
     if (!id || id.length > 128) {
@@ -48,9 +39,16 @@ export async function PATCH(
     }
 
     const body = await request.json().catch(() => ({}))
-    const action = typeof body?.action === 'string' ? body.action.toUpperCase() : ''
-    const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 2000) : undefined
-    const providerRef = typeof body?.providerRef === 'string' ? body.providerRef.trim().slice(0, 500) : undefined
+    const action = typeof body?.action === 'string' ? body.action.trim().toUpperCase() : ''
+    const reason = typeof body?.reason === 'string'
+      ? body.reason.trim().slice(0, 2000)
+      : ''
+    const providerRef = typeof body?.providerRef === 'string'
+      ? body.providerRef.trim().slice(0, 500)
+      : ''
+    const idempotencyKey = typeof body?.idempotencyKey === 'string'
+      ? body.idempotencyKey.trim().slice(0, 200)
+      : ''
 
     if (!VALID_ACTIONS.includes(action as (typeof VALID_ACTIONS)[number])) {
       return NextResponse.json(
@@ -58,11 +56,42 @@ export async function PATCH(
         { status: 400 }
       )
     }
-    if ((action === 'FAILED' || action === 'CANCELLED') && !reason) {
-      return NextResponse.json({ error: 'Reason is required for FAILED/CANCELLED' }, { status: 400 })
+
+    if ((action === 'FAILED' || action === 'CANCELLED') && reason.length < 4) {
+      return NextResponse.json(
+        { error: 'A clear reason is required for FAILED/CANCELLED' },
+        { status: 400 }
+      )
     }
 
-    const payout = await prisma.payout.findUnique({ where: { id } })
+    if (action === 'CONFIRM_EXTERNAL') {
+      if (providerRef.length < 4) {
+        return NextResponse.json(
+          { error: 'External transfer reference is required' },
+          { status: 400 }
+        )
+      }
+      if (idempotencyKey.length < 8) {
+        return NextResponse.json(
+          { error: 'A valid idempotencyKey is required' },
+          { status: 400 }
+        )
+      }
+    }
+
+    const payout = await prisma.payout.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        userId: true,
+        amount: true,
+        currency: true,
+        countryCode: true,
+        status: true,
+        method: true,
+        source: true,
+      },
+    })
     if (!payout) {
       return NextResponse.json({ error: 'Payout not found' }, { status: 404 })
     }
@@ -70,52 +99,125 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const actorId = security.adminId
-    const key = (next: string) => `admin-payout:${next}:${payout.id}`
-
-    let result
-    if (action === 'PROCESSING') {
-      result = await markProcessing(payout.id, actorId, key('PROCESSING'))
-    } else if (action === 'SUCCEEDED') {
-      if (payout.status === 'RESERVED') {
-        const step = await markProcessing(payout.id, actorId, key('PROCESSING'))
-        if (!step.ok) {
-          return NextResponse.json(
-            { error: step.error, code: step.code },
-            { status: step.code === 'INVALID_TRANSITION' ? 409 : 400 }
-          )
-        }
+    if (action === 'CONFIRM_EXTERNAL') {
+      if (!['RESERVED', 'PROCESSING'].includes(payout.status)) {
+        return NextResponse.json(
+          { error: `Payout in status ${payout.status} cannot be externally confirmed` },
+          { status: 409 }
+        )
       }
-      result = await markSucceeded(payout.id, providerRef ?? null, key('SUCCEEDED'), actorId)
-    } else if (action === 'FAILED') {
-      result = await markFailed(payout.id, reason!, key('FAILED'), actorId)
-    } else {
-      result = await cancelPayout(payout.id, reason!, key('CANCELLED'), actorId)
+
+      const currentRisk = await resolveCurrentApprovalRisk({
+        actionId: 'finance.payout',
+        market: payout.countryCode,
+        targetType: 'Payout',
+        targetId: payout.id,
+        amountMinor: payout.amount,
+        currency: payout.currency,
+      })
+
+      const approval = await createCrmApprovalRequest({
+        actionId: 'finance.payout',
+        initiatorAdminId: security.adminId,
+        market: payout.countryCode,
+        targetType: 'Payout',
+        targetId: payout.id,
+        amountMinor: payout.amount,
+        currency: payout.currency,
+        reasonCode: 'EXTERNAL_PAYOUT_CONFIRMATION',
+        note: 'External payout confirmation submitted for governed approval',
+        idempotencyKey,
+        actionPayload: {
+          mode: 'CONFIRM_EXTERNAL_PAYOUT',
+          providerRef,
+        },
+        risk: currentRisk.risk,
+      })
+
+      return NextResponse.json(
+        {
+          mode: 'APPROVAL_REQUIRED',
+          approval: {
+            id: approval.request.id,
+            status: approval.request.status,
+            tier: approval.request.tier,
+            expiresAt: approval.request.expiresAt,
+            reused: approval.reused,
+          },
+        },
+        { status: 202 }
+      )
     }
+
+    const stepUp = await consumeCrmStepUpFromHeader({
+      headerValue: request.headers.get('x-crm-step-up'),
+      adminUserId: security.adminId,
+      sessionId: security.sessionId,
+      actionId: 'finance.payout',
+    })
+    if (!stepUp) {
+      return NextResponse.json(
+        { error: 'Step-up authentication required', code: 'STEP_UP_REQUIRED' },
+        { status: 403 }
+      )
+    }
+
+    const key = `crm-payout:${action.toLowerCase()}:${payout.id}`
+    const result =
+      action === 'FAILED'
+        ? await markFailed(payout.id, reason, key, security.adminId)
+        : await cancelPayout(payout.id, reason, key, security.adminId)
 
     if (!result.ok) {
-      const status = result.code === 'NOT_FOUND' ? 404 : result.code === 'INVALID_TRANSITION' ? 409 : 400
-      return NextResponse.json({ error: result.error, code: result.code }, { status })
+      return NextResponse.json(
+        { error: result.error, code: result.code },
+        { status: financialErrorStatus(result.code) }
+      )
     }
 
-    const updated = await prisma.payout.findUnique({ where: { id: payout.id } })
-    const auditSession = sessionFromGuard(security)
-
     await createAuditLog({
-      session: auditSession,
-      action: action === 'FAILED' || action === 'CANCELLED' ? 'PAYOUT_REJECT' : 'PAYOUT_PROCESS',
-      targetTable: 'Payout',
-      targetId: payout.id,
-      targetLabel: payout.method || undefined,
-      oldValue: { status: payout.status },
+      action: 'UPDATE',
+      category: 'FINANCE',
+      userId: security.adminId,
+      userEmail: security.email,
+      userRole: security.role,
+      entityType: 'Payout',
+      entityId: payout.id,
+      entityName: payout.userId,
+      description:
+        action === 'FAILED'
+          ? 'CRM payout failed and reserved funds restored'
+          : 'CRM payout cancelled and reserved funds restored',
+      oldValue: {
+        status: payout.status,
+      },
       newValue: {
         status: result.status,
-        ...(reason ? { reason } : {}),
-        ...(providerRef ? { providerRef: '[PRESENT]' } : {}),
-        processedBy: security.email,
+        reason,
+        amountMinor: payout.amount.toString(),
+        currency: payout.currency,
+        countryCode: payout.countryCode,
       },
       ipAddress: security.ipAddress,
-      userAgent: security.userAgent,
+      userAgent: security.userAgent || undefined,
+      riskLevel: 'HIGH',
+    })
+
+    const updated = await prisma.payout.findUnique({
+      where: { id: payout.id },
+      select: {
+        id: true,
+        userId: true,
+        amount: true,
+        status: true,
+        source: true,
+        method: true,
+        currency: true,
+        countryCode: true,
+        rejectedReason: true,
+        createdAt: true,
+        clearedAt: true,
+      },
     })
 
     return NextResponse.json({
@@ -123,13 +225,12 @@ export async function PATCH(
         ? {
             ...updated,
             amount: updated.amount.toString(),
-            bankDetails: updated.bankDetails ? '[REDACTED]' : null,
           }
         : null,
       status: result.status,
     })
   } catch (error) {
     console.error('CRM payout action error:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to process payout action' }, { status: 500 })
   }
 }
