@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { assertCrmCountryAllowed, getCrmCountryFilter, guardCrmAction, guardCrmRequest } from '@/lib/crm/security'
+import {
+  assertCrmCountryAllowed,
+  getCrmCountryFilter,
+  guardCrmAction,
+  guardCrmRequest,
+} from '@/lib/crm/security'
 import { evaluateActionInitiation } from '@/lib/crm/governance'
 import { consumeCrmStepUpFromHeader } from '@/lib/crm/governance/step-up'
 import { auditWalletFreeze, auditWalletUnfreeze } from '@/lib/financial-audit'
@@ -16,7 +21,8 @@ async function scopedUserIds(countryFilter: ReturnType<typeof getCrmCountryFilte
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'wallets:view',
+      permission: 'finance:wallets:view',
+      permissionClass: 'READ',
       level: 'read',
       requireCountryScope: true,
     })
@@ -25,8 +31,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') || 'providers'
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')))
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '30', 10) || 30))
     const skip = (page - 1) * limit
 
     if (!['providers', 'customers', 'transactions'].includes(type)) {
@@ -35,18 +41,49 @@ export async function GET(request: NextRequest) {
 
     const countryFilter = getCrmCountryFilter(security)
     const userIds = security.isSuperAdmin ? null : await scopedUserIds(countryFilter)
+    const userWhere = userIds ? { userId: { in: userIds } } : {}
+
+    const [
+      providerSummary,
+      customerSummary,
+      frozenProviders,
+      frozenCustomers,
+    ] = await Promise.all([
+      prisma.providerWallet.aggregate({
+        where: userWhere,
+        _sum: { availableBalance: true, pendingBalance: true },
+        _count: { _all: true },
+      }),
+      prisma.customerWallet.aggregate({
+        where: userWhere,
+        _sum: { balance: true },
+        _count: { _all: true },
+      }),
+      prisma.providerWallet.count({
+        where: { ...userWhere, isFrozen: true },
+      }),
+      prisma.customerWallet.count({
+        where: { ...userWhere, isFrozen: true },
+      }),
+    ])
 
     let providerWallets: any[] = []
     let customerWallets: any[] = []
     let transactions: any[] = []
+    let total = 0
 
     if (type === 'providers') {
-      const wallets = await prisma.providerWallet.findMany({
-        where: userIds ? { userId: { in: userIds } } : {},
-        orderBy: { updatedAt: 'desc' },
-        skip,
-        take: limit,
-      })
+      const [wallets, count] = await Promise.all([
+        prisma.providerWallet.findMany({
+          where: userWhere,
+          orderBy: { updatedAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        prisma.providerWallet.count({ where: userWhere }),
+      ])
+      total = count
+
       const ids = wallets.map(wallet => wallet.userId)
       const users = ids.length
         ? await prisma.user.findMany({
@@ -55,14 +92,22 @@ export async function GET(request: NextRequest) {
           })
         : []
       const userMap = new Map(users.map(user => [user.id, user]))
-      providerWallets = wallets.map(wallet => ({ ...wallet, user: userMap.get(wallet.userId) || null }))
+      providerWallets = wallets.map(wallet => ({
+        ...wallet,
+        user: userMap.get(wallet.userId) || null,
+      }))
     } else if (type === 'customers') {
-      const wallets = await prisma.customerWallet.findMany({
-        where: userIds ? { userId: { in: userIds } } : {},
-        orderBy: { updatedAt: 'desc' },
-        skip,
-        take: limit,
-      })
+      const [wallets, count] = await Promise.all([
+        prisma.customerWallet.findMany({
+          where: userWhere,
+          orderBy: { updatedAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        prisma.customerWallet.count({ where: userWhere }),
+      ])
+      total = count
+
       const ids = wallets.map(wallet => wallet.userId)
       const users = ids.length
         ? await prisma.user.findMany({
@@ -71,14 +116,22 @@ export async function GET(request: NextRequest) {
           })
         : []
       const userMap = new Map(users.map(user => [user.id, user]))
-      customerWallets = wallets.map(wallet => ({ ...wallet, user: userMap.get(wallet.userId) || null }))
+      customerWallets = wallets.map(wallet => ({
+        ...wallet,
+        user: userMap.get(wallet.userId) || null,
+      }))
     } else {
-      const txns = await prisma.walletTransaction.findMany({
-        where: userIds ? { userId: { in: userIds } } : {},
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      })
+      const [txns, count] = await Promise.all([
+        prisma.walletTransaction.findMany({
+          where: userWhere,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        prisma.walletTransaction.count({ where: userWhere }),
+      ])
+      total = count
+
       const ids = [...new Set(txns.map(txn => txn.userId))]
       const users = ids.length
         ? await prisma.user.findMany({
@@ -87,7 +140,10 @@ export async function GET(request: NextRequest) {
           })
         : []
       const userMap = new Map(users.map(user => [user.id, user]))
-      transactions = txns.map(txn => ({ ...txn, user: userMap.get(txn.userId) || null }))
+      transactions = txns.map(txn => ({
+        ...txn,
+        user: userMap.get(txn.userId) || null,
+      }))
     }
 
     return NextResponse.json(
@@ -95,6 +151,20 @@ export async function GET(request: NextRequest) {
         providerWallets,
         customerWallets,
         transactions,
+        summary: {
+          providerAvailable: providerSummary._sum.availableBalance || 0,
+          providerPending: providerSummary._sum.pendingBalance || 0,
+          providerCount: providerSummary._count._all,
+          customerBalance: customerSummary._sum.balance || 0,
+          customerCount: customerSummary._count._all,
+          frozenCount: frozenProviders + frozenCustomers,
+        },
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.max(1, Math.ceil(total / limit)),
+        },
         actions: {
           freeze: evaluateActionInitiation({
             role: security.role,
