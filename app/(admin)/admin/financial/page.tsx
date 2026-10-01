@@ -143,6 +143,9 @@ export default function FinanceControlCentrePage() {
         <Panel title="Escrow state" subtitle="Canonical JobEscrow status distribution">
           <StatusRows rows={data?.escrow || []} amountField="total" />
           <div className="mt-4 flex flex-col gap-2">
+            <Link href="/admin/financial/escrow" className="inline-flex items-center gap-1 text-sm font-medium text-amber-700">
+              Open escrow operations <FiArrowUpRight size={14} />
+            </Link>
             <Link href="/admin/financial/wallets" className="inline-flex items-center gap-1 text-sm font-medium text-amber-700">
               Open wallet controls <FiArrowUpRight size={14} />
             </Link>
@@ -155,6 +158,9 @@ export default function FinanceControlCentrePage() {
         <Panel title="Payment state" subtitle="PaymentIntent status distribution">
           <StatusRows rows={data?.payments || []} amountField="total" />
           <div className="mt-4 flex flex-col gap-2">
+            <Link href="/admin/financial/payments" className="inline-flex items-center gap-1 text-sm font-medium text-amber-700">
+              Open payment operations <FiArrowUpRight size={14} />
+            </Link>
             <Link href="/admin/financial/refunds" className="inline-flex items-center gap-1 text-sm font-medium text-amber-700">
               Open PayHere refund queue <FiArrowUpRight size={14} />
             </Link>
