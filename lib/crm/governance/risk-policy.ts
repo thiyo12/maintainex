@@ -88,6 +88,11 @@ export function evaluateCrmRiskPolicy(
         break
       }
 
+      if (context.financialAlreadyReleased) {
+        prohibitCodes.push('JOB_FINANCIAL_STATE_IRREVERSIBLE')
+        break
+      }
+
       if (context.activeDispute) {
         holdCodes.push('ACTIVE_DISPUTE')
         break
@@ -96,9 +101,9 @@ export function evaluateCrmRiskPolicy(
       if (context.hasFinancialImpact) {
         tier = maxTier(tier, 'T2')
         reasons.push('Cancellation has financial impact and requires maker-checker approval.')
-      } else if (status === 'QUOTE_ACCEPTED') {
+      } else if (status === 'QUOTE_ACCEPTED' || status === 'ASSIGNED') {
         tier = maxTier(tier, 'T1')
-        reasons.push('Accepted-provider cancellation requires operational approval.')
+        reasons.push('Assigned-provider cancellation requires operational approval.')
       } else {
         tier = 'T0'
       }
