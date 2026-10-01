@@ -80,6 +80,31 @@ export function evaluateCrmRiskPolicy(
   if (context.gatewayResultUncertain) holdCodes.push('GATEWAY_RESULT_UNCERTAIN')
 
   switch (context.actionId) {
+    case 'jobs.cancel': {
+      const status = String(context.jobStatus || '').toUpperCase()
+
+      if (status === 'COMPLETED' || status === 'CANCELLED' || status === 'IN_PROGRESS') {
+        prohibitCodes.push('JOB_CANCELLATION_STATE_FORBIDDEN')
+        break
+      }
+
+      if (context.activeDispute) {
+        holdCodes.push('ACTIVE_DISPUTE')
+        break
+      }
+
+      if (context.hasFinancialImpact) {
+        tier = maxTier(tier, 'T2')
+        reasons.push('Cancellation has financial impact and requires maker-checker approval.')
+      } else if (status === 'QUOTE_ACCEPTED') {
+        tier = maxTier(tier, 'T1')
+        reasons.push('Accepted-provider cancellation requires operational approval.')
+      } else {
+        tier = 'T0'
+      }
+      break
+    }
+
     case 'finance.refund': {
       if (!policy) {
         holdCodes.push('MARKET_FINANCE_POLICY_MISSING')
