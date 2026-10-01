@@ -13,7 +13,7 @@ describe('CRM V2 financial ledger boundary', () => {
     expect(route).toContain("permission: 'finance:ledger:view'")
     expect(route).toContain('requireCountryScope: true')
     expect(route).toContain('"countryCode" IN')
-    expect(route).toContain("b."referenceType" = 'REVERSAL'")
+    expect(route).toContain('b."referenceType" = \'REVERSAL\'')
     expect(route).not.toContain('financialLedger.update')
     expect(route).not.toContain('financialLedger.delete')
     expect(route).not.toContain('financialLedger.create')
