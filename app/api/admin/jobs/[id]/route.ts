@@ -57,11 +57,6 @@ async function getV2Job(id: string, request: NextRequest) {
     actionId: 'jobs.cancel',
     overrides: security.permissionOverrides,
   }).allowed
-  const canCancel = evaluateActionInitiation({
-    role: security.role,
-    actionId: 'jobs.cancel',
-    overrides: security.permissionOverrides,
-  }).allowed
 
   const [
     customer,
@@ -488,6 +483,11 @@ async function getV1Job(id: string, request: NextRequest) {
   const security = guard.context
   const { finance: canFinance, trust: canTrust, audit: canAudit } =
     getCrmSectionAccess(security.role, security.isSuperAdmin)
+  const canCancel = evaluateActionInitiation({
+    role: security.role,
+    actionId: 'jobs.cancel',
+    overrides: security.permissionOverrides,
+  }).allowed
 
   const job = await prisma.jobPosting.findUnique({
     where: { id },
