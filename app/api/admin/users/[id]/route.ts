@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
-  crmHasPermission,
   guardCrmRequest,
   redactCrmSensitiveData,
 } from '@/lib/crm/security'
 import { getCrmSectionAccess } from '@/lib/crm/section-access'
+import {
+  evaluateEffectivePermission,
+  getPermissionCatalogEntry,
+} from '@/lib/crm/governance'
 
 function safeJson(value: unknown) {
   return redactCrmSensitiveData(
@@ -21,7 +24,23 @@ function safeJson(value: unknown) {
 function permissionForRole(role: string): string {
   if (role === 'TASKER') return 'taskers:view'
   if (role === 'COMPANY') return 'companies:view'
-  return 'users:view'
+  return 'customers:view'
+}
+
+function canLivePermission(
+  security: {
+    role: any
+    permissionOverrides: Array<{ permission: string; effect: 'ALLOW' | 'DENY' }>
+  },
+  permission: string
+): boolean {
+  const entry = getPermissionCatalogEntry(permission)
+  return evaluateEffectivePermission({
+    role: security.role,
+    permission,
+    permissionClass: entry?.class,
+    overrides: security.permissionOverrides,
+  }).allowed
 }
 
 export async function GET(
@@ -163,7 +182,7 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    if (!crmHasPermission(security.role, permissionForRole(user.role))) {
+    if (!canLivePermission(security, permissionForRole(user.role))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -179,6 +198,25 @@ export async function GET(
       security: canSecurity,
       customerCrm: canCustomerCrm,
     } = getCrmSectionAccess(security.role, security.isSuperAdmin, security.permissionOverrides)
+
+    const accountActions = {
+      suspend:
+        user.role === 'TASKER'
+          ? canLivePermission(security, 'taskers:status:manage')
+          : user.role === 'COMPANY'
+            ? canLivePermission(security, 'companies:status:manage')
+            : canLivePermission(security, 'customers:status:manage'),
+      ban:
+        user.role === 'TASKER'
+          ? canLivePermission(security, 'taskers:ban')
+          : user.role === 'COMPANY'
+            ? canLivePermission(security, 'companies:ban')
+            : canLivePermission(security, 'users:ban'),
+      verifyTasker:
+        user.role === 'TASKER' && canLivePermission(security, 'taskers:verify'),
+      verifyCompany:
+        user.role === 'COMPANY' && canLivePermission(security, 'companies:verify'),
+    }
 
     const companyId = user.companyProfile?.id
     const taskerId = user.taskerProfile?.id
@@ -387,6 +425,7 @@ export async function GET(
           audit: canAudit,
           security: canSecurity,
           customerCrm: canCustomerCrm,
+          accountActions,
         },
         user: userView,
         jobs: {
