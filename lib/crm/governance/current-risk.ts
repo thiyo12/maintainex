@@ -47,7 +47,7 @@ export async function resolveCurrentApprovalRisk(request: {
       }),
       prisma.marketplaceDispute.findUnique({
         where: { jobId: intent.jobId },
-        select: { status: true },
+        select: { status: true, resolutionAction: true },
       }),
     ])
 
@@ -71,7 +71,11 @@ export async function resolveCurrentApprovalRisk(request: {
       currency: intent.currency,
       risk: {
         remainingRefundableMinor: refundable ? intent.amount : 0n,
-        activeDispute: Boolean(dispute && dispute.status !== 'RESOLVED'),
+        activeDispute: Boolean(
+          dispute &&
+          dispute.status !== 'RESOLVED' &&
+          !(dispute.status === 'RESOLVING' && dispute.resolutionAction === 'REFUND_CUSTOMER')
+        ),
         manualAfterRelease: escrow?.status === 'RELEASED',
         activeChargeback: intent.status === 'CHARGEDBACK',
       },
