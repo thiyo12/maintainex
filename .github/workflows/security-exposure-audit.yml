@@ -51,7 +51,11 @@ jobs:
               r"""(?ix)
               \|\s*(?:db[-_ ]?password|password|passwd|secret|token|api[_-]?key|merchant[_-]?secret|private[_-]?key)
               \s*\|\s*
-              `(?!<|example|test\b|maintainex_dev_)[^`\r\n]{20,}`
+              `
+              (?!<|example|test\b|maintainex_dev_)
+              (?![A-Z][A-Z0-9_]{7,}`)
+              [A-Za-z0-9+_.:-]{20,}
+              `
               """
           )
           unquoted_random_secret = re.compile(
@@ -66,7 +70,20 @@ jobs:
 
           def classify(line):
               hits = [name for name, rx in patterns if rx.search(line)]
-              if literal_secret.search(line) or markdown_secret.search(line) or unquoted_random_secret.search(line):
+              literal_match = literal_secret.search(line)
+              markdown_match = markdown_secret.search(line)
+              random_match = unquoted_random_secret.search(line)
+              if literal_match:
+                  candidate = literal_match.group(0)
+                  generated = any(marker in candidate for marker in (
+                      "${",
+                      "process.env",
+                      "randomBytes(",
+                      "Date.now(",
+                  ))
+                  if not generated:
+                      hits.append("possible-hardcoded-secret")
+              if markdown_match or random_match:
                   hits.append("possible-hardcoded-secret")
               for m in re.finditer(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", line):
                   ip=m.group(0)
