@@ -50,6 +50,7 @@ export type CrmActionId =
   | 'finance.refund'
   | 'finance.escrow.manual_release'
   | 'finance.wallet.adjust'
+  | 'finance.wallet.freeze'
   | 'finance.payout'
   | 'finance.payout_destination.change'
   | 'finance.settlement'
