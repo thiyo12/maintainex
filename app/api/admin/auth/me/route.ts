@@ -35,6 +35,15 @@ export async function GET(request: NextRequest) {
 
     const assignedCountries = guard.context.assignedCountries
     const name = [adminUser.firstName, adminUser.lastName].filter(Boolean).join(' ') || null
+    const marketWhere = guard.context.isSuperAdmin
+      ? {}
+      : { code: { in: assignedCountries } }
+    const markets = await prisma.country.findMany({
+      where: marketWhere,
+      select: { code: true, name: true },
+      orderBy: { name: 'asc' },
+    })
+
     const effectivePermissions = getPermissionCatalog()
       .filter(entry => evaluateEffectivePermission({
         role: guard.context.role,
@@ -63,6 +72,7 @@ export async function GET(request: NextRequest) {
           permissions: effectivePermissions,
           totpEnabled: adminUser.totpEnabled,
           sessionExpiresAt: liveSession.expiresAt.toISOString(),
+          markets,
         },
       },
       { headers: { 'Cache-Control': 'no-store' } }
