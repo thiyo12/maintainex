@@ -17,7 +17,7 @@ describe('Real-estate public privacy boundary', () => {
   it('hides non-public listing detail from non-owners', () => {
     const source = readFileSync(resolve(process.cwd(), 'app/api/properties/[id]/route.ts'), 'utf8')
     expect(source).toContain('isPublicRealEstateStatus')
-    expect(source).toContain('if (!isPublic && !isOwner && !isLegacyStaff)')
+    expect(source).toContain('if (!isPublic && !isOwner)')
     expect(source).toContain("return NextResponse.json({ error: 'Listing not found' }, { status: 404 })")
     expect(source).toContain("toPublicListingDto(listing, { includeContact: Boolean(session) })")
   })
