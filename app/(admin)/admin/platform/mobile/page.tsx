@@ -25,6 +25,7 @@ import {
   crmTdClass,
   crmThClass,
 } from '@/components/crm/v2/CrmPrimitives'
+import PlatformRuntimeControls from '@/components/crm/v2/PlatformRuntimeControls'
 
 interface MarketRow {
   id: string
@@ -328,6 +329,8 @@ export default function MobileManagementPage() {
           </table>
         </CrmTableFrame>
       )}
+
+      <PlatformRuntimeControls surface="mobile" />
 
       <CrmCard
         title="Runtime-control boundary"
