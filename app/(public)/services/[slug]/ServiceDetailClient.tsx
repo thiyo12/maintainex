@@ -289,8 +289,9 @@ export default function ServiceDetailClient({
                       localStorage.setItem('selectedService', JSON.stringify({
                         id: service.id, name: service.name, price: service.price, category: service.category?.name
                       }))
-                      const districtParam = city ? `&district=${encodeURIComponent(city)}` : ''
-                      router.push(`/waitlist`)
+                      const params = new URLSearchParams({ service: service.name })
+                      if (city) params.set('district', city)
+                      router.push(`/book?${params.toString()}`)
                     }}
                     className="w-full bg-amber-500 hover:bg-amber-600 text-ink font-bold py-4 px-6 rounded-full transition-all duration-300 glow-amber active:scale-[0.98] text-center text-sm md:text-lg mb-4"
                   >
@@ -385,7 +386,7 @@ export default function ServiceDetailClient({
               Book now and let our professional team handle the cleaning. Easy scheduling, instant confirmation.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/waitlist"
+              <Link href={`/book?service=${encodeURIComponent(service.name)}${city ? `&district=${encodeURIComponent(city)}` : ''}`}
                 className="bg-amber-500 hover:bg-amber-600 text-ink font-bold px-8 py-4 rounded-full transition-all duration-300 glow-amber active:scale-[0.98] text-lg"
               >
                 {city ? `Book ${service.name} in ${city}` : 'Book Now'}
