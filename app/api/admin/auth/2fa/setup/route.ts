@@ -13,15 +13,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
     }
 
+    if (adminUser.totpEnabled) {
+      return NextResponse.json(
+        { error: 'Two-factor authentication is already enabled.' },
+        { status: 409 }
+      )
+    }
+
     const secret = generateTotpSecret()
     const uri = generateTotpUri(secret, adminUser.email)
 
     await prisma.adminUser.update({
       where: { id: adminUser.id },
-      data: { totpSecret: secret, totpEnabled: false },
+      data: {
+        totpSecret: secret,
+        totpEnabled: false,
+        totpVerifiedAt: null,
+      },
     })
 
-    return NextResponse.json({ secret, uri })
+    return NextResponse.json(
+      { secret, uri },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
     console.error('2FA setup error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
