@@ -80,12 +80,6 @@ const OWNERSHIP: Record<string, {
     href: '/admin/kyc',
     note: 'KYC approval remains governed by the verification workflow. This stored legacy value is not a live bypass switch.',
   },
-  maintenanceMode: {
-    owner: 'Website runtime',
-    mode: 'delegated',
-    href: '/admin/platform/website',
-    note: 'No runtime maintenance switch is exposed until the public website actually consumes one.',
-  },
 }
 
 function displayValue(value: string | number | boolean) {
@@ -303,7 +297,7 @@ export default function AdminSettingsPage() {
         <ControlCard
           icon={<FiTool size={17} />}
           title="Public runtime"
-          description="Catalog and promotions are real public-surface controls. Website runtime switches are added only when consumed."
+          description="Website and mobile runtime controls are live through the canonical App & Web runtime contract; legacy generic maintenance settings are retired."
           href="/admin/platform"
           label="App & Web"
         />

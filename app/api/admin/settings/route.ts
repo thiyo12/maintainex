@@ -9,7 +9,6 @@ const DELEGATED_SETTINGS = new Set([
   'minTaskerStaff',
   'weeklySettlementDay',
   'autoApproveKyc',
-  'maintenanceMode',
 ])
 
 const DEFAULT_SETTINGS: Record<string, { value: string; type: string; label: string; description: string; groupName: string }> = {
@@ -20,7 +19,6 @@ const DEFAULT_SETTINGS: Record<string, { value: string; type: string; label: str
   minTaskerStaff: { value: '3', type: 'number', label: 'Minimum Tasker Staff', description: 'Minimum staff required for company verification', groupName: 'taskers' },
   weeklySettlementDay: { value: 'monday', type: 'string', label: 'Weekly Settlement Day', description: 'Day of the week for automatic settlements', groupName: 'billing' },
   autoApproveKyc: { value: 'false', type: 'boolean', label: 'Auto-Approve KYC', description: 'Automatically approve identity verification documents', groupName: 'security' },
-  maintenanceMode: { value: 'false', type: 'boolean', label: 'Maintenance Mode', description: 'Enable maintenance mode to restrict public access', groupName: 'general' },
 }
 
 function parseSettingValue(value: string, type: string): string | number | boolean {
@@ -168,7 +166,7 @@ export async function PUT(request: NextRequest) {
       newValue: updated,
       ipAddress: security.ipAddress,
       userAgent: security.userAgent || undefined,
-      riskLevel: validated.some(([key]) => ['commissionRate', 'maintenanceMode', 'autoApproveKyc'].includes(key)) ? 'HIGH' : 'MEDIUM',
+      riskLevel: validated.some(([key]) => ['commissionRate', 'autoApproveKyc'].includes(key)) ? 'HIGH' : 'MEDIUM',
     })
 
     return NextResponse.json({ settings: updated })

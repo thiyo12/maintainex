@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
   PLATFORM_RUNTIME_KEYS,
@@ -118,6 +118,24 @@ describe('CRM V2 platform runtime controls', () => {
     expect(catalogAdmin).toContain('createAuditLog')
     expect(offerAdmin).toContain("permission: 'promotions:manage'")
     expect(offerAdmin).toContain('createAuditLog')
+  })
+
+  it('retires the legacy maintenance settings endpoint and duplicate key', () => {
+    expect(
+      existsSync(resolve(process.cwd(), 'app/api/settings/maintenance/route.ts'))
+    ).toBe(false)
+
+    const settingsApi = readFileSync(
+      resolve(process.cwd(), 'app/api/admin/settings/route.ts'),
+      'utf8'
+    )
+    const settingsPage = readFileSync(
+      resolve(process.cwd(), 'app/(admin)/admin/settings/page.tsx'),
+      'utf8'
+    )
+    expect(settingsApi).not.toContain("'maintenanceMode'")
+    expect(settingsPage).not.toContain('maintenanceMode:')
+    expect(settingsPage).toContain('/admin/platform')
   })
 
   it('protects runtime mutation with canonical CRM permission and audit', () => {
