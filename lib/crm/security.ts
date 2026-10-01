@@ -114,11 +114,6 @@ function normalizedCountries(session: any): string[] {
   return normalizeCountryValues(session?.assignedCountries)
 }
 
-export function crmHasPermission(role: AdminRole, permission?: string): boolean {
-  if (!permission) return true
-  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
-}
-
 export function isTrustedCrmMutationRequest(request: NextRequest): boolean {
   const method = request.method.toUpperCase()
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return true

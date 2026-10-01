@@ -52,6 +52,24 @@ describe('CRM V2 Phase 15 legacy demolition gate', () => {
     expect(offenders).toEqual([])
   })
 
+  it('has no legacy redirect pages in the active CRM tree', () => {
+    const files = filesUnder('app/(admin)/admin', ['.tsx'])
+      .filter(path => path.endsWith('page.tsx'))
+    const offenders = files.filter(path =>
+      readFileSync(path, 'utf8').includes('redirect(')
+    )
+    expect(offenders).toEqual([])
+  })
+
+  it('has one effective permission evaluator without the legacy helper', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'lib/crm/security.ts'),
+      'utf8'
+    )
+    expect(source).not.toContain('export function crmHasPermission')
+    expect(source).toContain('evaluateEffectivePermission')
+  })
+
   it('keeps the canonical admin shell on the V2 design system', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'components/admin/AdminLayout.tsx'),
