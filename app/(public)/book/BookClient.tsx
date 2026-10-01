@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { useRegion } from '@/lib/region-context'
+import { marketplaceWebFetch } from '@/lib/auth/web-marketplace-client'
 import {
   ArrowLeft,
   ArrowRight,
@@ -136,7 +137,7 @@ export default function BookClient() {
   const loadSession = useCallback(async () => {
     setSessionLoading(true)
     try {
-      const response = await fetch('/api/web/auth/session', {
+      const response = await marketplaceWebFetch('/api/web/auth/session', {
         credentials: 'include',
         cache: 'no-store',
       })
@@ -434,7 +435,7 @@ export default function BookClient() {
         payload.budgetAmount = budgetAmount.trim()
       }
 
-      const response = await fetch('/api/web/jobs', {
+      const response = await marketplaceWebFetch('/api/web/jobs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
