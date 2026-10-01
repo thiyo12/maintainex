@@ -236,34 +236,51 @@ async function transitionPayout(
   }
 
   return prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string; currency: string; countryCode: string }>>(
-        `SELECT id, "userId", amount::text, status, currency, "countryCode" FROM "Payout" WHERE id = $1 FOR UPDATE`,
-        payoutId,
-      )
-    if (rows.length === 0) throw new Error('NOT_FOUND')
+    const rows = await tx.$queryRawUnsafe<Array<{
+      id: string
+      userId: string
+      amount: string
+      status: string
+      currency: string
+      countryCode: string
+    }>>(
+      `SELECT id, "userId", amount::text, status, currency, "countryCode"
+       FROM "Payout"
+       WHERE id = $1
+       FOR UPDATE`,
+      payoutId,
+    )
 
+    if (rows.length === 0) throw new Error('NOT_FOUND')
     const row = rows[0]
 
+    if (row.status === targetStatus) {
+      return {
+        payout: {
+          id: row.id,
+          userId: row.userId,
+          amount: BigInt(row.amount),
+          status: row.status,
+        },
+        changed: false,
+      }
+    }
+
+    // Break-glass freezes block progression toward external money movement,
+    // but FAILED/CANCELLED paths remain available to restore reserved funds.
     if (targetStatus === 'PROCESSING') {
       await assertPayoutNotFrozenInTransaction(tx, row.countryCode)
     }
-    // PAYOUT_TRANSITION_TRANSACTION_FREEZE_CHECK
 
-    if (row.status === targetStatus) {
-        `SELECT id, "userId", amount::text, status, currency FROM "Payout" WHERE id = $1 FOR UPDATE`,
-        payoutId,
-      )
-    if (rows.length === 0) throw new Error('NOT_FOUND')
-
-    const row = rows[0]
-    if (row.status === targetStatus) {
-      return { payout: { id: row.id, userId: row.userId, amount: BigInt(row.amount), status: row.status }, changed: false }
-    }
     if (!isValidTransition(row.status as PayoutStatus, targetStatus)) {
       throw new Error(`INVALID_TRANSITION:${row.status}->${targetStatus}`)
     }
 
-    await tx.payout.update({ where: { id: payoutId }, data: { status: targetStatus, ...extra } })
+    await tx.payout.update({
+      where: { id: payoutId },
+      data: { status: targetStatus, ...extra },
+    })
+
     await tx.idempotencyRecord.create({
       data: {
         idempotencyKey,
@@ -275,7 +292,15 @@ async function transitionPayout(
       },
     })
 
-    return { payout: { id: row.id, userId: row.userId, amount: BigInt(row.amount), status: targetStatus }, changed: true }
+    return {
+      payout: {
+        id: row.id,
+        userId: row.userId,
+        amount: BigInt(row.amount),
+        status: targetStatus,
+      },
+      changed: true,
+    }
   })
 }
 
@@ -397,6 +422,9 @@ export async function markSucceeded(
     return { ok: true, payoutId, status: 'SUCCEEDED' }
   } catch (error: any) {
     if (error?.message === 'NOT_FOUND') return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
+    if (error?.message === 'PAYOUTS_FROZEN') {
+      return { ok: false, error: 'Payout execution is temporarily frozen', code: 'PAYOUTS_FROZEN' }
+    }
     if (error?.message?.startsWith('INVALID_TRANSITION')) {
       return { ok: false, error: error.message, code: 'INVALID_TRANSITION' }
     }
