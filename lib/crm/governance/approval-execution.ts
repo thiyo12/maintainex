@@ -6,6 +6,7 @@ import {
 } from '@/lib/crm/jobs/cancellation'
 import { buildApprovalPlan } from './approval-engine'
 import { confirmManualExternalRefund, requestRequiredPayHereRefund } from '@/lib/finance/payments/payment-service'
+import { markProcessing, markSucceeded } from '@/lib/finance/payouts/payout-engine'
 import { tierAtLeast } from './action-registry'
 import { resolveCurrentApprovalRisk } from './current-risk'
 import type { ApprovalTier } from './types'
@@ -27,6 +28,40 @@ export interface ApprovalExecutionResult {
 
 function higherTier(current: ApprovalTier, stored: ApprovalTier): boolean {
   return current !== stored && tierAtLeast(current, stored)
+}
+
+type PayoutExecutionPayload = {
+  mode: 'CONFIRM_EXTERNAL_PAYOUT'
+  providerRef: string
+}
+
+function parsePayoutExecutionPayload(raw: string | null): PayoutExecutionPayload {
+  if (!raw) throw new Error('APPROVAL_ACTION_PAYLOAD_MISSING')
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+  }
+
+  const value = parsed as Record<string, unknown>
+  const providerRef =
+    typeof value.providerRef === 'string' ? value.providerRef.trim() : ''
+
+  if (
+    value.mode !== 'CONFIRM_EXTERNAL_PAYOUT' ||
+    providerRef.length < 4 ||
+    providerRef.length > 500
+  ) {
+    throw new Error('APPROVAL_PAYOUT_REFERENCE_INVALID')
+  }
+
+  return { mode: 'CONFIRM_EXTERNAL_PAYOUT', providerRef }
 }
 
 type RefundExecutionPayload =
@@ -241,6 +276,80 @@ export async function executeApprovedCrmRequest(
           approvalRequestId: request.id,
           refundReferencePresent: Boolean(result.refundReference),
           mode: payload.mode,
+        },
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent || undefined,
+        riskLevel: 'CRITICAL',
+      })
+    } else if (request.actionId === 'finance.payout') {
+      if (request.targetType !== 'Payout') {
+        throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+      }
+
+      const payload = parsePayoutExecutionPayload(request.actionPayload)
+      const payout = await prisma.payout.findUnique({
+        where: { id: request.targetId },
+        select: {
+          id: true,
+          status: true,
+          amount: true,
+          currency: true,
+          countryCode: true,
+          userId: true,
+        },
+      })
+      if (!payout) throw new Error('APPROVAL_TARGET_NOT_FOUND')
+
+      if (payout.status === 'RESERVED') {
+        const processing = await markProcessing(
+          payout.id,
+          actor.adminId,
+          `approval-payout:processing:${request.id}`
+        )
+        if (!processing.ok) {
+          throw new Error(
+            `PAYOUT_EXECUTION_FAILED:${processing.code || processing.error}`
+          )
+        }
+      } else if (payout.status !== 'PROCESSING') {
+        throw new Error(`PAYOUT_STATUS_NOT_EXECUTABLE:${payout.status}`)
+      }
+
+      const succeeded = await markSucceeded(
+        payout.id,
+        payload.providerRef,
+        `approval-payout:succeeded:${request.id}`,
+        actor.adminId
+      )
+      if (!succeeded.ok) {
+        throw new Error(
+          `PAYOUT_EXECUTION_FAILED:${succeeded.code || succeeded.error}`
+        )
+      }
+
+      executionRef = `Payout:${payout.id}:${payload.providerRef}`
+
+      await createAuditLog({
+        action: 'UPDATE',
+        category: 'FINANCE',
+        userId: actor.adminId,
+        userEmail: actor.email,
+        userRole: actor.role,
+        entityType: 'Payout',
+        entityId: payout.id,
+        entityName: payout.userId,
+        description: 'Approved external payout confirmation executed',
+        oldValue: {
+          status: payout.status,
+          approvalRequestId: request.id,
+        },
+        newValue: {
+          status: 'SUCCEEDED',
+          approvalRequestId: request.id,
+          externalReferencePresent: true,
+          amountMinor: payout.amount.toString(),
+          currency: payout.currency,
+          countryCode: payout.countryCode,
         },
         ipAddress: actor.ipAddress,
         userAgent: actor.userAgent || undefined,
