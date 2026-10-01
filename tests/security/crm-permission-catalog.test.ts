@@ -6,10 +6,25 @@ import {
 } from '@/lib/crm/governance'
 
 describe('CRM V2 permission catalog', () => {
-  it('recognizes legacy and V2 action permissions', () => {
+  it('recognizes legacy, canonical V2 read, and action permissions', () => {
     expect(isKnownPermission('jobs:view')).toBe(true)
+    expect(isKnownPermission('finance:payments:view')).toBe(true)
+    expect(isKnownPermission('finance:escrow:view')).toBe(true)
+    expect(isKnownPermission('finance:ledger:view')).toBe(true)
     expect(isKnownPermission('finance:refund:initiate')).toBe(true)
     expect(isKnownPermission('staff:permissions:manage')).toBe(true)
+  })
+
+  it('classifies canonical finance views as delegable READ permissions', () => {
+    expect(getPermissionCatalogEntry('finance:payments:view')).toMatchObject({
+      class: 'READ',
+      source: 'CANONICAL_V2',
+    })
+    expect(getPermissionCatalogEntry('finance:ledger:view')).toMatchObject({
+      class: 'READ',
+      source: 'CANONICAL_V2',
+    })
+    expect(canDelegatePermissionClass('MANAGER', 'READ')).toBe(true)
   })
 
   it('classifies owner-only permissions as non-delegable', () => {
