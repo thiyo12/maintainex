@@ -2433,8 +2433,96 @@ model AdminUser {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
+  permissionOverrides AdminPermissionOverride[] @relation("AdminPermissionOverrideSubject")
+
   @@index([email])
   @@index([parentId])
+}
+
+model AdminPermissionOverride {
+  id          String   @id @default(cuid())
+  adminUserId String
+  adminUser   AdminUser @relation("AdminPermissionOverrideSubject", fields: [adminUserId], references: [id], onDelete: Cascade)
+  permission  String
+  effect      String   // ALLOW, DENY
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([adminUserId, permission])
+  @@index([adminUserId, effect])
+  @@index([permission, effect])
+}
+
+model CrmApprovalRequest {
+  id                   String   @id @default(cuid())
+  actionId             String
+  status               String   @default("DRAFT")
+  initiatorAdminId     String
+  market               String
+  targetType           String
+  targetId             String
+  amountMinor          BigInt?
+  currency             String?
+  tier                 String
+  reversibility        String
+  reasonCode           String?
+  note                 String?
+  riskFlags            String   @default("[]")
+  policyVersion        String
+  idempotencyKey       String?  @unique
+  requiredApprovers    String   @default("[]")
+  expiresAt            DateTime?
+  executionRef         String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  decisions CrmApprovalDecision[]
+  events    CrmApprovalEvent[]
+
+  @@index([status, createdAt])
+  @@index([actionId, status])
+  @@index([initiatorAdminId, createdAt])
+  @@index([market, status])
+  @@index([targetType, targetId])
+  @@index([expiresAt])
+}
+
+model CrmApprovalDecision {
+  id        String   @id @default(cuid())
+  requestId String
+  request   CrmApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  adminId   String
+  adminRole String
+  decision  String   // APPROVE, REJECT
+  reason    String?
+  decidedAt DateTime @default(now())
+
+  @@unique([requestId, adminId])
+  @@index([requestId, decidedAt])
+  @@index([adminId, decidedAt])
+}
+
+model CrmApprovalEvent {
+  id            String   @id @default(cuid())
+  requestId     String
+  request       CrmApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  eventType     String
+  actorAdminId  String?
+  actorRole     String?
+  permission    String?
+  market        String?
+  targetType    String?
+  targetId      String?
+  correlationId String?
+  metadata      String?
+  createdAt     DateTime @default(now())
+
+  @@index([requestId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([actorAdminId, createdAt])
+  @@index([targetType, targetId])
+  @@index([correlationId])
 }
 
 model AdminNotification {
