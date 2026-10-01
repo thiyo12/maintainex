@@ -573,6 +573,25 @@ Understand the whole platform before building visual modules.
 
 # Phase 10 — Website booking + App & Web controls
 
+## Design-before-build gate
+- [ ] website-booking UX designed first
+- [ ] desktop and mobile flows approved
+- [ ] guest vs signed-in identity flow approved
+- [ ] service/category discovery flow approved
+- [ ] booking questions/details flow approved
+- [ ] quote comparison/acceptance flow approved
+- [ ] payment/escrow UX approved
+- [ ] booking status/tracking UX approved
+- [ ] cancellation/dispute handoff UX approved
+- [ ] accessibility/responsive states approved
+- [ ] only after this gate passes may public booking pages, CTAs, header/menu links, or booking client code be implemented
+
+Until this gate passes:
+- CRM may prepare safe runtime/config controls only.
+- Existing app/mobile booking behavior remains untouched.
+- Do not expose a new public booking route.
+- Do not redirect public website CTAs into an undesigned booking flow.
+
 ## Website booking
 - [ ] same catalog as app
 - [ ] same customer identity rules
