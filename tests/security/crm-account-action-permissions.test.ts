@@ -3,7 +3,10 @@ import {
   crmAccountActionRequiresReason,
   getCrmAccountActionPermission,
 } from '@/lib/crm/account-action-permissions'
-import { crmHasPermission } from '@/lib/crm/security'
+import { evaluateEffectivePermission } from '@/lib/crm/governance'
+
+const allowed = (role: Parameters<typeof evaluateEffectivePermission>[0]['role'], permission: string) =>
+  evaluateEffectivePermission({ role, permission, overrides: [] }).allowed
 
 describe('CRM account action permissions', () => {
   it('uses customer permissions for customer restrictions', () => {
@@ -24,23 +27,23 @@ describe('CRM account action permissions', () => {
   })
 
   it('allows managers to suspend providers but not ban them', () => {
-    expect(crmHasPermission('MANAGER', getCrmAccountActionPermission('suspend', 'TASKER')!)).toBe(true)
-    expect(crmHasPermission('MANAGER', getCrmAccountActionPermission('suspend', 'COMPANY')!)).toBe(true)
-    expect(crmHasPermission('MANAGER', getCrmAccountActionPermission('ban', 'TASKER')!)).toBe(false)
-    expect(crmHasPermission('MANAGER', getCrmAccountActionPermission('ban', 'COMPANY')!)).toBe(false)
+    expect(allowed('MANAGER', getCrmAccountActionPermission('suspend', 'TASKER')!)).toBe(true)
+    expect(allowed('MANAGER', getCrmAccountActionPermission('suspend', 'COMPANY')!)).toBe(true)
+    expect(allowed('MANAGER', getCrmAccountActionPermission('ban', 'TASKER')!)).toBe(false)
+    expect(allowed('MANAGER', getCrmAccountActionPermission('ban', 'COMPANY')!)).toBe(false)
   })
 
   it('does not grant managers customer suspension through provider permissions', () => {
-    expect(crmHasPermission('MANAGER', getCrmAccountActionPermission('suspend', 'CUSTOMER')!)).toBe(false)
+    expect(allowed('MANAGER', getCrmAccountActionPermission('suspend', 'CUSTOMER')!)).toBe(false)
   })
 
   it('allows user management to apply supported restrictions', () => {
     for (const targetRole of ['CUSTOMER', 'TASKER', 'COMPANY']) {
-      expect(crmHasPermission(
+      expect(allowed(
         'USER_MANAGEMENT',
         getCrmAccountActionPermission('suspend', targetRole)!
       )).toBe(true)
-      expect(crmHasPermission(
+      expect(allowed(
         'USER_MANAGEMENT',
         getCrmAccountActionPermission('ban', targetRole)!
       )).toBe(true)

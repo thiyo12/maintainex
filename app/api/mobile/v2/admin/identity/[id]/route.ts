@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
-  crmHasPermission,
   guardCrmRequest,
 } from '@/lib/crm/security'
+import { evaluateEffectivePermission } from '@/lib/crm/governance'
 import { transitionUserKyc } from '@/lib/phase6/kyc-writer'
 
 export async function PATCH(
@@ -33,7 +33,11 @@ export async function PATCH(
     }
 
     const requiredPermission = status === 'APPROVED' ? 'kyc:approve' : 'kyc:reject'
-    if (!crmHasPermission(security.role, requiredPermission)) {
+    if (!evaluateEffectivePermission({
+      role: security.role,
+      permission: requiredPermission,
+      overrides: security.permissionOverrides,
+    }).allowed) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     if (status === 'REJECTED' && !reviewNote) {

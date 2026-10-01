@@ -38,11 +38,11 @@ import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
 import { checkRateLimit } from '@/lib/shared/rate-limit/middleware'
 import {
   assertCrmCountryAllowed,
-  crmHasPermission,
   guardCrmRequest,
   isTrustedCrmMutationRequest,
   redactCrmSensitiveData,
 } from '@/lib/crm/security'
+import { evaluateEffectivePermission } from '@/lib/crm/governance'
 
 const mockedSession = vi.mocked(getAdminSession)
 const mockedRateLimit = vi.mocked(checkRateLimit)
@@ -111,8 +111,16 @@ describe('CRM three-layer security', () => {
   })
 
   it('enforces the canonical role permission map', () => {
-    expect(crmHasPermission('MANAGER', 'jobs:manage')).toBe(true)
-    expect(crmHasPermission('SUPPORT', 'jobs:manage')).toBe(false)
+    expect(evaluateEffectivePermission({
+      role: 'MANAGER',
+      permission: 'jobs:manage',
+      overrides: [],
+    }).allowed).toBe(true)
+    expect(evaluateEffectivePermission({
+      role: 'SUPPORT',
+      permission: 'jobs:manage',
+      overrides: [],
+    }).allowed).toBe(false)
   })
 
   it('recursively redacts secrets before CRM data is persisted or exposed', () => {

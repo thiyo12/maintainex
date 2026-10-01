@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
-  crmHasPermission,
   guardCrmRequest,
 } from '@/lib/crm/security'
+import { evaluateEffectivePermission } from '@/lib/crm/governance'
 
 export async function GET(
   request: NextRequest,
@@ -18,8 +18,13 @@ export async function GET(
     if (!guard.ok) return guard.response
     const security = guard.context
 
-    const canRead = crmHasPermission(security.role, 'jobs:view') ||
-      crmHasPermission(security.role, 'commission:view')
+    const canRead = ['jobs:view', 'commission:view'].some(permission =>
+      evaluateEffectivePermission({
+        role: security.role,
+        permission,
+        overrides: security.permissionOverrides,
+      }).allowed
+    )
     if (!canRead) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
