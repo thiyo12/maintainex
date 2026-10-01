@@ -21,6 +21,7 @@ export interface CrmSecurityContext {
   isSuperAdmin: boolean
   ipAddress: string
   userAgent: string | null
+  sessionId: string
   permissionOverrides: PermissionOverride[]
 }
 
@@ -375,6 +376,7 @@ export async function guardCrmRequest(
       isSuperAdmin,
       ipAddress: getIp(request),
       userAgent: request.headers.get('user-agent'),
+      sessionId: liveSession.id,
       permissionOverrides,
     },
   }
