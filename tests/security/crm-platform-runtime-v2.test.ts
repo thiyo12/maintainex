@@ -91,6 +91,16 @@ describe('CRM V2 platform runtime controls', () => {
     expect(push).toContain('!runtime.notifications.enabled')
   })
 
+  it('keeps public mobile catalog reads mutation-free', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'app/api/mobile/job-categories/route.ts'),
+      'utf8'
+    )
+    expect(source).not.toContain('seedJobCategories')
+    expect(source).not.toContain('prisma.jobCategory.create')
+    expect(source).not.toContain('prisma.jobCategory.upsert')
+  })
+
   it('keeps public catalog and offer writers read-only while CRM owns mutations', () => {
     for (const path of [
       'app/api/categories/route.ts',

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { seedJobCategories } from '@/lib/v2-job-categories'
 import { safeParseJsonArr, storedListIncludes } from '@/lib/db-utils'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 
@@ -16,11 +15,6 @@ export async function GET(request: NextRequest) {
       !runtime.market.available
     ) {
       return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } })
-    }
-
-    const count = await prisma.jobCategory.count()
-    if (count === 0) {
-      await seedJobCategories(prisma)
     }
 
     const allCategories = await prisma.jobCategory.findMany({
