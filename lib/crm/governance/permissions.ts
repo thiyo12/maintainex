@@ -50,7 +50,7 @@ export function evaluateEffectivePermission(input: EffectivePermissionInput): Ef
 }
 
 export function canDelegatePermissionClass(role: AdminRole, permissionClass: PermissionClass): boolean {
-  if (permissionClass === 'SYSTEM_ONLY') return false
+  if (permissionClass === 'SYSTEM_ONLY' || permissionClass === 'OWNER_ONLY') return false
   if (role === 'SUPER_ADMIN') return true
   if (role === 'MANAGER') return permissionClass === 'NORMAL' || permissionClass === 'READ'
   return false
