@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
       ? undefined
       : { code: { in: security.assignedCountries } }
 
-    const countries = await prisma.country.findMany({
+    const databaseCountries = await prisma.country.findMany({
       where,
       orderBy: { name: 'asc' },
       include: {
@@ -91,23 +91,28 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    if (countries.length > 0) {
-      return NextResponse.json(
-        { source: 'database', readOnlyFallback: false, countries },
-        { headers: { 'Cache-Control': 'no-store' } }
-      )
-    }
-
-    const fallback = LOCATIONS.filter(country =>
+    const scopedFallback = LOCATIONS.filter(country =>
       security.isSuperAdmin || security.assignedCountries.includes(country.code)
     )
+    const databaseCodes = new Set(databaseCountries.map(country => country.code))
+    const fallbackCountries = scopedFallback
+      .filter(country => !databaseCodes.has(country.code))
+      .map(country => ({ ...country, _source: 'static-fallback' as const }))
+
+    const countries = [
+      ...databaseCountries.map(country => ({ ...country, _source: 'database' as const })),
+      ...fallbackCountries,
+    ].sort((a, b) => a.name.localeCompare(b.name))
+
+    const source =
+      databaseCountries.length === 0
+        ? 'static-fallback'
+        : fallbackCountries.length === 0
+          ? 'database'
+          : 'hybrid'
 
     return NextResponse.json(
-      {
-        source: 'static-fallback',
-        readOnlyFallback: true,
-        countries: fallback,
-      },
+      { source, countries },
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
