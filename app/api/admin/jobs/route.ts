@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { guardCrmRequest, getCrmCountryFilter, assertCrmCountryAllowed } from '@/lib/crm/security'
+import { guardCrmAction, guardCrmRequest, getCrmCountryFilter, assertCrmCountryAllowed } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { transitionMarketplaceJob, type JobStatus } from '@/lib/domain/job-lifecycle'
 
@@ -238,16 +238,18 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const guard = await guardCrmRequest(request, {
-      permission: 'jobs:manage',
-      level: 'sensitive',
-      requireCountryScope: true,
-    })
-    if (!guard.ok) return guard.response
-    const security = guard.context
-
     const body = await request.json()
     const { jobId, status, source } = body
+
+    const guard = status === 'CANCELLED'
+      ? await guardCrmAction(request, 'jobs.cancel')
+      : await guardCrmRequest(request, {
+          permission: 'jobs:manage',
+          level: 'sensitive',
+          requireCountryScope: true,
+        })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     if (!jobId || !status) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
