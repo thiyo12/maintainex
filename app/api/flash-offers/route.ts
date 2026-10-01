@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 
 export async function GET() {
   try {
+    const runtime = await getPlatformRuntimeConfig()
+    if (!runtime.offers.visible) {
+      return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } })
+    }
+
     const now = new Date()
     const offers = await prisma.flashOffer.findMany({
       where: {
