@@ -47,6 +47,7 @@ export type CrmActionId =
   | 'companies.suspend'
   | 'kyc.approve'
   | 'kyc.reject'
+  | 'disputes.financial_resolution'
   | 'finance.refund'
   | 'finance.escrow.manual_release'
   | 'finance.wallet.adjust'
