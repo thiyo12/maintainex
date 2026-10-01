@@ -134,7 +134,7 @@ export default function SubscriptionScreen() {
         plans.map((plan) => (
           <View key={plan.id} style={styles.planCard}>
             <Text style={styles.planName}>{plan.name}</Text>
-            <Text style={styles.planPrice}>LKR {plan.price.toLocaleString()}/{t('subscription.perMonth')}</Text>
+            <Text style={styles.planPrice}>{plan.currency || 'LKR'} {plan.price.toLocaleString()}/{t('subscription.perMonth')}</Text>
             {plan.description && (
               <Text style={styles.planDesc}>{plan.description}</Text>
             )}
