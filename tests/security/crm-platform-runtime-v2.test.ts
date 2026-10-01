@@ -91,6 +91,22 @@ describe('CRM V2 platform runtime controls', () => {
     expect(push).toContain('!runtime.notifications.enabled')
   })
 
+  it('keeps public promotion CTAs behind the booking UX gate', () => {
+    const route = readFileSync(
+      resolve(process.cwd(), 'app/api/flash-offers/route.ts'),
+      'utf8'
+    )
+    const splash = readFileSync(
+      resolve(process.cwd(), 'components/ui/FlashOfferSplash.tsx'),
+      'utf8'
+    )
+
+    expect(route).toContain("path === '/booking'")
+    expect(route).toContain("path.startsWith('/booking/')")
+    expect(splash).not.toContain("'/booking'")
+    expect(splash).toContain("'/services'")
+  })
+
   it('keeps public mobile catalog reads mutation-free', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'app/api/mobile/job-categories/route.ts'),

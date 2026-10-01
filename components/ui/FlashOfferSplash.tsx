@@ -192,7 +192,7 @@ export default function FlashOfferSplash() {
         </div>
 
         <a
-          href={offer.linkUrl || '/booking'}
+          href={offer.linkUrl || '/services'}
           className={`inline-block px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all hover:scale-105 ${
             isLight ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'
           }`}

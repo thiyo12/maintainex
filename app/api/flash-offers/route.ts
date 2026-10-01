@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 
+function publicOfferLink(value: string | null): string | null {
+  const link = value?.trim()
+  if (!link || !/^\/(?!\/)/.test(link)) return null
+
+  const path = link.split(/[?#]/, 1)[0].toLowerCase()
+  if (path === '/booking' || path.startsWith('/booking/')) return null
+
+  return link
+}
+
 export async function GET() {
   try {
     const runtime = await getPlatformRuntimeConfig()
@@ -40,10 +50,7 @@ export async function GET() {
         .map(offer => ({
           ...offer,
           // Public promotion links must remain internal. Legacy/external values are suppressed.
-          linkUrl:
-            offer.linkUrl && /^\/(?!\/)/.test(offer.linkUrl)
-              ? offer.linkUrl
-              : null,
+          linkUrl: publicOfferLink(offer.linkUrl),
         })),
       {
         headers: {
