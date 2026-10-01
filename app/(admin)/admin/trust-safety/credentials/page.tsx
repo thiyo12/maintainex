@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiShield, FiCheck, FiX, FiRefreshCw, FiUser, FiSearch } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface Credential {
   id: string
@@ -33,7 +32,7 @@ export default function CredentialsPage() {
 
 function CredentialsContent() {
   const { user: admin } = useAdminSession()
-  const canReviewCredentials = !!admin && (ROLE_PERMISSIONS[admin.role as AdminRole] || []).includes('credentials:write')
+  const canReviewCredentials = Boolean(admin?.permissions?.includes('credentials:manage'))
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<string>('PENDING')
