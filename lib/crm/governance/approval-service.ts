@@ -3,10 +3,14 @@ import {
   areApprovalSlotsSatisfied,
   buildApprovalPlan,
   canRoleFillPendingApprovalSlot,
-  getApprovalSlots,
   isStepUpRequired,
 } from './approval-engine'
-import { CRM_ACTIONS, evaluateApprovalEligibility, getCrmAction, tierAtLeast } from './action-registry'
+import {
+  CRM_ACTIONS,
+  evaluateApprovalEligibility,
+  getApprovalSlots,
+  getCrmAction,
+} from './action-registry'
 import type {
   ApprovalDecisionRecord,
   ApprovalStatus,
