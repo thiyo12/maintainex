@@ -4,9 +4,29 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
-  FiArrowUpRight, FiBriefcase, FiChevronLeft, FiChevronRight,
-  FiClock, FiFilter, FiSearch, FiTool, FiUsers
+  FiArrowUpRight,
+  FiBriefcase,
+  FiClock,
+  FiFilter,
+  FiSearch,
+  FiTool,
+  FiUsers,
 } from 'react-icons/fi'
+import {
+  CrmBadge,
+  CrmFilterBar,
+  CrmMetricCard,
+  CrmPageHeader,
+  CrmState,
+  CrmTableFrame,
+  CrmTabs,
+  crmInputClass,
+  crmTableClass,
+  crmTdClass,
+  crmThClass,
+  type CrmTone,
+} from '@/components/crm/v2/CrmPrimitives'
+import { CrmPagination } from '@/components/crm/v2/CrmOperational'
 
 interface Job {
   id: string
@@ -46,13 +66,13 @@ const STATUS_TABS = [
 type StatusKey = (typeof STATUS_TABS)[number]['key']
 type SourceKey = 'ALL' | 'V1' | 'V2'
 
-function statusClasses(status: string) {
+function statusTone(status: string): CrmTone {
   const normalized = status.toUpperCase()
-  if (normalized === 'COMPLETED') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  if (normalized === 'CANCELLED') return 'bg-red-50 text-red-700 border-red-200'
-  if (normalized === 'IN_PROGRESS') return 'bg-amber-50 text-amber-700 border-amber-200'
-  if (normalized === 'QUOTE_ACCEPTED') return 'bg-violet-50 text-violet-700 border-violet-200'
-  return 'bg-blue-50 text-blue-700 border-blue-200'
+  if (normalized === 'COMPLETED') return 'success'
+  if (normalized === 'CANCELLED') return 'danger'
+  if (normalized === 'IN_PROGRESS') return 'warning'
+  if (normalized === 'QUOTE_ACCEPTED') return 'amber'
+  return 'info'
 }
 
 function formatMoney(value: number) {
@@ -131,195 +151,180 @@ export default function JobsCommandCentrePage() {
 
   return (
     <div className="space-y-5">
-      <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-[0.16em] text-amber-600 font-semibold">Operations</div>
-          <h1 className="mt-1 text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">Jobs Command Centre</h1>
-          <p className="mt-1.5 text-sm text-slate-500">
-            Search, filter and open every booking into the Job 360 operations workspace.
-          </p>
-        </div>
-        <Link
-          href="/admin/jobs/disputes"
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          Open dispute queue <FiArrowUpRight size={15} />
-        </Link>
+      <CrmPageHeader
+        eyebrow="Operations"
+        title="Jobs Command Centre"
+        description="Search, filter and open every booking into the Job 360 operations workspace."
+        actions={
+          <Link
+            href="/admin/jobs/disputes"
+            className="inline-flex h-10 items-center gap-2 rounded-[11px] border border-[var(--crm-border)] bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Open dispute queue <FiArrowUpRight size={15} />
+          </Link>
+        }
+      />
+
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <CrmMetricCard
+          icon={<FiBriefcase size={16} />}
+          label="Matching jobs"
+          value={pagination.total.toLocaleString()}
+          helper="Current filters"
+          tone="neutral"
+        />
+        <CrmMetricCard
+          icon={<FiTool size={16} />}
+          label="Marketplace"
+          value={summary.totalV2.toLocaleString()}
+          helper="V2 canonical jobs"
+          tone="amber"
+        />
+        <CrmMetricCard
+          icon={<FiClock size={16} />}
+          label="Classic"
+          value={summary.totalV1.toLocaleString()}
+          helper="Legacy job postings"
+          tone="info"
+        />
+        <CrmMetricCard
+          icon={<FiUsers size={16} />}
+          label="Visible page"
+          value={jobs.length.toLocaleString()}
+          helper={`Page ${pagination.page} of ${pagination.pages}`}
+          tone="neutral"
+        />
       </section>
 
-      <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <MetricCard icon={FiBriefcase} label="Matching jobs" value={pagination.total} detail="Current filters" />
-        <MetricCard icon={FiTool} label="Marketplace" value={summary.totalV2} detail="V2 canonical jobs" />
-        <MetricCard icon={FiClock} label="Classic" value={summary.totalV1} detail="Legacy job postings" />
-        <MetricCard icon={FiUsers} label="Visible page" value={jobs.length} detail={`Page ${pagination.page} of ${pagination.pages}`} />
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <div className="p-4 md:p-5 border-b border-slate-100">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="relative flex-1">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                value={query}
-                onChange={event => setQuery(event.target.value)}
-                placeholder="Search job ID, title, customer name, email or MX ID..."
-                className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-amber-300 focus:ring-2 focus:ring-amber-100"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <FiFilter className="text-slate-400" size={16} />
-              <select
-                value={source}
-                onChange={event => setSource(event.target.value as SourceKey)}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none"
-              >
-                <option value="ALL">All sources</option>
-                <option value="V2">Marketplace V2</option>
-                <option value="V1">Classic V1</option>
-              </select>
-            </div>
+      <div className="space-y-3">
+        <CrmFilterBar>
+          <div className="relative min-w-0 flex-1">
+            <FiSearch
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              size={16}
+            />
+            <input
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder="Search job ID, title, customer name, email or MX ID..."
+              className={`${crmInputClass} pl-9`}
+            />
           </div>
 
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-            {STATUS_TABS.map(tab => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveStatus(tab.key)}
-                className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition ${
-                  activeStatus === tab.key
-                    ? 'bg-slate-950 text-white'
-                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 md:w-[220px]">
+            <FiFilter className="shrink-0 text-slate-400" size={16} />
+            <select
+              value={source}
+              onChange={event => setSource(event.target.value as SourceKey)}
+              className={crmInputClass}
+              aria-label="Job source"
+            >
+              <option value="ALL">All sources</option>
+              <option value="V2">Marketplace V2</option>
+              <option value="V1">Classic V1</option>
+            </select>
           </div>
-        </div>
+        </CrmFilterBar>
 
-        {loading ? (
-          <div className="py-20 flex items-center justify-center">
-            <div className="w-8 h-8 border-[3px] border-amber-400 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : jobs.length === 0 ? (
-          <div className="py-20 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
-              <FiSearch size={20} />
-            </div>
-            <h2 className="mt-3 text-sm font-semibold text-slate-800">No jobs match this view</h2>
-            <p className="mt-1 text-xs text-slate-400">Change the filters or search for another record.</p>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] text-sm">
-                <thead className="bg-slate-50/80 border-b border-slate-100">
-                  <tr className="text-left text-[11px] uppercase tracking-[0.12em] text-slate-400">
-                    <th className="px-5 py-3.5 font-semibold">Job</th>
-                    <th className="px-4 py-3.5 font-semibold">Customer</th>
-                    <th className="px-4 py-3.5 font-semibold">Category</th>
-                    <th className="px-4 py-3.5 font-semibold">Location</th>
-                    <th className="px-4 py-3.5 font-semibold">Amount</th>
-                    <th className="px-4 py-3.5 font-semibold">Source</th>
-                    <th className="px-4 py-3.5 font-semibold">Status</th>
-                    <th className="px-4 py-3.5 font-semibold">Created</th>
-                    <th className="px-5 py-3.5 font-semibold text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {jobs.map(job => (
-                    <tr key={job.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-slate-900 max-w-[220px] truncate">{job.title}</div>
-                        <div className="mt-1 font-mono text-[11px] text-slate-400 max-w-[220px] truncate">{job.id}</div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <Link href={`/admin/users/${job.customer.id}`} className="font-medium text-slate-800 hover:text-amber-700">
-                          {job.customer.name}
-                        </Link>
-                        <div className="text-xs text-slate-400 mt-1">{job.customer.mxId || job.customer.email}</div>
-                      </td>
-                      <td className="px-4 py-4 text-slate-600">{job.category}</td>
-                      <td className="px-4 py-4 text-slate-500 max-w-[160px] truncate">{job.location}</td>
-                      <td className="px-4 py-4 font-semibold text-slate-900">
-                        {formatMoney(job.budget)}
-                        {job.budgetType && job.budgetType !== 'FIXED' && (
-                          <div className="text-[10px] text-slate-400 font-normal mt-1">{job.budgetType.replaceAll('_', ' ')}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${
-                          job.source === 'V2'
-                            ? 'bg-violet-50 text-violet-700 border-violet-200'
-                            : 'bg-blue-50 text-blue-700 border-blue-200'
-                        }`}>
-                          {job.source === 'V2' ? 'Marketplace' : 'Classic'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${statusClasses(job.status)}`}>
-                          {job.status.replaceAll('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-xs text-slate-400 whitespace-nowrap">{formatDate(job.createdAt)}</td>
-                      <td className="px-5 py-4 text-right">
-                        <Link
-                          href={`/admin/jobs/${job.id}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-950 hover:text-white hover:border-slate-950 transition"
-                        >
-                          Job 360 <FiArrowUpRight size={13} />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="px-5 py-4 border-t border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-xs text-slate-400">
-                {pagination.total.toLocaleString()} matching jobs · page {pagination.page} of {pagination.pages}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPage(current => Math.max(1, current - 1))}
-                  disabled={page <= 1}
-                  className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30"
-                >
-                  <FiChevronLeft size={15} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPage(current => Math.min(pagination.pages, current + 1))}
-                  disabled={page >= pagination.pages}
-                  className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30"
-                >
-                  <FiChevronRight size={15} />
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </section>
-    </div>
-  )
-}
-
-function MetricCard({ icon: Icon, label, value, detail }: { icon: any; label: string; value: number; detail: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs text-slate-400">{label}</div>
-          <div className="mt-2 text-2xl font-semibold text-slate-950">{value.toLocaleString()}</div>
-          <div className="mt-1 text-[11px] text-slate-400">{detail}</div>
-        </div>
-        <div className="w-9 h-9 rounded-xl bg-slate-950 text-amber-300 flex items-center justify-center">
-          <Icon size={16} />
-        </div>
+        <CrmTabs
+          items={STATUS_TABS.map(tab => ({ id: tab.key, label: tab.label }))}
+          active={activeStatus}
+          onChange={id => setActiveStatus(id as StatusKey)}
+        />
       </div>
+
+      {loading ? (
+        <CrmState
+          type="loading"
+          title="Loading jobs"
+          description="Loading the scoped job queue for your current market access."
+        />
+      ) : jobs.length === 0 ? (
+        <CrmState
+          type="empty"
+          title="No jobs match this view"
+          description="Change the filters or search for another record."
+        />
+      ) : (
+        <CrmTableFrame
+          title="Job queue"
+          description={`${pagination.total.toLocaleString()} matching jobs across the allowed market scope.`}
+        >
+          <table className={`${crmTableClass} min-w-[1080px]`}>
+            <thead>
+              <tr>
+                <th className={crmThClass}>Job</th>
+                <th className={crmThClass}>Customer</th>
+                <th className={crmThClass}>Category</th>
+                <th className={crmThClass}>Location</th>
+                <th className={crmThClass}>Amount</th>
+                <th className={crmThClass}>Source</th>
+                <th className={crmThClass}>Status</th>
+                <th className={crmThClass}>Created</th>
+                <th className={`${crmThClass} text-right`}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {jobs.map(job => (
+                <tr key={job.id} className="transition-colors hover:bg-[#fafbf9]">
+                  <td className={crmTdClass}>
+                    <div className="max-w-[220px] truncate font-semibold text-slate-900">{job.title}</div>
+                    <div className="mt-1 max-w-[220px] truncate font-mono text-[10px] text-slate-400">{job.id}</div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <Link
+                      href={`/admin/users/${job.customer.id}`}
+                      className="font-semibold text-slate-800 hover:text-amber-700"
+                    >
+                      {job.customer.name}
+                    </Link>
+                    <div className="mt-1 text-xs text-slate-400">{job.customer.mxId || job.customer.email}</div>
+                  </td>
+                  <td className={crmTdClass}>{job.category}</td>
+                  <td className={`${crmTdClass} max-w-[170px] truncate text-slate-500`}>{job.location}</td>
+                  <td className={`${crmTdClass} font-semibold text-slate-900`}>
+                    {formatMoney(job.budget)}
+                    {job.budgetType && job.budgetType !== 'FIXED' && (
+                      <div className="mt-1 text-[10px] font-normal text-slate-400">
+                        {job.budgetType.replaceAll('_', ' ')}
+                      </div>
+                    )}
+                  </td>
+                  <td className={crmTdClass}>
+                    <CrmBadge tone={job.source === 'V2' ? 'amber' : 'neutral'}>
+                      {job.source === 'V2' ? 'Marketplace' : 'Classic'}
+                    </CrmBadge>
+                  </td>
+                  <td className={crmTdClass}>
+                    <CrmBadge tone={statusTone(job.status)} dot>
+                      {job.status.replaceAll('_', ' ')}
+                    </CrmBadge>
+                  </td>
+                  <td className={`${crmTdClass} whitespace-nowrap text-xs text-slate-400`}>
+                    {formatDate(job.createdAt)}
+                  </td>
+                  <td className={`${crmTdClass} text-right`}>
+                    <Link
+                      href={`/admin/jobs/${job.id}`}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-[9px] border border-[var(--crm-border)] bg-white px-3 text-xs font-semibold text-slate-700 hover:border-slate-900 hover:bg-slate-900 hover:text-white"
+                    >
+                      Job 360 <FiArrowUpRight size={13} />
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <CrmPagination
+            page={pagination.page}
+            totalPages={pagination.pages}
+            total={pagination.total}
+            pageSize={pagination.limit}
+            onPageChange={setPage}
+          />
+        </CrmTableFrame>
+      )}
     </div>
   )
 }
