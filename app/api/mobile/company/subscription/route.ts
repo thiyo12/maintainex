@@ -38,8 +38,9 @@ export async function GET(request: NextRequest) {
         ? {
             id: activeSubscription.id,
             planId: activeSubscription.planId,
-            planName: activeSubscription.plan.name,
-            planPrice: activeSubscription.plan.price,
+            planName: activeSubscription.planNameSnapshot || activeSubscription.plan.name,
+            planPrice: activeSubscription.priceSnapshot ?? activeSubscription.plan.price,
+            currency: activeSubscription.currency || activeSubscription.plan.currency,
             planFeatures: activeSubscription.plan.features,
             status: activeSubscription.status,
             startDate: activeSubscription.startDate.toISOString(),
@@ -68,9 +69,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Plan ID is required' }, { status: 400 })
     }
 
+    const profile = await prisma.companyProfile.findUnique({
+      where: { userId: user.id },
+      select: { id: true, countryCode: true },
+    })
+    if (!profile) {
+      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
+    }
+
     const plan = await prisma.subscriptionPlan.findUnique({ where: { id: planId } })
-    if (!plan || !plan.isActive) {
-      return NextResponse.json({ error: 'Invalid or inactive plan' }, { status: 400 })
+    if (!plan || !plan.isActive || plan.countryCode !== profile.countryCode) {
+      return NextResponse.json({ error: 'Invalid or inactive plan for this market' }, { status: 400 })
     }
 
     if (Number(plan.price) > 0) {
@@ -81,14 +90,6 @@ export async function POST(request: NextRequest) {
         },
         { status: 503 }
       )
-    }
-
-    const profile = await prisma.companyProfile.findUnique({
-      where: { userId: user.id },
-      select: { id: true },
-    })
-    if (!profile) {
-      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
     }
 
     const startDate = new Date()
@@ -118,6 +119,9 @@ export async function POST(request: NextRequest) {
           startDate,
           endDate,
           autoRenew: typeof autoRenew === 'boolean' ? autoRenew : true,
+          priceSnapshot: plan.price,
+          currency: plan.currency,
+          planNameSnapshot: plan.name,
         },
       })
 
