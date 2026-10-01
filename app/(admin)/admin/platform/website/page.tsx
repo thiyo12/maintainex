@@ -244,7 +244,7 @@ export default function WebsiteManagementPage() {
 
       <CrmCard
         title="Website booking runtime boundary"
-        description="CRM controls are only exposed after the website runtime consumes the same canonical marketplace services."
+        description="Website availability, maintenance, catalog, offers, operational banners and market availability are wired to the live public runtime. Public booking remains separately design-gated."
         action={<CrmBadge tone="warning">Phase 10</CrmBadge>}
       >
         <div className="flex gap-3">
@@ -256,7 +256,7 @@ export default function WebsiteManagementPage() {
               No fake maintenance or website-booking switch
             </div>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-              The current repository does not yet expose a dedicated website-booking runtime that consumes those settings. Catalog and promotions above are real controls; website booking availability, maintenance state and feature flags will be added only when the public runtime is wired to consume them.
+              The public website now consumes the approved runtime controls for availability, maintenance, catalog visibility, offers, operational banners and market availability. Public booking is intentionally hard-locked off until the website-booking UX gate is approved; no CRM switch can bypass that gate.
             </p>
           </div>
         </div>
