@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiAlertTriangle, FiCheck, FiX, FiArrowUp, FiRefreshCw, FiMinus } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface RiskEvent {
   id: string
@@ -40,9 +39,7 @@ export default function RiskEventsPage() {
 
 function RiskEventsContent() {
   const { user: admin } = useAdminSession()
-  const role = (admin?.role || 'SUPPORT') as AdminRole
-  const permissions = ROLE_PERMISSIONS[role] || []
-  const canResolve = permissions.includes('risk_events:resolve')
+  const canResolve = Boolean(admin?.permissions?.includes('risk:resolve'))
   const [events, setEvents] = useState<RiskEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('pending')
