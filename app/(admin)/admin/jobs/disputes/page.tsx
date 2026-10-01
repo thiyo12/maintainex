@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { FiAlertTriangle, FiEye, FiCheck, FiX, FiSearch } from 'react-icons/fi'
+import { FiEye, FiX, FiSearch } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import {
   CrmBadge,
@@ -80,7 +80,6 @@ export default function DisputesPage() {
   const fetchDisputes = async () => {
     setLoading(true)
     try {
-      const statusParam = activeTab === 'ALL' ? '' : `&status=${activeTab}`
       const res = await fetch(`/api/admin/disputes?status=${activeTab === 'ALL' ? '' : activeTab}`, {
         headers: { },
       })
@@ -245,16 +244,16 @@ export default function DisputesPage() {
                     <th className={crmThClass}>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-[var(--crm-border)]">
                   {disputes.map((dispute) => (
                     <tr key={dispute.id} className="transition-colors hover:bg-[#fafbf9]">
                       <td className={crmTdClass}>
                         <div className="max-w-[180px] truncate font-semibold text-slate-900">{dispute.job.title}</div>
                         <div className="font-mono text-[10px] text-slate-400">{dispute.jobId.slice(0, 10)}...</div>
                         {dispute.source === 'MARKETPLACE' && (
-                          <span className="inline-flex mt-1 text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                            Marketplace escrow
-                          </span>
+                          <div className="mt-1">
+                            <CrmBadge tone="info">Marketplace escrow</CrmBadge>
+                          </div>
                         )}
                       </td>
                       <td className={crmTdClass}>
@@ -335,7 +334,7 @@ export default function DisputesPage() {
                 {detailModal.resolution && (
                   <div>
                     <div className="text-xs text-slate-400 mb-1">Resolution</div>
-                    <div className="text-green-400 text-sm bg-green-500/10 rounded-lg p-3">{detailModal.resolution}</div>
+                    <div className="rounded-xl border border-emerald-200 bg-[var(--crm-success-soft)] p-3 text-sm text-[var(--crm-success)]">{detailModal.resolution}</div>
                   </div>
                 )}
 
@@ -345,7 +344,7 @@ export default function DisputesPage() {
                     <textarea
                       value={resolveNotes}
                       onChange={(e) => setResolveNotes(e.target.value)}
-                      className="w-full bg-[#0B0C12] border border-white/10 rounded-lg p-3 text-slate-900 text-sm focus:outline-none focus:border-amber-500/50 resize-none"
+                      className={`${crmInputClass} h-auto min-h-[96px] resize-y py-2.5`}
                       rows={3}
                       placeholder="Enter resolution notes..."
                     />
@@ -357,51 +356,51 @@ export default function DisputesPage() {
                 {!canResolveDisputes && <span className="text-xs text-slate-400 self-center mr-auto">Read-only access</span>}
                 {canResolveDisputes && detailModal.status === 'OPEN' && (
                   <>
-                    <button
+                    <CrmButton
+                      variant="secondary"
                       onClick={() => handleUnderReview(detailModal.id)}
                       disabled={actionLoading}
-                      className="px-4 py-2 bg-amber-500/10 text-amber-400 rounded-lg hover:bg-amber-500/20 disabled:opacity-50 transition font-medium text-sm"
                     >
-                      Mark Under Review
-                    </button>
+                      Mark under review
+                    </CrmButton>
                     {detailModal.source !== 'MARKETPLACE' && (
-                      <button
+                      <CrmButton
+                        variant="ghost"
                         onClick={() => handleDismiss(detailModal.id)}
                         disabled={actionLoading}
-                        className="px-4 py-2 bg-gray-500/10 text-slate-500 rounded-lg hover:bg-gray-500/20 disabled:opacity-50 transition font-medium text-sm"
                       >
                         Dismiss
-                      </button>
+                      </CrmButton>
                     )}
                   </>
                 )}
                 {canResolveDisputes && detailModal.status === 'UNDER_REVIEW' && detailModal.source === 'MARKETPLACE' && (
                   <>
-                    <button
+                    <CrmButton
+                      variant="primary"
                       onClick={() => handleResolve(detailModal.id, 'RELEASE_PROVIDER')}
                       disabled={actionLoading || !resolveNotes.trim()}
-                      className="px-4 py-2 bg-green-500 text-[#0B0C12] rounded-lg hover:bg-green-400 disabled:opacity-50 transition font-medium text-sm"
                     >
-                      {actionLoading ? 'Resolving...' : 'Release to provider'}
-                    </button>
-                    <button
+                      {actionLoading ? 'Submitting…' : 'Release to provider'}
+                    </CrmButton>
+                    <CrmButton
+                      variant="danger"
                       onClick={() => handleResolve(detailModal.id, 'REFUND_CUSTOMER')}
                       disabled={actionLoading || !resolveNotes.trim()}
-                      className="px-4 py-2 bg-red-500/15 text-red-300 border border-red-500/30 rounded-lg hover:bg-red-500/25 disabled:opacity-50 transition font-medium text-sm"
                     >
-                      {actionLoading ? 'Resolving...' : 'Refund customer'}
-                    </button>
+                      {actionLoading ? 'Submitting…' : 'Refund customer'}
+                    </CrmButton>
                   </>
                 )}
                 {canResolveDisputes && detailModal.status === 'UNDER_REVIEW' && detailModal.source !== 'MARKETPLACE' && (
                   <>
-                    <button
+                    <CrmButton
+                      variant="primary"
                       onClick={() => handleResolve(detailModal.id)}
                       disabled={actionLoading || !resolveNotes.trim()}
-                      className="px-4 py-2 bg-green-500 text-[#0B0C12] rounded-lg hover:bg-green-400 disabled:opacity-50 transition font-medium text-sm"
                     >
-                      {actionLoading ? 'Resolving...' : 'Resolve'}
-                    </button>
+                      {actionLoading ? 'Resolving…' : 'Resolve'}
+                    </CrmButton>
                     <button
                       onClick={() => handleDismiss(detailModal.id)}
                       disabled={actionLoading}
@@ -416,12 +415,13 @@ export default function DisputesPage() {
                     Financial action is being reconciled. Do not submit a second payout/refund.
                   </span>
                 )}
-                <button
+                <CrmButton
+                  variant="secondary"
                   onClick={() => setDetailModal(null)}
-                  className="px-4 py-2 bg-white/5 text-slate-500 rounded-lg hover:bg-white/10 transition text-sm"
+                  disabled={actionLoading}
                 >
                   Close
-                </button>
+                </CrmButton>
               </div>
             </div>
           </div>
