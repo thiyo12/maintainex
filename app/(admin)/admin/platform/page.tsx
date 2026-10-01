@@ -8,6 +8,7 @@ import {
   FiBell,
   FiGrid,
   FiMonitor,
+  FiMapPin,
   FiRefreshCw,
   FiSettings,
   FiShield,
@@ -82,6 +83,7 @@ export default function PlatformManagementPage() {
       { title: 'Offers & promotions', description: 'Seasonal and flash campaigns with market/channel controls.', icon: FiTag, href: '/admin/platform/offers', detail: `${data?.offers.activeSeasonal || 0} seasonal · ${data?.offers.activeFlash || 0} flash` },
       { title: 'Notifications', description: 'Operational alerts, user messaging and controlled broadcasts.', icon: FiBell, href: '/admin/platform/notifications', detail: 'Notification operations' },
       { title: 'Market & pricing', description: 'Country availability, currencies, limits and pricing configuration.', icon: FiSliders, href: '/admin/pricing/market-config', detail: `${data?.mobile.marketConfigs.length || 0} market configs` },
+      { title: 'Locations & coverage', description: 'Canonical countries, provinces, cities and service areas used by booking.', icon: FiMapPin, href: '/admin/platform/locations', detail: 'Database-backed location hierarchy' },
       { title: 'Staff control', description: 'Staff accounts, granular permissions, sessions and market scope.', icon: FiUserCheck, href: '/admin/admins', detail: 'Governed staff administration' },
       { title: 'Platform settings', description: 'Privileged operational configuration with audit protection.', icon: FiSettings, href: '/admin/settings', detail: 'Audited configuration' },
     ]
