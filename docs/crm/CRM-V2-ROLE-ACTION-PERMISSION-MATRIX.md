@@ -77,7 +77,8 @@ Legend: O=owner/final authority, P=primary operator, A=approver/reviewer, R=read
 | Manage market config | markets:manage | SENSITIVE | O | P | finance fields | identity input | R | validation |
 | Publish/disable market | markets:publish | OWNER_ONLY/SENSITIVE | O | A-delegated | — | — | — | — |
 | Manage promotions | promotions:manage | NORMAL | O | P | finance validation | eligibility | R | — |
-| Manage real estate | realestate:manage | NORMAL | O | P | boost/payment read | identity support | moderation | — |
+| View real estate | realestate:view | READ | O | P | R-boost/payment | R-identity | R | — |
+| Moderate/feature real estate | realestate:manage | SENSITIVE | O | P | — | — | E | — |
 | View staff | staff:view | READ | O | R | self/team | self/team | self | security status |
 | Create staff | staff:create | OWNER_ONLY/SENSITIVE | O | delegated non-sensitive only | — | — | — | — |
 | Assign role | staff:role:manage | OWNER_ONLY | O | — | — | — | — | — |

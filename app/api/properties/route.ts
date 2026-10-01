@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
 import {
   PUBLIC_REAL_ESTATE_STATUSES,
+  isSafePropertyMediaRef,
+  readPropertyMediaRefs,
+  sanitizePropertyMediaRefs,
   toPublicListingDto,
 } from '@/lib/real-estate/visibility'
 
@@ -105,7 +108,7 @@ export async function GET(request: NextRequest) {
     const data = includePrivateFields
       ? listings.map(listing => ({
           ...listing,
-          photos: listing.photos ? JSON.parse(listing.photos) : [],
+          photos: readPropertyMediaRefs(listing.photos),
           amenities: listing.amenities ? JSON.parse(listing.amenities) : [],
         }))
       : listings.map(listing => toPublicListingDto(listing))
@@ -165,9 +168,16 @@ export async function POST(request: NextRequest) {
       const parsed = Number(value)
       return Number.isFinite(parsed) ? parsed : null
     }
-    const photos = Array.isArray(body?.photos)
-      ? body.photos.filter((item: unknown): item is string => typeof item === 'string').slice(0, 10)
-      : []
+    const rawPhotos = Array.isArray(body?.photos) ? body.photos : []
+    if (rawPhotos.some((item: unknown) => !isSafePropertyMediaRef(item))) {
+      return NextResponse.json({ error: 'Invalid property media reference' }, { status: 400 })
+    }
+    const photos = sanitizePropertyMediaRefs(rawPhotos, 10)
+    const rawVideoUrl = typeof body?.videoUrl === 'string' ? body.videoUrl.trim() : ''
+    if (rawVideoUrl && !isSafePropertyMediaRef(rawVideoUrl)) {
+      return NextResponse.json({ error: 'Invalid property video reference' }, { status: 400 })
+    }
+    const videoUrl = rawVideoUrl || null
     const amenities = Array.isArray(body?.amenities)
       ? body.amenities.filter((item: unknown): item is string => typeof item === 'string').map((item: string) => item.slice(0, 120)).slice(0, 50)
       : []
@@ -200,7 +210,7 @@ export async function POST(request: NextRequest) {
         isNewProperty: body?.isNewProperty !== false,
         photos: photos.length ? JSON.stringify(photos) : null,
         amenities: amenities.length ? JSON.stringify(amenities) : null,
-        videoUrl: safeString(body?.videoUrl, 1000),
+        videoUrl,
         contactPhone: safeString(body?.contactPhone, 50),
         contactName: safeString(body?.contactName, 120),
         status: 'pending',

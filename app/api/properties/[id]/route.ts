@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
 import {
   isPublicRealEstateStatus,
+  isSafePropertyMediaRef,
+  readPropertyMediaRefs,
+  sanitizePropertyMediaRefs,
   toPublicListingDto,
 } from '@/lib/real-estate/visibility'
 
@@ -20,16 +23,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const isOwner = Boolean(session?.id && listing.postedBy === session.id)
-    const isLegacyStaff = session?.role === 'SUPER_ADMIN' || session?.role === 'MANAGER'
     const isPublic = isPublicRealEstateStatus(listing.status)
 
-    if (!isPublic && !isOwner && !isLegacyStaff) {
+    if (!isPublic && !isOwner) {
       // Do not leak whether a draft/rejected/pending listing exists.
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
     }
 
     let views = listing.views
-    if (isPublic && !isOwner && !isLegacyStaff) {
+    if (isPublic && !isOwner) {
       const updated = await prisma.realEstateListing.update({
         where: { id },
         data: { views: { increment: 1 } },
@@ -38,11 +40,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       views = updated.views
     }
 
-    const data = isOwner || isLegacyStaff
+    const data = isOwner
       ? {
           ...listing,
           views,
-          photos: listing.photos ? JSON.parse(listing.photos) : [],
+          photos: readPropertyMediaRefs(listing.photos),
           amenities: listing.amenities ? JSON.parse(listing.amenities) : [],
         }
       : {
@@ -92,7 +94,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       city: 120,
       area: 120,
       address: 300,
-      videoUrl: 1000,
       contactPhone: 50,
       contactName: 120,
     }
@@ -130,9 +131,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
     if (body.photos !== undefined) {
       if (!Array.isArray(body.photos)) return NextResponse.json({ error: 'Invalid photos' }, { status: 400 })
-      data.photos = JSON.stringify(
-        body.photos.filter((item: unknown): item is string => typeof item === 'string').slice(0, 10)
-      )
+      if (body.photos.some((item: unknown) => !isSafePropertyMediaRef(item))) {
+        return NextResponse.json({ error: 'Invalid property media reference' }, { status: 400 })
+      }
+      data.photos = JSON.stringify(sanitizePropertyMediaRefs(body.photos, 10))
+    }
+    if (body.videoUrl !== undefined) {
+      const videoUrl = typeof body.videoUrl === 'string' ? body.videoUrl.trim() : ''
+      if (videoUrl && !isSafePropertyMediaRef(videoUrl)) {
+        return NextResponse.json({ error: 'Invalid property video reference' }, { status: 400 })
+      }
+      data.videoUrl = videoUrl || null
     }
     if (body.amenities !== undefined) {
       if (!Array.isArray(body.amenities)) return NextResponse.json({ error: 'Invalid amenities' }, { status: 400 })

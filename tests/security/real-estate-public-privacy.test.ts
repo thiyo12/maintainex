@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import {
+  isSafePropertyMediaRef,
+  sanitizePropertyMediaRefs,
+} from '@/lib/real-estate/visibility'
 
 describe('Real-estate public privacy boundary', () => {
   it('does not allow public callers to select pending or rejected listing states', () => {
@@ -34,5 +38,25 @@ describe('Real-estate public privacy boundary', () => {
     expect(source).toContain('rejectionReason')
     expect(source).toContain('reviewedBy')
     expect(source).toContain('includeContact')
+  })
+
+  it('accepts only safe HTTPS or MaintainEX media references', () => {
+    expect(isSafePropertyMediaRef('https://images.unsplash.com/photo-123?w=800')).toBe(true)
+    expect(isSafePropertyMediaRef('/uploads/avatars/example.webp')).toBe(true)
+    expect(isSafePropertyMediaRef('/api/mobile/files/user/photo.jpg')).toBe(true)
+    expect(isSafePropertyMediaRef('javascript:alert(1)')).toBe(false)
+    expect(isSafePropertyMediaRef('data:image/svg+xml,<svg/>')).toBe(false)
+    expect(isSafePropertyMediaRef('//evil.example/image.jpg')).toBe(false)
+    expect(sanitizePropertyMediaRefs([
+      'https://example.com/a.jpg',
+      'javascript:alert(1)',
+      'https://example.com/a.jpg',
+    ])).toEqual(['https://example.com/a.jpg'])
+  })
+
+  it('removes the legacy staff shortcut from the public detail route', () => {
+    const source = readFileSync(resolve(process.cwd(), 'app/api/properties/[id]/route.ts'), 'utf8')
+    expect(source).not.toContain('isLegacyStaff')
+    expect(source).toContain('if (!isPublic && !isOwner)')
   })
 })
