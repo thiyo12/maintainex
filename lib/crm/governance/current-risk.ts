@@ -82,6 +82,117 @@ export async function resolveCurrentApprovalRisk(request: {
     }
   }
 
+  if (request.actionId === 'finance.payout') {
+    if (request.targetType !== 'Payout') {
+      throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+    }
+
+    const payout = await prisma.payout.findUnique({
+      where: { id: request.targetId },
+      select: {
+        id: true,
+        userId: true,
+        amount: true,
+        currency: true,
+        countryCode: true,
+        status: true,
+        createdAt: true,
+        user: {
+          select: {
+            id: true,
+            identityStatus: true,
+            isSuspended: true,
+            isBanned: true,
+            taskerProfile: {
+              select: {
+                verificationStatus: true,
+                isVerified: true,
+              },
+            },
+            companyProfile: {
+              select: {
+                verificationStatus: true,
+                isVerified: true,
+              },
+            },
+          },
+        },
+      },
+    })
+    if (!payout) throw new Error('APPROVAL_TARGET_NOT_FOUND')
+
+    if (payout.countryCode.toUpperCase() !== request.market.toUpperCase()) {
+      throw new Error('APPROVAL_MARKET_CHANGED')
+    }
+    if (request.amountMinor !== null && request.amountMinor !== payout.amount) {
+      throw new Error('APPROVAL_AMOUNT_CHANGED')
+    }
+    if (request.currency && request.currency.toUpperCase() !== payout.currency.toUpperCase()) {
+      throw new Error('APPROVAL_CURRENCY_CHANGED')
+    }
+
+    const now = new Date()
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+    const [priorSucceededCount, recipient24h, recipient7d] = await Promise.all([
+      prisma.payout.count({
+        where: {
+          userId: payout.userId,
+          status: 'SUCCEEDED',
+          id: { not: payout.id },
+        },
+      }),
+      prisma.payout.aggregate({
+        where: {
+          userId: payout.userId,
+          createdAt: { gte: dayAgo },
+          status: { in: ['RESERVED', 'PROCESSING', 'SUCCEEDED'] },
+        },
+        _sum: { amount: true },
+      }),
+      prisma.payout.aggregate({
+        where: {
+          userId: payout.userId,
+          createdAt: { gte: weekAgo },
+          status: { in: ['RESERVED', 'PROCESSING', 'SUCCEEDED'] },
+        },
+        _sum: { amount: true },
+      }),
+    ])
+
+    const identityVerified = payout.user.identityStatus === 'VERIFIED'
+    const taskerVerified = payout.user.taskerProfile
+      ? payout.user.taskerProfile.verificationStatus === 'VERIFIED' &&
+        payout.user.taskerProfile.isVerified
+      : true
+    const companyVerified = payout.user.companyProfile
+      ? payout.user.companyProfile.verificationStatus === 'VERIFIED' &&
+        payout.user.companyProfile.isVerified
+      : true
+
+    return {
+      actionId: 'finance.payout',
+      market: payout.countryCode,
+      amountMinor: payout.amount,
+      currency: payout.currency,
+      risk: {
+        kycStatus:
+          identityVerified && taskerVerified && companyVerified
+            ? 'APPROVED'
+            : payout.user.identityStatus === 'REJECTED'
+              ? 'REJECTED'
+              : payout.user.identityStatus === 'EXPIRED'
+                ? 'EXPIRED'
+                : 'PENDING',
+        fraudOrSecurityHold: payout.user.isSuspended || payout.user.isBanned,
+        firstPayout: priorSucceededCount === 0,
+        rollingRecipientAmountMinor24h: recipient24h._sum.amount ?? payout.amount,
+        rollingRecipientAmountMinor7d: recipient7d._sum.amount ?? payout.amount,
+      },
+    }
+  }
+
   if (request.actionId === 'jobs.cancel') {
     const source =
       request.targetType === 'MarketplaceJob'
