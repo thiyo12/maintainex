@@ -10,7 +10,7 @@ export async function POST(
 ) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'companies:edit',
+      permission: 'companies:status:manage',
       level: 'sensitive',
       requireCountryScope: true,
     })
