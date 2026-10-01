@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { guardCrmRequest } from '@/lib/crm/security'
+import { guardCrmRequest, type CrmSecurityContext } from '@/lib/crm/security'
+import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 import { createAuditLog } from '@/lib/crm/audit'
 import { createProfessionSkill, deactivateProfessionSkill } from '@/lib/profession'
+
+function canPublishCatalog(security: CrmSecurityContext): boolean {
+  const entry = getPermissionCatalogEntry('catalog:publish')
+  return evaluateEffectivePermission({
+    role: security.role,
+    permission: 'catalog:publish',
+    permissionClass: entry?.class,
+    overrides: security.permissionOverrides,
+  }).allowed
+}
 
 function cleanSlug(value: unknown): string {
   return typeof value === 'string'
@@ -16,7 +27,7 @@ export async function GET(
 ) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'professions:read',
+      permission: 'catalog:view',
       level: 'read',
     })
     if (!guard.ok) return guard.response
@@ -49,7 +60,7 @@ export async function POST(
 ) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'professions:write',
+      permission: 'catalog:edit',
       level: 'sensitive',
     })
     if (!guard.ok) return guard.response
@@ -65,6 +76,14 @@ export async function POST(
     const i18nKey = typeof body?.i18nKey === 'string' ? body.i18nKey.trim().slice(0, 200) : ''
     const description = typeof body?.description === 'string' ? body.description.trim().slice(0, 2000) : undefined
     const sortOrder = body?.sortOrder === undefined ? 0 : Number(body.sortOrder)
+    const requestedActive = body?.isActive === true
+
+    if (requestedActive && !canPublishCatalog(security)) {
+      return NextResponse.json(
+        { error: 'catalog:publish is required to create an active skill' },
+        { status: 403 }
+      )
+    }
 
     if (!slug || !i18nKey) return NextResponse.json({ error: 'slug and i18nKey required' }, { status: 400 })
     if (!Number.isInteger(sortOrder) || sortOrder < -100000 || sortOrder > 100000) {
@@ -77,6 +96,7 @@ export async function POST(
       i18nKey,
       description,
       sortOrder,
+      isActive: requestedActive,
     })
 
     await createAuditLog({
@@ -106,13 +126,121 @@ export async function POST(
   }
 }
 
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const guard = await guardCrmRequest(request, {
+      permission: 'catalog:edit',
+      level: 'sensitive',
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
+
+    const { id } = await params
+    if (!id || id.length > 128) {
+      return NextResponse.json({ error: 'Invalid profession ID' }, { status: 400 })
+    }
+
+    const body = await request.json().catch(() => ({}))
+    const skillId = typeof body?.skillId === 'string' ? body.skillId.trim().slice(0, 128) : ''
+    if (!skillId) return NextResponse.json({ error: 'skillId required' }, { status: 400 })
+
+    const existing = await prisma.professionSkill.findUnique({ where: { id: skillId } })
+    if (!existing) return NextResponse.json({ error: 'Skill not found' }, { status: 404 })
+    if (existing.professionId !== id) {
+      return NextResponse.json({ error: 'Skill does not belong to this profession' }, { status: 400 })
+    }
+
+    const data: {
+      slug?: string
+      i18nKey?: string
+      description?: string | null
+      sortOrder?: number
+      isActive?: boolean
+    } = {}
+
+    if (body?.slug !== undefined) {
+      const slug = cleanSlug(body.slug)
+      if (!slug) return NextResponse.json({ error: 'Invalid slug' }, { status: 400 })
+      data.slug = slug
+    }
+    if (body?.i18nKey !== undefined) {
+      const i18nKey = typeof body.i18nKey === 'string' ? body.i18nKey.trim().slice(0, 200) : ''
+      if (!i18nKey) return NextResponse.json({ error: 'Invalid i18nKey' }, { status: 400 })
+      data.i18nKey = i18nKey
+    }
+    if (body?.description !== undefined) {
+      data.description = typeof body.description === 'string' && body.description.trim()
+        ? body.description.trim().slice(0, 2000)
+        : null
+    }
+    if (body?.sortOrder !== undefined) {
+      const sortOrder = Number(body.sortOrder)
+      if (!Number.isInteger(sortOrder) || sortOrder < -100000 || sortOrder > 100000) {
+        return NextResponse.json({ error: 'Invalid sortOrder' }, { status: 400 })
+      }
+      data.sortOrder = sortOrder
+    }
+    if (body?.isActive !== undefined) {
+      if (typeof body.isActive !== 'boolean') {
+        return NextResponse.json({ error: 'isActive must be boolean' }, { status: 400 })
+      }
+      if (!canPublishCatalog(security)) {
+        return NextResponse.json(
+          { error: 'Changing skill publication state requires catalog:publish' },
+          { status: 403 }
+        )
+      }
+      data.isActive = body.isActive
+    }
+
+    if (!Object.keys(data).length) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    }
+
+    const updated = await prisma.professionSkill.update({
+      where: { id: skillId },
+      data,
+    })
+
+    await createAuditLog({
+      action: 'UPDATE',
+      category: 'SYSTEM',
+      userId: security.adminId,
+      userEmail: security.email,
+      userRole: security.role,
+      entityType: 'ProfessionSkill',
+      entityId: skillId,
+      entityName: existing.slug,
+      description: 'CRM profession skill updated',
+      oldValue: existing,
+      newValue: updated,
+      ipAddress: security.ipAddress,
+      userAgent: security.userAgent || undefined,
+      riskLevel: body?.isActive !== undefined ? 'HIGH' : 'MEDIUM',
+    })
+
+    return NextResponse.json({ skill: updated })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Server error'
+    if (message.includes('Unique constraint')) {
+      return NextResponse.json({ error: 'Skill with this slug already exists in this profession' }, { status: 409 })
+    }
+    console.error('CRM profession skill update error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'professions:write',
+      permission: 'catalog:publish',
       level: 'sensitive',
     })
     if (!guard.ok) return guard.response
