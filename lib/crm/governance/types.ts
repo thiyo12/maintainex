@@ -117,6 +117,7 @@ export interface RiskPolicyContext {
   requiredTotpMissing?: boolean
   jobStatus?: string
   hasFinancialImpact?: boolean
+  financialAlreadyReleased?: boolean
 }
 
 export interface RiskPolicyResult {
