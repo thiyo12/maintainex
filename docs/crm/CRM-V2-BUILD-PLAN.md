@@ -61,11 +61,11 @@ This is not a parallel admin product. CRM V2 replaces the existing CRM implement
 - [x] Legacy helpers have owners and removal phase assigned
 
 ### Phase 0 gate
-- [ ] TypeScript green
-- [ ] auth/RBAC tests green
-- [ ] migration validation green
-- [ ] no secret exposure
-- [ ] no production behavior changed unintentionally
+- [x] TypeScript green
+- [x] auth/RBAC tests green
+- [x] migration validation green
+- [x] no secret exposure
+- [x] no production behavior changed unintentionally
 
 ---
 
