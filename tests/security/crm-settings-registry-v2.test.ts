@@ -27,11 +27,18 @@ describe('CRM V2 settings ownership registry', () => {
       'minTaskerStaff',
       'weeklySettlementDay',
       'autoApproveKyc',
-      'maintenanceMode',
     ]) {
       expect(source).toContain(`'${key}'`)
     }
     expect(source).toContain('must be changed through its canonical domain control')
+    expect(source).not.toContain("'maintenanceMode'")
+
+    const runtimeSource = readFileSync(
+      resolve(process.cwd(), 'lib/runtime/platform-runtime.ts'),
+      'utf8'
+    )
+    expect(runtimeSource).toContain("key: 'runtime.maintenance.enabled'")
+    expect(runtimeSource).toContain("key: 'runtime.maintenance.message'")
   })
 
   it('uses the approved V2 design and does not expose the old generic settings editor', () => {
