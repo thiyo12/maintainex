@@ -84,7 +84,7 @@ function staffCapabilities(security: {
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'admins:view',
+      permission: 'staff:view',
       level: 'read',
     })
     if (!guard.ok) return guard.response
