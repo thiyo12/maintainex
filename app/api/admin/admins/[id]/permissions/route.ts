@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmAction, guardCrmRequest } from '@/lib/crm/security'
+import { consumeCrmStepUpFromHeader } from '@/lib/crm/governance/step-up'
 import {
   canDelegatePermissionClass,
   evaluateEffectivePermission,
@@ -161,6 +162,16 @@ export async function PATCH(
           { status: 403 }
         )
       }
+    }
+
+    const stepUp = await consumeCrmStepUpFromHeader({
+      headerValue: request.headers.get('x-crm-step-up'),
+      adminUserId: security.adminId,
+      sessionId: security.sessionId,
+      actionId: 'staff.permission.change',
+    })
+    if (!stepUp) {
+      return NextResponse.json({ error: 'Step-up authentication required' }, { status: 403 })
     }
 
     const previous = await prisma.adminPermissionOverride.findMany({
