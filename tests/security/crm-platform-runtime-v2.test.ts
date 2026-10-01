@@ -70,6 +70,27 @@ describe('CRM V2 platform runtime controls', () => {
     expect(search).toContain('runtime.catalog.visible')
   })
 
+  it('consumes runtime controls in the mobile root and push boundaries', () => {
+    const runtime = readFileSync(resolve(process.cwd(), 'apps/mobile/lib/runtime.tsx'), 'utf8')
+    const layout = readFileSync(resolve(process.cwd(), 'apps/mobile/app/_layout.tsx'), 'utf8')
+    const notifications = readFileSync(
+      resolve(process.cwd(), 'app/api/mobile/notifications/route.ts'),
+      'utf8'
+    )
+    const push = readFileSync(resolve(process.cwd(), 'lib/push.ts'), 'utf8')
+
+    expect(runtime).toContain('config.maintenance.enabled')
+    expect(runtime).toContain('!config.channels.mobile')
+    expect(runtime).toContain('!config.market.available')
+    expect(runtime).toContain('config.mobile.minimumVersion')
+    expect(runtime).toContain('config.banner.enabled')
+    expect(layout).toContain('!config.notifications.enabled')
+    expect(notifications).toContain('getPlatformRuntimeConfig')
+    expect(notifications).toContain('!runtime.notifications.enabled')
+    expect(push).toContain('getPlatformRuntimeConfig')
+    expect(push).toContain('!runtime.notifications.enabled')
+  })
+
   it('protects runtime mutation with canonical CRM permission and audit', () => {
     const source = readFileSync(resolve(process.cwd(), 'app/api/admin/platform/runtime/route.ts'), 'utf8')
     expect(source).toContain("permission: 'platform:settings:manage'")
