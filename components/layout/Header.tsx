@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { LogIn } from 'lucide-react'
 import { useRegion } from '@/lib/region-context'
 import MobileMenu from './MobileMenu'
 import ThemeToggle from './ThemeToggle'
+import AppStoreModal from './AppStoreModal'
 
 const navigation = [
   { name: 'Home', href: '/' },
@@ -17,7 +19,13 @@ const navigation = [
 
 export default function Header() {
   const region = useRegion()
+  const [showSignIn, setShowSignIn] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    document.body.classList.toggle('signin-open', showSignIn)
+    return () => document.body.classList.remove('signin-open')
+  }, [showSignIn])
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50)
@@ -60,28 +68,29 @@ export default function Header() {
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
             <Link
-              href="/book"
+              href="/vision"
               className="px-4 py-2.5 text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-black rounded-full transition-colors"
             >
-              Book now
+              Join Waitlist
             </Link>
           </div>
 
           <div className="flex items-center gap-1">
             <div className="flex md:hidden items-center gap-1">
               <ThemeToggle />
-              <Link
-                href="/book"
+              <button
+                onClick={() => setShowSignIn(true)}
                 className="px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground rounded-lg hover:bg-amber-soft/50 transition-colors"
               >
                 Sign in
-              </Link>
+              </button>
             </div>
             <MobileMenu navigation={navigation} phoneRaw={region.phoneRaw} phone={region.phone} />
           </div>
         </div>
       </nav>
 
+      <AppStoreModal open={showSignIn} onClose={() => setShowSignIn(false)} />
     </header>
   )
 }

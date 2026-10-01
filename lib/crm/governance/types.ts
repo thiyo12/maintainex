@@ -59,7 +59,6 @@ export type CrmActionId =
   | 'finance.commission.enforce'
   | 'finance.commission.reconcile'
   | 'platform.market.disable'
-  | 'platform.website_booking.toggle'
   | 'notifications.broadcast'
   | 'staff.create'
   | 'staff.account.update'

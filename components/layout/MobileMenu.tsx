@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Menu, X, ArrowRight, LogIn } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
+import AppStoreModal from './AppStoreModal'
 
 interface MobileMenuProps {
   navigation: Array<{ name: string; href: string }>
@@ -13,6 +14,12 @@ interface MobileMenuProps {
 
 export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuProps) {
   const [open, setOpen] = useState(false)
+  const [showSignIn, setShowSignIn] = useState(false)
+
+  useEffect(() => {
+    document.body.classList.toggle('signin-open', showSignIn)
+    return () => document.body.classList.remove('signin-open')
+  }, [showSignIn])
 
   return (
     <>
@@ -46,16 +53,15 @@ export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuPr
               </Link>
               <ThemeToggle />
             </div>
-            <Link
-              href="/book"
-              onClick={() => setOpen(false)}
+            <button
+              onClick={() => { setShowSignIn(true); setOpen(false) }}
               className="inline-flex items-center justify-center gap-2 text-foreground font-medium px-5 py-3 rounded-full border border-border hover:border-amber-300 text-sm transition-all mt-2"
             >
               <LogIn className="w-4 h-4" />
               Sign in
-            </Link>
+            </button>
             <Link
-              href="/book"
+              href="/booking"
               onClick={() => setOpen(false)}
               className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-5 py-3 rounded-full text-sm transition-all mt-2"
             >
@@ -66,6 +72,7 @@ export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuPr
         </div>
       )}
 
+      <AppStoreModal open={showSignIn} onClose={() => setShowSignIn(false)} />
     </>
   )
 }
