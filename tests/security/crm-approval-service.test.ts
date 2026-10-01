@@ -95,7 +95,6 @@ describe('CRM V2 approval service security', () => {
       approverAdminId: 'finance-1',
       approverRole: 'FINANCE',
       decision: 'APPROVE',
-      stepUpVerified: false,
       currentRisk: {
         remainingRefundableMinor: lkr(10_000),
       },
@@ -127,7 +126,6 @@ describe('CRM V2 approval service security', () => {
       approverAdminId: 'finance-1',
       approverRole: 'FINANCE',
       decision: 'APPROVE',
-      stepUpVerified: true,
       currentRisk: {
         remainingRefundableMinor: lkr(75_000),
       },
