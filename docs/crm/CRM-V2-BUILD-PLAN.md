@@ -31,34 +31,34 @@ This is not a parallel admin product. CRM V2 replaces the existing CRM implement
 - [x] Lock security-by-design contract
 - [x] Create module build/security checklist
 - [x] Create trust-boundary map
-- [ ] Inventory every existing CRM page
-- [ ] Inventory every CRM API route
-- [ ] Inventory all old admin components/helpers
-- [ ] Inventory all legacy role/permission vocabulary
-- [ ] Inventory duplicate catalog/category sources
-- [ ] Inventory direct Prisma mutations for high-risk domains
-- [ ] Mark each legacy file: KEEP / REWRITE / ADAPT TEMPORARILY / DELETE
+- [x] Inventory every existing CRM page
+- [x] Inventory every CRM API route
+- [x] Inventory all old admin components/helpers
+- [x] Inventory all legacy role/permission vocabulary
+- [x] Inventory duplicate catalog/category sources
+- [x] Inventory direct Prisma mutations for high-risk domains
+- [x] Mark each legacy file: KEEP / REWRITE / ADAPT TEMPORARILY / DELETE
 
 ### 0B. Critical auth/security foundation
-- [ ] Fix staff create/reset password hashing to use canonical peppered `hashPassword()`
-- [ ] Define canonical permission vocabulary
-- [ ] Add per-staff permission overrides
-- [ ] Define owner-only/non-delegable permissions
-- [ ] Define permission evaluation order
-- [ ] Add immediate session impact for deactivation/security-sensitive changes
-- [ ] Add tests for explicit ALLOW/DENY overrides
-- [ ] Add tests for stale JWT vs live DB permissions
+- [x] Fix staff create/reset password hashing to use canonical peppered `hashPassword()`
+- [x] Define canonical permission vocabulary
+- [x] Add per-staff permission overrides
+- [x] Define owner-only/non-delegable permissions
+- [x] Define permission evaluation order
+- [x] Add immediate session impact for deactivation/security-sensitive changes
+- [x] Add tests for explicit ALLOW/DENY overrides
+- [x] Add tests for stale JWT vs live DB permissions
 - [ ] Finish Cloudflare Access + MFA
 - [ ] Lock direct-origin bypass
 - [ ] Disable production automated test SUPER_ADMIN accounts
-- [ ] Resolve admin device-recording mismatch
+- [x] Resolve admin device-recording mismatch
 - [ ] Enable owner TOTP after verified first login
 
 ### 0C. Legacy exit gate
-- [ ] No production-critical route uses `PROVINCE_ADMIN` / `BRANCH_ADMIN` legacy authorization
-- [ ] No second admin session/auth system is introduced
-- [ ] All new CRM server actions use canonical live-session authorization
-- [ ] Legacy helpers have owners and removal phase assigned
+- [x] No production-critical route uses `PROVINCE_ADMIN` / `BRANCH_ADMIN` legacy authorization
+- [x] No second admin session/auth system is introduced
+- [x] All new CRM server actions use canonical live-session authorization
+- [x] Legacy helpers have owners and removal phase assigned
 
 ### Phase 0 gate
 - [ ] TypeScript green
