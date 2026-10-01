@@ -155,7 +155,16 @@ jobs:
           psql "$DATABASE_URL" -c "\di *countryCode*"
 
       - name: TypeScript
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit 2>&1 | tee /tmp/tsc.txt
+
+      - name: Upload TypeScript diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-diagnostics
+          path: /tmp/tsc.txt
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: Mobile TypeScript
         run: |
