@@ -807,3 +807,72 @@ input, select, textarea { font-size: 16px; }
   background: #c6cbc5;
   border-radius: 999px;
 }
+
+
+/* ===== CRM V2 TEMPORARY LEGACY VISUAL BRIDGE =====
+   Transitional only. Keeps unmigrated admin pages visually consistent with
+   the approved CRM V2 reference while each module is rewritten on native
+   CrmPrimitives. Remove selectors module-by-module; delete this bridge in the
+   final legacy-demolition phase. */
+.crm-v2 main [class*="bg-[#15161E]"],
+.crm-v2 main [class*="bg-[#0B0C12]"] {
+  background: var(--crm-surface) !important;
+  border-color: var(--crm-border) !important;
+  color: var(--crm-text) !important;
+  box-shadow: var(--crm-shadow-card);
+}
+
+.crm-v2 main [class*="border-white/"] {
+  border-color: var(--crm-border) !important;
+}
+
+.crm-v2 main [class*="bg-white/"] {
+  background: var(--crm-surface-soft) !important;
+}
+
+.crm-v2 main .text-white {
+  color: var(--crm-text) !important;
+}
+
+.crm-v2 main .text-gray-300 {
+  color: #475569 !important;
+}
+
+.crm-v2 main .text-gray-400 {
+  color: var(--crm-text-muted) !important;
+}
+
+.crm-v2 main .text-gray-500,
+.crm-v2 main .text-gray-600 {
+  color: #94a3b8 !important;
+}
+
+.crm-v2 main .text-red-300,
+.crm-v2 main .text-red-400 {
+  color: var(--crm-danger) !important;
+}
+
+.crm-v2 main .text-green-300,
+.crm-v2 main .text-green-400 {
+  color: var(--crm-success) !important;
+}
+
+.crm-v2 main .text-amber-300,
+.crm-v2 main .text-amber-400 {
+  color: var(--crm-warning) !important;
+}
+
+.crm-v2 main .text-blue-300,
+.crm-v2 main .text-blue-400 {
+  color: var(--crm-info) !important;
+}
+
+.crm-v2 main [class*="hover:bg-white/"]:hover {
+  background: #f8fafc !important;
+}
+
+.crm-v2 main input,
+.crm-v2 main select,
+.crm-v2 main textarea {
+  color-scheme: light;
+}
