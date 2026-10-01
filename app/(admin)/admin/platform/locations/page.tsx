@@ -31,11 +31,10 @@ import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 type Area = { id: string; name: string }
 type City = { id: string; name: string; areas: Area[] }
 type StateRow = { id: string; name: string; cities: City[] }
-type Country = { id: string; name: string; code: string; states: StateRow[] }
+type Country = { id: string; name: string; code: string; states: StateRow[]; _source?: 'database' | 'static-fallback' }
 
 type Payload = {
-  source: 'database' | 'static-fallback'
-  readOnlyFallback?: boolean
+  source: 'database' | 'hybrid' | 'static-fallback'
   countries: Country[]
 }
 
@@ -102,6 +101,7 @@ export default function LocationsManagementPage() {
     () => data?.countries.find(item => item.code === selectedCountry) || null,
     [data, selectedCountry]
   )
+  const countryIsFallback = country?._source === 'static-fallback'
 
   const totals = useMemo(() => {
     const countries = data?.countries || []
@@ -269,7 +269,7 @@ export default function LocationsManagementPage() {
                 Country
               </CrmButton>
             )}
-            {country && canManage && !data.readOnlyFallback && (
+            {country && canManage && !countryIsFallback && (
               <CrmButton variant="primary" onClick={() => openCreate('state')}>
                 <FiPlus size={14} />
                 State / province
@@ -287,7 +287,7 @@ export default function LocationsManagementPage() {
               App & Web
             </Link>
             <CrmBadge tone={data.source === 'database' ? 'success' : 'warning'} dot>
-              {data.source === 'database' ? 'Database source' : 'Static fallback'}
+              {data.source === 'database' ? 'Database source' : data.source === 'hybrid' ? 'Hybrid migration' : 'Static fallback'}
             </CrmBadge>
             <CrmBadge tone={canManage ? 'amber' : 'neutral'}>
               {canManage ? 'Manage access' : 'Read-only'}
@@ -303,7 +303,7 @@ export default function LocationsManagementPage() {
         <CrmMetricCard label="Areas" value={totals.areas} helper="Service-area granularity" icon={<FiMapPin size={16} />} tone="success" />
       </section>
 
-      {data.readOnlyFallback && country && (
+      {countryIsFallback && country && (
         <CrmCard
           title="Static fallback is still serving this market"
           description="Seed this hierarchy into the database before editing. Existing fallback IDs are preserved during the seed."
@@ -346,7 +346,7 @@ export default function LocationsManagementPage() {
           title={`${country.name} hierarchy`}
           description="States/provinces, cities and areas used by marketplace booking."
           action={
-            !data.readOnlyFallback && canManage ? (
+            !countryIsFallback && canManage ? (
               <button
                 type="button"
                 onClick={() => startRename('country', country.id, country.name)}
@@ -392,7 +392,7 @@ export default function LocationsManagementPage() {
                               <button
                                 type="button"
                                 key={area.id}
-                                disabled={!canManage || Boolean(data.readOnlyFallback)}
+                                disabled={!canManage || Boolean(countryIsFallback)}
                                 onClick={() => startRename('area', area.id, area.name)}
                                 className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 disabled:cursor-default"
                               >
@@ -402,7 +402,7 @@ export default function LocationsManagementPage() {
                           </div>
                         </td>
                         <td className={`${crmTdClass} text-right`}>
-                          {!data.readOnlyFallback && canManage ? (
+                          {!countryIsFallback && canManage ? (
                             <div className="inline-flex gap-2">
                               <CrmButton size="sm" variant="secondary" onClick={() => startRename('city', city.id, city.name)}>
                                 Rename city
@@ -423,7 +423,7 @@ export default function LocationsManagementPage() {
                         <td className={crmTdClass}><span className="text-xs text-slate-400">No cities</span></td>
                         <td className={crmTdClass}>—</td>
                         <td className={`${crmTdClass} text-right`}>
-                          {!data.readOnlyFallback && canManage ? (
+                          {!countryIsFallback && canManage ? (
                             <CrmButton size="sm" variant="primary" onClick={() => openCreate('city', state.id)}>
                               Add city
                             </CrmButton>
@@ -435,7 +435,7 @@ export default function LocationsManagementPage() {
             </tbody>
           </table>
 
-          {!data.readOnlyFallback && canManage && country.states.length > 0 && (
+          {!countryIsFallback && canManage && country.states.length > 0 && (
             <div className="flex flex-wrap gap-2 border-t border-[var(--crm-border)] bg-[#fafbf9] px-4 py-3">
               {country.states.map(state => (
                 <div key={state.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
