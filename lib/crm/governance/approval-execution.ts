@@ -7,6 +7,7 @@ import {
 import { buildApprovalPlan } from './approval-engine'
 import { confirmManualExternalRefund, requestRequiredPayHereRefund } from '@/lib/finance/payments/payment-service'
 import { markProcessing, markSucceeded } from '@/lib/finance/payouts/payout-engine'
+import { releaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { tierAtLeast } from './action-registry'
 import { resolveCurrentApprovalRisk } from './current-risk'
 import type { ApprovalTier } from './types'
@@ -276,6 +277,69 @@ export async function executeApprovedCrmRequest(
           approvalRequestId: request.id,
           refundReferencePresent: Boolean(result.refundReference),
           mode: payload.mode,
+        },
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent || undefined,
+        riskLevel: 'CRITICAL',
+      })
+    } else if (request.actionId === 'finance.escrow.manual_release') {
+      if (request.targetType !== 'JobEscrow') {
+        throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+      }
+
+      const escrow = await prisma.jobEscrow.findUnique({
+        where: { id: request.targetId },
+        select: {
+          id: true,
+          jobId: true,
+          status: true,
+          totalAmount: true,
+          currency: true,
+          paymentMethod: true,
+        },
+      })
+      if (!escrow) throw new Error('APPROVAL_TARGET_NOT_FOUND')
+      if (!['PROTECTED', 'ON_HOLD'].includes(escrow.status)) {
+        throw new Error(`ESCROW_STATUS_NOT_EXECUTABLE:${escrow.status}`)
+      }
+      if (escrow.paymentMethod === 'CASH') {
+        throw new Error('CASH_PAYMENT_DISABLED')
+      }
+
+      const released = await releaseEscrow(
+        {
+          jobId: escrow.jobId,
+          actorId: actor.adminId,
+          actorType: 'STAFF',
+          reason: 'CRM approved manual escrow release',
+          metadata: { approvalRequestId: request.id },
+        },
+        escrow.jobId,
+      )
+
+      executionRef = `JobEscrow:${escrow.id}:RELEASED`
+
+      await createAuditLog({
+        action: 'UPDATE',
+        category: 'FINANCE',
+        userId: actor.adminId,
+        userEmail: actor.email,
+        userRole: actor.role,
+        entityType: 'JobEscrow',
+        entityId: escrow.id,
+        entityName: escrow.jobId,
+        description: 'Approved manual escrow release executed',
+        oldValue: {
+          status: escrow.status,
+          approvalRequestId: request.id,
+        },
+        newValue: {
+          status: 'RELEASED',
+          approvalRequestId: request.id,
+          amountMinor: escrow.totalAmount.toString(),
+          currency: escrow.currency,
+          providerNetMinor: released.netCents.toString(),
+          commissionMinor: released.commissionCents.toString(),
         },
         ipAddress: actor.ipAddress,
         userAgent: actor.userAgent || undefined,
