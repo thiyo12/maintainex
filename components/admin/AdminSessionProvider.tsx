@@ -18,6 +18,7 @@ interface AdminUser {
   permissions: string[]
   totpEnabled: boolean
   sessionExpiresAt: string
+  markets: Array<{ code: string; name: string }>
 }
 
 interface SessionContextType {
