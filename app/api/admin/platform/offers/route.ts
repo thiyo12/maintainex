@@ -9,7 +9,7 @@ const DISCOUNT_TYPES = new Set(['PERCENTAGE', 'FLAT'])
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'settings:view',
+      permission: 'promotions:view',
       level: 'read',
       requireCountryScope: true,
     })
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'settings:edit',
+      permission: 'promotions:manage',
       level: 'sensitive',
       requireCountryScope: true,
     })
@@ -128,6 +128,7 @@ export async function POST(request: NextRequest) {
         !DISCOUNT_TYPES.has(discountType) ||
         !Number.isFinite(discountValue) ||
         discountValue <= 0 ||
+        (discountType === 'PERCENTAGE' && discountValue > 100) ||
         Number.isNaN(startsAt.getTime()) ||
         Number.isNaN(expiresAt.getTime()) ||
         expiresAt <= startsAt
@@ -182,7 +183,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'settings:edit',
+      permission: 'promotions:manage',
       level: 'sensitive',
       requireCountryScope: true,
     })
