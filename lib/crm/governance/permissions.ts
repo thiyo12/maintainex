@@ -3,7 +3,7 @@ import type { PermissionClass } from './types'
 
 export type PermissionOverrideEffect = 'ALLOW' | 'DENY'
 
-const CRM_PERMISSION_LEGACY_ALIASES: Readonly<Record<string, readonly string[]>> = {
+export const CRM_PERMISSION_LEGACY_ALIASES: Readonly<Record<string, readonly string[]>> = {
   'customers:view': ['users:view'],
   'customers:edit': ['users:edit'],
   'customers:status:manage': ['users:suspend', 'users:ban'],
@@ -23,6 +23,7 @@ const CRM_PERMISSION_LEGACY_ALIASES: Readonly<Record<string, readonly string[]>>
   'finance:payouts:view': ['wallets:view'],
   'finance:commission:view': ['commission:view'],
   'finance:settlements:view': ['commission:view'],
+  'finance:ledger:view': ['wallets:view', 'commission:view'],
   'disputes:manage': ['disputes:resolve'],
   'risk:view': ['risk_events:read'],
   'risk:resolve': ['risk_events:resolve'],
