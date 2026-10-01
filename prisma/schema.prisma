@@ -2454,6 +2454,20 @@ model AdminPermissionOverride {
   @@index([permission, effect])
 }
 
+model CrmStepUpGrant {
+  id          String    @id @default(cuid())
+  adminUserId String
+  sessionId   String
+  actionId    String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([adminUserId, sessionId, actionId])
+  @@index([expiresAt])
+  @@index([usedAt])
+}
+
 model CrmApprovalRequest {
   id                   String   @id @default(cuid())
   actionId             String
