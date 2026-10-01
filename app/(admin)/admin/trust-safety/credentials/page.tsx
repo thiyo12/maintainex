@@ -4,6 +4,21 @@ import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiShield, FiCheck, FiX, FiRefreshCw, FiUser, FiSearch } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmPageHeader,
+  CrmState,
+  CrmTableFrame,
+  CrmTabs,
+  crmInputClass,
+  crmTableClass,
+  crmTdClass,
+  crmThClass,
+  type CrmTone,
+} from '@/components/crm/v2/CrmPrimitives'
+import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { CrmPagination } from '@/components/crm/v2/CrmOperational'
 
 interface Credential {
   id: string
@@ -17,6 +32,13 @@ interface Credential {
   holderType: string
   holderId: string
   createdAt: string
+}
+
+function credentialTone(value: string): CrmTone {
+  if (value === 'VERIFIED') return 'success'
+  if (value === 'REJECTED') return 'danger'
+  if (value === 'PENDING') return 'warning'
+  return 'neutral'
 }
 
 const STATUS_TABS = [
@@ -84,58 +106,63 @@ function CredentialsContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center space-x-3">
-          <FiShield className="w-6 h-6 text-amber-500" />
-          <h1 className="text-2xl font-bold text-white">Credential Review</h1>
-        </div>
-        <button onClick={fetchCredentials} className="flex items-center space-x-2 px-3 py-2 bg-[#1A1B26] text-gray-300 rounded-lg hover:bg-[#24263a]">
-          <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh</span>
-        </button>
-      </div>
+      <CrmPageHeader
+        eyebrow="Trust & Safety"
+        title="Credential review"
+        description="Review provider and company credentials through the governed verification workflow."
+        actions={
+          <CrmButton variant="secondary" onClick={fetchCredentials} disabled={loading}>
+            <FiRefreshCw className={loading ? 'animate-spin' : ''} size={14} />
+            Refresh
+          </CrmButton>
+        }
+        context={
+          <>
+            <CrmBadge tone={canReviewCredentials ? 'success' : 'neutral'} dot>
+              {canReviewCredentials ? 'Review access' : 'Read-only access'}
+            </CrmBadge>
+            <CrmBadge tone="info">{total.toLocaleString()} records</CrmBadge>
+          </>
+        }
+      />
 
-      <div className="flex space-x-1 bg-[#15161E] rounded-lg p-1 overflow-x-auto">
-        {STATUS_TABS.map(t => (
-          <button key={t.key} onClick={() => { setTab(t.key); setPage(1) }}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === t.key ? 'bg-amber-500 text-[#0B0C12]' : 'text-gray-400 hover:text-white'}`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <CrmTabs
+        items={STATUS_TABS.map(item => ({ id: item.key, label: item.label }))}
+        active={tab}
+        onChange={id => { setTab(id); setPage(1) }}
+      />
 
-      <div className="bg-[#15161E] rounded-xl overflow-x-auto">
-        <table className="w-full min-w-[760px]">
+      <CrmTableFrame title="Credential queue" description="Provider and company credential verification">
+        <table className={`${crmTableClass} min-w-[760px]`}>
           <thead><tr className="border-b border-gray-800">
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Name</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Type</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Holder</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Created</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Actions</th>
+            <th className={crmThClass}>Name</th>
+            <th className={crmThClass}>Type</th>
+            <th className={crmThClass}>Holder</th>
+            <th className={crmThClass}>Status</th>
+            <th className={crmThClass}>Created</th>
+            <th className={crmThClass}>Actions</th>
           </tr></thead>
-          <tbody className="divide-y divide-gray-800">
+          <tbody className="divide-y divide-[var(--crm-border)]">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-500">
-                <div className="flex items-center justify-center space-x-2"><FiRefreshCw className="animate-spin" /><span>Loading...</span></div>
+              <tr><td colSpan={6} className="p-4">
+                <CrmState type="loading" title="Loading credentials" />
               </td></tr>
             ) : credentials.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-500">No credentials found</td></tr>
+              <tr><td colSpan={6} className="p-4">
+                <CrmState type="empty" title="No credentials found" />
+              </td></tr>
             ) : credentials.map(c => (
-              <tr key={c.id} className="hover:bg-[#1A1B26]">
-                <td className="px-4 py-3 text-sm text-white font-medium">{c.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-300">{c.certificationType}</td>
-                <td className="px-4 py-3 text-sm text-gray-300">{c.holderType}: {c.holderId.slice(0, 8)}...</td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                    c.verificationStatus === 'VERIFIED' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-                    c.verificationStatus === 'REJECTED' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                    c.verificationStatus === 'EXPIRED' ? 'bg-gray-500/20 text-gray-400 border border-gray-500/30' :
-                    'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                  }`}>{c.verificationStatus}</span>
+              <tr key={c.id} className="hover:bg-[#fafbf9]">
+                <td className={`${crmTdClass} font-semibold text-slate-900`}>{c.name}</td>
+                <td className={crmTdClass}>{c.certificationType}</td>
+                <td className={crmTdClass}>{c.holderType}: {c.holderId.slice(0, 8)}...</td>
+                <td className={crmTdClass}>
+                  <CrmBadge tone={credentialTone(c.verificationStatus)} dot>
+                    {c.verificationStatus}
+                  </CrmBadge>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</td>
-                <td className="px-4 py-3">
+                <td className={`${crmTdClass} text-xs text-slate-500`}>{new Date(c.createdAt).toLocaleDateString()}</td>
+                <td className={crmTdClass}>
                   {canReviewCredentials && c.verificationStatus === 'PENDING' && (
                     <div className="flex items-center space-x-2">
                       <button onClick={() => handleReview(c.id, 'VERIFIED')} disabled={actionLoading === c.id}
@@ -156,36 +183,54 @@ function CredentialsContent() {
             ))}
           </tbody>
         </table>
-      </div>
+      </CrmTableFrame>
 
       {totalPages > 1 && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-sm text-gray-400">{total} total</span>
-          <div className="flex items-center space-x-2">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              className="px-3 py-1.5 bg-[#1A1B26] text-gray-300 rounded-lg hover:bg-[#24263a] disabled:opacity-50 text-sm">Prev</button>
-            <span className="text-sm text-gray-400">Page {page} of {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              className="px-3 py-1.5 bg-[#1A1B26] text-gray-300 rounded-lg hover:bg-[#24263a] disabled:opacity-50 text-sm">Next</button>
-          </div>
+        <div className="crm-card overflow-hidden">
+          <CrmPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={20}
+            onPageChange={setPage}
+          />
         </div>
       )}
 
-      {canReviewCredentials && rejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#15161E] rounded-xl p-6 w-full max-w-md border border-gray-800">
-            <h3 className="text-lg font-semibold text-white mb-4">Reject Credential</h3>
-            <p className="text-sm text-gray-400 mb-4">Provide a reason for rejecting &ldquo;{rejectModal.name}&rdquo;:</p>
-            <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3}
-              className="w-full bg-[#0B0C12] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500" placeholder="Rejection reason (required)..." />
-            <div className="flex justify-end space-x-3 mt-4">
-              <button onClick={() => { setRejectModal(null); setRejectReason('') }} className="px-4 py-2 text-gray-400 hover:text-white text-sm">Cancel</button>
-              <button onClick={() => handleReview(rejectModal.id, 'REJECTED', rejectReason)} disabled={!rejectReason.trim() || actionLoading === rejectModal.id}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 text-sm">Reject</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CrmModal
+        open={Boolean(canReviewCredentials && rejectModal)}
+        onClose={() => { setRejectModal(null); setRejectReason('') }}
+        title="Reject credential"
+        description={rejectModal ? `Provide a reason for rejecting “${rejectModal.name}”.` : undefined}
+        maxWidth="max-w-md"
+        footer={
+          <>
+            <CrmButton
+              variant="secondary"
+              onClick={() => { setRejectModal(null); setRejectReason('') }}
+              disabled={Boolean(actionLoading)}
+            >
+              Cancel
+            </CrmButton>
+            <CrmButton
+              variant="danger"
+              onClick={() => rejectModal && handleReview(rejectModal.id, 'REJECTED', rejectReason)}
+              disabled={!rejectReason.trim() || Boolean(actionLoading)}
+            >
+              {actionLoading ? 'Rejecting…' : 'Reject'}
+            </CrmButton>
+          </>
+        }
+      >
+        <textarea
+          value={rejectReason}
+          onChange={event => setRejectReason(event.target.value)}
+          rows={4}
+          maxLength={2000}
+          className={`${crmInputClass} h-auto min-h-[108px] resize-y py-2.5`}
+          placeholder="Rejection reason (required)…"
+        />
+      </CrmModal>}
     </div>
   )
 }
