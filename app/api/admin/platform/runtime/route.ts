@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createAuditLog } from '@/lib/crm/audit'
 import { guardCrmRequest } from '@/lib/crm/security'
+import { evaluateEffectivePermission } from '@/lib/crm/governance'
 import {
   PLATFORM_RUNTIME_DEFINITIONS,
   getPlatformRuntimeConfig,
@@ -23,10 +24,12 @@ export async function GET(request: NextRequest) {
       {
         config,
         definitions: PLATFORM_RUNTIME_DEFINITIONS,
-        canManage: guard.context.isSuperAdmin ||
-          guard.context.permissionOverrides.some(
-            item => item.permission === 'platform:settings:manage' && item.effect === 'ALLOW'
-          ),
+        canManage: evaluateEffectivePermission({
+          role: guard.context.role,
+          permission: 'platform:settings:manage',
+          permissionClass: 'SENSITIVE',
+          overrides: guard.context.permissionOverrides,
+        }).allowed,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     )
