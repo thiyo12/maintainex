@@ -2501,6 +2501,7 @@ model CrmApprovalRequest {
   reasonCode           String?
   note                 String?
   riskFlags            String   @default("[]")
+  actionPayload        String?
   policyVersion        String
   idempotencyKey       String?  @unique
   requiredApprovers    String   @default("[]")
