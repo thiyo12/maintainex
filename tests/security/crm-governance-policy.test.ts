@@ -94,6 +94,18 @@ describe('CRM V2 governance foundation', () => {
     expect(result.prohibitCodes).toContain('REFUND_EXCEEDS_REMAINING')
   })
 
+  it('holds refunds when an unrelated dispute is active', () => {
+    const result = evaluateCrmRiskPolicy({
+      actionId: 'finance.refund',
+      market: 'LK',
+      amountMinor: lkr(20_000),
+      remainingRefundableMinor: lkr(20_000),
+      activeDispute: true,
+    })
+    expect(result.decision).toBe('HOLD')
+    expect(result.holdCodes).toContain('ACTIVE_DISPUTE')
+  })
+
   it('holds manual escrow release when dispute is active', () => {
     const result = evaluateCrmRiskPolicy({
       actionId: 'finance.escrow.manual_release',
