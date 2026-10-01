@@ -44,28 +44,60 @@ export async function GET(request: NextRequest) {
     const userWhere = userIds ? { userId: { in: userIds } } : {}
 
     const [
-      providerSummary,
-      customerSummary,
-      frozenProviders,
-      frozenCustomers,
+      providerSummaryRows,
+      customerSummaryRows,
+      frozenProviderRows,
+      frozenCustomerRows,
     ] = await Promise.all([
-      prisma.providerWallet.aggregate({
+      prisma.providerWallet.groupBy({
+        by: ['currency'],
         where: userWhere,
         _sum: { availableBalance: true, pendingBalance: true },
         _count: { _all: true },
       }),
-      prisma.customerWallet.aggregate({
+      prisma.customerWallet.groupBy({
+        by: ['currency'],
         where: userWhere,
         _sum: { balance: true },
         _count: { _all: true },
       }),
-      prisma.providerWallet.count({
+      prisma.providerWallet.groupBy({
+        by: ['currency'],
         where: { ...userWhere, isFrozen: true },
+        _count: { _all: true },
       }),
-      prisma.customerWallet.count({
+      prisma.customerWallet.groupBy({
+        by: ['currency'],
         where: { ...userWhere, isFrozen: true },
+        _count: { _all: true },
       }),
     ])
+
+    const summaryCurrencies = new Set<string>([
+      ...providerSummaryRows.map(row => row.currency || 'LKR'),
+      ...customerSummaryRows.map(row => row.currency || 'LKR'),
+      ...frozenProviderRows.map(row => row.currency || 'LKR'),
+      ...frozenCustomerRows.map(row => row.currency || 'LKR'),
+    ])
+
+    const summaryByCurrency = [...summaryCurrencies].sort().map(currency => {
+      const provider = providerSummaryRows.find(row => (row.currency || 'LKR') === currency)
+      const customer = customerSummaryRows.find(row => (row.currency || 'LKR') === currency)
+      const frozenProviders = frozenProviderRows.find(row => (row.currency || 'LKR') === currency)
+      const frozenCustomers = frozenCustomerRows.find(row => (row.currency || 'LKR') === currency)
+
+      return {
+        currency,
+        providerAvailable: provider?._sum.availableBalance || 0,
+        providerPending: provider?._sum.pendingBalance || 0,
+        providerCount: provider?._count._all || 0,
+        customerBalance: customer?._sum.balance || 0,
+        customerCount: customer?._count._all || 0,
+        frozenCount:
+          (frozenProviders?._count._all || 0) +
+          (frozenCustomers?._count._all || 0),
+      }
+    })
 
     let providerWallets: any[] = []
     let customerWallets: any[] = []
@@ -151,14 +183,7 @@ export async function GET(request: NextRequest) {
         providerWallets,
         customerWallets,
         transactions,
-        summary: {
-          providerAvailable: providerSummary._sum.availableBalance || 0,
-          providerPending: providerSummary._sum.pendingBalance || 0,
-          providerCount: providerSummary._count._all,
-          customerBalance: customerSummary._sum.balance || 0,
-          customerCount: customerSummary._count._all,
-          frozenCount: frozenProviders + frozenCustomers,
-        },
+        summaryByCurrency,
         pagination: {
           page,
           limit,
