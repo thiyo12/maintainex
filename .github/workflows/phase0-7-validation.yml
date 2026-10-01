@@ -244,6 +244,7 @@ jobs:
           tests/finance/payments/cancellation-payment-postgres.test.ts
           tests/finance/payments/payment-intent-concurrency-postgres.test.ts
           tests/finance/payments/payhere-refund-concurrency-contract.test.ts
+          tests/finance/payouts/payout-engine.test.ts
           tests/finance/commission-currency-isolation.test.ts
           tests/quotes/change-order.test.ts
           --reporter=verbose 2>&1 | tee /tmp/financial-flow-tests.txt
