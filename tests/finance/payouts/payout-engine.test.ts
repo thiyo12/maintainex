@@ -18,6 +18,7 @@ const WALLET_ID = 'test-5f-wallet-001'
 const OPENING_CENTS = 1_000_000n // LKR 10,000.00
 
 async function cleanup() {
+  await prisma.$executeRawUnsafe(`DELETE FROM "CrmEmergencyControl" WHERE "controlKey" = 'PAYOUTS_FROZEN'`)
   await prisma.$executeRawUnsafe(`DELETE FROM "FinancialLedger" WHERE "createdBy" = 'test-5f'`)
   await prisma.$executeRawUnsafe(`DELETE FROM "IdempotencyRecord" WHERE "idempotencyKey" LIKE '%test-5f-%'`)
   await prisma.$executeRawUnsafe(`DELETE FROM "Payout" WHERE "userId" = $1`, USER_ID)
@@ -76,6 +77,73 @@ describe('Phase 5F — canonical payout engine', () => {
     expect(isValidTransition('PROCESSING', 'CANCELLED')).toBe(true)
     expect(isValidTransition('SUCCEEDED', 'FAILED')).toBe(false)
     expect(isValidTransition('FAILED', 'SUCCEEDED')).toBe(false)
+  })
+
+  it('blocks payout execution during a global emergency freeze', async () => {
+    await prisma.crmEmergencyControl.create({
+      data: {
+        controlKey: 'PAYOUTS_FROZEN',
+        market: 'GLOBAL',
+        active: true,
+        reason: 'Automated test emergency freeze',
+        activatedBy: 'test-security',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    })
+
+    const result = await requestPayout(
+      USER_ID,
+      100_000n,
+      'bank',
+      null,
+      'test-5f-breakglass-request',
+      'test-5f'
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('PAYOUTS_FROZEN')
+    expect((await balanceMajor()).balance).toBe(10000)
+  })
+
+  it('blocks payout progression but still allows cancellation to restore reserved funds', async () => {
+    const requested = await requestPayout(
+      USER_ID,
+      100_000n,
+      'bank',
+      null,
+      'test-5f-breakglass-reserve',
+      'test-5f'
+    )
+    expect(requested.ok).toBe(true)
+    if (!requested.ok) return
+
+    await prisma.crmEmergencyControl.create({
+      data: {
+        controlKey: 'PAYOUTS_FROZEN',
+        market: 'GLOBAL',
+        active: true,
+        reason: 'Automated test emergency freeze',
+        activatedBy: 'test-security',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    })
+
+    const processing = await markProcessing(
+      requested.payoutId,
+      'admin-test',
+      'test-5f-breakglass-processing'
+    )
+    expect(processing.ok).toBe(false)
+    if (!processing.ok) expect(processing.code).toBe('PAYOUTS_FROZEN')
+
+    const cancelled = await cancelPayout(
+      requested.payoutId,
+      'emergency safety cancellation',
+      'test-5f-breakglass-cancel',
+      'test-5f'
+    )
+    expect(cancelled.ok).toBe(true)
+    expect((await balanceMajor()).balance).toBe(10000)
   })
 
   it('atomically reserves funds into payout clearing', async () => {
