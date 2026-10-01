@@ -46,6 +46,9 @@ const CANONICAL_SENSITIVE = new Set([
   'credentials:view',
   'credentials:manage',
   'risk:resolve',
+  'catalog:publish',
+  'promotions:manage',
+  'platform:settings:manage',
   'pricing:manage',
   'markets:manage',
 ])
