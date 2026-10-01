@@ -10,13 +10,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const company = await prisma.companyProfile.findUnique({
+      where: { userId: user.id },
+      select: { countryCode: true },
+    })
+    const countryCode = (company?.countryCode || user.countryCode || 'LK').toUpperCase()
+
     const plans = await prisma.subscriptionPlan.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        countryCode,
+      },
       orderBy: { price: 'asc' },
       select: {
         id: true,
         name: true,
         price: true,
+        currency: true,
+        countryCode: true,
         description: true,
         features: true,
       },
@@ -27,6 +38,8 @@ export async function GET(request: NextRequest) {
         id: p.id,
         name: p.name,
         price: p.price,
+        currency: p.currency,
+        countryCode: p.countryCode,
         description: p.description,
         features: safeParseJsonArr(p.features),
       }))
