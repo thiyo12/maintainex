@@ -178,7 +178,7 @@ export async function GET(
       audit: canAudit,
       security: canSecurity,
       customerCrm: canCustomerCrm,
-    } = getCrmSectionAccess(security.role, security.isSuperAdmin)
+    } = getCrmSectionAccess(security.role, security.isSuperAdmin, security.permissionOverrides)
 
     const companyId = user.companyProfile?.id
     const taskerId = user.taskerProfile?.id
