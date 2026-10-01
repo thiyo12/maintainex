@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { hash } from 'bcryptjs'
+import { hashPassword } from '@/lib/security/password'
 import { ADMIN_ROLES, type AdminRole } from '@/lib/admin-types'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email already in use' }, { status: 409 })
     }
 
-    const passwordHash = await hash(password, 12)
+    const passwordHash = await hashPassword(password)
 
     const admin = existing
       ? await prisma.adminUser.update({
@@ -289,7 +289,7 @@ export async function PATCH(request: NextRequest) {
       if (typeof body.password !== 'string' || body.password.length < 8 || body.password.length > 200) {
         return NextResponse.json({ error: 'Password must be between 8 and 200 characters' }, { status: 400 })
       }
-      updateData.passwordHash = await hash(body.password, 12)
+      updateData.passwordHash = await hashPassword(body.password)
     }
 
     if (Object.keys(updateData).length === 0) {
