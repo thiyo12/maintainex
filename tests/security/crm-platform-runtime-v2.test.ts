@@ -91,6 +91,35 @@ describe('CRM V2 platform runtime controls', () => {
     expect(push).toContain('!runtime.notifications.enabled')
   })
 
+  it('keeps public catalog and offer writers read-only while CRM owns mutations', () => {
+    for (const path of [
+      'app/api/categories/route.ts',
+      'app/api/services/route.ts',
+      'app/api/seasonal-offers/route.ts',
+    ]) {
+      const source = readFileSync(resolve(process.cwd(), path), 'utf8')
+      expect(source).toContain('export async function GET')
+      expect(source).not.toContain('export async function POST')
+      expect(source).not.toContain('export async function PUT')
+      expect(source).not.toContain('export async function DELETE')
+    }
+
+    const categories = readFileSync(resolve(process.cwd(), 'app/api/categories/route.ts'), 'utf8')
+    const services = readFileSync(resolve(process.cwd(), 'app/api/services/route.ts'), 'utf8')
+    const homeServices = readFileSync(resolve(process.cwd(), 'components/ui/HomeServices.tsx'), 'utf8')
+    const catalogAdmin = readFileSync(resolve(process.cwd(), 'app/api/admin/platform/catalog/route.ts'), 'utf8')
+    const offerAdmin = readFileSync(resolve(process.cwd(), 'app/api/admin/platform/offers/route.ts'), 'utf8')
+
+    expect(categories).toContain('countryCode: country')
+    expect(services).not.toContain("searchParams.get('all')")
+    expect(homeServices).not.toContain('/booking?')
+    expect(homeServices).toContain('/waitlist')
+    expect(catalogAdmin).toContain("permission: 'catalog:edit'")
+    expect(catalogAdmin).toContain('createAuditLog')
+    expect(offerAdmin).toContain("permission: 'promotions:manage'")
+    expect(offerAdmin).toContain('createAuditLog')
+  })
+
   it('protects runtime mutation with canonical CRM permission and audit', () => {
     const source = readFileSync(resolve(process.cwd(), 'app/api/admin/platform/runtime/route.ts'), 'utf8')
     expect(source).toContain("permission: 'platform:settings:manage'")

@@ -80,6 +80,8 @@ describe('CRM V2 Phase 15 legacy demolition gate', () => {
       'app/api/admin/cheating/route.ts',
       'app/api/admin/wishlist/route.ts',
       'app/api/admin/security/logs/route.ts',
+      'app/api/seasonal-offers/[id]/route.ts',
+      'app/api/seasonal-offers/[id]/jobs/route.ts',
     ]
     for (const path of retired) {
       expect(() => readFileSync(resolve(process.cwd(), path), 'utf8')).toThrow()

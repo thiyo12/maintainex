@@ -101,7 +101,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
         category: category.name,
         categoryId: category.id
       }))
-      window.location.href = `/booking?serviceId=${firstSvc.id}&category=${category.slug}`
+      window.location.href = '/waitlist'
     }
   }
 
@@ -114,7 +114,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
       category: featuredCategory?.name || categories[0]?.name
     }))
     localStorage.setItem('bookingCategory', categorySlug)
-    window.location.href = `/booking?serviceId=${service.id}&category=${categorySlug}`
+    window.location.href = '/waitlist'
   }
 
   return (
