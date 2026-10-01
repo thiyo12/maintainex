@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
 import { bigIntToSafeNumber, type Currency, getCurrencyForCountry } from '@/lib/shared/money/money'
+import { isPayoutExecutionFrozen } from '@/lib/crm/emergency-controls'
 
 export type PayoutStatus =
   | 'REQUESTED'
@@ -95,6 +96,14 @@ export async function requestPayout(
 
   const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { countryCode: true } })
   const payoutCountry = userRecord?.countryCode || (currency === 'CAD' ? 'CA' : 'LK')
+
+  if (await isPayoutExecutionFrozen(payoutCountry)) {
+    return {
+      ok: false,
+      error: 'Payout execution is temporarily frozen',
+      code: 'PAYOUTS_FROZEN',
+    }
+  }
 
   try {
     const payout = await prisma.$transaction(async (tx) => {
@@ -228,6 +237,23 @@ export async function markProcessing(
   actorId: string,
   idempotencyKey: string
 ): Promise<PayoutResult> {
+  const completed = await readCompletedIdempotency(idempotencyKey)
+  if (completed) return { ok: true, payoutId, status: completed.status }
+
+  const payoutMeta = await prisma.payout.findUnique({
+    where: { id: payoutId },
+    select: { countryCode: true },
+  })
+  if (!payoutMeta) return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
+  if (await isPayoutExecutionFrozen(payoutMeta.countryCode)) {
+    return {
+      ok: false,
+      error: 'Payout execution is temporarily frozen',
+      code: 'PAYOUTS_FROZEN',
+    }
+  }
+
+  // PAYOUT_PROCESSING_FROZEN_CHECK
   try {
     const { payout } = await transitionPayout(
       payoutId,
@@ -255,6 +281,20 @@ export async function markSucceeded(
   const existing = await readCompletedIdempotency(idempotencyKey)
   if (existing) return { ok: true, payoutId, status: existing.status }
 
+  const payoutMeta = await prisma.payout.findUnique({
+    where: { id: payoutId },
+    select: { countryCode: true },
+  })
+  if (!payoutMeta) return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
+  if (await isPayoutExecutionFrozen(payoutMeta.countryCode)) {
+    return {
+      ok: false,
+      error: 'Payout execution is temporarily frozen',
+      code: 'PAYOUTS_FROZEN',
+    }
+  }
+
+  // PAYOUT_SUCCESS_FROZEN_CHECK
   try {
     await prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string; currency: string }>>(
