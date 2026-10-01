@@ -182,6 +182,16 @@ function links(body: Record<string, unknown> | null): Array<Record<string, unkno
     : []
 }
 
+export function findPayPalApprovalUrl(
+  body: Record<string, unknown> | null
+): string | null {
+  const approval = links(body).find(link => {
+    const rel = typeof link.rel === 'string' ? link.rel : ''
+    return rel === 'approve' || rel === 'payer-action'
+  })
+  return approval && typeof approval.href === 'string' ? approval.href : null
+}
+
 export async function createPayPalOrder(input: {
   paymentIntentId: string
   jobId: string
@@ -237,12 +247,7 @@ export async function createPayPalOrder(input: {
     typeof response.body?.id === 'string' ? response.body.id : undefined
   const orderStatus =
     typeof response.body?.status === 'string' ? response.body.status : undefined
-  const approval = links(response.body).find(link => {
-    const rel = typeof link.rel === 'string' ? link.rel : ''
-    return rel === 'approve' || rel === 'payer-action'
-  })
-  const approvalUrl =
-    approval && typeof approval.href === 'string' ? approval.href : undefined
+  const approvalUrl = findPayPalApprovalUrl(response.body) || undefined
 
   return {
     ok: response.ok && Boolean(orderId) && Boolean(approvalUrl),
