@@ -127,3 +127,21 @@ export function isVerifiedCrmStepUp(value: unknown): value is VerifiedCrmStepUp 
     (value as Record<PropertyKey, unknown>)[VERIFIED_STEP_UP] === true
   )
 }
+
+
+export async function consumeCrmStepUpFromHeader(input: {
+  headerValue: string | null
+  adminUserId: string
+  sessionId: string
+  actionId: CrmActionId
+}): Promise<VerifiedCrmStepUp | null> {
+  const token = input.headerValue?.trim()
+  if (!token) return null
+
+  return consumeCrmStepUpProof({
+    token,
+    adminUserId: input.adminUserId,
+    sessionId: input.sessionId,
+    actionId: input.actionId,
+  })
+}
