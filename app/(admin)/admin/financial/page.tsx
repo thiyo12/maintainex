@@ -142,9 +142,14 @@ export default function FinanceControlCentrePage() {
       <section className="grid xl:grid-cols-2 gap-5">
         <Panel title="Escrow state" subtitle="Canonical JobEscrow status distribution">
           <StatusRows rows={data?.escrow || []} amountField="total" />
-          <Link href="/admin/financial/wallets" className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-amber-700">
-            Open wallets & payouts <FiArrowUpRight size={14} />
-          </Link>
+          <div className="mt-4 flex flex-col gap-2">
+            <Link href="/admin/financial/wallets" className="inline-flex items-center gap-1 text-sm font-medium text-amber-700">
+              Open wallet controls <FiArrowUpRight size={14} />
+            </Link>
+            <Link href="/admin/financial/payouts" className="inline-flex items-center gap-1 text-sm font-medium text-amber-700">
+              Open payout queue <FiArrowUpRight size={14} />
+            </Link>
+          </div>
         </Panel>
 
         <Panel title="Payment state" subtitle="PaymentIntent status distribution">
@@ -166,7 +171,7 @@ export default function FinanceControlCentrePage() {
 
         <Panel title="Payout state" subtitle="Provider payouts by state">
           <StatusRows rows={data?.payouts || []} amountField="amount" />
-          <Link href="/admin/financial/wallets" className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-amber-700">
+          <Link href="/admin/financial/payouts" className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-amber-700">
             Open payout queue <FiArrowUpRight size={14} />
           </Link>
         </Panel>
