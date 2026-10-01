@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { guardCrmRequest } from '@/lib/crm/security'
+import { guardCrmRequest, type CrmSecurityContext } from '@/lib/crm/security'
+import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 import { createAuditLog } from '@/lib/crm/audit'
 import { updateProfession, deactivateProfession } from '@/lib/profession'
 import type { ProfessionUpdateInput } from '@/lib/profession/types'
+
+function canPublishCatalog(security: CrmSecurityContext): boolean {
+  const entry = getPermissionCatalogEntry('catalog:publish')
+  return evaluateEffectivePermission({
+    role: security.role,
+    permission: 'catalog:publish',
+    permissionClass: entry?.class,
+    overrides: security.permissionOverrides,
+  }).allowed
+}
 
 function cleanSlug(value: unknown): string | undefined {
   if (value === undefined) return undefined
@@ -17,7 +28,7 @@ export async function GET(
 ) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'professions:read',
+      permission: 'catalog:view',
       level: 'read',
     })
     if (!guard.ok) return guard.response
@@ -61,7 +72,7 @@ export async function PATCH(
 ) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'professions:write',
+      permission: 'catalog:edit',
       level: 'sensitive',
     })
     if (!guard.ok) return guard.response
@@ -92,6 +103,12 @@ export async function PATCH(
     }
     if (body?.isActive !== undefined) {
       if (typeof body.isActive !== 'boolean') return NextResponse.json({ error: 'isActive must be boolean' }, { status: 400 })
+      if (!canPublishCatalog(security)) {
+        return NextResponse.json(
+          { error: 'Changing profession publication state requires catalog:publish' },
+          { status: 403 }
+        )
+      }
       data.isActive = body.isActive
     }
     if (body?.sortOrder !== undefined) {
@@ -137,7 +154,7 @@ export async function DELETE(
 ) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'professions:write',
+      permission: 'catalog:publish',
       level: 'sensitive',
     })
     if (!guard.ok) return guard.response
