@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { getActiveEmergencyControl } from '@/lib/crm/emergency-controls'
 import { inspectCrmJobCancellation } from '@/lib/crm/jobs/cancellation'
 import type { CrmActionId, RiskPolicyContext } from './types'
 
@@ -135,7 +136,7 @@ export async function resolveCurrentApprovalRisk(request: {
     const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    const [priorSucceededCount, recipient24h, recipient7d] = await Promise.all([
+    const [priorSucceededCount, recipient24h, recipient7d, payoutFreeze] = await Promise.all([
       prisma.payout.count({
         where: {
           userId: payout.userId,
@@ -159,6 +160,7 @@ export async function resolveCurrentApprovalRisk(request: {
         },
         _sum: { amount: true },
       }),
+      getActiveEmergencyControl('PAYOUTS_FROZEN', payout.countryCode),
     ])
 
     const identityVerified = payout.user.identityStatus === 'VERIFIED'
@@ -186,6 +188,7 @@ export async function resolveCurrentApprovalRisk(request: {
                 ? 'EXPIRED'
                 : 'PENDING',
         fraudOrSecurityHold: payout.user.isSuspended || payout.user.isBanned,
+        payoutExecutionFrozen: Boolean(payoutFreeze),
         firstPayout: priorSucceededCount === 0,
         rollingRecipientAmountMinor24h: recipient24h._sum.amount ?? payout.amount,
         rollingRecipientAmountMinor7d: recipient7d._sum.amount ?? payout.amount,
