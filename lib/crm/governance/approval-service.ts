@@ -19,6 +19,7 @@ import type {
   RiskPolicyContext,
 } from './types'
 import type { AdminRole } from '@/lib/admin-types'
+import { isVerifiedCrmStepUp, type VerifiedCrmStepUp } from './step-up'
 
 export class CrmApprovalError extends Error {
   constructor(
@@ -51,7 +52,7 @@ export interface DecideCrmApprovalInput {
   approverRole: AdminRole
   decision: 'APPROVE' | 'REJECT'
   reason?: string
-  stepUpVerified: boolean
+  stepUp?: VerifiedCrmStepUp
   currentRisk: Omit<RiskPolicyContext, 'actionId' | 'market' | 'amountMinor' | 'currency'>
 }
 
@@ -361,7 +362,7 @@ export async function decideCrmApprovalRequest(input: DecideCrmApprovalInput) {
     return { status: 'PENDING_APPROVAL' as const, retiered: true, tier: currentPlan.tier }
   }
 
-  if (isStepUpRequired(actionId, currentPlan.tier) && !input.stepUpVerified) {
+  if (isStepUpRequired(actionId, currentPlan.tier) && !isVerifiedCrmStepUp(input.stepUp)) {
     throw new CrmApprovalError('STEP_UP_REQUIRED', 'Step-up authentication is required.', 403)
   }
 
@@ -464,7 +465,7 @@ export async function decideCrmApprovalRequest(input: DecideCrmApprovalInput) {
         metadata: JSON.stringify({
           tier: currentPlan.tier,
           allSlotsSatisfied: satisfied,
-          stepUpVerified: input.stepUpVerified,
+          stepUpVerified: isVerifiedCrmStepUp(input.stepUp),
         }),
       },
     })
