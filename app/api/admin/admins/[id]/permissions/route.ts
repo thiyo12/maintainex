@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { createAuditLog } from '@/lib/crm/audit'
 import { guardCrmAction, guardCrmRequest } from '@/lib/crm/security'
 import {
   canDelegatePermissionClass,
@@ -182,23 +181,28 @@ export async function PATCH(
           })),
         })
       }
-    })
 
-    await createAuditLog({
-      action: 'UPDATE',
-      category: 'ADMIN',
-      userId: security.adminId,
-      userEmail: security.email,
-      userRole: security.role,
-      entityType: 'AdminPermissionOverride',
-      entityId: id,
-      entityName: `${target.firstName} ${target.lastName}`,
-      description: 'CRM staff permission overrides replaced',
-      oldValue: { overrides: previous },
-      newValue: { overrides },
-      ipAddress: security.ipAddress,
-      userAgent: security.userAgent || undefined,
-      riskLevel: 'CRITICAL',
+      // Privilege changes are fail-closed on audit: a failed audit insert
+      // rolls back the permission mutation in this same transaction.
+      await tx.securityAudit.create({
+        data: {
+          action: 'UPDATE',
+          category: 'ADMIN',
+          userId: security.adminId,
+          userEmail: security.email,
+          userRole: security.role,
+          entityType: 'AdminPermissionOverride',
+          entityId: id,
+          entityName: `${target.firstName} ${target.lastName}`,
+          description: 'CRM staff permission overrides replaced',
+          oldValue: JSON.stringify({ overrides: previous }),
+          newValue: JSON.stringify({ overrides }),
+          ipAddress: security.ipAddress,
+          userAgent: security.userAgent || undefined,
+          riskLevel: 'CRITICAL',
+          isSuspicious: true,
+        },
+      })
     })
 
     return NextResponse.json({
