@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { assertCrmCountryAllowed, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
+import { assertCrmCountryAllowed, getCrmCountryFilter, guardCrmAction, guardCrmRequest } from '@/lib/crm/security'
+import { evaluateActionInitiation } from '@/lib/crm/governance'
+import { consumeCrmStepUpFromHeader } from '@/lib/crm/governance/step-up'
 import { auditWalletFreeze, auditWalletUnfreeze } from '@/lib/financial-audit'
 
 async function scopedUserIds(countryFilter: ReturnType<typeof getCrmCountryFilter>) {
@@ -89,7 +91,18 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { providerWallets, customerWallets, transactions },
+      {
+        providerWallets,
+        customerWallets,
+        transactions,
+        actions: {
+          freeze: evaluateActionInitiation({
+            role: security.role,
+            actionId: 'finance.wallet.freeze',
+            overrides: security.permissionOverrides,
+          }).allowed,
+        },
+      },
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
@@ -100,67 +113,112 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const guard = await guardCrmRequest(request, {
-      permission: 'wallets:manage',
-      level: 'sensitive',
-      requireCountryScope: true,
-    })
+    const guard = await guardCrmAction(request, 'finance.wallet.freeze')
     if (!guard.ok) return guard.response
     const security = guard.context
 
     const body = await request.json().catch(() => ({}))
-    const walletId = typeof body?.walletId === 'string' ? body.walletId : ''
+    const walletId = typeof body?.walletId === 'string' ? body.walletId.trim().slice(0, 128) : ''
     const action = typeof body?.action === 'string' ? body.action.toUpperCase() : ''
 
     if (!walletId || !['FREEZE', 'UNFREEZE'].includes(action)) {
       return NextResponse.json({ error: 'Invalid wallet action' }, { status: 400 })
     }
 
-    const isFrozen = action === 'FREEZE'
     const providerWallet = await prisma.providerWallet.findUnique({
       where: { id: walletId },
-      select: { id: true, userId: true },
+      select: { id: true, userId: true, isFrozen: true },
     })
+    const customerWallet = providerWallet
+      ? null
+      : await prisma.customerWallet.findUnique({
+          where: { id: walletId },
+          select: { id: true, userId: true, isFrozen: true },
+        })
 
-    if (providerWallet) {
-      const walletUser = await prisma.user.findUnique({
-        where: { id: providerWallet.userId },
-        select: { countryCode: true },
-      })
-      if (!walletUser || !assertCrmCountryAllowed(security, walletUser.countryCode)) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
-      const updated = await prisma.providerWallet.update({
-        where: { id: walletId },
-        data: { isFrozen },
-      })
-      const audit = isFrozen ? auditWalletFreeze : auditWalletUnfreeze
-      audit({ walletId, walletType: 'PROVIDER', actorId: security.adminId })
-      return NextResponse.json({ wallet: updated })
-    }
-
-    const customerWallet = await prisma.customerWallet.findUnique({
-      where: { id: walletId },
-      select: { id: true, userId: true },
-    })
-    if (!customerWallet) {
+    const wallet = providerWallet || customerWallet
+    if (!wallet) {
       return NextResponse.json({ error: 'Wallet not found' }, { status: 404 })
     }
 
+    const walletType = providerWallet ? 'PROVIDER' : 'CUSTOMER'
     const walletUser = await prisma.user.findUnique({
-      where: { id: customerWallet.userId },
-      select: { countryCode: true },
+      where: { id: wallet.userId },
+      select: { id: true, name: true, countryCode: true },
     })
     if (!walletUser || !assertCrmCountryAllowed(security, walletUser.countryCode)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const updated = await prisma.customerWallet.update({
-      where: { id: walletId },
-      data: { isFrozen },
+    const stepUp = await consumeCrmStepUpFromHeader({
+      headerValue: request.headers.get('x-crm-step-up'),
+      adminUserId: security.adminId,
+      sessionId: security.sessionId,
+      actionId: 'finance.wallet.freeze',
     })
+    if (!stepUp) {
+      return NextResponse.json(
+        { error: 'Step-up authentication required', code: 'STEP_UP_REQUIRED' },
+        { status: 403 }
+      )
+    }
+
+    const isFrozen = action === 'FREEZE'
+    if (wallet.isFrozen === isFrozen) {
+      return NextResponse.json({
+        wallet: {
+          id: wallet.id,
+          isFrozen,
+          unchanged: true,
+        },
+      })
+    }
+
+    const updated = await prisma.$transaction(async tx => {
+      const result = providerWallet
+        ? await tx.providerWallet.update({
+            where: { id: walletId },
+            data: { isFrozen },
+          })
+        : await tx.customerWallet.update({
+            where: { id: walletId },
+            data: { isFrozen },
+          })
+
+      await tx.securityAudit.create({
+        data: {
+          action: 'UPDATE',
+          category: 'FINANCE',
+          userId: security.adminId,
+          userEmail: security.email,
+          userRole: security.role,
+          entityType: `${walletType}Wallet`,
+          entityId: walletId,
+          entityName: walletUser.name || walletUser.id,
+          description: isFrozen ? 'CRM wallet frozen' : 'CRM wallet unfrozen',
+          oldValue: JSON.stringify({ isFrozen: wallet.isFrozen }),
+          newValue: JSON.stringify({
+            isFrozen,
+            walletType,
+            countryCode: walletUser.countryCode,
+          }),
+          ipAddress: security.ipAddress,
+          userAgent: security.userAgent || undefined,
+          riskLevel: 'HIGH',
+          isSuspicious: false,
+        },
+      })
+
+      return result
+    })
+
     const audit = isFrozen ? auditWalletFreeze : auditWalletUnfreeze
-    audit({ walletId, walletType: 'CUSTOMER', actorId: security.adminId })
+    audit({
+      walletId,
+      walletType,
+      actorId: security.adminId,
+    })
+
     return NextResponse.json({ wallet: updated })
   } catch (error) {
     console.error('CRM wallets PATCH error:', error)
