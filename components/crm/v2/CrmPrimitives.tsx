@@ -181,7 +181,7 @@ export function CrmMetricCard({
   }
 
   return (
-    <div className="crm-card p-4.5 min-h-[132px]">
+    <div className="crm-card min-h-[132px] p-[18px]">
       <div className="flex items-start justify-between gap-3">
         <div className="text-xs font-medium text-slate-500">{label}</div>
         {icon && <div className={`grid h-9 w-9 place-items-center rounded-xl ${iconTone[tone]}`}>{icon}</div>}
