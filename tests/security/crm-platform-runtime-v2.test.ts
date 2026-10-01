@@ -50,6 +50,26 @@ describe('CRM V2 platform runtime controls', () => {
     expect(serviceCategories).toContain('storedListIncludes(job.countries, country)')
   })
 
+  it('wires website and mobile consumers to the runtime contract', () => {
+    const publicLayout = readFileSync(resolve(process.cwd(), 'app/(public)/layout.tsx'), 'utf8')
+    const mobileLayout = readFileSync(resolve(process.cwd(), 'apps/mobile/app/_layout.tsx'), 'utf8')
+    const mobileRuntime = readFileSync(resolve(process.cwd(), 'apps/mobile/lib/runtime.tsx'), 'utf8')
+    const categories = readFileSync(resolve(process.cwd(), 'app/api/categories/route.ts'), 'utf8')
+    const serviceTemplates = readFileSync(resolve(process.cwd(), 'app/api/mobile/v2/service-templates/route.ts'), 'utf8')
+    const search = readFileSync(resolve(process.cwd(), 'app/api/mobile/v2/search/route.ts'), 'utf8')
+
+    expect(publicLayout).toContain('getPlatformRuntimeConfig')
+    expect(publicLayout).toContain("redirect('/maintenance')")
+    expect(mobileLayout).toContain('RuntimeProvider')
+    expect(mobileLayout).toContain('RuntimeGate')
+    expect(mobileLayout).toContain('config.notifications.enabled')
+    expect(mobileRuntime).toContain('minimumVersion')
+    expect(mobileRuntime).toContain('!config.market.available')
+    expect(categories).toContain('runtime.catalog.visible')
+    expect(serviceTemplates).toContain('runtime.catalog.visible')
+    expect(search).toContain('runtime.catalog.visible')
+  })
+
   it('protects runtime mutation with canonical CRM permission and audit', () => {
     const source = readFileSync(resolve(process.cwd(), 'app/api/admin/platform/runtime/route.ts'), 'utf8')
     expect(source).toContain("permission: 'platform:settings:manage'")
