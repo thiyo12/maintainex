@@ -1,5 +1,9 @@
 import type { AdminRole } from '@/lib/admin-types'
-import { crmHasPermission } from '@/lib/crm/security'
+import {
+  evaluateEffectivePermission,
+  getPermissionCatalogEntry,
+  type PermissionOverride,
+} from '@/lib/crm/governance'
 
 export interface CrmSectionAccess {
   work: boolean
@@ -12,25 +16,41 @@ export interface CrmSectionAccess {
 
 export function getCrmSectionAccess(
   role: AdminRole,
-  isSuperAdmin = role === 'SUPER_ADMIN'
+  isSuperAdmin = role === 'SUPER_ADMIN',
+  overrides: readonly PermissionOverride[] = []
 ): CrmSectionAccess {
+  const can = (permission: string) => {
+    const entry = getPermissionCatalogEntry(permission)
+    return evaluateEffectivePermission({
+      role,
+      permission,
+      permissionClass: entry?.class,
+      overrides,
+    }).allowed
+  }
+
   return {
-    work: crmHasPermission(role, 'jobs:view'),
+    work: can('jobs:view'),
     finance:
-      crmHasPermission(role, 'wallets:view') ||
-      crmHasPermission(role, 'commission:view'),
+      can('wallets:view') ||
+      can('commission:view') ||
+      can('finance:payments:view'),
     trust:
-      crmHasPermission(role, 'kyc:view') ||
-      crmHasPermission(role, 'disputes:view') ||
-      crmHasPermission(role, 'risk_events:read') ||
-      crmHasPermission(role, 'credentials:read') ||
-      crmHasPermission(role, 'trust:view') ||
-      crmHasPermission(role, 'security:view'),
-    audit: crmHasPermission(role, 'audit:read'),
-    security: crmHasPermission(role, 'security:view'),
+      can('kyc:view') ||
+      can('kyc:review') ||
+      can('disputes:view') ||
+      can('risk_events:read') ||
+      can('risk:view') ||
+      can('credentials:read') ||
+      can('credentials:view') ||
+      can('trust:view') ||
+      can('security:view'),
+    audit: can('audit:read') || can('audit:view'),
+    security: can('security:view'),
     customerCrm:
       isSuperAdmin ||
-      crmHasPermission(role, 'users:edit') ||
-      crmHasPermission(role, 'support:view'),
+      can('users:edit') ||
+      can('customers:edit') ||
+      can('support:view'),
   }
 }
