@@ -13,8 +13,8 @@ describe('Mobile marketplace taxonomy source-of-truth', () => {
       'utf8'
     )
 
-    expect(api).toContain("request<JobCategory[]>('/api/mobile/job-categories")
-    expect(api).toContain("request<TemplateJob[]>('/api/mobile/template-jobs")
+    expect(api).toContain("request<JobCategory[]>(`/api/mobile/job-categories")
+    expect(api).toContain("request<TemplateJob[]>(`/api/mobile/template-jobs")
     expect(screen).toContain('jobCategories.get')
     expect(screen).toContain('templateJobs.listByCategory')
     expect(screen).not.toContain("from '@/lib/categories'")
