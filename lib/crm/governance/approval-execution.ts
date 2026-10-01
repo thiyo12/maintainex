@@ -5,6 +5,7 @@ import {
   inspectCrmJobCancellation,
 } from '@/lib/crm/jobs/cancellation'
 import { buildApprovalPlan } from './approval-engine'
+import { confirmManualExternalRefund, requestRequiredPayHereRefund } from '@/lib/finance/payments/payment-service'
 import { tierAtLeast } from './action-registry'
 import { resolveCurrentApprovalRisk } from './current-risk'
 import type { ApprovalTier } from './types'
@@ -26,6 +27,44 @@ export interface ApprovalExecutionResult {
 
 function higherTier(current: ApprovalTier, stored: ApprovalTier): boolean {
   return current !== stored && tierAtLeast(current, stored)
+}
+
+type RefundExecutionPayload =
+  | { mode: 'REQUEST_GATEWAY_REFUND' }
+  | { mode: 'CONFIRM_MANUAL'; manualReference: string; note?: string }
+
+function parseRefundExecutionPayload(raw: string | null): RefundExecutionPayload {
+  if (!raw) throw new Error('APPROVAL_ACTION_PAYLOAD_MISSING')
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+  }
+
+  const value = parsed as Record<string, unknown>
+  if (value.mode === 'REQUEST_GATEWAY_REFUND') {
+    return { mode: 'REQUEST_GATEWAY_REFUND' }
+  }
+
+  if (value.mode === 'CONFIRM_MANUAL') {
+    const manualReference =
+      typeof value.manualReference === 'string' ? value.manualReference.trim() : ''
+    const note = typeof value.note === 'string' ? value.note.trim().slice(0, 500) : undefined
+
+    if (manualReference.length < 4 || manualReference.length > 200) {
+      throw new Error('APPROVAL_MANUAL_REFUND_REFERENCE_INVALID')
+    }
+
+    return { mode: 'CONFIRM_MANUAL', manualReference, note }
+  }
+
+  throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
 }
 
 export async function executeApprovedCrmRequest(
@@ -158,7 +197,56 @@ export async function executeApprovedCrmRequest(
   try {
     let executionRef: string
 
-    if (request.actionId === 'jobs.cancel') {
+    if (request.actionId === 'finance.refund') {
+      if (request.targetType !== 'PaymentIntent') {
+        throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+      }
+
+      const payload = parseRefundExecutionPayload(request.actionPayload)
+      const result =
+        payload.mode === 'REQUEST_GATEWAY_REFUND'
+          ? await requestRequiredPayHereRefund(request.targetId)
+          : await confirmManualExternalRefund(request.targetId, {
+              actorId: actor.adminId,
+              reference: payload.manualReference,
+              note: payload.note,
+            })
+
+      if (!result.success) {
+        throw new Error(`REFUND_EXECUTION_FAILED:${result.code || result.error || 'UNKNOWN'}`)
+      }
+
+      executionRef =
+        result.refundReference ||
+        `PaymentIntent:${request.targetId}:${result.status}`
+
+      await createAuditLog({
+        action: 'UPDATE',
+        category: 'FINANCE',
+        userId: actor.adminId,
+        userEmail: actor.email,
+        userRole: actor.role,
+        entityType: 'PaymentIntent',
+        entityId: request.targetId,
+        entityName: request.targetId,
+        description:
+          payload.mode === 'CONFIRM_MANUAL'
+            ? 'Approved manual external refund confirmation executed'
+            : 'Approved PayHere refund request executed',
+        oldValue: {
+          approvalRequestId: request.id,
+        },
+        newValue: {
+          status: result.status,
+          approvalRequestId: request.id,
+          refundReferencePresent: Boolean(result.refundReference),
+          mode: payload.mode,
+        },
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent || undefined,
+        riskLevel: 'CRITICAL',
+      })
+    } else if (request.actionId === 'jobs.cancel') {
       const source =
         request.targetType === 'MarketplaceJob'
           ? 'V2'
