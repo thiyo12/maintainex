@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
+import { CrmBadge, CrmButton, CrmState, CrmTabs } from '@/components/crm/v2/CrmPrimitives'
+import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 import {
   FiActivity,
   FiAlertTriangle,
@@ -24,8 +26,6 @@ import {
   FiUsers,
   FiUserX,
 } from 'react-icons/fi'
-import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 type TabKey = 'overview' | 'workforce' | 'jobs' | 'finance' | 'trust' | 'audit'
 
@@ -35,6 +35,10 @@ interface Payload {
     finance: boolean
     trust: boolean
     audit: boolean
+    actions: {
+      suspend: boolean
+      verify: boolean
+    }
   }
   company: any
   documents: any[]
@@ -93,16 +97,18 @@ function fmtMoneyMajor(value: unknown, currency = 'LKR') {
   }).format(Number.isFinite(amount) ? amount : 0)
 }
 
-function badgeClasses(value?: string) {
-  const v = String(value || '').toUpperCase()
-  if (['ACTIVE', 'VERIFIED', 'APPROVED', 'COMPLETED', 'CLEARED', 'SETTLED'].includes(v)) return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  if (['SUSPENDED', 'PAST_DUE', 'PENDING', 'PROCESSING', 'HIGH'].includes(v)) return 'bg-amber-50 text-amber-700 border-amber-200'
-  if (['REJECTED', 'FAILED', 'CANCELLED', 'CRITICAL'].includes(v)) return 'bg-red-50 text-red-700 border-red-200'
-  return 'bg-slate-50 text-slate-600 border-slate-200'
-}
-
 function Badge({ value }: { value?: string | null }) {
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${badgeClasses(value || '')}`}>{String(value || '—').replaceAll('_', ' ')}</span>
+  const raw = String(value || '—').toUpperCase()
+  const tone =
+    ['ACTIVE', 'VERIFIED', 'APPROVED', 'COMPLETED', 'CLEARED', 'SETTLED'].includes(raw)
+      ? 'success'
+      : ['SUSPENDED', 'PAST_DUE', 'PENDING', 'PROCESSING', 'HIGH'].includes(raw)
+        ? 'warning'
+        : ['REJECTED', 'FAILED', 'CANCELLED', 'CRITICAL'].includes(raw)
+          ? 'danger'
+          : 'neutral'
+
+  return <CrmBadge tone={tone as any} dot>{raw.replaceAll('_', ' ')}</CrmBadge>
 }
 
 function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
@@ -129,11 +135,14 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 export default function Company360Page() {
   const params = useParams<{ id: string }>()
   const id = params?.id
-  const { user: admin } = useAdminSession()
   const [data, setData] = useState<Payload | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<TabKey>('overview')
   const [actionLoading, setActionLoading] = useState(false)
+  const [companyActionModal, setCompanyActionModal] = useState<{
+    action: 'suspend' | 'reactivate' | 'approve' | 'reject'
+  } | null>(null)
+  const [actionReason, setActionReason] = useState('')
 
   const load = useCallback(async () => {
     if (!id) return
@@ -158,8 +167,6 @@ export default function Company360Page() {
   }, [load])
 
   const company = data?.company
-  const role = (admin?.role || 'SUPPORT') as AdminRole
-  const permissions = ROLE_PERMISSIONS[role] || []
   const visibleTabs = TABS.filter(item =>
     item.key === 'overview' ||
     item.key === 'workforce' ||
@@ -175,78 +182,85 @@ export default function Company360Page() {
     [company]
   )
 
-  async function companyAction(action: 'suspend' | 'reactivate') {
-    if (!company) return
-    let reason = 'Reactivated by admin'
-    if (action === 'suspend') {
-      reason = window.prompt('Suspension reason:')?.trim() || ''
-      if (reason.length < 3) return
+  async function submitCompanyAction() {
+    if (!company || !companyActionModal || actionLoading) return
+
+    const action = companyActionModal.action
+    const needsReason = action === 'suspend' || action === 'reject'
+    if (needsReason && actionReason.trim().length < 3) {
+      toast.error('Enter a reason of at least 3 characters')
+      return
     }
-    if (!window.confirm(`Confirm ${action} for ${company.companyName}?`)) return
 
     setActionLoading(true)
     try {
-      const response = await fetch(`/api/admin/companies/${company.id}/${action}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason }),
-      })
+      let response: Response
+      if (action === 'suspend' || action === 'reactivate') {
+        response = await fetch(`/api/admin/companies/${company.id}/${action}`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reason: actionReason.trim() || 'Reactivated by admin',
+          }),
+        })
+      } else {
+        response = await fetch(`/api/admin/companies/${company.id}/verification`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: action === 'approve' ? 'APPROVE' : 'REJECT',
+            reviewNote: actionReason.trim() || undefined,
+          }),
+        })
+      }
+
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Action failed')
-      toast.success(`Company ${action === 'suspend' ? 'suspended' : 'reactivated'}`)
+      if (!response.ok) throw new Error(body?.error || 'Company action failed')
+
+      toast.success(
+        action === 'suspend'
+          ? 'Company suspended'
+          : action === 'reactivate'
+            ? 'Company reactivated'
+            : action === 'approve'
+              ? 'Company verification approved'
+              : 'Company verification rejected'
+      )
+      setCompanyActionModal(null)
+      setActionReason('')
       await load()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Action failed')
+      toast.error(error instanceof Error ? error.message : 'Company action failed')
     } finally {
       setActionLoading(false)
     }
   }
 
-  async function verifyAction(action: 'APPROVE' | 'REJECT') {
-    if (!company) return
-    const reviewNote = action === 'REJECT' ? window.prompt('Rejection reason:')?.trim() : ''
-    if (action === 'REJECT' && !reviewNote) return
-    if (!window.confirm(`Confirm ${action.toLowerCase()} for ${company.companyName}?`)) return
-
-    setActionLoading(true)
-    try {
-      const response = await fetch(`/api/admin/companies/${company.id}/verification`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, reviewNote }),
-      })
-      const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Verification action failed')
-      toast.success('Company verification updated')
-      await load()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Verification action failed')
-    } finally {
-      setActionLoading(false)
-    }
-  }
 
   if (loading) {
     return (
-      <div className="space-y-5 animate-pulse">
-        <div className="h-40 rounded-2xl bg-white border border-slate-200" />
-        <div className="grid xl:grid-cols-[minmax(0,1fr)_320px] gap-5">
-          <div className="h-[600px] rounded-2xl bg-white border border-slate-200" />
-          <div className="h-[420px] rounded-2xl bg-white border border-slate-200" />
-        </div>
-      </div>
+      <CrmState
+        type="loading"
+        title="Loading Company 360"
+        description="Loading workforce, marketplace, finance, trust and audit context."
+      />
     )
   }
 
   if (!data || !company) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
-        <FiAlertTriangle className="mx-auto text-amber-500" size={34} />
-        <h1 className="mt-3 text-xl font-semibold text-slate-900">Company unavailable</h1>
-        <p className="mt-1 text-sm text-slate-500">The company is missing or outside your assigned market.</p>
-      </div>
+      <CrmState
+        type="error"
+        title="Company unavailable"
+        description="The company is missing or outside your assigned market."
+        action={
+          <Link href="/admin/users/companies" className="text-sm font-semibold text-amber-700">
+            Back to companies
+          </Link>
+        }
+      />
     )
   }
 
@@ -277,9 +291,9 @@ export default function Company360Page() {
               </div>
             </div>
 
-            <button type="button" onClick={load} className="inline-flex items-center gap-2 h-10 px-3.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50">
+            <CrmButton variant="secondary" onClick={load}>
               <FiRefreshCw size={15} /> Refresh
-            </button>
+            </CrmButton>
           </div>
 
           <div className="mt-6 grid grid-cols-2 xl:grid-cols-4 gap-3">
@@ -290,21 +304,12 @@ export default function Company360Page() {
           </div>
         </div>
 
-        <div className="border-t border-slate-100 px-3 md:px-5 overflow-x-auto">
-          <div className="flex min-w-max">
-            {visibleTabs.map(item => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setTab(item.key)}
-                className={`px-3.5 py-3.5 text-sm font-medium border-b-2 transition ${
-                  tab === item.key ? 'border-amber-400 text-slate-950' : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+        <div className="border-t border-[var(--crm-border)] px-4 py-3">
+          <CrmTabs
+            items={visibleTabs.map(item => ({ id: item.key, label: item.label }))}
+            active={tab}
+            onChange={id => setTab(id as TabKey)}
+          />
         </div>
       </section>
 
@@ -321,15 +326,15 @@ export default function Company360Page() {
         <aside className="space-y-4 xl:sticky xl:top-[92px]">
           <Card title="Company controls" subtitle="Permission-gated and audited">
             <div className="space-y-2">
-              {permissions.includes('companies:edit') && (
+              {data.permissions.actions.suspend && (
                 company.verificationStatus === 'SUSPENDED'
-                  ? <Action disabled={actionLoading} icon={FiUnlock} label="Reactivate company" onClick={() => companyAction('reactivate')} />
-                  : <Action disabled={actionLoading} icon={FiUserX} label="Suspend company" tone="red" onClick={() => companyAction('suspend')} />
+                  ? <Action disabled={actionLoading} icon={FiUnlock} label="Reactivate company" onClick={() => { setActionReason(''); setCompanyActionModal({ action: 'reactivate' }) }} />
+                  : <Action disabled={actionLoading} icon={FiUserX} label="Suspend company" tone="red" onClick={() => { setActionReason(''); setCompanyActionModal({ action: 'suspend' }) }} />
               )}
-              {permissions.includes('companies:verify') && (
+              {data.permissions.actions.verify && (
                 <>
-                  <Action disabled={actionLoading} icon={FiCheckCircle} label="Approve verification" onClick={() => verifyAction('APPROVE')} />
-                  <Action disabled={actionLoading} icon={FiAlertTriangle} label="Reject verification" tone="amber" onClick={() => verifyAction('REJECT')} />
+                  <Action disabled={actionLoading} icon={FiCheckCircle} label="Approve verification" onClick={() => { setActionReason(''); setCompanyActionModal({ action: 'approve' }) }} />
+                  <Action disabled={actionLoading} icon={FiAlertTriangle} label="Reject verification" tone="amber" onClick={() => { setActionReason(''); setCompanyActionModal({ action: 'reject' }) }} />
                 </>
               )}
             </div>
@@ -355,6 +360,70 @@ export default function Company360Page() {
           </Card>
         </aside>
       </div>
+
+      <CrmModal
+        open={Boolean(companyActionModal)}
+        onClose={() => {
+          if (!actionLoading) setCompanyActionModal(null)
+        }}
+        title={
+          companyActionModal?.action === 'suspend'
+            ? 'Suspend company'
+            : companyActionModal?.action === 'reactivate'
+              ? 'Reactivate company'
+              : companyActionModal?.action === 'approve'
+                ? 'Approve company verification'
+                : 'Reject company verification'
+        }
+        description={company.companyName}
+        maxWidth="max-w-lg"
+        footer={
+          <>
+            <CrmButton
+              variant="secondary"
+              onClick={() => setCompanyActionModal(null)}
+              disabled={actionLoading}
+            >
+              Cancel
+            </CrmButton>
+            <CrmButton
+              variant={
+                companyActionModal?.action === 'suspend' ||
+                companyActionModal?.action === 'reject'
+                  ? 'danger'
+                  : 'primary'
+              }
+              onClick={submitCompanyAction}
+              disabled={actionLoading}
+            >
+              {actionLoading ? 'Working…' : 'Confirm action'}
+            </CrmButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {(companyActionModal?.action === 'suspend' ||
+            companyActionModal?.action === 'reject') && (
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                Reason
+              </label>
+              <textarea
+                value={actionReason}
+                onChange={event => setActionReason(event.target.value)}
+                rows={4}
+                maxLength={1000}
+                className="w-full resize-none rounded-[11px] border border-[var(--crm-border)] bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-amber-300 focus:ring-2 focus:ring-amber-100"
+                placeholder="Explain why this company action is required…"
+              />
+            </div>
+          )}
+
+          <div className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-3 text-xs leading-5 text-slate-500">
+            The server will re-check your live permission, market scope and the company&apos;s current lifecycle state before applying this action. The mutation is audited.
+          </div>
+        </div>
+      </CrmModal>
     </div>
   )
 }
