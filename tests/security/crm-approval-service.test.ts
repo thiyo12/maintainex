@@ -39,7 +39,7 @@ describe('CRM V2 approval service security', () => {
       risk: {
         remainingRefundableMinor: lkr(20_000),
       },
-    })).rejects.toMatchObject<Partial<CrmApprovalError>>({
+    })).rejects.toMatchObject({
       code: 'CRM_ACTION_PROHIBITED',
     })
 
@@ -73,7 +73,7 @@ describe('CRM V2 approval service security', () => {
       risk: {
         remainingRefundableMinor: lkr(20_000),
       },
-    })).rejects.toMatchObject<Partial<CrmApprovalError>>({
+    })).rejects.toMatchObject({
       code: 'APPROVAL_IDEMPOTENCY_CONFLICT',
     })
 
@@ -131,7 +131,7 @@ describe('CRM V2 approval service security', () => {
       currentRisk: {
         remainingRefundableMinor: lkr(10_000),
       },
-    })).rejects.toMatchObject<Partial<CrmApprovalError>>({
+    })).rejects.toMatchObject({
       code: 'STEP_UP_REQUIRED',
     })
 
@@ -162,7 +162,7 @@ describe('CRM V2 approval service security', () => {
       currentRisk: {
         remainingRefundableMinor: lkr(75_000),
       },
-    })).rejects.toMatchObject<Partial<CrmApprovalError>>({
+    })).rejects.toMatchObject({
       code: 'SELF_APPROVAL_FORBIDDEN',
     })
 
