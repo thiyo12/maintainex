@@ -110,6 +110,16 @@ export function evaluateCrmRiskPolicy(
       break
     }
 
+    case 'disputes.financial_resolution': {
+      if (!policy) {
+        holdCodes.push('MARKET_FINANCE_POLICY_MISSING')
+        break
+      }
+      tier = maxTier('T2', tierFromAmount(context.amountMinor, policy.refund, 'T2'))
+      if (context.fraudOrSecurityHold) holdCodes.push('FRAUD_OR_SECURITY_HOLD')
+      break
+    }
+
     case 'finance.refund': {
       if (!policy) {
         holdCodes.push('MARKET_FINANCE_POLICY_MISSING')
