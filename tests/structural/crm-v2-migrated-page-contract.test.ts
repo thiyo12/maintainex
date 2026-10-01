@@ -8,6 +8,15 @@ const migratedPages = [
   'app/(admin)/admin/users/companies/page.tsx',
   'app/(admin)/admin/admins/page.tsx',
   'app/(admin)/admin/companies/[id]/page.tsx',
+  'app/(admin)/admin/financial/ledger/page.tsx',
+  'app/(admin)/admin/financial/settlements/page.tsx',
+  'app/(admin)/admin/financial/commission/page.tsx',
+  'app/(admin)/admin/financial/payouts/page.tsx',
+  'app/(admin)/admin/financial/wallets/page.tsx',
+  'app/(admin)/admin/financial/refunds/page.tsx',
+  'app/(admin)/admin/financial/escrow/page.tsx',
+  'app/(admin)/admin/financial/payments/page.tsx',
+  'app/(admin)/admin/financial/page.tsx',
 ]
 
 describe('CRM V2 migrated page contract', () => {
