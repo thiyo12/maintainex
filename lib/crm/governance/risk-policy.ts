@@ -158,6 +158,7 @@ export function evaluateCrmRiskPolicy(
       }
       tier = maxTier(tier, tierFromAmount(context.amountMinor, policy.payout, 'T1'))
       if (context.kycStatus && context.kycStatus !== 'APPROVED') holdCodes.push('PAYOUT_KYC_NOT_APPROVED')
+      if (context.payoutExecutionFrozen) holdCodes.push('PAYOUT_EXECUTION_FROZEN')
       if (context.payoutDestinationChangedAt) {
         const ageHours = hoursSince(context.payoutDestinationChangedAt, now)
         if (ageHours < policy.payoutDestinationCoolingHours) {
