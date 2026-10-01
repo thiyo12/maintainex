@@ -73,8 +73,7 @@ export async function GET(request: NextRequest) {
         priorDecisions: decisions,
       })
 
-      const canApprove =
-        row.status === 'PENDING_APPROVAL' &&
+      const eligibleRole =
         !explicitlyDenied &&
         eligibility.allowed &&
         canRoleFillPendingApprovalSlot(
@@ -83,7 +82,11 @@ export async function GET(request: NextRequest) {
           decisions
         )
 
-      if (!canApprove && row.status !== 'ON_HOLD') return []
+      if (!eligibleRole) return []
+
+      const canApprove =
+        row.status === 'PENDING_APPROVAL' &&
+        eligibleRole
 
       return [{
         id: row.id,
