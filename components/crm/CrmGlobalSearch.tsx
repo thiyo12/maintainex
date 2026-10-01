@@ -39,7 +39,7 @@ interface SearchPayload {
   }
 }
 
-export default function CrmGlobalSearch() {
+export default function CrmGlobalSearch({ market = 'ALL' }: { market?: string }) {
   const [query, setQuery] = useState('')
   const [payload, setPayload] = useState<SearchPayload | null>(null)
   const [loading, setLoading] = useState(false)
@@ -80,7 +80,7 @@ export default function CrmGlobalSearch() {
     const timer = window.setTimeout(async () => {
       setLoading(true)
       try {
-        const response = await fetch(`/api/admin/search?q=${encodeURIComponent(trimmed)}&type=all&pageSize=15`, {
+        const response = await fetch(`/api/admin/search?q=${encodeURIComponent(trimmed)}&type=all&pageSize=15&market=${encodeURIComponent(market)}`, {
           credentials: 'include',
         })
         if (!response.ok) {
@@ -96,7 +96,7 @@ export default function CrmGlobalSearch() {
     }, 250)
 
     return () => window.clearTimeout(timer)
-  }, [query])
+  }, [query, market])
 
   const users = payload?.results?.users || []
   const companies = payload?.results?.companies || []
