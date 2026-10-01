@@ -3,13 +3,14 @@ import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
   guardCrmRequest,
+  type CrmSecurityContext,
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 
 const ENTITY_TYPES = new Set(['category', 'service', 'template'])
 
-function canPublishCatalog(security: { role: any; permissionOverrides: any[] }): boolean {
+function canPublishCatalog(security: CrmSecurityContext): boolean {
   const entry = getPermissionCatalogEntry('catalog:publish')
   return evaluateEffectivePermission({
     role: security.role,
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'catalog:publish',
+      permission: 'catalog:edit',
       level: 'sensitive',
       requireCountryScope: true,
     })
@@ -263,7 +264,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'settings:edit',
+      permission: 'catalog:publish',
       level: 'sensitive',
       requireCountryScope: true,
     })
