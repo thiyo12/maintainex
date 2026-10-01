@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 import { getCountries } from '@/lib/locations'
 
 export async function GET() {
   try {
+    const runtime = await getPlatformRuntimeConfig()
+    const availableMarkets = new Set(runtime.market.availableMarkets)
     const databaseCountries = await prisma.country.findMany({
       orderBy: { name: 'asc' },
       include: {
@@ -29,7 +32,9 @@ export async function GET() {
     const countries = [
       ...databaseCountries.map(country => ({ ...country, _source: 'database' as const })),
       ...fallbackCountries,
-    ].sort((a, b) => a.name.localeCompare(b.name))
+    ]
+      .filter(country => availableMarkets.size === 0 || availableMarkets.has(country.code.toUpperCase()))
+      .sort((a, b) => a.name.localeCompare(b.name))
 
     const source =
       databaseCountries.length === 0
