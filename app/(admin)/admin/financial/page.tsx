@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
+import { CrmBadge, CrmButton, CrmCard, CrmMetricCard, CrmPageHeader, CrmState } from '@/components/crm/v2/CrmPrimitives'
 import {
   FiAlertTriangle,
   FiArrowUpRight,
@@ -45,14 +46,6 @@ function minor(value: unknown, currency = 'LKR') {
 function date(value?: string | null) {
   if (!value) return '—'
   return new Date(value).toLocaleString('en-LK', { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-function badge(status: string) {
-  const s = status.toUpperCase()
-  if (['CLEARED', 'SETTLED', 'SUCCESS', 'RELEASED', 'PROTECTED', 'REFUNDED'].includes(s)) return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  if (['FAILED', 'REJECTED', 'CHARGEDBACK'].includes(s)) return 'bg-red-50 text-red-700 border-red-200'
-  if (['PENDING', 'PROCESSING', 'ON_HOLD', 'CREATED', 'REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(s)) return 'bg-amber-50 text-amber-700 border-amber-200'
-  return 'bg-slate-50 text-slate-600 border-slate-200'
 }
 
 export default function FinanceControlCentrePage() {
@@ -110,28 +103,26 @@ export default function FinanceControlCentrePage() {
 
   if (loading) {
     return (
-      <div className="space-y-5 animate-pulse">
-        <div className="h-24 rounded-2xl bg-white border border-slate-200" />
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {[0,1,2,3].map(item => <div key={item} className="h-28 rounded-2xl bg-white border border-slate-200" />)}
-        </div>
-        <div className="h-[480px] rounded-2xl bg-white border border-slate-200" />
-      </div>
+      <CrmState
+        type="loading"
+        title="Loading finance control centre"
+        description="Loading escrow, payments, commission and payout state for your current market scope."
+      />
     )
   }
 
   return (
     <div className="space-y-5">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-[0.16em] text-amber-600 font-semibold">Finance operations</div>
-          <h1 className="mt-1 text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">Finance Control Centre</h1>
-          <p className="mt-1.5 text-sm text-slate-500">Escrow, payments, commission and payout queues in one view.</p>
-        </div>
-        <button type="button" onClick={load} className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50">
-          <FiRefreshCw size={15} /> Refresh
-        </button>
-      </section>
+      <CrmPageHeader
+        eyebrow="Finance operations"
+        title="Finance Control Centre"
+        description="Escrow, payments, commission and payout queues in one view. All values come from canonical finance state; gateway secrets are never exposed."
+        actions={
+          <CrmButton variant="secondary" onClick={load}>
+            <FiRefreshCw size={15} /> Refresh
+          </CrmButton>
+        }
+      />
 
       <section className="space-y-4">
         {metrics.length ? metrics.map(row => (
@@ -193,7 +184,7 @@ export default function FinanceControlCentrePage() {
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-semibold text-slate-900">{minor(item.commissionAmount, item.currency)}</div>
-                    <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge(item.status)}`}>{item.status}</span>
+                    <div className="mt-1"><FinanceStatus value={item.status} /></div>
                   </div>
                 </Link>
               ))}
@@ -212,7 +203,7 @@ export default function FinanceControlCentrePage() {
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-semibold text-slate-900">{minor(item.amount, item.currency)}</div>
-                    <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge(item.status)}`}>{item.status}</span>
+                    <div className="mt-1"><FinanceStatus value={item.status} /></div>
                   </div>
                 </div>
               ))}
@@ -226,28 +217,21 @@ export default function FinanceControlCentrePage() {
 
 function Metric({ icon: Icon, label, value, detail, danger = false }: { icon: any; label: string; value: string; detail: string; danger?: boolean }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs text-slate-400">{label}</div>
-          <div className={`mt-2 text-xl md:text-2xl font-semibold ${danger ? 'text-red-700' : 'text-slate-950'}`}>{value}</div>
-          <div className="mt-1 text-[11px] text-slate-400">{detail}</div>
-        </div>
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${danger ? 'bg-red-50 text-red-600' : 'bg-slate-950 text-amber-300'}`}>
-          <Icon size={16} />
-        </div>
-      </div>
-    </div>
+    <CrmMetricCard
+      label={label}
+      value={value}
+      helper={detail}
+      icon={<Icon size={16} />}
+      tone={danger ? 'danger' : 'neutral'}
+    />
   )
 }
 
 function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5">
-      <h2 className="font-semibold text-slate-900">{title}</h2>
-      {subtitle && <p className="text-xs text-slate-400 mt-1 mb-4">{subtitle}</p>}
+    <CrmCard title={title} description={subtitle}>
       {children}
-    </section>
+    </CrmCard>
   )
 }
 
@@ -259,14 +243,28 @@ function StatusRows({ rows, amountField }: { rows: Group[]; amountField: keyof G
         <div key={`${row.status}-${row.currency}`} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
           <div className="flex items-center gap-2">
             {['FAILED', 'REJECTED', 'CHARGEDBACK'].includes(row.status) ? <FiAlertTriangle className="text-red-500" size={14} /> : <FiCheckCircle className="text-slate-400" size={14} />}
-            <span className="text-sm text-slate-700">{row.status.replaceAll('_', ' ')} · {row.currency}</span>
-            <span className="text-xs text-slate-400">({row.count})</span>
+            <FinanceStatus value={row.status} />
+            <span className="text-xs text-slate-400">{row.currency} · {row.count}</span>
           </div>
           <span className="text-sm font-semibold text-slate-900">{minor(row[amountField], row.currency)}</span>
         </div>
       ))}
     </div>
   )
+}
+
+function FinanceStatus({ value }: { value: string }) {
+  const status = String(value || '').toUpperCase()
+  const tone =
+    ['CLEARED', 'SETTLED', 'SUCCESS', 'RELEASED', 'PROTECTED', 'REFUNDED'].includes(status)
+      ? 'success'
+      : ['FAILED', 'REJECTED', 'CHARGEDBACK'].includes(status)
+        ? 'danger'
+        : ['PENDING', 'PROCESSING', 'ON_HOLD', 'CREATED', 'REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(status)
+          ? 'warning'
+          : 'neutral'
+
+  return <CrmBadge tone={tone as any} dot>{status.replaceAll('_', ' ') || '—'}</CrmBadge>
 }
 
 function Empty({ text }: { text: string }) {
