@@ -4,8 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmCard,
+  CrmState,
+  type CrmTone,
+} from '@/components/crm/v2/CrmPrimitives'
+import { CrmConfirmDialog } from '@/components/crm/v2/CrmOverlays'
 import {
   FiActivity,
   FiAlertTriangle,
@@ -38,6 +44,7 @@ interface Job360Payload {
     finance: boolean
     trust: boolean
     audit: boolean
+    cancel: boolean
   }
   job: any
   quotes?: any[]
@@ -104,29 +111,25 @@ function formatMoney(value: unknown, currency = 'LKR') {
   }).format(Number.isFinite(amount) ? amount : 0)
 }
 
-function statusClasses(status?: string) {
+function statusTone(status?: string | null): CrmTone {
   const normalized = String(status || '').toUpperCase()
   if (['COMPLETED', 'CLEARED', 'SETTLED', 'SUCCESS', 'VERIFIED', 'RELEASED', 'APPROVED'].includes(normalized)) {
-    return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    return 'success'
   }
   if (['DISPUTED', 'FAILED', 'REJECTED', 'CANCELLED', 'CHARGEDBACK', 'CRITICAL'].includes(normalized)) {
-    return 'bg-red-50 text-red-700 border-red-200'
+    return 'danger'
   }
   if (['IN_PROGRESS', 'PROCESSING', 'PROTECTED', 'ON_HOLD', 'UNDER_REVIEW', 'HIGH'].includes(normalized)) {
-    return 'bg-amber-50 text-amber-700 border-amber-200'
+    return 'warning'
   }
   if (['OPEN', 'PENDING', 'CREATED', 'QUOTE_ACCEPTED', 'MEDIUM'].includes(normalized)) {
-    return 'bg-blue-50 text-blue-700 border-blue-200'
+    return 'info'
   }
-  return 'bg-slate-50 text-slate-600 border-slate-200'
+  return 'neutral'
 }
 
 function StatusBadge({ value }: { value?: string | null }) {
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusClasses(value || '')}`}>
-      {label(value)}
-    </span>
-  )
+  return <CrmBadge tone={statusTone(value)} dot>{label(value)}</CrmBadge>
 }
 
 function Card({
@@ -141,16 +144,9 @@ function Card({
   action?: React.ReactNode
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-4">
-        <div>
-          <h2 className="font-semibold text-slate-900">{title}</h2>
-          {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
-        </div>
-        {action}
-      </div>
-      <div className="p-5">{children}</div>
-    </section>
+    <CrmCard title={title} description={subtitle} action={action}>
+      {children}
+    </CrmCard>
   )
 }
 
@@ -166,14 +162,11 @@ function Field({ label: fieldLabel, value, mono = false }: { label: string; valu
 export default function Job360Page() {
   const params = useParams<{ id: string }>()
   const jobId = params?.id
-  const { user: admin } = useAdminSession()
-  const adminRole = (admin?.role || 'SUPPORT') as AdminRole
-  const rolePermissions = ROLE_PERMISSIONS[adminRole] || []
-  const canManageJob = rolePermissions.includes('jobs:manage')
   const [payload, setPayload] = useState<Job360Payload | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [actionLoading, setActionLoading] = useState(false)
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (!jobId) return
@@ -251,7 +244,6 @@ export default function Job360Page() {
 
   async function cancelJob() {
     if (!job || ['COMPLETED', 'CANCELLED'].includes(job.status)) return
-    if (!window.confirm('Cancel this job? This action will be audited.')) return
 
     setActionLoading(true)
     try {
@@ -270,6 +262,7 @@ export default function Job360Page() {
         throw new Error(body?.error?.message || body?.error || 'Unable to cancel job')
       }
       toast.success('Job cancelled')
+      setCancelConfirmOpen(false)
       await load()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Cancel failed')
@@ -279,27 +272,21 @@ export default function Job360Page() {
   }
 
   if (loading) {
-    return (
-      <div className="space-y-5 animate-pulse">
-        <div className="h-32 rounded-2xl bg-white border border-slate-200" />
-        <div className="grid xl:grid-cols-[minmax(0,1fr)_320px] gap-5">
-          <div className="h-[620px] rounded-2xl bg-white border border-slate-200" />
-          <div className="h-[520px] rounded-2xl bg-white border border-slate-200" />
-        </div>
-      </div>
-    )
+    return <CrmState type="loading" title="Loading Job 360" description="Loading lifecycle, finance, risk and operational context." />
   }
 
   if (!payload || !job) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
-        <FiAlertTriangle className="mx-auto text-amber-500" size={34} />
-        <h1 className="mt-3 text-xl font-semibold text-slate-900">Job unavailable</h1>
-        <p className="mt-1 text-sm text-slate-500">The record could not be loaded or is outside your assigned market.</p>
-        <Link href="/admin/jobs" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-amber-700">
-          <FiArrowLeft /> Back to jobs
-        </Link>
-      </div>
+      <CrmState
+        type="error"
+        title="Job unavailable"
+        description="The record could not be loaded or is outside your assigned market."
+        action={
+          <Link href="/admin/jobs" className="inline-flex items-center gap-2 text-sm font-semibold text-amber-700">
+            <FiArrowLeft /> Back to jobs
+          </Link>
+        }
+      />
     )
   }
 
@@ -338,24 +325,19 @@ export default function Job360Page() {
             </div>
 
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={load}
-                className="inline-flex items-center gap-2 h-10 px-3.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
+              <CrmButton variant="secondary" onClick={load}>
                 <FiRefreshCw size={15} />
                 Refresh
-              </button>
-              {canManageJob && !['COMPLETED', 'CANCELLED'].includes(job.status) && (
-                <button
-                  type="button"
+              </CrmButton>
+              {payload.permissions.cancel && !['COMPLETED', 'CANCELLED'].includes(job.status) && (
+                <CrmButton
+                  variant="danger"
                   disabled={actionLoading}
-                  onClick={cancelJob}
-                  className="inline-flex items-center gap-2 h-10 px-3.5 rounded-xl border border-red-200 bg-red-50 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                  onClick={() => setCancelConfirmOpen(true)}
                 >
                   <FiXCircle size={15} />
-                  {actionLoading ? 'Cancelling…' : 'Cancel job'}
-                </button>
+                  Cancel job
+                </CrmButton>
               )}
             </div>
           </div>
@@ -443,6 +425,17 @@ export default function Job360Page() {
           </Card>
         </aside>
       </div>
+
+      <CrmConfirmDialog
+        open={cancelConfirmOpen}
+        onClose={() => setCancelConfirmOpen(false)}
+        onConfirm={cancelJob}
+        title="Cancel this job?"
+        description="This will change the job lifecycle and may affect provider assignments or financial state. The server will re-check your permission, market scope and allowed transition before applying the cancellation."
+        confirmLabel="Cancel job"
+        dangerous
+        busy={actionLoading}
+      />
     </div>
   )
 }
