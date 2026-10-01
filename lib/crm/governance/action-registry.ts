@@ -15,7 +15,7 @@ export const CRM_ACTIONS: Readonly<Record<CrmActionId, ActionDefinition>> = {
     requiresMarketScope: true,
     reversibility: 'R2',
     riskLevel: 'HIGH',
-    baseTier: 'T1',
+    baseTier: 'T0',
     makerCheckerFromTier: 'T2',
     stepUpFromTier: 'T2',
     breakGlass: 'NONE',
