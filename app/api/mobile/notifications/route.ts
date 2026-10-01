@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
+import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,6 +41,18 @@ export async function POST(request: NextRequest) {
     }
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
+
+    const runtime = await getPlatformRuntimeConfig(user.countryCode)
+    if (!runtime.notifications.enabled) {
+      await prisma.user.updateMany({
+        where: { id: user.id },
+        data: { pushToken: null },
+      })
+      return NextResponse.json(
+        { error: 'Push notifications are temporarily disabled' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      )
+    }
 
     const { token } = await request.json()
     if (!token) {
