@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiShield, FiCheck, FiX, FiEye, FiFileText, FiClock, FiUser, FiExternalLink } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface KYCDocument {
   id: string
@@ -73,10 +72,8 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 
 export default function KYCPage() {
   const { user: admin } = useAdminSession()
-  const role = (admin?.role || 'SUPPORT') as AdminRole
-  const permissions = ROLE_PERMISSIONS[role] || []
-  const canApprove = permissions.includes('kyc:approve')
-  const canReject = permissions.includes('kyc:reject')
+  const canApprove = Boolean(admin?.permissions?.includes('kyc:approve'))
+  const canReject = Boolean(admin?.permissions?.includes('kyc:reject'))
   const [documents, setDocuments] = useState<KYCDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('PENDING')
