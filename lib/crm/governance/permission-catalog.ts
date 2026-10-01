@@ -28,7 +28,7 @@ const SENSITIVE_LEGACY = new Set([
   'risk_events:resolve',
   'pricing_config:write',
   'market_config:write',
-  'real_estate:manage',
+  'realestate:manage',
 ])
 
 const OWNER_ONLY_LEGACY = new Set([

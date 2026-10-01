@@ -41,6 +41,10 @@ interface Listing {
     name: string
     countryCode: string
     accountState: string
+    riskSignals: {
+      fraudEvents: number
+      openFlags: number
+    }
   } | null
   title: string
   description?: string | null
@@ -108,8 +112,8 @@ const STATUS_OPTIONS = ['ALL', 'pending', 'approved', 'published', 'rejected', '
 export default function RealEstateOperationsPage() {
   const { user } = useAdminSession()
   const { market } = useCrmShell()
-  const canView = Boolean(user?.permissions?.includes('real_estate:view'))
-  const canManagePermission = Boolean(user?.permissions?.includes('real_estate:manage'))
+  const canView = Boolean(user?.permissions?.includes('realestate:view'))
+  const canManagePermission = Boolean(user?.permissions?.includes('realestate:manage'))
 
   const [data, setData] = useState<Payload>(EMPTY)
   const [loading, setLoading] = useState(true)
@@ -347,9 +351,16 @@ export default function RealEstateOperationsPage() {
                       <div className="mt-0.5 text-[10px] text-slate-400">
                         {listing.seller?.mxId || listing.postedBy}
                       </div>
-                      {listing.seller && listing.seller.accountState !== 'ACTIVE' && (
-                        <CrmBadge tone="danger">{listing.seller.accountState}</CrmBadge>
-                      )}
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {listing.seller && listing.seller.accountState !== 'ACTIVE' && (
+                          <CrmBadge tone="danger">{listing.seller.accountState}</CrmBadge>
+                        )}
+                        {listing.seller && (listing.seller.riskSignals.fraudEvents > 0 || listing.seller.riskSignals.openFlags > 0) && (
+                          <CrmBadge tone="warning">
+                            RISK · {listing.seller.riskSignals.fraudEvents} events · {listing.seller.riskSignals.openFlags} flags
+                          </CrmBadge>
+                        )}
+                      </div>
                     </td>
                     <td className={crmTdClass}>
                       <CrmBadge tone="info">{listing.countryCode}</CrmBadge>
@@ -546,8 +557,13 @@ function ListingReviewCard({
         <p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-500">{listing.description}</p>
       )}
       <div className="mt-3 border-t border-[var(--crm-border)] pt-3">
-        <div className="text-[10px] text-slate-400">
-          Seller · {listing.seller?.name || 'Unknown'} · {listing.seller?.mxId || listing.postedBy}
+        <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
+          <span>Seller · {listing.seller?.name || 'Unknown'} · {listing.seller?.mxId || listing.postedBy}</span>
+          {listing.seller && (listing.seller.riskSignals.fraudEvents > 0 || listing.seller.riskSignals.openFlags > 0) && (
+            <CrmBadge tone="warning">
+              RISK · {listing.seller.riskSignals.fraudEvents} events · {listing.seller.riskSignals.openFlags} flags
+            </CrmBadge>
+          )}
         </div>
         {canManage && (
           <div className="mt-3 flex gap-2">

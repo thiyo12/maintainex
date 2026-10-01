@@ -17,7 +17,7 @@ function normalizeCountry(value: string | null): string | null {
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'real_estate:view',
+      permission: 'realestate:view',
       level: 'read',
       requireCountryScope: true,
     })
@@ -100,6 +100,26 @@ export async function GET(request: NextRequest) {
       : []
     const sellerMap = new Map(sellers.map(seller => [seller.id, seller]))
 
+    const [fraudCounts, openFlags] = await Promise.all([
+      prisma.fraudEvent.groupBy({
+        by: ['userId'],
+        where: { userId: { in: sellerIds } },
+        _count: { id: true },
+      }),
+      prisma.adminFlag.findMany({
+        where: {
+          userId: { in: sellerIds },
+          status: { in: ['pending', 'reviewed'] },
+        },
+        select: { userId: true, status: true },
+      }),
+    ])
+    const fraudCountMap = new Map(fraudCounts.map(item => [item.userId, item._count.id]))
+    const openFlagCountMap = openFlags.reduce((map, item) => {
+      map.set(item.userId, (map.get(item.userId) || 0) + 1)
+      return map
+    }, new Map<string, number>())
+
     const listingIds = listings.map(item => item.id)
     const inquiries = listingIds.length
       ? await prisma.propertyInquiry.findMany({
@@ -121,7 +141,7 @@ export async function GET(request: NextRequest) {
 
     const canManage = evaluateEffectivePermission({
       role: security.role,
-      permission: 'real_estate:manage',
+      permission: 'realestate:manage',
       permissionClass: 'SENSITIVE',
       overrides: security.permissionOverrides,
     }).allowed
@@ -153,6 +173,10 @@ export async function GET(request: NextRequest) {
                       : seller.isActive
                         ? 'ACTIVE'
                         : 'INACTIVE',
+                  riskSignals: {
+                    fraudEvents: fraudCountMap.get(seller.id) || 0,
+                    openFlags: openFlagCountMap.get(seller.id) || 0,
+                  },
                 }
               : null,
             title: item.title,
@@ -214,7 +238,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'real_estate:manage',
+      permission: 'realestate:manage',
       level: 'sensitive',
       requireCountryScope: true,
       permissionClass: 'SENSITIVE',

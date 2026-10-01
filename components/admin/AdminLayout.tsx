@@ -51,7 +51,7 @@ const NAVIGATION: NavItem[] = [
   { name: 'Trust & Safety', href: '/admin/trust-safety', icon: FiShield, permissions: ['risk:view'] },
   { name: 'Analytics', href: '/admin/analytics', icon: FiBarChart2, permissions: ['audit:view'] },
   { name: 'App & Web', href: '/admin/platform', icon: FiMonitor, permissions: ['markets:view'] },
-  { name: 'Real Estate', href: '/admin/real-estate', icon: FiHome, permissions: ['real_estate:view'] },
+  { name: 'Real Estate', href: '/admin/real-estate', icon: FiHome, permissions: ['realestate:view'] },
   { name: 'Staff', href: '/admin/admins', icon: FiUserCheck, permissions: ['staff:view'] },
   { name: 'Settings', href: '/admin/settings', icon: FiSettings, permissions: ['settings:view'] },
 ]
