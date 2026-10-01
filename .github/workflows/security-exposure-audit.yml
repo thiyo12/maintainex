@@ -39,16 +39,34 @@ jobs:
           ]
           literal_secret = re.compile(
               r"""(?ix)
-              \b(?:db[-_ ]?password|password|passwd|secret|token|api[_-]?key|merchant[_-]?secret|private[_-]?key)
-              (?:\s*[:=]\s*|\s*\|\s*[`"']?)
+              \b(?:password|passwd|secret|token|api[_-]?key|merchant[_-]?secret|private[_-]?key)
+              \s*[:=]\s*
+              ["'`]
               (?!\$\{|process\.env|<|your[-_ ]|change[-_ ]|generate[-_ ]|example|test\b|ci[-_ ]only|maintainex_dev_)
-              [A-Za-z0-9+/_=.:-]{20,}
+              [^"'`\r\n]{20,}
+              ["'`]
+              """
+          )
+          markdown_secret = re.compile(
+              r"""(?ix)
+              \|\s*(?:db[-_ ]?password|password|passwd|secret|token|api[_-]?key|merchant[_-]?secret|private[_-]?key)
+              \s*\|\s*
+              `(?!<|example|test\b|maintainex_dev_)[^`\r\n]{20,}`
+              """
+          )
+          unquoted_random_secret = re.compile(
+              r"""(?ix)
+              \b(?:password|passwd|secret|token|api[_-]?key|merchant[_-]?secret|private[_-]?key)
+              \s*[:=]\s*
+              (?!\$\{|process\.env|<|your[-_ ]|change[-_ ]|generate[-_ ]|example|test\b|ci[-_ ]only|maintainex_dev_)
+              [A-F0-9]{32,}
+              \b
               """
           )
 
           def classify(line):
               hits = [name for name, rx in patterns if rx.search(line)]
-              if literal_secret.search(line):
+              if literal_secret.search(line) or markdown_secret.search(line) or unquoted_random_secret.search(line):
                   hits.append("possible-hardcoded-secret")
               for m in re.finditer(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", line):
                   ip=m.group(0)
