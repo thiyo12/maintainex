@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiAlertTriangle, FiEye, FiCheck, FiX, FiSearch } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface Dispute {
   id: string
@@ -53,7 +52,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function DisputesPage() {
   const { user: admin } = useAdminSession()
-  const canResolveDisputes = !!admin && (ROLE_PERMISSIONS[admin.role as AdminRole] || []).includes('disputes:resolve')
+  const canResolveDisputes = Boolean(admin?.permissions?.includes('disputes:resolve'))
   const [disputes, setDisputes] = useState<Dispute[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('ALL')
