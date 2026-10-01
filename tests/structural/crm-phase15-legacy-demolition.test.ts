@@ -70,6 +70,22 @@ describe('CRM V2 Phase 15 legacy demolition gate', () => {
     expect(source).toContain('evaluateEffectivePermission')
   })
 
+  it('retired legacy CRM routes stay absent', () => {
+    const retired = [
+      'app/(admin)/admin/analytics/security/page.tsx',
+      'app/(admin)/admin/cheating/page.tsx',
+      'app/(admin)/admin/wishlist/page.tsx',
+      'app/(admin)/admin/commission/page.tsx',
+      'app/(admin)/admin/users/page.tsx',
+      'app/api/admin/cheating/route.ts',
+      'app/api/admin/wishlist/route.ts',
+      'app/api/admin/security/logs/route.ts',
+    ]
+    for (const path of retired) {
+      expect(() => readFileSync(resolve(process.cwd(), path), 'utf8')).toThrow()
+    }
+  })
+
   it('keeps the canonical admin shell on the V2 design system', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'components/admin/AdminLayout.tsx'),
