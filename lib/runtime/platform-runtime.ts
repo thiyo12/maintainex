@@ -165,7 +165,9 @@ export async function getPlatformRuntimeConfig(countryInput?: string | null) {
       .filter(code => /^[A-Z]{2}$/.test(code))
   )]
   const countryCode = normalizeCountry(countryInput)
-  const marketAvailable = countryCode ? availableMarkets.includes(countryCode) : true
+  const marketAvailable = countryCode
+    ? availableMarkets.length === 0 || availableMarkets.includes(countryCode)
+    : true
 
   const bannerSeverity = String(value('runtime.banner.severity')).toUpperCase() as RuntimeBannerSeverity
   const maintenanceEnabled = Boolean(value('runtime.maintenance.enabled'))
