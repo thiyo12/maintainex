@@ -43,16 +43,16 @@ interface NavItem {
 const NAVIGATION: NavItem[] = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: FiGrid, permissions: ['dashboard:view'] },
   { name: 'Jobs', href: '/admin/jobs', icon: FiTool, permissions: ['jobs:view'] },
-  { name: 'Customers', href: '/admin/users/customers', icon: FiUsers, permissions: ['users:view', 'customers:view'] },
+  { name: 'Customers', href: '/admin/users/customers', icon: FiUsers, permissions: ['customers:view'] },
   { name: 'Taskers', href: '/admin/users/taskers', icon: FiUserCheck, permissions: ['taskers:view'] },
   { name: 'Companies', href: '/admin/users/companies', icon: FiBriefcase, permissions: ['companies:view'] },
-  { name: 'Finance', href: '/admin/financial', icon: FiDollarSign, permissions: ['wallets:view', 'commission:view', 'finance:payments:view'] },
+  { name: 'Finance', href: '/admin/financial', icon: FiDollarSign, permissions: ['finance:payments:view'] },
   { name: 'Disputes', href: '/admin/jobs/disputes', icon: FiAlertTriangle, permissions: ['disputes:view'] },
-  { name: 'Trust & Safety', href: '/admin/trust-safety', icon: FiShield, permissions: ['trust:view', 'kyc:view', 'risk_events:read', 'credentials:read', 'security:view'] },
-  { name: 'Analytics', href: '/admin/analytics', icon: FiBarChart2, permissions: ['analytics:view', 'audit:read'] },
-  { name: 'App & Web', href: '/admin/platform', icon: FiMonitor, permissions: ['settings:view', 'market_config:read'] },
+  { name: 'Trust & Safety', href: '/admin/trust-safety', icon: FiShield, permissions: ['risk:view'] },
+  { name: 'Analytics', href: '/admin/analytics', icon: FiBarChart2, permissions: ['audit:view'] },
+  { name: 'App & Web', href: '/admin/platform', icon: FiMonitor, permissions: ['markets:view'] },
   { name: 'Real Estate', icon: FiHome, permissions: ['settings:view'], disabled: true, badge: 'Phase 12' },
-  { name: 'Staff', href: '/admin/admins', icon: FiUserCheck, permissions: ['admins:view', 'staff:view'] },
+  { name: 'Staff', href: '/admin/admins', icon: FiUserCheck, permissions: ['staff:view'] },
   { name: 'Settings', href: '/admin/settings', icon: FiSettings, permissions: ['settings:view'] },
 ]
 
