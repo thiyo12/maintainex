@@ -21,6 +21,7 @@ import {
   CrmPageHeader,
   CrmState,
 } from '@/components/crm/v2/CrmPrimitives'
+import PlatformRuntimeControls from '@/components/crm/v2/PlatformRuntimeControls'
 
 interface Overview {
   catalog: {
@@ -238,6 +239,8 @@ export default function WebsiteManagementPage() {
           )}
         </CrmCard>
       </section>
+
+      <PlatformRuntimeControls surface="website" />
 
       <CrmCard
         title="Website booking runtime boundary"
