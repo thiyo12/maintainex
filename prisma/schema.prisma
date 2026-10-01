@@ -3548,6 +3548,8 @@ model PaymentIntent {
   escrowId        String
   merchantOrderId String    @unique
   paymentId       String?
+  gateway         String    @default("PAYPAL") // PAYPAL for new payments; PAYHERE retained for legacy transactions
+  refundId        String?
   amount          BigInt
   currency        String    @default("LKR")
   status          String    @default("CREATED") // CREATED, PENDING, SUCCESS, FAILED, CANCELLED, EXPIRED, REFUND_REQUIRED, REFUND_PROCESSING, REFUNDED, CHARGEDBACK
@@ -3559,5 +3561,6 @@ model PaymentIntent {
   @@index([jobId])
   @@index([customerId])
   @@index([status])
+  @@index([gateway, status])
   @@index([merchantOrderId])
 }
