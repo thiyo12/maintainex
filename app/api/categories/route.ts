@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
 
 function serializeService(service: any) {
@@ -16,6 +17,10 @@ function serializeService(service: any) {
 
 export async function GET() {
   try {
+    const runtime = await getPlatformRuntimeConfig()
+    if (!runtime.catalog.visible) {
+      return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } })
+    }
     const categories = await prisma.category.findMany({
       where: { isActive: true },
       include: {
