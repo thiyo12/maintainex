@@ -139,6 +139,27 @@ export default function FinanceControlCentrePage() {
         )}
       </section>
 
+      <div className="flex flex-wrap gap-3">
+        <Link href="/admin/financial/ledger">
+          <CrmButton variant="secondary">
+            <FiShield size={14} />
+            Financial ledger
+          </CrmButton>
+        </Link>
+        <Link href="/admin/financial/payments">
+          <CrmButton variant="secondary">
+            <FiCreditCard size={14} />
+            Payment operations
+          </CrmButton>
+        </Link>
+        <Link href="/admin/financial/escrow">
+          <CrmButton variant="secondary">
+            <FiDollarSign size={14} />
+            Escrow operations
+          </CrmButton>
+        </Link>
+      </div>
+
       <section className="grid xl:grid-cols-2 gap-5">
         <Panel title="Escrow state" subtitle="Canonical JobEscrow status distribution">
           <StatusRows rows={data?.escrow || []} amountField="total" />
