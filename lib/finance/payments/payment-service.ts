@@ -4,6 +4,12 @@ import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { notifyEscrowDeposited } from '@/lib/notifications'
+import {
+  createPayPalOrder,
+  findPayPalApprovalUrl,
+  getPayPalConfig,
+  getPayPalOrder,
+} from '@/lib/finance/payments/paypal-adapter'
 import { bigIntToSafeNumber, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
 import {
   getPayHereConfig,
@@ -12,7 +18,6 @@ import {
   getPayHereReturnUrl,
   getPayHereCancelUrl,
   getPayHereNotifyUrl,
-  generateMerchantOrderId,
   formatPayHereAmount,
   parsePayHereAmount,
   requestPayHereRefund,
@@ -50,38 +55,30 @@ export interface PaymentResult {
 export async function createPaymentIntent(params: CreatePaymentParams): Promise<PaymentResult> {
   const { jobId, customerId, baseUrl } = params
 
-  const config = getPayHereConfig()
-  if (!config) {
-    return { success: false, error: 'Payment gateway not configured', code: 'PAYHERE_NOT_CONFIGURED' }
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: customerId },
-    select: { name: true, email: true, phone: true },
-  })
-  if (!user?.email || !user?.phone) {
+  if (!getPayPalConfig()) {
     return {
       success: false,
-      error: 'A verified email and phone number are required before card payment',
-      code: 'CUSTOMER_PAYMENT_DETAILS_REQUIRED',
+      error: 'PayPal payment gateway is not configured',
+      code: 'PAYPAL_NOT_CONFIGURED',
     }
   }
 
-  const buildResult = (intent: { id: string; merchantOrderId: string }): PaymentResult => ({
-    success: true,
-    paymentIntentId: intent.id,
-    checkoutUrl: buildHostedCheckoutUrl(baseUrl, intent.id, config.merchantSecret),
-    merchantOrderId: intent.merchantOrderId,
-  })
-
   type IntentDecision = {
-    intent: { id: string; merchantOrderId: string } | null
+    intent: {
+      id: string
+      merchantOrderId: string
+      amount: bigint
+      currency: string
+    } | null
+    jobTitle: string | null
     failure: PaymentResult | null
   }
 
-  const decision: IntentDecision = await prisma.$transaction(async (tx) => {
-    const lockedJobs = await tx.$queryRaw<{ id: string; customerId: string; status: string }[]>`
-      SELECT id, "customerId", status
+  const decision: IntentDecision = await prisma.$transaction(async tx => {
+    const lockedJobs = await tx.$queryRaw<
+      { id: string; customerId: string; status: string; title: string }[]
+    >`
+      SELECT id, "customerId", status, title
       FROM "MarketplaceJob"
       WHERE id = ${jobId}
       FOR UPDATE
@@ -90,18 +87,21 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     if (!job) {
       return {
         intent: null,
+        jobTitle: null,
         failure: { success: false, error: 'Job not found', code: 'JOB_NOT_FOUND' },
       }
     }
     if (job.customerId !== customerId) {
       return {
         intent: null,
+        jobTitle: job.title,
         failure: { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' },
       }
     }
     if (job.status !== 'QUOTE_ACCEPTED') {
       return {
         intent: null,
+        jobTitle: job.title,
         failure: { success: false, error: 'Job is not payable', code: 'JOB_NOT_PAYABLE' },
       }
     }
@@ -110,13 +110,23 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     if (!escrow) {
       return {
         intent: null,
-        failure: { success: false, error: 'Escrow not initialized', code: 'ESCROW_NOT_INITIALIZED' },
+        jobTitle: job.title,
+        failure: {
+          success: false,
+          error: 'Escrow not initialized',
+          code: 'ESCROW_NOT_INITIALIZED',
+        },
       }
     }
     if (escrow.status !== 'PENDING_PAYMENT') {
       return {
         intent: null,
-        failure: { success: false, error: 'Escrow is not awaiting payment', code: 'ESCROW_NOT_FUNDABLE' },
+        jobTitle: job.title,
+        failure: {
+          success: false,
+          error: 'Escrow is not awaiting payment',
+          code: 'ESCROW_NOT_FUNDABLE',
+        },
       }
     }
 
@@ -130,12 +140,32 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       data: { status: 'EXPIRED' },
     })
 
+    // The product has switched to PayPal. Do not issue a new PayHere checkout
+    // URL when the customer retries after the cutover.
+    await tx.paymentIntent.updateMany({
+      where: {
+        jobId,
+        gateway: 'PAYHERE',
+        status: { in: ['CREATED', 'PENDING'] },
+      },
+      data: { status: 'EXPIRED' },
+    })
+
     const existingPending = await tx.paymentIntent.findFirst({
-      where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
-      select: { id: true, merchantOrderId: true },
+      where: {
+        jobId,
+        gateway: 'PAYPAL',
+        status: { in: ['CREATED', 'PENDING'] },
+      },
+      select: {
+        id: true,
+        merchantOrderId: true,
+        amount: true,
+        currency: true,
+      },
     })
     if (existingPending) {
-      return { intent: existingPending, failure: null }
+      return { intent: existingPending, jobTitle: job.title, failure: null }
     }
 
     const totalAmount = escrow.totalAmount ?? escrow.amount
@@ -144,22 +174,144 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         jobId,
         customerId,
         escrowId: escrow.id,
-        merchantOrderId: generateMerchantOrderId(jobId),
+        merchantOrderId: `PP-PENDING-${crypto.randomUUID()}`,
+        gateway: 'PAYPAL',
         amount: totalAmount,
         currency: (escrow.currency || 'LKR') as Currency,
         status: 'CREATED',
       },
-      select: { id: true, merchantOrderId: true },
+      select: {
+        id: true,
+        merchantOrderId: true,
+        amount: true,
+        currency: true,
+      },
     })
 
-    return { intent: paymentIntent, failure: null }
+    return { intent: paymentIntent, jobTitle: job.title, failure: null }
   })
 
   if (decision.failure) return decision.failure
   if (!decision.intent) {
-    return { success: false, error: 'Could not create payment session', code: 'PAYMENT_INTENT_FAILED' }
+    return {
+      success: false,
+      error: 'Could not create payment session',
+      code: 'PAYMENT_INTENT_FAILED',
+    }
   }
-  return buildResult(decision.intent)
+
+  const intent = decision.intent
+  if (!intent.merchantOrderId.startsWith('PP-PENDING-')) {
+    const existingOrder = await getPayPalOrder(intent.merchantOrderId)
+    const approvalUrl = findPayPalApprovalUrl(existingOrder.body || null)
+
+    if (existingOrder.ok && approvalUrl) {
+      return {
+        success: true,
+        paymentIntentId: intent.id,
+        checkoutUrl: approvalUrl,
+        merchantOrderId: intent.merchantOrderId,
+      }
+    }
+
+    if (existingOrder.ok && existingOrder.orderStatus === 'COMPLETED') {
+      return {
+        success: false,
+        paymentIntentId: intent.id,
+        merchantOrderId: intent.merchantOrderId,
+        error: 'PayPal order is already completed and awaiting local reconciliation',
+        code: 'PAYMENT_RECONCILIATION_REQUIRED',
+      }
+    }
+  }
+
+  const origin = new URL(baseUrl).origin
+  const created = await createPayPalOrder({
+    paymentIntentId: intent.id,
+    jobId,
+    description: decision.jobTitle || 'MaintainEX service booking',
+    amountMinor: intent.amount,
+    currency: intent.currency,
+    returnUrl: `${origin}/api/payments/paypal/return?paymentIntentId=${encodeURIComponent(intent.id)}`,
+    cancelUrl: `${origin}/api/payments/paypal/cancel?paymentIntentId=${encodeURIComponent(intent.id)}`,
+  })
+
+  if (!created.ok || !created.orderId || !created.approvalUrl) {
+    await prisma.paymentIntent.updateMany({
+      where: {
+        id: intent.id,
+        gateway: 'PAYPAL',
+        merchantOrderId: intent.merchantOrderId,
+        status: 'CREATED',
+      },
+      data: {
+        status: 'FAILED',
+        gatewayResponse: JSON.stringify({
+          provider: 'PAYPAL',
+          phase: 'CREATE_ORDER',
+          httpStatus: created.status,
+          error: created.error || 'PayPal order creation failed',
+        }),
+      },
+    })
+
+    return {
+      success: false,
+      paymentIntentId: intent.id,
+      error: created.error || 'Unable to create PayPal checkout',
+      code: 'PAYPAL_ORDER_CREATE_FAILED',
+    }
+  }
+
+  const claimed = await prisma.paymentIntent.updateMany({
+    where: {
+      id: intent.id,
+      gateway: 'PAYPAL',
+      merchantOrderId: intent.merchantOrderId,
+      status: 'CREATED',
+    },
+    data: {
+      merchantOrderId: created.orderId,
+      status: 'PENDING',
+      gatewayResponse: JSON.stringify({
+        provider: 'PAYPAL',
+        orderStatus: created.orderStatus || 'CREATED',
+        createdAt: new Date().toISOString(),
+      }),
+    },
+  })
+
+  if (claimed.count !== 1) {
+    const current = await prisma.paymentIntent.findUnique({
+      where: { id: intent.id },
+      select: { merchantOrderId: true, status: true, gateway: true },
+    })
+    if (
+      current?.gateway === 'PAYPAL' &&
+      current.status === 'PENDING' &&
+      current.merchantOrderId === created.orderId
+    ) {
+      return {
+        success: true,
+        paymentIntentId: intent.id,
+        checkoutUrl: created.approvalUrl,
+        merchantOrderId: created.orderId,
+      }
+    }
+    return {
+      success: false,
+      paymentIntentId: intent.id,
+      error: 'Payment session changed concurrently',
+      code: 'PAYMENT_SESSION_CHANGED',
+    }
+  }
+
+  return {
+    success: true,
+    paymentIntentId: intent.id,
+    checkoutUrl: created.approvalUrl,
+    merchantOrderId: created.orderId,
+  }
 }
 
 function checkoutToken(intentId: string, secret: string): string {
