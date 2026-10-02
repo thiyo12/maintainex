@@ -17,6 +17,7 @@ import {
   FiActivity,
   FiAlertTriangle,
   FiArrowLeft,
+  FiArrowUpRight,
   FiCalendar,
   FiCheck,
   FiClock,
