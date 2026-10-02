@@ -8,6 +8,7 @@ export const v2Payments = {
       paymentIntentId: string
       checkoutUrl: string
       merchantOrderId: string
+      gateway: string
     }>(`/api/mobile/v2/jobs/${jobId}/payment`, { method: 'POST' }),
 
   status: (jobId: string) =>
