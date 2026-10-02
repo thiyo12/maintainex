@@ -9,6 +9,9 @@ import {
   findPayPalApprovalUrl,
   getPayPalConfig,
   getPayPalOrder,
+  getPayPalRefund,
+  parsePayPalAmountToMinor,
+  refundPayPalCapture,
 } from '@/lib/finance/payments/paypal-adapter'
 import { bigIntToSafeNumber, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
 import {
@@ -650,7 +653,7 @@ async function recordCapturedPaymentForRefund(
   await postLedgerTransaction({
     entries: [
       {
-        accountId: 'external:payhere',
+        accountId: externalAccountId,
         accountType: 'EXTERNAL_PAYOUT',
         entryType: 'DEBIT',
         amount: paymentIntent.amount,
@@ -1356,14 +1359,15 @@ export async function reconcilePayHereRefund(
   }
 }
 
-async function finalizePayHereRefund(
+async function finalizeExternalProviderRefund(
   paymentIntentId: string,
   details: {
+    provider: 'PAYHERE' | 'PAYPAL'
     gatewayStatus: string
     refundReference: string | null
     message: string
     actorId?: string
-    source?: 'PAYHERE' | 'MANUAL'
+    source?: 'PAYHERE' | 'PAYPAL' | 'MANUAL'
   }
 ): Promise<PayHereRefundProcessingResult> {
   const intent = await prisma.paymentIntent.findUnique({
@@ -1419,8 +1423,12 @@ async function finalizePayHereRefund(
     }
   }
 
-  const actorId = details.actorId || 'system:payhere-refund'
+  const actorId =
+    details.actorId ||
+    `system:${details.provider.toLowerCase()}-refund`
   const actorType = details.source === 'MANUAL' ? 'STAFF' : 'SYSTEM'
+  const externalAccountId = `external:${details.provider.toLowerCase()}`
+  const providerKey = details.provider.toLowerCase()
 
   await prisma.$transaction(async tx => {
     const claimed = await tx.paymentIntent.updateMany({
@@ -1462,7 +1470,7 @@ async function finalizePayHereRefund(
             amount: intent.amount,
           },
           {
-            accountId: 'external:payhere',
+            accountId: externalAccountId,
             accountType: 'EXTERNAL_PAYOUT',
             entryType: 'CREDIT',
             amount: intent.amount,
@@ -1471,15 +1479,15 @@ async function finalizePayHereRefund(
         currency: intent.currency as Currency,
         referenceType: 'PAYMENT_EXTERNAL_REFUND',
         referenceId: intent.id,
-        idempotencyKey: `payhere-refund-suspense-release:${intent.id}:${intent.paymentId || intent.merchantOrderId}`,
-        description: `External refund of late PayHere capture ${intent.id}`,
+        idempotencyKey: `${providerKey}-refund-suspense-release:${intent.id}:${intent.paymentId || intent.merchantOrderId}`,
+        description: `External refund of late ${details.provider} capture ${intent.id}`,
         createdBy: actorId,
         metadata: JSON.stringify({
           paymentIntentId: intent.id,
           paymentId: intent.paymentId,
           merchantOrderId: intent.merchantOrderId,
           refundReference: details.refundReference,
-          refundSource: details.source || 'PAYHERE',
+          refundSource: details.source || details.provider,
           fundingSource: 'REFUND_SUSPENSE',
         }),
       }, tx)
@@ -1508,7 +1516,7 @@ async function finalizePayHereRefund(
             amount: activeEscrow.totalAmount,
           },
           {
-            accountId: 'external:payhere',
+            accountId: externalAccountId,
             accountType: 'EXTERNAL_PAYOUT',
             entryType: 'CREDIT',
             amount: activeEscrow.totalAmount,
@@ -1517,15 +1525,15 @@ async function finalizePayHereRefund(
         currency: activeEscrow.currency as Currency,
         referenceType: 'ESCROW_EXTERNAL_REFUND',
         referenceId: activeEscrow.id,
-        idempotencyKey: `payhere-refund:${activeEscrow.id}:${intent.paymentId || intent.merchantOrderId}`,
-        description: `PayHere refund reconciliation for escrow ${activeEscrow.id}`,
+        idempotencyKey: `${providerKey}-refund:${activeEscrow.id}:${intent.paymentId || intent.merchantOrderId}`,
+        description: `${details.provider} refund reconciliation for escrow ${activeEscrow.id}`,
         createdBy: actorId,
         metadata: JSON.stringify({
           paymentIntentId: intent.id,
           paymentId: intent.paymentId,
           merchantOrderId: intent.merchantOrderId,
           refundReference: details.refundReference,
-          refundSource: details.source || 'PAYHERE',
+          refundSource: details.source || details.provider
           fundingSource: 'ESCROW',
         }),
       }, tx)
@@ -1575,7 +1583,7 @@ async function finalizePayHereRefund(
         paymentId: intent.paymentId,
         escrowId: intent.escrowId,
         refundReference: details.refundReference,
-        refundSource: details.source || 'PAYHERE',
+        refundSource: details.source || details.provider
         fundingSource: suspenseFunding ? 'REFUND_SUSPENSE' : 'ESCROW',
         refundMinor: suspenseFunding ? intent.amount : escrow!.totalAmount,
         currency: suspenseFunding ? intent.currency : escrow!.currency,
@@ -1588,6 +1596,22 @@ async function finalizePayHereRefund(
     status: 'REFUNDED',
     refundReference: details.refundReference,
   }
+}
+
+async function finalizePayHereRefund(
+  paymentIntentId: string,
+  details: {
+    gatewayStatus: string
+    refundReference: string | null
+    message: string
+    actorId?: string
+    source?: 'PAYHERE' | 'MANUAL'
+  }
+): Promise<PayHereRefundProcessingResult> {
+  return finalizeExternalProviderRefund(paymentIntentId, {
+    ...details,
+    provider: 'PAYHERE',
+  })
 }
 
 export async function confirmManualExternalRefund(
@@ -1610,7 +1634,7 @@ export async function confirmManualExternalRefund(
 
   const intent = await prisma.paymentIntent.findUnique({
     where: { id: paymentIntentId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, gateway: true },
   })
   if (!intent) {
     return {
@@ -1632,7 +1656,23 @@ export async function confirmManualExternalRefund(
     }
   }
 
-  return finalizePayHereRefund(paymentIntentId, {
+  const provider =
+    intent.gateway === 'PAYPAL'
+      ? 'PAYPAL'
+      : intent.gateway === 'PAYHERE'
+        ? 'PAYHERE'
+        : null
+  if (!provider) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: `Manual external refund is unsupported for gateway ${intent.gateway}`,
+      code: 'PAYMENT_PROVIDER_REFUND_UNSUPPORTED',
+    }
+  }
+
+  return finalizeExternalProviderRefund(paymentIntentId, {
+    provider,
     gatewayStatus: 'MANUAL_REFUND_CONFIRMED',
     refundReference: reference,
     message: input.note?.trim().slice(0, 500) || 'Manual external refund confirmed by finance',
