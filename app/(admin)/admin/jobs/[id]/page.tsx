@@ -18,6 +18,8 @@ import {
   FiAlertTriangle,
   FiArrowLeft,
   FiBriefcase,
+  FiCalendar,
+  FiChevronRight,
   FiCheck,
   FiCheckCircle,
   FiClock,
@@ -27,8 +29,10 @@ import {
   FiExternalLink,
   FiFileText,
   FiFlag,
+  FiMail,
   FiMapPin,
   FiMessageSquare,
+  FiPhone,
   FiRefreshCw,
   FiShield,
   FiTool,
@@ -303,70 +307,52 @@ export default function Job360Page() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <div className="p-5 md:p-6">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0">
-              <Link href="/admin/jobs" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900">
-                <FiArrowLeft size={15} />
-                Back to jobs
-              </Link>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">{job.title}</h1>
-                <StatusBadge value={job.status} />
-                <CrmBadge tone={payload.source === 'V2' ? 'amber' : 'neutral'}>
-                  {payload.source === 'V2' ? 'Marketplace' : 'Classic'}
-                </CrmBadge>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(job.id)
-                    toast.success('Job ID copied')
-                  }}
-                  className="inline-flex items-center gap-1.5 font-mono hover:text-slate-700"
-                >
-                  {job.id}
-                  <FiCopy size={12} />
-                </button>
-                <span>Created {formatDate(job.createdAt)}</span>
-                {job.urgency && <span>Urgency: {label(job.urgency)}</span>}
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <CrmButton variant="secondary" onClick={load}>
-                <FiRefreshCw size={15} />
-                Refresh
-              </CrmButton>
-              {payload.permissions.cancel && !['COMPLETED', 'CANCELLED'].includes(job.status) && (
-                <CrmButton
-                  variant="danger"
-                  disabled={actionLoading}
-                  onClick={() => setCancelConfirmOpen(true)}
-                >
-                  <FiXCircle size={15} />
-                  Cancel job
-                </CrmButton>
-              )}
-            </div>
+    <div className="space-y-3.5">
+      <section className="crm-card overflow-hidden">
+        <div className="px-4 pt-3.5">
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/admin/jobs" className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 hover:text-slate-900">
+              <FiArrowLeft size={12} />
+              Back to Jobs
+            </Link>
+            <CrmButton variant="secondary" size="sm" onClick={load}>
+              <FiRefreshCw size={12} />
+              Refresh
+            </CrmButton>
           </div>
 
-          <div className="mt-6 grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
-            <SummaryTile icon={FiUser} label="Customer" value={customer?.name || 'Unknown'} meta={customer?.mxId || customer?.email} href={customer?.id ? `/admin/users/${customer.id}` : undefined} />
-            <SummaryTile icon={FiTool} label="Provider" value={provider?.companyName || provider?.name || 'Not assigned'} meta={acceptedQuote ? `${label(acceptedQuote.providerType)} provider` : 'Awaiting accepted quote'} href={providerLink || undefined} />
-            <SummaryTile icon={FiMapPin} label="Location" value={location || 'Not specified'} meta={job.countryCode || customer?.countryCode || '—'} />
-            <SummaryTile icon={FiDollarSign} label="Amount" value={formatMoney(amount, currency)} meta={acceptedQuote ? 'Accepted / authorized value' : 'Budget value'} />
+          <div className="mt-3 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-mono text-[21px] font-extrabold tracking-[-0.025em] text-slate-950">
+                  {job.id}
+                </h1>
+                <StatusBadge value={job.status} />
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
+                <span className="font-semibold text-slate-700">{job.title}</span>
+                <span>•</span>
+                <span>{payload.source === 'V2' ? 'Marketplace' : 'Classic'}</span>
+                <span>•</span>
+                <span>Created {formatDate(job.createdAt)}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-5 gap-y-2 sm:grid-cols-4">
+              <TopFact label="Customer" icon={FiUser} value={customer?.name || 'Unknown'} />
+              <TopFact label="Provider" icon={FiTool} value={provider?.companyName || provider?.name || 'Unassigned'} />
+              <TopFact label="Location" icon={FiMapPin} value={location || 'Not specified'} />
+              <TopFact label="Amount" icon={FiDollarSign} value={formatMoney(amount, currency)} />
+            </div>
           </div>
         </div>
 
-        <div className="border-t border-[var(--crm-border)] px-4 py-3">
+        <div className="mt-2 px-4">
           <CrmTabs
+            variant="underline"
             items={visibleTabs.map(tab => ({
               id: tab.key,
-              label: tab.label,
+              label: tab.label === 'Dispute / Risk' ? 'Dispute' : tab.label,
               count: tab.key === 'dispute' && riskEvents.length > 0 ? riskEvents.length : undefined,
             }))}
             active={activeTab}
@@ -375,9 +361,18 @@ export default function Job360Page() {
         </div>
       </section>
 
-      <div className="grid xl:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
-        <div className="space-y-5">
-          {activeTab === 'overview' && <OverviewTab payload={payload} location={location} />}
+      <div className="grid items-start gap-3.5 xl:grid-cols-[minmax(0,1fr)_270px]">
+        <div className="space-y-3.5">
+          {activeTab === 'overview' && (
+            <OverviewTab
+              payload={payload}
+              location={location}
+              provider={provider}
+              providerLink={providerLink}
+              currency={currency}
+              amount={amount}
+            />
+          )}
           {activeTab === 'lifecycle' && <LifecycleTab payload={payload} />}
           {activeTab === 'quotes' && <QuotesTab payload={payload} currency={currency} />}
           {activeTab === 'workspace' && <WorkspaceTab payload={payload} />}
@@ -386,45 +381,86 @@ export default function Job360Page() {
           {activeTab === 'audit' && payload.permissions.audit && <AuditTab rows={auditRows} />}
         </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-[92px]">
-          <Card title="Operations rail" subtitle="Current job controls">
+        <aside className="space-y-3.5 xl:sticky xl:top-[76px]">
+          <ReferenceCard title="Quick Actions">
             <div className="space-y-2">
-              {customer?.id && (
-                <RailLink href={`/admin/users/${customer.id}`} icon={FiUser} label="Open customer 360" />
-              )}
-              {providerLink && <RailLink href={providerLink} icon={FiTool} label="Open provider 360" />}
+              <button type="button" onClick={() => setActiveTab('workspace')} className="flex h-8 w-full items-center gap-2 rounded-md border border-[#e2b200] bg-[#ffca18] px-3 text-[10px] font-bold text-[#111827] hover:bg-[#ffd642]">
+                <FiMessageSquare size={12} />
+                Message / Workspace
+              </button>
+              {customer?.id && <RailLink href={`/admin/users/${customer.id}`} icon={FiUser} label="Open customer" />}
+              {providerLink && <RailLink href={providerLink} icon={FiTool} label="Open provider" />}
               {payload.permissions.finance && (
-                <RailLink href="/admin/financial/wallets" icon={FiCreditCard} label="Finance operations" />
+                <button type="button" onClick={() => setActiveTab('finance')} className="flex h-8 w-full items-center gap-2 rounded-md border border-[#dfe4e8] bg-white px-3 text-left text-[10px] font-semibold text-slate-700 hover:bg-[#f8fafb]">
+                  <FiCreditCard size={12} className="text-slate-500" />
+                  Finance details
+                </button>
               )}
               {payload.permissions.trust && (
-                <>
-                  <RailLink href="/admin/jobs/disputes" icon={FiFlag} label="Dispute queue" />
-                  <RailLink href="/admin/trust-safety/risk-events" icon={FiShield} label="Trust & safety" />
-                </>
+                <button type="button" onClick={() => setActiveTab('dispute')} className="flex h-8 w-full items-center gap-2 rounded-md border border-[#dfe4e8] bg-white px-3 text-left text-[10px] font-semibold text-slate-700 hover:bg-[#f8fafb]">
+                  <FiFlag size={12} className="text-slate-500" />
+                  Dispute / Risk
+                </button>
+              )}
+              {payload.permissions.cancel && !['COMPLETED', 'CANCELLED'].includes(job.status) && (
+                <CrmButton variant="danger" size="sm" className="w-full" disabled={actionLoading} onClick={() => setCancelConfirmOpen(true)}>
+                  <FiXCircle size={12} />
+                  Cancel job
+                </CrmButton>
               )}
             </div>
-          </Card>
+          </ReferenceCard>
 
           {payload.permissions.finance && (
-            <Card title="Payment / escrow" subtitle="Canonical financial state">
-              <div className="space-y-3">
-                <KeyValue label="Escrow" value={finance.escrow?.status || 'Not funded'} />
-                <KeyValue label="Payment" value={finance.paymentIntents?.[0]?.status || 'No payment intent'} />
-                <KeyValue label="Commission" value={finance.settlements?.[0]?.status || 'Not created'} />
-                <KeyValue label="Payout" value={finance.payouts?.[0]?.status || 'Not created'} />
+            <ReferenceCard title="Payment / Escrow">
+              <div className="flex items-start gap-3">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#fff4c2] text-[#b87500]">
+                  <FiCreditCard size={15} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[15px] font-extrabold text-slate-950">{formatMoney(finance.escrow?.totalAmount ?? amount, finance.escrow?.currency || currency)}</div>
+                  <div className="mt-0.5 text-[9px] text-slate-500">{label(finance.escrow?.status || 'Not funded')}</div>
+                </div>
               </div>
-            </Card>
+              <div className="mt-3 space-y-2">
+                <RailState label="Payment" value={finance.paymentIntents?.[0]?.status || 'No payment intent'} />
+                <RailState label="Escrow" value={finance.escrow?.status || 'Not funded'} />
+                <RailState label="Payout" value={finance.payouts?.[0]?.status || 'Not created'} />
+              </div>
+            </ReferenceCard>
           )}
 
-          <Card title="Verification" subtitle="Operator safety signals">
-            <div className="space-y-3">
-              {payload.permissions.trust && <KeyValue label="Risk events" value={String(riskEvents.length)} />}
-              <KeyValue label="PIN status" value={operations.verificationPin?.status || 'Not generated'} />
-              <KeyValue label="Arrival verified" value={operations.verificationPin?.arrivalVerifiedAt ? 'Yes' : 'No'} />
-              <KeyValue label="Work start verified" value={operations.verificationPin?.workStartVerifiedAt ? 'Yes' : 'No'} />
-              <KeyValue label="Completion verified" value={operations.verificationPin?.completionVerifiedAt ? 'Yes' : 'No'} />
+          {payload.permissions.finance && (
+            <ReferenceCard title="Financials">
+              <div className="space-y-2">
+                <KeyValue label="Service amount" value={formatMoney(amount, currency)} />
+                <KeyValue label="Commission" value={finance.settlements?.[0]?.commissionAmount ? formatMoney(finance.settlements[0].commissionAmount, finance.settlements[0].currency || currency) : `${job.commissionRate || 10}% configured`} />
+                <KeyValue label="Payout" value={finance.payouts?.[0]?.amount ? formatMoney(finance.payouts[0].amount, finance.payouts[0].currency || currency) : 'Pending'} />
+              </div>
+            </ReferenceCard>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <ReferenceCard title="Risk">
+              <CrmBadge tone={riskEvents.length ? 'warning' : 'success'} dot>
+                {riskEvents.length ? `${riskEvents.length} flags` : 'Low risk'}
+              </CrmBadge>
+            </ReferenceCard>
+            <ReferenceCard title="SLA">
+              <CrmBadge tone={['COMPLETED', 'CANCELLED'].includes(job.status) ? 'neutral' : 'success'} dot>
+                {['COMPLETED', 'CANCELLED'].includes(job.status) ? 'Closed' : 'On track'}
+              </CrmBadge>
+            </ReferenceCard>
+          </div>
+
+          <ReferenceCard title="Verification">
+            <div className="space-y-2">
+              <KeyValue label="PIN" value={operations.verificationPin?.status || 'Not generated'} />
+              <KeyValue label="Arrival" value={operations.verificationPin?.arrivalVerifiedAt ? 'Verified' : 'Pending'} />
+              <KeyValue label="Work start" value={operations.verificationPin?.workStartVerifiedAt ? 'Verified' : 'Pending'} />
+              <KeyValue label="Completion" value={operations.verificationPin?.completionVerifiedAt ? 'Verified' : 'Pending'} />
             </div>
-          </Card>
+          </ReferenceCard>
         </aside>
       </div>
 
@@ -438,6 +474,37 @@ export default function Job360Page() {
         dangerous
         busy={actionLoading}
       />
+    </div>
+  )
+}
+
+function TopFact({ icon: Icon, label: factLabel, value }: { icon: any; label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#f3f5f7] text-slate-500"><Icon size={12} /></span>
+      <div className="min-w-0">
+        <div className="text-[8px] font-semibold text-slate-400">{factLabel}</div>
+        <div className="max-w-[126px] truncate text-[10px] font-bold text-slate-800">{value}</div>
+      </div>
+    </div>
+  )
+}
+
+function ReferenceCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="crm-card overflow-hidden">
+      <div className="border-b border-[#e9edf0] px-3.5 py-2.5 text-[11px] font-bold text-slate-900">{title}</div>
+      <div className="p-3.5">{children}</div>
+    </section>
+  )
+}
+
+function RailState({ label: railLabel, value }: { label: string; value: string }) {
+  const tone = statusTone(value)
+  return (
+    <div className="flex items-center justify-between gap-2 text-[9px]">
+      <span className="text-slate-500">{railLabel}</span>
+      <CrmBadge tone={tone} dot>{label(value)}</CrmBadge>
     </div>
   )
 }
@@ -477,78 +544,174 @@ function KeyValue({ label: keyLabel, value }: { label: string; value: string }) 
   )
 }
 
-function OverviewTab({ payload, location }: { payload: Job360Payload; location: string }) {
+function OverviewTab({
+  payload,
+  location,
+  provider,
+  providerLink,
+  currency,
+  amount,
+}: {
+  payload: Job360Payload
+  location: string
+  provider: any
+  providerLink: string | null
+  currency: string
+  amount: unknown
+}) {
   const job = payload.job
   const customer = job.customer
   const isV2 = payload.source === 'V2'
-  const operations = payload.operations
+  const operations = payload.operations || {}
+  const events = payload.source === 'V2'
+    ? payload.lifecycle || []
+    : [
+        { id: 'created', action: 'JOB_CREATED', toState: 'OPEN', createdAt: payload.job.createdAt, actorType: 'CUSTOMER' },
+        ...(payload.job.assignments || []).map((item: any) => ({
+          id: `assignment-${item.id}`,
+          action: 'TASKER_ASSIGNMENT',
+          toState: item.status,
+          createdAt: item.createdAt,
+          actorType: 'SYSTEM',
+        })),
+      ]
 
   return (
     <>
-      <Card title="Job overview" subtitle="Core request, customer and scheduling information">
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
-          <Field label="Service / category" value={isV2 ? job.category?.name || job.categoryId : job.category} />
-          <Field label="Location" value={location} />
-          <Field label="Country" value={job.countryCode || customer?.countryCode} />
-          <Field label="Preferred date" value={formatDate(job.preferredDate || job.scheduledDate)} />
-          <Field label="Time slot" value={label(job.preferredTimeSlot)} />
-          <Field label="Urgency" value={label(job.urgency)} />
-        </div>
-        <div className="mt-5 pt-5 border-t border-slate-100">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Description</div>
-          <p className="mt-2 text-sm leading-6 text-slate-700 whitespace-pre-wrap">{job.description || 'No description provided.'}</p>
-        </div>
-      </Card>
-
-      <div className="grid lg:grid-cols-2 gap-5">
-        <Card title="Customer" subtitle="Customer attached to this job">
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Name" value={customer?.name} />
-            <Field label="MX ID" value={customer?.mxId} mono />
-            <Field label="Email" value={customer?.email} />
-            <Field label="Phone" value={customer?.phone} />
-            <Field label="Account state" value={customer?.isBanned ? 'Banned' : customer?.isSuspended ? 'Suspended' : 'Active'} />
-            <Field label="Customer type" value={customer?.customerProfile?.customerType || '—'} />
-          </div>
-        </Card>
-
-        <Card title="Work assignment" subtitle="Provider, company and worker state">
-          {payload.source === 'V2' ? (
-            operations?.assignments?.length ? (
-              <div className="space-y-3">
-                {operations.assignments.map((assignment: any) => (
-                  <div key={assignment.id} className="rounded-xl border border-slate-200 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">{assignment.company?.companyName || assignment.worker?.name}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">{assignment.worker?.name ? `Worker: ${assignment.worker.name}` : assignment.company?.mxId}</div>
-                      </div>
-                      <StatusBadge value={assignment.status} />
-                    </div>
-                    <div className="mt-3 text-xs text-slate-400">Assigned {formatDate(assignment.assignedAt)}</div>
-                  </div>
-                ))}
+      <div className="grid gap-3.5 lg:grid-cols-2">
+        <ReferenceCard title="Customer">
+          <div className="flex items-start gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#eef2f5] text-sm font-extrabold text-slate-600">
+              {(customer?.name?.[0] || 'C').toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-[12px] font-bold text-slate-900">{customer?.name || 'Unknown customer'}</div>
+                {!customer?.isBanned && !customer?.isSuspended && <CrmBadge tone="success">Active</CrmBadge>}
               </div>
-            ) : (
-              <EmptyState icon={FiUsers} title="No workforce assignment" text="The accepted provider has not assigned a company worker." />
-            )
-          ) : payload.job.assignments?.length ? (
+              {customer?.phone && <div className="mt-2 flex items-center gap-2 text-[9px] text-slate-500"><FiPhone size={10} />{customer.phone}</div>}
+              {customer?.email && <div className="mt-1 flex items-center gap-2 truncate text-[9px] text-slate-500"><FiMail size={10} />{customer.email}</div>}
+              {customer?.id && (
+                <Link href={`/admin/users/${customer.id}`} className="mt-3 inline-flex items-center gap-1 text-[9px] font-bold text-[#3478d4]">
+                  View profile <FiArrowUpRight size={10} />
+                </Link>
+              )}
+            </div>
+          </div>
+        </ReferenceCard>
+
+        <ReferenceCard title="Provider / Company / Worker">
+          {provider ? (
+            <div className="flex items-start gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#eef2f5] text-sm font-extrabold text-slate-600">
+                {(provider?.companyName?.[0] || provider?.name?.[0] || 'P').toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[12px] font-bold text-slate-900">{provider?.companyName || provider?.name || 'Assigned provider'}</div>
+                <div className="mt-1 text-[9px] text-slate-500">{provider?.mxId || label(provider?.role || 'Provider')}</div>
+                {providerLink && (
+                  <Link href={providerLink} className="mt-3 inline-flex items-center gap-1 text-[9px] font-bold text-[#3478d4]">
+                    View provider <FiArrowUpRight size={10} />
+                  </Link>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="py-3 text-center text-[10px] text-slate-400">No provider assigned yet.</div>
+          )}
+        </ReferenceCard>
+      </div>
+
+      <div className="grid gap-3.5 lg:grid-cols-[1.35fr_.65fr]">
+        <ReferenceCard title="Location">
+          <div className="flex items-start gap-3">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#eef2f5] text-slate-600"><FiMapPin size={13} /></span>
+            <div>
+              <div className="text-[11px] font-bold text-slate-800">{location || 'Not specified'}</div>
+              <div className="mt-1 text-[9px] text-slate-400">{job.countryCode || customer?.countryCode || '—'}</div>
+            </div>
+          </div>
+          {job.latitude && job.longitude ? (
+            <div className="relative mt-3 h-[112px] overflow-hidden rounded-lg border border-[#e2e7ea] bg-[linear-gradient(135deg,#edf2f6_25%,#f8fafb_25%,#f8fafb_50%,#edf2f6_50%,#edf2f6_75%,#f8fafb_75%)] bg-[length:24px_24px]">
+              <div className="absolute inset-0 grid place-items-center">
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-[#ef4562] text-white shadow-lg"><FiMapPin size={14} /></span>
+              </div>
+            </div>
+          ) : null}
+        </ReferenceCard>
+
+        <ReferenceCard title="Schedule">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-[#eef2f5] text-slate-600"><FiCalendar size={11} /></span>
+              <div>
+                <div className="text-[9px] text-slate-400">Preferred date</div>
+                <div className="text-[10px] font-bold text-slate-800">{formatDate(job.preferredDate || job.scheduledDate)}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-[#eef2f5] text-slate-600"><FiClock size={11} /></span>
+              <div>
+                <div className="text-[9px] text-slate-400">Time slot</div>
+                <div className="text-[10px] font-bold text-slate-800">{label(job.preferredTimeSlot || 'Not specified')}</div>
+              </div>
+            </div>
+            <CrmBadge tone={['COMPLETED', 'CANCELLED'].includes(job.status) ? 'neutral' : 'success'} dot>
+              {['COMPLETED', 'CANCELLED'].includes(job.status) ? 'Closed' : 'On schedule'}
+            </CrmBadge>
+          </div>
+        </ReferenceCard>
+      </div>
+
+      <ReferenceCard title="Service Details">
+        <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-3">
+            <Field label="Service" value={job.title} />
+            <Field label="Priority" value={label(job.urgency || 'normal')} />
+            <Field label="Category" value={isV2 ? job.category?.name || job.categoryId : job.category} />
+            <Field label="Job type" value={payload.source === 'V2' ? 'Marketplace' : 'Classic'} />
+            <Field label="Amount" value={formatMoney(amount, currency)} />
+            <Field label="Workers" value={String(job.workersCount || operations.assignments?.length || 1)} />
+          </div>
+          <div>
+            <div className="text-[8px] font-semibold uppercase tracking-[0.12em] text-slate-400">Verification</div>
+            <div className="mt-2 space-y-1.5">
+              <RailState label="PIN" value={operations.verificationPin?.status || 'Not generated'} />
+              <RailState label="Arrival" value={operations.verificationPin?.arrivalVerifiedAt ? 'Verified' : 'Pending'} />
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 border-t border-[#edf0f2] pt-3">
+          <div className="text-[8px] font-semibold uppercase tracking-[0.12em] text-slate-400">Description</div>
+          <p className="mt-1.5 whitespace-pre-wrap text-[10px] leading-5 text-slate-600">{job.description || 'No description provided.'}</p>
+        </div>
+      </ReferenceCard>
+
+      <ReferenceCard title="Job Lifecycle">
+        {events.length ? (
+          <div className="relative">
+            <div className="absolute bottom-3 left-[12px] top-3 w-px bg-[#dfe4e8]" />
             <div className="space-y-3">
-              {payload.job.assignments.map((assignment: any) => (
-                <div key={assignment.id} className="rounded-xl border border-slate-200 p-3 flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900">{assignment.tasker?.user?.name || 'Tasker'}</div>
-                    <div className="text-xs text-slate-400">{formatDate(assignment.createdAt)}</div>
+              {events.slice(0, 7).map((event: any, index: number) => (
+                <div key={event.id || index} className="relative flex gap-3">
+                  <span className={`relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 border-white text-white ${index === events.length - 1 ? 'bg-[#4a82ee]' : 'bg-[#31b86b]'}`}>
+                    <FiCheck size={10} />
+                  </span>
+                  <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-800">{label(event.action)}</div>
+                      <div className="mt-0.5 text-[8px] text-slate-400">{event.toState ? label(event.toState) : label(event.actorType)}</div>
+                    </div>
+                    <div className="shrink-0 text-right text-[8px] text-slate-400">{formatDate(event.createdAt)}</div>
                   </div>
-                  <StatusBadge value={assignment.status} />
                 </div>
               ))}
             </div>
-          ) : (
-            <EmptyState icon={FiUsers} title="No assignment" text="No provider has been assigned to this classic job." />
-          )}
-        </Card>
-      </div>
+          </div>
+        ) : (
+          <div className="py-4 text-center text-[10px] text-slate-400">No lifecycle events recorded.</div>
+        )}
+      </ReferenceCard>
     </>
   )
 }
