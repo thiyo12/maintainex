@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
+import { assertCrmCountryAllowed, getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { getCurrencyForCountry } from '@/lib/shared/money/money'
 import { safeParseJsonArr } from '@/lib/db-utils'
@@ -41,17 +41,18 @@ export async function GET(request: NextRequest) {
     if (!guard.ok) return guard.response
     const security = guard.context
 
-    const planWhere = security.isSuperAdmin
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const planWhere = scopedCountryCodes === null
       ? {}
-      : { countryCode: { in: security.assignedCountries } }
+      : { countryCode: { in: scopedCountryCodes } }
 
-    const companyWhere = security.isSuperAdmin
+    const companyWhere = scopedCountryCodes === null
       ? {}
-      : { countryCode: { in: security.assignedCountries } }
+      : { countryCode: { in: scopedCountryCodes } }
 
-    const subscriptionWhere = security.isSuperAdmin
+    const subscriptionWhere = scopedCountryCodes === null
       ? {}
-      : { company: { countryCode: { in: security.assignedCountries } } }
+      : { company: { countryCode: { in: scopedCountryCodes } } }
 
     const [
       plans,
