@@ -49,7 +49,23 @@ Release metadata:
 
 Payment/media/email variables should be present when those production capabilities are enabled, but absence must not be hidden by placeholder values.
 
-### B3. Create production recovery point
+### B3. Run the automated production preflight
+
+After rotating the database credential, run from the exact release checkout:
+
+```bash
+CONFIRM_DB_CREDENTIAL_ROTATED=yes \
+VPS=<ssh-user@production-host> \
+SSH_KEY=<path-to-private-key> \
+bash scripts/crm-v2-production-preflight.sh
+```
+
+The script does not print secret values. It verifies required environment names, current container health/non-root execution, current migration status, public liveness, readiness authentication, records the rollback image, and creates a validated production DB backup.
+
+- [ ] Preflight ends with `PRE-MERGE PRODUCTION PREFLIGHT: PASS`.
+- [ ] Preserve its non-secret receipt until the release is verified.
+
+### B4. Create production recovery point
 
 Immediately before merge/deploy:
 
@@ -62,7 +78,7 @@ Immediately before merge/deploy:
 
 Do not proceed when backup or rollback-image verification fails.
 
-### B4. Confirm deployment trigger
+### B5. Confirm deployment trigger
 
 Exactly one path:
 

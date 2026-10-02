@@ -277,6 +277,10 @@ jobs:
         shell: bash
         run: |
           bash -n deploy-rsync.sh
+          bash -n scripts/crm-v2-production-preflight.sh
+          grep -q 'CONFIRM_DB_CREDENTIAL_ROTATED' scripts/crm-v2-production-preflight.sh
+          grep -q 'gzip -t' scripts/crm-v2-production-preflight.sh
+          grep -q 'required environment names' scripts/crm-v2-production-preflight.sh
           grep -q 'docker build' deploy-rsync.sh
           grep -q 'pg_dump' deploy-rsync.sh
           grep -q 'gzip -t' deploy-rsync.sh
