@@ -41,9 +41,15 @@ DB_USER=$(printf '%s' "$DB_META" | cut -d'|' -f1)
 DB_NAME=$(printf '%s' "$DB_META" | cut -d'|' -f2)
 DB_HOST=$(printf '%s' "$DB_META" | cut -d'|' -f3)
 
-DB_CONTAINER=$(ssh $SSH_OPTS "$SERVER" "docker ps --format '{{.Names}}' | grep -F '$DB_HOST' | head -1 || docker ps --format '{{.Names}}' | grep -E 'maintainex-db|dokploy-postgres' | head -1")
+DB_CONTAINER=$(ssh $SSH_OPTS "$SERVER" "name=\$(docker ps --format '{{.Names}}' | grep -F '$DB_HOST' | head -1); if [ -z \"\$name\" ]; then name=\$(docker ps --format '{{.Names}}' | grep -E 'maintainex-db|dokploy-postgres' | head -1); fi; printf '%s' \"\$name\"")
 if [ -z "$DB_CONTAINER" ]; then
   echo "ERROR: production PostgreSQL container not found" >&2
+  exit 1
+fi
+
+LIVE_DB=$(ssh $SSH_OPTS "$SERVER" "docker exec '$DB_CONTAINER' psql -U '$DB_USER' -d '$DB_NAME' -Atqc 'SELECT current_database()'")
+if [ "$LIVE_DB" != "$DB_NAME" ]; then
+  echo "ERROR: database identity mismatch" >&2
   exit 1
 fi
 
