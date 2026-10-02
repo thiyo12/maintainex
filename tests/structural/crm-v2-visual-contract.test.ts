@@ -22,11 +22,12 @@ describe('CRM V2 visual contract', () => {
     }
   })
 
-  it('keeps the temporary legacy visual bridge explicit until module migration removes it', () => {
+  it('keeps the retired legacy visual bridge out of the fully migrated CRM', () => {
     const css = readFileSync(resolve(process.cwd(), 'app/globals.css'), 'utf8')
 
-    expect(css).toContain('CRM V2 TEMPORARY LEGACY VISUAL BRIDGE')
-    expect(css).toContain('.crm-v2 main')
+    expect(css).not.toContain('CRM V2 TEMPORARY LEGACY VISUAL BRIDGE')
+    expect(css).not.toContain('.crm-v2 main .text-white')
+    expect(css).toContain('Do not globally rewrite utility text/background')
   })
 
   it('uses the V2 shell on every admin page through the admin route-group layout', () => {
