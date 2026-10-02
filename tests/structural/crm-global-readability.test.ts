@@ -33,6 +33,7 @@ describe('CRM V2 global readability guard', () => {
     const failures: string[] = []
     const patterns: Array<[string, RegExp]> = [
       ['accent background with white text', /bg-\[var\(--crm-accent\)\][^"'\n]{0,100}text-white|text-white[^"'\n]{0,100}bg-\[var\(--crm-accent\)\]/g],
+      ['amber action background with white text', /bg-amber-(?:400|500|600)[^"'\n]{0,100}text-white|text-white[^"'\n]{0,100}bg-amber-(?:400|500|600)/g],
       ['white background with white text', /bg-white[^"'\n]{0,100}text-white|text-white[^"'\n]{0,100}bg-white/g],
       ['accent action with white text', /crm-accent-action[^"'\n]{0,100}text-white|text-white[^"'\n]{0,100}crm-accent-action/g],
       ['danger action with danger-colored text', /crm-danger-action[^"'\n]{0,100}text-\[var\(--crm-danger\)\]/g],
@@ -49,6 +50,15 @@ describe('CRM V2 global readability guard', () => {
     }
 
     expect(failures).toEqual([])
+  })
+
+  it('keeps every admin workspace on the shared CRM V2 component system', () => {
+    const pages = filesUnder('app/(admin)/admin')
+    const legacyPages = pages
+      .filter(path => !readFileSync(path, 'utf8').includes('@/components/crm/v2/'))
+      .map(path => path.replace(process.cwd(), ''))
+
+    expect(legacyPages).toEqual([])
   })
 
   it('keeps shared CRM inputs and buttons contrast-safe and focus-visible', () => {
