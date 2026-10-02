@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
+  FiActivity,
   FiAlertTriangle,
   FiArrowUpRight,
   FiBriefcase,
@@ -11,10 +12,10 @@ import {
   FiClock,
   FiCreditCard,
   FiDollarSign,
+  FiServer,
   FiShield,
   FiTool,
   FiUserCheck,
-  FiUsers,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import {
@@ -23,6 +24,7 @@ import {
   CrmMetricCard,
   CrmPageHeader,
   CrmState,
+  type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
 
 interface DashboardStats {
@@ -68,56 +70,100 @@ interface DashboardStats {
     trust: boolean
     platform: boolean
   }
-  isSuperAdmin?: boolean
 }
 
-function formatCurrency(amount: number, currency = 'LKR') {
-  return new Intl.NumberFormat('en-LK', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0,
-  }).format(Number(amount || 0))
+interface RecentJob {
+  id: string
+  title: string
+  category: string
+  budget: number
+  status: string
+  source: 'V1' | 'V2'
+  customer: { name: string }
+  createdAt: string
 }
 
-function number(value?: number) {
+interface AnalyticsPayload {
+  visibility?: { finance?: boolean; disputes?: boolean }
+  summary?: {
+    totalJobs?: number
+    openJobs?: number
+    completedJobs?: number
+    cancelledJobs?: number
+    openDisputes?: number
+    totalRevenue?: number | null
+    totalCommission?: number | null
+    staleJobs?: number
+    avgTaskerResponseMin?: number
+  }
+  jobsByStatus?: {
+    open?: number
+    completed?: number
+    cancelled?: number
+    inProgress?: number
+  }
+  recentActivity?: Array<{
+    id: string
+    adminEmail: string
+    action: string
+    entityType?: string
+    description?: string
+    createdAt: string
+  }>
+}
+
+interface HealthPayload {
+  status?: 'healthy' | 'degraded'
+  database?: { status?: string; latencyMs?: number }
+  queues?: { jobMatchPending?: number; offerMatchPending?: number }
+  payments?: { pending?: number; paypalConfigured?: boolean; paypalWebhookConfigured?: boolean }
+  notifications?: { createdLastHour?: number; expoPushAvailable?: boolean; mediaStorageConfigured?: boolean }
+  cron?: { configured?: boolean }
+}
+
+function number(value?: number | null) {
   return Number(value || 0)
 }
 
-function ProgressRow({
-  label,
-  value,
-  total,
-  tone,
-}: {
-  label: string
-  value: number
-  total: number
-  tone: 'amber' | 'success' | 'danger' | 'info'
-}) {
-  const percentage = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0
-  const toneClass = {
-    amber: 'bg-[var(--crm-accent)]',
-    success: 'bg-[var(--crm-success)]',
-    danger: 'bg-[var(--crm-danger)]',
-    info: 'bg-[var(--crm-info)]',
-  }[tone]
+function formatCurrency(amount: number, currency = 'LKR') {
+  try {
+    return new Intl.NumberFormat('en-LK', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(Number(amount || 0))
+  } catch {
+    return `${currency} ${Number(amount || 0).toLocaleString()}`
+  }
+}
 
-  return (
-    <div>
-      <div className="flex items-center justify-between text-xs">
-        <span className="font-medium text-slate-600">{label}</span>
-        <span className="font-semibold text-slate-900">{value.toLocaleString()}</span>
-      </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full rounded-full ${toneClass}`} style={{ width: `${percentage}%` }} />
-      </div>
-    </div>
-  )
+function relativeTime(value?: string) {
+  if (!value) return '—'
+  const diff = Date.now() - new Date(value).getTime()
+  if (!Number.isFinite(diff)) return '—'
+  const minutes = Math.max(0, Math.round(diff / 60000))
+  if (minutes < 1) return 'now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.round(hours / 24)}d ago`
+}
+
+function statusTone(status?: string): CrmTone {
+  const value = String(status || '').toUpperCase()
+  if (['COMPLETED', 'SETTLED', 'PAID', 'APPROVED'].includes(value)) return 'success'
+  if (['CANCELLED', 'FAILED', 'REJECTED', 'DISPUTED'].includes(value)) return 'danger'
+  if (['IN_PROGRESS', 'ASSIGNED', 'QUOTE_ACCEPTED', 'UNDER_REVIEW'].includes(value)) return 'info'
+  if (['OPEN', 'PENDING', 'CREATED'].includes(value)) return 'warning'
+  return 'neutral'
 }
 
 export default function AdminDashboard() {
   const { user } = useAdminSession()
   const [data, setData] = useState<DashboardStats | null>(null)
+  const [recentJobs, setRecentJobs] = useState<RecentJob[]>([])
+  const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null)
+  const [health, setHealth] = useState<HealthPayload | null>(null)
   const [approvalCount, setApprovalCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
@@ -126,35 +172,43 @@ export default function AdminDashboard() {
 
     async function loadDashboard() {
       try {
-        const [dashboardResponse, approvalsResponse] = await Promise.all([
-          fetch('/api/dashboard', {
-            credentials: 'include',
-            cache: 'no-store',
-          }),
-          fetch('/api/admin/approvals', {
-            credentials: 'include',
-            cache: 'no-store',
-          }),
-        ])
+        const [dashboardResult, approvalsResult, jobsResult, analyticsResult, healthResult] =
+          await Promise.allSettled([
+            fetch('/api/dashboard', { credentials: 'include', cache: 'no-store' }),
+            fetch('/api/admin/approvals', { credentials: 'include', cache: 'no-store' }),
+            fetch('/api/admin/jobs?limit=5&page=1', { credentials: 'include', cache: 'no-store' }),
+            fetch('/api/admin/analytics', { credentials: 'include', cache: 'no-store' }),
+            fetch('/api/admin/health', { credentials: 'include', cache: 'no-store' }),
+          ])
 
-        if (dashboardResponse.status === 401) {
+        if (dashboardResult.status !== 'fulfilled') throw new Error('Dashboard request failed')
+        if (dashboardResult.value.status === 401) {
           window.location.href = '/admin/login'
           return
         }
+        if (!dashboardResult.value.ok) throw new Error('Dashboard request failed')
 
-        if (!dashboardResponse.ok) throw new Error('Dashboard request failed')
-        const payload = await dashboardResponse.json()
-        if (payload.error) throw new Error(payload.error)
+        const dashboardPayload = await dashboardResult.value.json()
+        if (!mounted) return
 
-        let approvals = 0
-        if (approvalsResponse.ok) {
-          const approvalPayload = await approvalsResponse.json().catch(() => ({}))
-          approvals = Number(approvalPayload?.total || 0)
+        setData(dashboardPayload)
+
+        if (approvalsResult.status === 'fulfilled' && approvalsResult.value.ok) {
+          const body = await approvalsResult.value.json().catch(() => ({}))
+          setApprovalCount(Number(body?.total || 0))
         }
 
-        if (mounted) {
-          setData(payload)
-          setApprovalCount(approvals)
+        if (jobsResult.status === 'fulfilled' && jobsResult.value.ok) {
+          const body = await jobsResult.value.json().catch(() => ({}))
+          setRecentJobs(Array.isArray(body?.jobs) ? body.jobs.slice(0, 5) : [])
+        }
+
+        if (analyticsResult.status === 'fulfilled' && analyticsResult.value.ok) {
+          setAnalytics(await analyticsResult.value.json().catch(() => null))
+        }
+
+        if (healthResult.status === 'fulfilled' && healthResult.value.ok) {
+          setHealth(await healthResult.value.json().catch(() => null))
         }
       } catch (error) {
         console.error('CRM dashboard error:', error)
@@ -173,366 +227,318 @@ export default function AdminDashboard() {
   const financeRows = data?.financeByCurrency || []
   const primaryFinance = financeRows.length === 1 ? financeRows[0] : null
 
-  const totals = useMemo(() => {
-    const jobs = number(stats?.totalJobPostings)
-    const completed = number(stats?.completedJobs)
-    const open = number(stats?.openJobs)
-    const otherJobs = Math.max(0, jobs - completed - open)
-    return { jobs, completed, open, otherJobs }
-  }, [stats])
+  const jobStatus = useMemo(() => {
+    const total = number(analytics?.summary?.totalJobs) || number(stats?.totalJobPostings)
+    const open = number(analytics?.jobsByStatus?.open) || number(stats?.openJobs)
+    const completed = number(analytics?.jobsByStatus?.completed) || number(stats?.completedJobs)
+    const cancelled = number(analytics?.jobsByStatus?.cancelled)
+    const inProgress = number(analytics?.jobsByStatus?.inProgress)
+    const accounted = open + completed + cancelled + inProgress
+    const other = Math.max(0, total - accounted)
+    return { total, open, completed, cancelled, inProgress, other }
+  }, [analytics, stats])
 
   const attentionItems = useMemo(() => {
     if (!data) return []
-
     return [
-      approvalCount > 0 && {
-        label: 'Governed approvals',
-        value: approvalCount,
-        href: '/admin/approvals',
-        severity: 'red' as const,
-      },
-      caps?.kyc && {
-        label: 'KYC waiting for review',
-        value: number(stats?.pendingKYC),
-        href: '/admin/kyc',
-        severity: number(stats?.pendingKYC) > 0 ? 'amber' as const : 'green' as const,
-      },
-      caps?.finance && {
-        label: 'Overdue settlements',
-        value: number(stats?.overdueSettlements),
-        href: '/admin/financial/settlements',
-        severity: number(stats?.overdueSettlements) > 0 ? 'red' as const : 'green' as const,
-      },
-      caps?.trust && {
-        label: 'Trust reports',
-        value: number(stats?.pendingCheatingReports),
-        href: '/admin/trust-safety',
-        severity: number(stats?.pendingCheatingReports) > 0 ? 'red' as const : 'green' as const,
-      },
-      caps?.users && {
-        label: 'Banned users',
-        value: number(stats?.bannedUsers),
-        href: '/admin/users/customers',
-        severity: 'slate' as const,
-      },
-    ].filter(Boolean) as Array<{
-      label: string
-      value: number
-      href: string
-      severity: 'red' | 'amber' | 'green' | 'slate'
-    }>
-  }, [approvalCount, caps, data, stats])
+      approvalCount > 0 && { label: 'Jobs awaiting approval', value: approvalCount, href: '/admin/approvals', tone: 'danger' as CrmTone },
+      caps?.finance && number(stats?.overdueSettlements) > 0 && { label: 'Payment releases pending', value: number(stats?.overdueSettlements), href: '/admin/financial/settlements', tone: 'warning' as CrmTone },
+      caps?.trust && number(analytics?.summary?.openDisputes) > 0 && { label: 'Disputes requiring attention', value: number(analytics?.summary?.openDisputes), href: '/admin/jobs/disputes', tone: 'danger' as CrmTone },
+      caps?.kyc && number(stats?.pendingKYC) > 0 && { label: 'New verification reviews', value: number(stats?.pendingKYC), href: '/admin/kyc', tone: 'info' as CrmTone },
+    ].filter(Boolean) as Array<{ label: string; value: number; href: string; tone: CrmTone }>
+  }, [approvalCount, analytics, caps, data, stats])
 
   if (loading) {
-    return (
-      <CrmState
-        type="loading"
-        title="Loading operations overview"
-        description="Loading scoped jobs, people, finance, trust and approval queues."
-      />
-    )
+    return <CrmState type="loading" title="Loading CRM dashboard" description="Preparing the live operational workspace." />
   }
 
   if (!data || !caps) {
-    return (
-      <CrmState
-        type="error"
-        title="Dashboard unavailable"
-        description="The CRM dashboard could not be loaded for the current staff session."
-      />
-    )
+    return <CrmState type="error" title="Dashboard unavailable" description="The CRM dashboard could not be loaded for this staff session." />
   }
 
-  const attentionTotal = attentionItems.reduce((sum, item) => sum + item.value, 0)
+  const revenueValue = analytics?.visibility?.finance
+    ? number(analytics?.summary?.totalCommission)
+    : null
+  const openDisputes = analytics?.visibility?.disputes
+    ? number(analytics?.summary?.openDisputes)
+    : number(stats?.pendingCheatingReports)
+  const activeJobs = number(stats?.openJobs) + number(analytics?.jobsByStatus?.inProgress)
+  const pendingCommission = primaryFinance
+    ? formatCurrency(primaryFinance.pendingCommission, primaryFinance.currency)
+    : financeRows.length > 1
+      ? `${financeRows.length} currencies`
+      : formatCurrency(number(data.weeklySummary?.pendingCommission))
+
+  const totalForDonut = Math.max(1, jobStatus.total)
+  const completedPct = (jobStatus.completed / totalForDonut) * 100
+  const openPct = (jobStatus.open / totalForDonut) * 100
+  const progressPct = (jobStatus.inProgress / totalForDonut) * 100
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
-        eyebrow="Operations overview"
-        title={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, ${user?.name || 'Admin'}`}
-        description="Marketplace, people, finance, trust and governed actions in one operational view."
+        title={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, ${user?.name || 'Admin'} 👋`}
+        description="Here’s what’s happening with your marketplace today."
         actions={
-          <div className="flex flex-wrap gap-2">
-            {caps.jobs && (
-              <Link
-                href="/admin/jobs"
-                className="inline-flex h-10 items-center gap-2 rounded-[11px] bg-[#17191b] px-4 text-sm font-semibold text-white hover:bg-slate-800"
-              >
-                Open job queue
-                <FiArrowUpRight size={15} />
-              </Link>
-            )}
-            {approvalCount > 0 && (
-              <Link
-                href="/admin/approvals"
-                className="inline-flex h-10 items-center gap-2 rounded-[11px] border border-amber-300 bg-[var(--crm-accent-soft)] px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100"
-              >
-                Review approvals
-                <CrmBadge tone="amber">{approvalCount}</CrmBadge>
-              </Link>
-            )}
+          <div className="rounded-xl border border-[var(--crm-border)] bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm">
+            {new Date().toLocaleDateString('en-LK', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
           </div>
         }
       />
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {caps.jobs && (
-          <CrmMetricCard
-            label="Open jobs"
-            value={number(stats?.openJobs).toLocaleString()}
-            helper={`${number(stats?.totalJobPostings).toLocaleString()} jobs recorded`}
-            icon={<FiTool size={16} />}
-            tone="success"
-          />
-        )}
-
-        {caps.finance && (
-          <CrmMetricCard
-            label="Pending commission"
-            value={
-              primaryFinance
-                ? formatCurrency(primaryFinance.pendingCommission, primaryFinance.currency)
-                : financeRows.length > 1
-                  ? `${financeRows.length} currencies`
-                  : formatCurrency(0)
-            }
-            helper={
-              financeRows.length > 1
-                ? 'Multi-market finance position'
-                : `${number(data.weeklySummary?.pendingCount)} settlement items`
-            }
-            icon={<FiDollarSign size={16} />}
-            tone="amber"
-          />
-        )}
-
-        {(caps.taskers || caps.companies) && (
-          <CrmMetricCard
-            label="Provider network"
-            value={number(stats?.totalTaskers).toLocaleString()}
-            helper={`${number(stats?.totalCompanies).toLocaleString()} companies onboarded`}
-            icon={<FiUserCheck size={16} />}
-            tone="info"
-          />
-        )}
-
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <CrmMetricCard
-          label="Items needing attention"
-          value={attentionTotal.toLocaleString()}
-          helper="Authorized operator queues"
-          icon={<FiAlertTriangle size={16} />}
-          tone={attentionTotal > 0 ? 'danger' : 'success'}
+          label="Active Jobs"
+          value={activeJobs.toLocaleString()}
+          helper={`${number(stats?.totalJobPostings).toLocaleString()} jobs recorded`}
+          icon={<FiTool size={16} />}
+          tone="success"
+        />
+        <CrmMetricCard
+          label="Commission Pending"
+          value={pendingCommission}
+          helper={`${number(data.weeklySummary?.pendingCount)} settlement items`}
+          icon={<FiDollarSign size={16} />}
+          tone="amber"
+        />
+        <CrmMetricCard
+          label="Revenue"
+          value={revenueValue === null ? 'Restricted' : formatCurrency(revenueValue)}
+          helper={revenueValue === null ? 'Finance permission required' : 'Commission revenue recorded'}
+          icon={<FiCreditCard size={16} />}
+          tone="info"
+        />
+        <CrmMetricCard
+          label="Disputes"
+          value={openDisputes.toLocaleString()}
+          helper="Open operational cases"
+          icon={<FiShield size={16} />}
+          tone={openDisputes > 0 ? 'danger' : 'success'}
         />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-3">
-        {(caps.jobs || caps.kyc) && (
-          <CrmCard
-            className="xl:col-span-2"
-            title="Marketplace operations"
-            description="Current job and verification workload"
-            action={<CrmBadge tone="success" dot>Live data</CrmBadge>}
-          >
-            <div className="grid gap-7 md:grid-cols-2">
-              {caps.jobs && (
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-medium text-slate-500">Jobs recorded</div>
-                      <div className="mt-1 text-3xl font-semibold tracking-[-0.03em] text-slate-950">
-                        {totals.jobs.toLocaleString()}
+      <section className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
+        <CrmCard
+          title="Jobs & Revenue Overview"
+          description="Live operational position for the selected market"
+          action={<CrmBadge tone="success" dot>Live data</CrmBadge>}
+        >
+          <div className="grid min-h-[240px] gap-6 md:grid-cols-[1.35fr_1fr]">
+            <div className="flex flex-col justify-between">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-4">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Jobs created</div>
+                  <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{jobStatus.total.toLocaleString()}</div>
+                </div>
+                <div className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-4">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Commission</div>
+                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                    {revenueValue === null ? '—' : formatCurrency(revenueValue)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                {[
+                  ['Open', jobStatus.open, 'bg-[var(--crm-accent)]'],
+                  ['In progress', jobStatus.inProgress, 'bg-[var(--crm-info)]'],
+                  ['Completed', jobStatus.completed, 'bg-[var(--crm-success)]'],
+                  ['Cancelled / other', jobStatus.cancelled + jobStatus.other, 'bg-[var(--crm-danger)]'],
+                ].map(([name, value, bar]) => {
+                  const amount = Number(value)
+                  const pct = Math.max(3, Math.round((amount / totalForDonut) * 100))
+                  return (
+                    <div key={String(name)}>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-slate-600">{String(name)}</span>
+                        <span className="font-semibold text-slate-900">{amount.toLocaleString()}</span>
+                      </div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
-                    <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#17191b] text-[var(--crm-accent)]">
-                      <FiBriefcase size={19} />
-                    </div>
-                  </div>
+                  )
+                })}
+              </div>
+            </div>
 
-                  <ProgressRow label="Open" value={totals.open} total={Math.max(1, totals.jobs)} tone="amber" />
-                  <ProgressRow label="Completed" value={totals.completed} total={Math.max(1, totals.jobs)} tone="success" />
-                  <ProgressRow label="Other states" value={totals.otherJobs} total={Math.max(1, totals.jobs)} tone="info" />
-
-                  <Link
-                    href="/admin/jobs"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800"
-                  >
-                    Open Job Command Centre <FiArrowUpRight size={12} />
-                  </Link>
-                </div>
-              )}
-
-              {caps.kyc && (
-                <div className="space-y-5">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--crm-border)] bg-white p-4">
+              <div
+                className="relative grid h-36 w-36 place-items-center rounded-full"
+                style={{
+                  background: `conic-gradient(
+                    var(--crm-success) 0 ${completedPct}%,
+                    var(--crm-accent) ${completedPct}% ${completedPct + openPct}%,
+                    var(--crm-info) ${completedPct + openPct}% ${completedPct + openPct + progressPct}%,
+                    #ef4444 ${completedPct + openPct + progressPct}% 100%
+                  )`,
+                }}
+              >
+                <div className="grid h-24 w-24 place-items-center rounded-full bg-white text-center shadow-inner">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">Verification pipeline</div>
-                    <div className="mt-1 text-xs text-slate-400">
-                      Identity document status across your assigned market scope
-                    </div>
+                    <div className="text-2xl font-bold text-slate-950">{jobStatus.total.toLocaleString()}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Total jobs</div>
                   </div>
-                  <ProgressRow
-                    label="Verified"
-                    value={number(stats?.verifiedKYC)}
-                    total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
-                    tone="success"
-                  />
-                  <ProgressRow
-                    label="Pending review"
-                    value={number(stats?.pendingKYC)}
-                    total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
-                    tone="amber"
-                  />
-                  <ProgressRow
-                    label="Rejected"
-                    value={number(stats?.rejectedKYC)}
-                    total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
-                    tone="danger"
-                  />
                 </div>
-              )}
+              </div>
+              <div className="mt-4 grid w-full grid-cols-2 gap-x-4 gap-y-2 text-[11px] text-slate-600">
+                <span>● Completed {jobStatus.completed}</span>
+                <span>● Open {jobStatus.open}</span>
+                <span>● In progress {jobStatus.inProgress}</span>
+                <span>● Other {jobStatus.cancelled + jobStatus.other}</span>
+              </div>
             </div>
-          </CrmCard>
-        )}
+          </div>
+        </CrmCard>
 
-        <CrmCard
-          title="Pending actions"
-          description="Queues that need an authorized operator"
-          padding="none"
-        >
-          {attentionItems.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-400">No pending actions.</div>
+        <CrmCard title="System Health" description="Live production services" action={<FiServer className="text-slate-400" />}>
+          {health ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-3">
+                <span className="flex items-center gap-2 text-xs font-semibold text-emerald-800">
+                  <FiCheckCircle /> {health.status === 'healthy' ? 'All systems operational' : 'System degraded'}
+                </span>
+                <CrmBadge tone={health.status === 'healthy' ? 'success' : 'warning'}>{health.status || 'unknown'}</CrmBadge>
+              </div>
+              {[
+                ['Database', health.database?.status || 'unknown', health.database?.latencyMs !== undefined ? `${health.database.latencyMs}ms` : '—'],
+                ['Job queue', number(health.queues?.jobMatchPending) === 0 ? 'healthy' : 'pending', String(number(health.queues?.jobMatchPending))],
+                ['Payments', number(health.payments?.pending) === 0 ? 'healthy' : 'pending', String(number(health.payments?.pending))],
+                ['Notifications', health.notifications?.expoPushAvailable ? 'healthy' : 'check', `${number(health.notifications?.createdLastHour)} / hr`],
+                ['Cron', health.cron?.configured ? 'configured' : 'check', ''],
+              ].map(([name, state, meta]) => (
+                <div key={name} className="flex items-center justify-between border-b border-slate-100 py-2.5 last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full ${state === 'healthy' || state === 'configured' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <span className="text-xs font-medium text-slate-600">{name}</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500">{meta}</span>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="divide-y divide-[var(--crm-border)]">
-              {attentionItems.map(item => {
-                const tone =
-                  item.severity === 'red' ? 'danger' :
-                  item.severity === 'amber' ? 'warning' :
-                  item.severity === 'green' ? 'success' : 'neutral'
-
-                return (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-[#fafbf9]"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <CrmBadge tone={tone} dot>{item.label}</CrmBadge>
-                    </div>
-                    <span className="text-sm font-semibold text-slate-950">
-                      {item.value.toLocaleString()}
-                    </span>
-                  </Link>
-                )
-              })}
-            </div>
+            <div className="text-xs leading-6 text-slate-500">Health details are restricted for this staff role.</div>
           )}
         </CrmCard>
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-3">
-        {caps.people && (
-          <CrmCard
-            title="People"
-            description="Marketplace account footprint"
-            action={<FiUsers size={18} className="text-slate-400" />}
-          >
-            <div className="grid grid-cols-3 divide-x divide-[var(--crm-border)]">
-              <div className="pr-3">
-                <div className="text-xl font-semibold text-slate-950">{number(stats?.totalUsers).toLocaleString()}</div>
-                <div className="mt-1 text-xs text-slate-400">Users</div>
-              </div>
-              <div className="px-3">
-                <div className="text-xl font-semibold text-slate-950">{number(stats?.totalTaskers).toLocaleString()}</div>
-                <div className="mt-1 text-xs text-slate-400">Taskers</div>
-              </div>
-              <div className="pl-3">
-                <div className="text-xl font-semibold text-slate-950">{number(stats?.totalCompanies).toLocaleString()}</div>
-                <div className="mt-1 text-xs text-slate-400">Companies</div>
-              </div>
-            </div>
-
-            {caps.users && (
-              <Link
-                href="/admin/users/customers"
-                className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800"
-              >
-                Open people management <FiArrowUpRight size={12} />
-              </Link>
-            )}
-          </CrmCard>
-        )}
-
-        {caps.finance && (
-          <CrmCard
-            title="Finance"
-            description="Commission and provider wallet position"
-            action={<FiCreditCard size={18} className="text-slate-400" />}
-          >
-            <div className="space-y-3">
-              {financeRows.length ? financeRows.map(row => (
-                <div key={row.currency} className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-3">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{row.currency}</div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-xs text-slate-500">Commission collected</span>
-                    <span className="text-xs font-semibold text-slate-900">{formatCurrency(row.paidCommission, row.currency)}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-xs text-slate-500">Commission pending</span>
-                    <span className="text-xs font-semibold text-slate-900">{formatCurrency(row.pendingCommission, row.currency)}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-xs text-slate-500">Provider wallet balance</span>
-                    <span className="text-xs font-semibold text-slate-900">{formatCurrency(row.providerWalletBalance, row.currency)}</span>
-                  </div>
-                </div>
+      <CrmCard
+        title="Recent Jobs"
+        description="Latest jobs in the selected market scope"
+        padding="none"
+        action={<Link href="/admin/jobs" className="text-xs font-semibold text-amber-700">View all →</Link>}
+      >
+        <div className="crm-scrollbar overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left">
+            <thead>
+              <tr className="border-b border-[var(--crm-border)] bg-[#fafbf9]">
+                {['ID', 'Service', 'Customer', 'Amount', 'Status', 'Created'].map(head => (
+                  <th key={head} className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{head}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {recentJobs.length ? recentJobs.map(job => (
+                <tr key={job.id} className="border-b border-[var(--crm-border)] last:border-0 hover:bg-[#fafbf9]">
+                  <td className="px-4 py-3 text-xs font-mono text-slate-500">
+                    <Link href={`/admin/jobs/${job.id}`} className="hover:text-amber-700">{job.id.slice(0, 14)}</Link>
+                  </td>
+                  <td className="px-4 py-3 text-xs font-semibold text-slate-800">{job.category || job.title}</td>
+                  <td className="px-4 py-3 text-xs text-slate-600">{job.customer?.name || 'Unknown'}</td>
+                  <td className="px-4 py-3 text-xs font-semibold text-slate-800">{formatCurrency(job.budget)}</td>
+                  <td className="px-4 py-3"><CrmBadge tone={statusTone(job.status)} dot>{job.status.replaceAll('_', ' ')}</CrmBadge></td>
+                  <td className="px-4 py-3 text-xs text-slate-400">{relativeTime(job.createdAt)}</td>
+                </tr>
               )) : (
-                <div className="text-xs text-slate-400">No finance balances are available for this market.</div>
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-xs text-slate-400">No recent jobs available for this scope.</td></tr>
               )}
-            </div>
+            </tbody>
+          </table>
+        </div>
+      </CrmCard>
 
-            <Link
-              href="/admin/financial/wallets"
-              className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800"
-            >
-              Open finance operations <FiArrowUpRight size={12} />
-            </Link>
-          </CrmCard>
-        )}
+      <section className="grid gap-4 xl:grid-cols-3">
+        <CrmCard
+          title="Alerts / Pending Actions"
+          description="Authorized queues requiring attention"
+          action={attentionItems.length > 0 ? <CrmBadge tone="danger">{attentionItems.length}</CrmBadge> : <CrmBadge tone="success">Clear</CrmBadge>}
+          padding="none"
+        >
+          <div className="divide-y divide-[var(--crm-border)]">
+            {attentionItems.length ? attentionItems.map(item => (
+              <Link key={item.label} href={item.href} className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-[#fafbf9]">
+                <span className="flex items-center gap-2 text-xs font-medium text-slate-700">
+                  <FiAlertTriangle className={item.tone === 'danger' ? 'text-red-500' : item.tone === 'warning' ? 'text-amber-500' : 'text-blue-500'} />
+                  {item.label}
+                </span>
+                <span className="text-xs font-semibold text-slate-900">{item.value}</span>
+              </Link>
+            )) : (
+              <div className="px-5 py-8 text-center text-xs text-slate-400">No urgent actions.</div>
+            )}
+          </div>
+        </CrmCard>
 
-        <CrmCard className="bg-[#10151d] text-white" padding="md">
+        <CrmCard
+          title="Live Activity"
+          description="Recent administrative events"
+          action={<FiActivity className="text-slate-400" />}
+          padding="none"
+        >
+          <div className="divide-y divide-[var(--crm-border)]">
+            {(analytics?.recentActivity || []).slice(0, 5).map(activity => (
+              <div key={activity.id} className="flex gap-3 px-4 py-3">
+                <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600">
+                  <FiActivity size={12} />
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-semibold text-slate-700">{activity.action.replaceAll('_', ' ')}</div>
+                  <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-400">{activity.description || activity.entityType || 'Administrative action'}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{relativeTime(activity.createdAt)}</div>
+                </div>
+              </div>
+            ))}
+            {!analytics?.recentActivity?.length && (
+              <div className="px-5 py-8 text-center text-xs text-slate-400">No activity visible for this role.</div>
+            )}
+          </div>
+        </CrmCard>
+
+        <CrmCard className="crm-dark-surface" padding="md">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-sm font-semibold text-white">Control centre</h2>
-              <p className="mt-1 text-xs text-slate-400">CRM V2 operational foundation</p>
+              <h2 className="text-sm font-semibold text-white">International Control</h2>
+              <p className="crm-dark-muted mt-1 text-xs">Current CRM control-plane coverage</p>
             </div>
-            <FiShield className="text-[var(--crm-accent)]" size={18} />
+            <FiBriefcase className="text-[var(--crm-accent)]" size={18} />
           </div>
-
           <div className="mt-5 space-y-3">
             {[
-              ['Live admin session', true],
-              ['Scoped marketplace data', true],
+              ['Market-scoped data', true],
               ['Server-issued permissions', true],
-              ['Job 360 workspace', true],
-              ['Governed approval queue', true],
+              ['Finance & escrow controls', caps.finance],
+              ['Trust & dispute controls', caps.trust],
+              ['App & web runtime controls', caps.platform],
             ].map(([label, ready]) => (
               <div key={String(label)} className="flex items-center justify-between gap-3">
-                <span className="text-xs text-slate-300">{String(label)}</span>
+                <span className="crm-dark-muted text-xs">{String(label)}</span>
                 <span className={`inline-flex items-center gap-1.5 text-[11px] ${ready ? 'text-emerald-300' : 'text-slate-500'}`}>
                   {ready ? <FiCheckCircle size={12} /> : <FiClock size={12} />}
-                  {ready ? 'Ready' : 'Pending'}
+                  {ready ? 'Ready' : 'Restricted'}
                 </span>
               </div>
             ))}
           </div>
-
-          {caps.platform && (
-            <Link
-              href="/admin/platform"
-              className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-[var(--crm-accent)] hover:text-amber-200"
-            >
-              Open platform controls <FiArrowUpRight size={12} />
+          <div className="mt-5 flex flex-wrap gap-2">
+            {caps.platform && (
+              <Link href="/admin/platform" className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--crm-accent)] hover:text-amber-200">
+                App & Web controls <FiArrowUpRight size={12} />
+              </Link>
+            )}
+            <Link href="/admin/analytics" className="inline-flex items-center gap-1 text-xs font-semibold text-white hover:text-amber-200">
+              Analytics <FiArrowUpRight size={12} />
             </Link>
-          )}
+          </div>
         </CrmCard>
       </section>
     </div>
