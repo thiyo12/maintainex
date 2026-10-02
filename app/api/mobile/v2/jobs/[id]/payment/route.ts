@@ -37,7 +37,14 @@ export async function POST(
       const status =
         result.code === 'UNAUTHORIZED' ? 403 :
         result.code === 'JOB_NOT_FOUND' ? 404 :
-        result.code === 'PAYHERE_NOT_CONFIGURED' ? 503 :
+        [
+          'PAYPAL_NOT_CONFIGURED',
+          'PAYHERE_NOT_CONFIGURED',
+          'PAYMENT_PROVIDER_NOT_ENABLED',
+          'PAYPAL_ENVIRONMENT_MISMATCH',
+          'PAYHERE_ENVIRONMENT_MISMATCH',
+          'PAYMENT_PROVIDER_CHECKOUT_UNSUPPORTED',
+        ].includes(result.code || '') ? 503 :
         result.code === 'CUSTOMER_PAYMENT_DETAILS_REQUIRED' ? 400 :
         409
       return NextResponse.json(result, { status })
