@@ -62,15 +62,16 @@ describe('CRM V2 visual contract', () => {
 
     for (const marker of [
       'Active Jobs',
-      'Commission Pending',
+      'Escrow Held',
       'Revenue',
       'Disputes',
-      'Jobs & Revenue Overview',
-      'System Health',
+      'Jobs & Revenue Trend',
+      'Job Status',
       'Recent Jobs',
+      "'Provider'",
       'Alerts / Pending Actions',
       'Live Activity',
-      'International Control',
+      'System Health',
     ]) {
       expect(dashboard).toContain(marker)
     }
@@ -81,10 +82,19 @@ describe('CRM V2 visual contract', () => {
 
     for (const marker of [
       'Back to Jobs',
+      'Overview',
+      'Lifecycle',
+      'Quotes',
+      'Workspace',
+      'Finance',
+      'Dispute / Risk',
+      'Audit',
       'Quick Actions',
       'Payment / Escrow',
       'Risk / Verification',
       'Provider / Company / Worker',
+      'Location',
+      'Schedule',
       'Service Details',
       'Job Lifecycle',
     ]) {
