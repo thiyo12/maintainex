@@ -277,6 +277,7 @@ jobs:
         shell: bash
         run: |
           bash -n deploy-rsync.sh
+          bash -n backup.sh
           bash -n scripts/crm-v2-production-preflight.sh
           grep -q 'CONFIRM_DB_CREDENTIAL_ROTATED' scripts/crm-v2-production-preflight.sh
           grep -q 'process.env.DATABASE_URL' scripts/crm-v2-production-preflight.sh
