@@ -72,27 +72,86 @@ rsync -av --delete --partial --compress --compress-level=6 --timeout=60 --stats 
 
 echo
 echo "=== 3/7 Create and verify production database backup ==="
-BACKUP_INFO=$("${SSH[@]}" "$VPS" "BACKUP_DIR='$REMOTE_BACKUPS' sh -s" <<'REMOTE'
+BACKUP_INFO=$("${SSH[@]}" "$VPS" "SERVICE='$SERVICE' BACKUP_DIR='$REMOTE_BACKUPS' sh -s" <<'REMOTE'
 set -eu
-DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'maintainex-db|dokploy-postgres' | head -1)
-if [ -z "$DB_CONTAINER" ]; then
-  echo "ERROR: production PostgreSQL container not found" >&2
+mkdir -p "$BACKUP_DIR"
+
+APP_CONTAINER=$(docker ps --filter "name=$SERVICE" --format '{{.ID}}' | head -1)
+if [ -z "$APP_CONTAINER" ]; then
+  echo "ERROR|running application container not found"
   exit 1
 fi
+
+DB_META=$(docker exec "$APP_CONTAINER" node -e '
+const raw = process.env.DATABASE_URL;
+if (!raw) process.exit(2);
+const u = new URL(raw);
+const user = decodeURIComponent(u.username || "");
+const name = decodeURIComponent(u.pathname.replace(/^\\/+/, ""));
+const host = u.hostname || "";
+if (!user || !name) process.exit(3);
+process.stdout.write([user, name, host].join("|"));
+')
+if [ -z "$DB_META" ]; then
+  echo "ERROR|could not derive production database identity from application DATABASE_URL"
+  exit 1
+fi
+
+DB_USER=$(printf '%s' "$DB_META" | cut -d'|' -f1)
+DB_NAME=$(printf '%s' "$DB_META" | cut -d'|' -f2)
+DB_HOST=$(printf '%s' "$DB_META" | cut -d'|' -f3)
+
+DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -F "$DB_HOST" | head -1 || true)
+if [ -z "$DB_CONTAINER" ]; then
+  DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'maintainex-db|dokploy-postgres' | head -1 || true)
+fi
+if [ -z "$DB_CONTAINER" ]; then
+  echo "ERROR|production PostgreSQL container not found"
+  exit 1
+fi
+
+LIVE_DB=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -Atqc 'SELECT current_database()')
+if [ "$LIVE_DB" != "$DB_NAME" ]; then
+  echo "ERROR|database identity mismatch"
+  exit 1
+fi
+
+LIVE_TABLES=$(docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -Atqc "SELECT COUNT(*) FROM pg_tables WHERE schemaname='public'")
+if [ -z "$LIVE_TABLES" ] || [ "$LIVE_TABLES" -le 0 ]; then
+  echo "ERROR|live production database has no public tables"
+  exit 1
+fi
+
 stamp=$(date +%Y%m%d-%H%M%S)
 backup="$BACKUP_DIR/maintainex-db-pre-release-$stamp.sql.gz"
-docker exec "$DB_CONTAINER" pg_dump -U postgres -d postgres --clean --if-exists | gzip -c > "$backup"
+docker exec "$DB_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" --clean --if-exists | gzip -c > "$backup"
 test -s "$backup"
 gzip -t "$backup"
+gzip -dc "$backup" | grep -q '_prisma_migrations'
+BACKUP_TABLES=$(gzip -dc "$backup" | grep -c '^CREATE TABLE public\.' || true)
+if [ "$BACKUP_TABLES" -ne "$LIVE_TABLES" ]; then
+  echo "ERROR|backup table count mismatch live=$LIVE_TABLES backup=$BACKUP_TABLES"
+  exit 1
+fi
+
 size=$(wc -c < "$backup" | tr -d ' ')
-echo "$backup|$size|$DB_CONTAINER"
+echo "$backup|$size|$DB_CONTAINER|$DB_NAME|$LIVE_TABLES"
 REMOTE
 )
+if printf '%s' "$BACKUP_INFO" | grep -q '^ERROR|'; then
+  echo "$BACKUP_INFO" >&2
+  exit 1
+fi
 BACKUP_PATH=$(printf '%s' "$BACKUP_INFO" | cut -d'|' -f1)
 BACKUP_SIZE=$(printf '%s' "$BACKUP_INFO" | cut -d'|' -f2)
-echo "Backup verified: $BACKUP_PATH ($BACKUP_SIZE bytes)"
+DB_CONTAINER=$(printf '%s' "$BACKUP_INFO" | cut -d'|' -f3)
+DB_NAME=$(printf '%s' "$BACKUP_INFO" | cut -d'|' -f4)
+DB_TABLES=$(printf '%s' "$BACKUP_INFO" | cut -d'|' -f5)
+echo "Backup: $BACKUP_PATH"
+echo "Database: $DB_NAME"
+echo "Tables:   $DB_TABLES"
+echo "Size:     $BACKUP_SIZE bytes"
 
-echo
 echo "=== 4/7 Record rollback image and build new immutable image ==="
 PREVIOUS_IMAGE=$("${SSH[@]}" "$VPS" "docker service inspect '$SERVICE' --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}'")
 echo "Rollback image: $PREVIOUS_IMAGE"

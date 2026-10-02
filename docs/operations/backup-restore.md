@@ -9,7 +9,7 @@ A comprehensive 5-part backup producing a single timestamped `.tar.gz` archive:
 | Part | Source | Method |
 |------|--------|--------|
 | **Source code** | Git HEAD | `git archive --format=tar HEAD` |
-| **Database** | Live PostgreSQL on VPS | `pg_dump` via SSH → `docker exec` on `maintainex-db` container |
+| **Database** | Live PostgreSQL on VPS | derive DB identity from running app `DATABASE_URL`, then `pg_dump` via SSH → PostgreSQL container |
 | **Uploads** | `public/uploads/` | Direct `cp -r` |
 | **Environment files** | `.env.example`, `mobile/.env` | Direct copy |
 | **Docker config** | `Dockerfile`, `nixpacks.toml`, `.dockerignore` | Direct copy |
@@ -65,7 +65,7 @@ cd code/
 npm install
 
 # 3. Restore database (on VPS)
-psql -U postgres -d postgres < database/maintainex-live-dump.sql
+psql -U <db_user> -d <db_name> < database/maintainex-live-dump.sql
 
 # 4. Rebuild and deploy
 npm run build
@@ -79,7 +79,7 @@ npm run build
 gunzip maintainex-db-TIMESTAMP.sql.gz
 
 # Restore
-psql -U postgres -d postgres < maintainex-db-TIMESTAMP.sql
+psql -U <db_user> -d <db_name> < maintainex-db-TIMESTAMP.sql
 ```
 
 ### Prisma Migration Status Check

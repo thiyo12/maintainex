@@ -60,7 +60,7 @@ SSH_KEY=<path-to-private-key> \
 bash scripts/crm-v2-production-preflight.sh
 ```
 
-The script does not print secret values. It verifies required environment names, current container health/non-root execution, current migration status, public liveness, readiness authentication, records the rollback image, and creates a validated production DB backup.
+The script does not print secret values. It derives the production database identity from the running app's `DATABASE_URL`, verifies it with `current_database()`, compares live and dumped public-table counts, verifies required environment names, current container health/non-root execution, current migration status, public liveness/readiness authentication, records the rollback image, and creates the validated production DB backup.
 
 - [ ] Preflight ends with `PRE-MERGE PRODUCTION PREFLIGHT: PASS`.
 - [ ] Preserve its non-secret receipt until the release is verified.
