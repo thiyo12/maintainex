@@ -52,6 +52,7 @@ const CANONICAL_SENSITIVE = new Set([
   'platform:settings:manage',
   'pricing:manage',
   'markets:manage',
+  'finance:payments:reconcile',
 ])
 
 const CANONICAL_NORMAL = new Set([

@@ -24,7 +24,7 @@ describe('CRM refund approval boundary', () => {
     )
 
     expect(source).toContain("request.actionId === 'finance.refund'")
-    expect(source).toContain('requestRequiredPayHereRefund(request.targetId)')
+    expect(source).toContain('requestRequiredProviderRefund(request.targetId, request.id)')
     expect(source).toContain('confirmManualExternalRefund(request.targetId')
     expect(source).toContain('parseRefundExecutionPayload')
   })

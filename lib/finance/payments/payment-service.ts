@@ -9,6 +9,9 @@ import {
   findPayPalApprovalUrl,
   getPayPalConfig,
   getPayPalOrder,
+  getPayPalRefund,
+  parsePayPalAmountToMinor,
+  refundPayPalCapture,
 } from '@/lib/finance/payments/paypal-adapter'
 import { bigIntToSafeNumber, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
 import {
@@ -18,12 +21,17 @@ import {
   getPayHereReturnUrl,
   getPayHereCancelUrl,
   getPayHereNotifyUrl,
+  generateMerchantOrderId,
   formatPayHereAmount,
   parsePayHereAmount,
   requestPayHereRefund,
   retrievePayHerePayment,
   type PayHereNotification,
 } from '@/lib/payment/payhere-adapter'
+import {
+  resolvePaymentProviderForMarket,
+  type ResolvedPaymentProvider,
+} from '@/lib/finance/payments/provider-registry'
 
 export type PaymentStatus =
   | 'CREATED'
@@ -48,6 +56,7 @@ export interface PaymentResult {
   paymentIntentId?: string
   checkoutUrl?: string
   merchantOrderId?: string
+  gateway?: string
   error?: string
   code?: string
 }
@@ -55,13 +64,49 @@ export interface PaymentResult {
 export async function createPaymentIntent(params: CreatePaymentParams): Promise<PaymentResult> {
   const { jobId, customerId, baseUrl } = params
 
-  if (!getPayPalConfig()) {
+  const previewJob = await prisma.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: {
+      id: true,
+      customerId: true,
+      countryCode: true,
+      status: true,
+      title: true,
+    },
+  })
+  if (!previewJob) {
+    return { success: false, error: 'Job not found', code: 'JOB_NOT_FOUND' }
+  }
+  if (previewJob.customerId !== customerId) {
+    return { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }
+  }
+
+  const previewEscrow = await prisma.jobEscrow.findFirst({
+    where: { jobId },
+    select: { currency: true },
+  })
+  if (!previewEscrow) {
     return {
       success: false,
-      error: 'PayPal payment gateway is not configured',
-      code: 'PAYPAL_NOT_CONFIGURED',
+      error: 'Escrow not initialized',
+      code: 'ESCROW_NOT_INITIALIZED',
     }
   }
+
+  const provider = await resolvePaymentProviderForMarket({
+    countryCode: previewJob.countryCode,
+    currency: previewEscrow.currency,
+  })
+  if (!provider) {
+    return {
+      success: false,
+      error: 'No payment provider is enabled for this market and currency',
+      code: 'PAYMENT_PROVIDER_NOT_ENABLED',
+    }
+  }
+
+  const providerConfigError = validateProviderRuntimeConfig(provider)
+  if (providerConfigError) return providerConfigError
 
   type IntentDecision = {
     intent: {
@@ -69,6 +114,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       merchantOrderId: string
       amount: bigint
       currency: string
+      gateway: string
     } | null
     jobTitle: string | null
     failure: PaymentResult | null
@@ -76,9 +122,15 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
 
   const decision: IntentDecision = await prisma.$transaction(async tx => {
     const lockedJobs = await tx.$queryRaw<
-      { id: string; customerId: string; status: string; title: string }[]
+      {
+        id: string
+        customerId: string
+        status: string
+        title: string
+        countryCode: string
+      }[]
     >`
-      SELECT id, "customerId", status, title
+      SELECT id, "customerId", status, title, "countryCode"
       FROM "MarketplaceJob"
       WHERE id = ${jobId}
       FOR UPDATE
@@ -105,6 +157,17 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         failure: { success: false, error: 'Job is not payable', code: 'JOB_NOT_PAYABLE' },
       }
     }
+    if (job.countryCode !== provider.countryCode) {
+      return {
+        intent: null,
+        jobTitle: job.title,
+        failure: {
+          success: false,
+          error: 'Payment market changed while checkout was starting',
+          code: 'PAYMENT_MARKET_CHANGED',
+        },
+      }
+    }
 
     const escrow = await tx.jobEscrow.findFirst({ where: { jobId } })
     if (!escrow) {
@@ -129,6 +192,17 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         },
       }
     }
+    if (escrow.currency !== provider.currency) {
+      return {
+        intent: null,
+        jobTitle: job.title,
+        failure: {
+          success: false,
+          error: 'Payment currency changed while checkout was starting',
+          code: 'PAYMENT_CURRENCY_CHANGED',
+        },
+      }
+    }
 
     const expiryCutoff = new Date(Date.now() - 30 * 60 * 1000)
     await tx.paymentIntent.updateMany({
@@ -140,12 +214,12 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       data: { status: 'EXPIRED' },
     })
 
-    // The product has switched to PayPal. Do not issue a new PayHere checkout
-    // URL when the customer retries after the cutover.
+    // Only one provider owns a fresh checkout attempt. Stale pending attempts
+    // from another provider are expired before a new provider intent is issued.
     await tx.paymentIntent.updateMany({
       where: {
         jobId,
-        gateway: 'PAYHERE',
+        gateway: { not: provider.provider },
         status: { in: ['CREATED', 'PENDING'] },
       },
       data: { status: 'EXPIRED' },
@@ -154,7 +228,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     const existingPending = await tx.paymentIntent.findFirst({
       where: {
         jobId,
-        gateway: 'PAYPAL',
+        gateway: provider.provider,
         status: { in: ['CREATED', 'PENDING'] },
       },
       select: {
@@ -162,6 +236,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         merchantOrderId: true,
         amount: true,
         currency: true,
+        gateway: true,
       },
     })
     if (existingPending) {
@@ -169,15 +244,20 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     }
 
     const totalAmount = escrow.totalAmount ?? escrow.amount
+    const merchantOrderId =
+      provider.provider === 'PAYPAL'
+        ? `PP-PENDING-${crypto.randomUUID()}`
+        : generateMerchantOrderId(jobId)
+
     const paymentIntent = await tx.paymentIntent.create({
       data: {
         jobId,
         customerId,
         escrowId: escrow.id,
-        merchantOrderId: `PP-PENDING-${crypto.randomUUID()}`,
-        gateway: 'PAYPAL',
+        merchantOrderId,
+        gateway: provider.provider,
         amount: totalAmount,
-        currency: (escrow.currency || 'LKR') as Currency,
+        currency: escrow.currency,
         status: 'CREATED',
       },
       select: {
@@ -185,6 +265,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         merchantOrderId: true,
         amount: true,
         currency: true,
+        gateway: true,
       },
     })
 
@@ -200,6 +281,30 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     }
   }
 
+  if (provider.provider === 'PAYHERE') {
+    const config = getPayHereConfig()!
+    return {
+      success: true,
+      paymentIntentId: decision.intent.id,
+      checkoutUrl: buildHostedCheckoutUrl(
+        baseUrl,
+        decision.intent.id,
+        config.merchantSecret
+      ),
+      merchantOrderId: decision.intent.merchantOrderId,
+      gateway: provider.provider,
+    }
+  }
+
+  if (provider.provider !== 'PAYPAL') {
+    return {
+      success: false,
+      paymentIntentId: decision.intent.id,
+      error: 'Selected payment provider does not support hosted checkout',
+      code: 'PAYMENT_PROVIDER_CHECKOUT_UNSUPPORTED',
+    }
+  }
+
   const intent = decision.intent
   if (!intent.merchantOrderId.startsWith('PP-PENDING-')) {
     const existingOrder = await getPayPalOrder(intent.merchantOrderId)
@@ -211,6 +316,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         paymentIntentId: intent.id,
         checkoutUrl: approvalUrl,
         merchantOrderId: intent.merchantOrderId,
+        gateway: provider.provider,
       }
     }
 
@@ -296,6 +402,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         paymentIntentId: intent.id,
         checkoutUrl: created.approvalUrl,
         merchantOrderId: created.orderId,
+        gateway: provider.provider,
       }
     }
     return {
@@ -311,6 +418,57 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     paymentIntentId: intent.id,
     checkoutUrl: created.approvalUrl,
     merchantOrderId: created.orderId,
+    gateway: provider.provider,
+  }
+}
+
+function validateProviderRuntimeConfig(
+  provider: ResolvedPaymentProvider
+): PaymentResult | null {
+  if (provider.provider === 'PAYPAL') {
+    const config = getPayPalConfig()
+    if (!config) {
+      return {
+        success: false,
+        error: 'PayPal payment gateway is not configured',
+        code: 'PAYPAL_NOT_CONFIGURED',
+      }
+    }
+    const runtimeEnvironment = config.sandbox ? 'SANDBOX' : 'LIVE'
+    if (runtimeEnvironment !== provider.environment) {
+      return {
+        success: false,
+        error: 'PayPal market configuration does not match runtime environment',
+        code: 'PAYPAL_ENVIRONMENT_MISMATCH',
+      }
+    }
+    return null
+  }
+
+  if (provider.provider === 'PAYHERE') {
+    const config = getPayHereConfig()
+    if (!config) {
+      return {
+        success: false,
+        error: 'PayHere payment gateway is not configured',
+        code: 'PAYHERE_NOT_CONFIGURED',
+      }
+    }
+    const runtimeEnvironment = config.sandbox ? 'SANDBOX' : 'LIVE'
+    if (runtimeEnvironment !== provider.environment) {
+      return {
+        success: false,
+        error: 'PayHere market configuration does not match runtime environment',
+        code: 'PAYHERE_ENVIRONMENT_MISMATCH',
+      }
+    }
+    return null
+  }
+
+  return {
+    success: false,
+    error: 'Selected payment provider does not support hosted checkout',
+    code: 'PAYMENT_PROVIDER_CHECKOUT_UNSUPPORTED',
   }
 }
 
@@ -446,6 +604,7 @@ export async function getPaymentStatus(jobId: string, customerId: string) {
     currency: payment.currency,
     merchantOrderId: payment.merchantOrderId,
     paymentId: payment.paymentId,
+    gateway: payment.gateway,
     createdAt: payment.createdAt.toISOString(),
     paidAt: payment.paidAt?.toISOString() || null,
   }
@@ -1205,14 +1364,15 @@ export async function reconcilePayHereRefund(
   }
 }
 
-async function finalizePayHereRefund(
+async function finalizeExternalProviderRefund(
   paymentIntentId: string,
   details: {
+    provider: 'PAYHERE' | 'PAYPAL'
     gatewayStatus: string
     refundReference: string | null
     message: string
     actorId?: string
-    source?: 'PAYHERE' | 'MANUAL'
+    source?: 'PAYHERE' | 'PAYPAL' | 'MANUAL'
   }
 ): Promise<PayHereRefundProcessingResult> {
   const intent = await prisma.paymentIntent.findUnique({
@@ -1268,8 +1428,12 @@ async function finalizePayHereRefund(
     }
   }
 
-  const actorId = details.actorId || 'system:payhere-refund'
+  const actorId =
+    details.actorId ||
+    `system:${details.provider.toLowerCase()}-refund`
   const actorType = details.source === 'MANUAL' ? 'STAFF' : 'SYSTEM'
+  const externalAccountId = `external:${details.provider.toLowerCase()}`
+  const providerKey = details.provider.toLowerCase()
 
   await prisma.$transaction(async tx => {
     const claimed = await tx.paymentIntent.updateMany({
@@ -1311,7 +1475,7 @@ async function finalizePayHereRefund(
             amount: intent.amount,
           },
           {
-            accountId: 'external:payhere',
+            accountId: externalAccountId,
             accountType: 'EXTERNAL_PAYOUT',
             entryType: 'CREDIT',
             amount: intent.amount,
@@ -1320,15 +1484,15 @@ async function finalizePayHereRefund(
         currency: intent.currency as Currency,
         referenceType: 'PAYMENT_EXTERNAL_REFUND',
         referenceId: intent.id,
-        idempotencyKey: `payhere-refund-suspense-release:${intent.id}:${intent.paymentId || intent.merchantOrderId}`,
-        description: `External refund of late PayHere capture ${intent.id}`,
+        idempotencyKey: `${providerKey}-refund-suspense-release:${intent.id}:${intent.paymentId || intent.merchantOrderId}`,
+        description: `External refund of late ${details.provider} capture ${intent.id}`,
         createdBy: actorId,
         metadata: JSON.stringify({
           paymentIntentId: intent.id,
           paymentId: intent.paymentId,
           merchantOrderId: intent.merchantOrderId,
           refundReference: details.refundReference,
-          refundSource: details.source || 'PAYHERE',
+          refundSource: details.source || details.provider,
           fundingSource: 'REFUND_SUSPENSE',
         }),
       }, tx)
@@ -1357,7 +1521,7 @@ async function finalizePayHereRefund(
             amount: activeEscrow.totalAmount,
           },
           {
-            accountId: 'external:payhere',
+            accountId: externalAccountId,
             accountType: 'EXTERNAL_PAYOUT',
             entryType: 'CREDIT',
             amount: activeEscrow.totalAmount,
@@ -1366,15 +1530,15 @@ async function finalizePayHereRefund(
         currency: activeEscrow.currency as Currency,
         referenceType: 'ESCROW_EXTERNAL_REFUND',
         referenceId: activeEscrow.id,
-        idempotencyKey: `payhere-refund:${activeEscrow.id}:${intent.paymentId || intent.merchantOrderId}`,
-        description: `PayHere refund reconciliation for escrow ${activeEscrow.id}`,
+        idempotencyKey: `${providerKey}-refund:${activeEscrow.id}:${intent.paymentId || intent.merchantOrderId}`,
+        description: `${details.provider} refund reconciliation for escrow ${activeEscrow.id}`,
         createdBy: actorId,
         metadata: JSON.stringify({
           paymentIntentId: intent.id,
           paymentId: intent.paymentId,
           merchantOrderId: intent.merchantOrderId,
           refundReference: details.refundReference,
-          refundSource: details.source || 'PAYHERE',
+          refundSource: details.source || details.provider,
           fundingSource: 'ESCROW',
         }),
       }, tx)
@@ -1424,7 +1588,7 @@ async function finalizePayHereRefund(
         paymentId: intent.paymentId,
         escrowId: intent.escrowId,
         refundReference: details.refundReference,
-        refundSource: details.source || 'PAYHERE',
+        refundSource: details.source || details.provider,
         fundingSource: suspenseFunding ? 'REFUND_SUSPENSE' : 'ESCROW',
         refundMinor: suspenseFunding ? intent.amount : escrow!.totalAmount,
         currency: suspenseFunding ? intent.currency : escrow!.currency,
@@ -1436,6 +1600,448 @@ async function finalizePayHereRefund(
     success: true,
     status: 'REFUNDED',
     refundReference: details.refundReference,
+  }
+}
+
+async function finalizePayHereRefund(
+  paymentIntentId: string,
+  details: {
+    gatewayStatus: string
+    refundReference: string | null
+    message: string
+    actorId?: string
+    source?: 'PAYHERE' | 'MANUAL'
+  }
+): Promise<PayHereRefundProcessingResult> {
+  return finalizeExternalProviderRefund(paymentIntentId, {
+    ...details,
+    provider: 'PAYHERE',
+  })
+}
+
+export async function requestRequiredPayPalRefund(
+  paymentIntentId: string,
+  approvalRequestId?: string
+): Promise<PayHereRefundProcessingResult> {
+  const intent = await prisma.paymentIntent.findUnique({
+    where: { id: paymentIntentId },
+  })
+  if (!intent) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment intent not found',
+      code: 'PAYMENT_INTENT_NOT_FOUND',
+    }
+  }
+  if (intent.gateway !== 'PAYPAL') {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment is not a PayPal transaction',
+      code: 'PAYMENT_PROVIDER_MISMATCH',
+    }
+  }
+  if (intent.status === 'REFUNDED') {
+    return {
+      success: true,
+      status: 'REFUNDED',
+      refundReference: intent.refundId,
+    }
+  }
+  if (intent.status === 'REFUND_PROCESSING') {
+    return reconcilePayPalRefund(paymentIntentId)
+  }
+  if (intent.status !== 'REFUND_REQUIRED') {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: `Payment is not awaiting refund (status=${intent.status})`,
+      code: 'PAYMENT_NOT_REFUNDABLE',
+    }
+  }
+
+  const transaction = await prisma.paymentProviderTransaction.findFirst({
+    where: {
+      paymentIntentId: intent.id,
+      provider: 'PAYPAL',
+      providerCaptureId: { not: null },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!transaction?.providerCaptureId) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'PayPal capture reference is missing',
+      code: 'PAYPAL_CAPTURE_ID_MISSING',
+    }
+  }
+  if (
+    transaction.grossAmount !== intent.amount ||
+    transaction.currency !== intent.currency
+  ) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'PayPal provider transaction does not match the payment intent',
+      code: 'PAYPAL_REFUND_TRANSACTION_MISMATCH',
+    }
+  }
+
+  const claim = await prisma.paymentIntent.updateMany({
+    where: {
+      id: intent.id,
+      gateway: 'PAYPAL',
+      status: 'REFUND_REQUIRED',
+    },
+    data: {
+      status: 'REFUND_PROCESSING',
+      gatewayResponse: mergeGatewayResponse(intent.gatewayResponse, 'refund', {
+        gatewayStatus: 'REFUND REQUEST CLAIMED',
+        provider: 'PAYPAL',
+        claimedAt: new Date().toISOString(),
+      }),
+    },
+  })
+  if (claim.count !== 1) {
+    const current = await prisma.paymentIntent.findUnique({
+      where: { id: intent.id },
+      select: { status: true },
+    })
+    if (current?.status === 'REFUNDED') {
+      return { success: true, status: 'REFUNDED' }
+    }
+    if (current?.status === 'REFUND_PROCESSING') {
+      return reconcilePayPalRefund(paymentIntentId)
+    }
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Refund request state changed concurrently',
+      code: 'PAYPAL_REFUND_STATE_CHANGED',
+    }
+  }
+
+  const job = await prisma.marketplaceJob.findUnique({
+    where: { id: intent.jobId },
+    select: { countryCode: true },
+  })
+  if (!job) {
+    await prisma.paymentIntent.updateMany({
+      where: { id: intent.id, status: 'REFUND_PROCESSING' },
+      data: { status: 'REFUND_REQUIRED' },
+    })
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment job not found',
+      code: 'PAYMENT_JOB_NOT_FOUND',
+    }
+  }
+
+  const requestRecord = await prisma.paymentProviderRefund.create({
+    data: {
+      paymentIntentId: intent.id,
+      providerTransactionId: transaction.id,
+      countryCode: job.countryCode,
+      provider: 'PAYPAL',
+      amount: intent.amount,
+      currency: intent.currency,
+      status: 'REQUESTING',
+      reason: 'Approved MaintainEX customer refund',
+      approvalRequestId: approvalRequestId || null,
+      metadata: JSON.stringify({
+        providerCaptureId: transaction.providerCaptureId,
+      }),
+    },
+  })
+
+  const refund = await refundPayPalCapture(
+    transaction.providerCaptureId,
+    intent.id,
+    {
+      amountMinor: intent.amount,
+      currency: intent.currency,
+      refundRequestKey: requestRecord.id,
+    }
+  )
+
+  if (!refund.ok || !refund.refundId) {
+    await prisma.$transaction([
+      prisma.paymentProviderRefund.update({
+        where: { id: requestRecord.id },
+        data: {
+          status: 'FAILED',
+          metadata: JSON.stringify({
+            providerCaptureId: transaction.providerCaptureId,
+            httpStatus: refund.status,
+            error: refund.error || 'PayPal refund request failed',
+          }),
+        },
+      }),
+      prisma.paymentIntent.update({
+        where: { id: intent.id },
+        data: {
+          status: 'REFUND_REQUIRED',
+          gatewayResponse: mergeGatewayResponse(intent.gatewayResponse, 'refund', {
+            provider: 'PAYPAL',
+            gatewayStatus: 'REFUND REQUEST FAILED',
+            error: refund.error || 'PayPal refund request failed',
+            failedAt: new Date().toISOString(),
+          }),
+        },
+      }),
+    ])
+
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: refund.error || 'PayPal refund request failed',
+      code: 'PAYPAL_REFUND_REQUEST_FAILED',
+    }
+  }
+
+  const providerStatus = (refund.refundStatus || 'PENDING').toUpperCase()
+  await prisma.$transaction(async tx => {
+    await tx.paymentProviderRefund.update({
+      where: { id: requestRecord.id },
+      data: {
+        providerRefundId: refund.refundId,
+        status: providerStatus,
+        completedAt: providerStatus === 'COMPLETED' ? new Date() : null,
+        metadata: JSON.stringify({
+          providerCaptureId: transaction.providerCaptureId,
+          providerStatus,
+        }),
+      },
+    })
+    await tx.paymentIntent.update({
+      where: { id: intent.id },
+      data: {
+        refundId: refund.refundId,
+        gatewayResponse: mergeGatewayResponse(intent.gatewayResponse, 'refund', {
+          provider: 'PAYPAL',
+          gatewayStatus: providerStatus,
+          refundReference: refund.refundId,
+          requestedAt: new Date().toISOString(),
+        }),
+      },
+    })
+    await recordJobLifecycleEvent(tx, {
+      jobId: intent.jobId,
+      actorId: 'system:paypal-refund',
+      actorType: 'SYSTEM',
+      action: 'PAYMENT_REFUND_SUBMITTED',
+      metadata: {
+        paymentIntentId: intent.id,
+        paymentId: transaction.providerCaptureId,
+        refundReference: refund.refundId,
+        approvalRequestId: approvalRequestId || null,
+        provider: 'PAYPAL',
+      },
+    })
+  })
+
+  if (providerStatus === 'COMPLETED') {
+    return finalizeExternalProviderRefund(intent.id, {
+      provider: 'PAYPAL',
+      gatewayStatus: providerStatus,
+      refundReference: refund.refundId,
+      message: 'PayPal refund completed',
+      source: 'PAYPAL',
+    })
+  }
+
+  return {
+    success: true,
+    status: 'REFUND_PROCESSING',
+    refundReference: refund.refundId,
+  }
+}
+
+export async function reconcilePayPalRefund(
+  paymentIntentId: string
+): Promise<PayHereRefundProcessingResult> {
+  const intent = await prisma.paymentIntent.findUnique({
+    where: { id: paymentIntentId },
+  })
+  if (!intent) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment intent not found',
+      code: 'PAYMENT_INTENT_NOT_FOUND',
+    }
+  }
+  if (intent.gateway !== 'PAYPAL') {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment is not a PayPal transaction',
+      code: 'PAYMENT_PROVIDER_MISMATCH',
+    }
+  }
+  if (intent.status === 'REFUNDED') {
+    return {
+      success: true,
+      status: 'REFUNDED',
+      refundReference: intent.refundId,
+    }
+  }
+  if (!['REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(intent.status)) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: `Payment is not in the refund queue (status=${intent.status})`,
+      code: 'PAYMENT_NOT_IN_REFUND_QUEUE',
+    }
+  }
+
+  const refundRecord = await prisma.paymentProviderRefund.findFirst({
+    where: {
+      paymentIntentId: intent.id,
+      provider: 'PAYPAL',
+      providerRefundId: { not: null },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!refundRecord?.providerRefundId) {
+    return {
+      success: false,
+      status: intent.status as 'REFUND_REQUIRED' | 'REFUND_PROCESSING',
+      error: 'PayPal refund reference is missing',
+      code: 'PAYPAL_REFUND_ID_MISSING',
+    }
+  }
+
+  const refund = await getPayPalRefund(refundRecord.providerRefundId)
+  if (!refund.ok) {
+    return {
+      success: false,
+      status: intent.status as 'REFUND_REQUIRED' | 'REFUND_PROCESSING',
+      error: refund.error || 'PayPal refund retrieval failed',
+      code: 'PAYPAL_REFUND_RETRIEVAL_FAILED',
+      refundReference: refundRecord.providerRefundId,
+    }
+  }
+
+  const providerStatus = (refund.refundStatus || 'PENDING').toUpperCase()
+  await prisma.paymentProviderRefund.update({
+    where: { id: refundRecord.id },
+    data: {
+      status: providerStatus,
+      completedAt: providerStatus === 'COMPLETED' ? new Date() : null,
+    },
+  })
+
+  if (refund.amountValue && refund.currency) {
+    const refundedMinor = parsePayPalAmountToMinor(
+      refund.amountValue,
+      refund.currency
+    )
+    if (
+      refundedMinor === null ||
+      refundedMinor !== intent.amount ||
+      refund.currency.toUpperCase() !== intent.currency.toUpperCase()
+    ) {
+      return {
+        success: false,
+        status: 'REFUND_PROCESSING',
+        error: 'PayPal refund amount or currency does not match the canonical payment',
+        code: 'PAYPAL_REFUND_AMOUNT_MISMATCH',
+        refundReference: refundRecord.providerRefundId,
+      }
+    }
+  }
+
+  if (providerStatus === 'COMPLETED') {
+    return finalizeExternalProviderRefund(intent.id, {
+      provider: 'PAYPAL',
+      gatewayStatus: providerStatus,
+      refundReference: refundRecord.providerRefundId,
+      message: 'PayPal refund reconciliation completed',
+      source: 'PAYPAL',
+    })
+  }
+
+  if (['PENDING', 'PROCESSING'].includes(providerStatus)) {
+    await prisma.paymentIntent.updateMany({
+      where: { id: intent.id, status: { in: ['REFUND_REQUIRED', 'REFUND_PROCESSING'] } },
+      data: { status: 'REFUND_PROCESSING' },
+    })
+    return {
+      success: true,
+      status: 'REFUND_PROCESSING',
+      refundReference: refundRecord.providerRefundId,
+    }
+  }
+
+  return {
+    success: false,
+    status: intent.status as 'REFUND_REQUIRED' | 'REFUND_PROCESSING',
+    error: `Unexpected PayPal refund status: ${providerStatus}`,
+    code: 'PAYPAL_REFUND_UNEXPECTED_STATUS',
+    refundReference: refundRecord.providerRefundId,
+  }
+}
+
+export async function requestRequiredProviderRefund(
+  paymentIntentId: string,
+  approvalRequestId?: string
+): Promise<PayHereRefundProcessingResult> {
+  const intent = await prisma.paymentIntent.findUnique({
+    where: { id: paymentIntentId },
+    select: { gateway: true },
+  })
+  if (!intent) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment intent not found',
+      code: 'PAYMENT_INTENT_NOT_FOUND',
+    }
+  }
+  if (intent.gateway === 'PAYPAL') {
+    return requestRequiredPayPalRefund(paymentIntentId, approvalRequestId)
+  }
+  if (intent.gateway === 'PAYHERE') {
+    return requestRequiredPayHereRefund(paymentIntentId)
+  }
+  return {
+    success: false,
+    status: 'REFUND_REQUIRED',
+    error: `Refund execution is unsupported for provider ${intent.gateway}`,
+    code: 'PAYMENT_PROVIDER_REFUND_UNSUPPORTED',
+  }
+}
+
+export async function reconcileProviderRefund(
+  paymentIntentId: string
+): Promise<PayHereRefundProcessingResult> {
+  const intent = await prisma.paymentIntent.findUnique({
+    where: { id: paymentIntentId },
+    select: { gateway: true },
+  })
+  if (!intent) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment intent not found',
+      code: 'PAYMENT_INTENT_NOT_FOUND',
+    }
+  }
+  if (intent.gateway === 'PAYPAL') {
+    return reconcilePayPalRefund(paymentIntentId)
+  }
+  if (intent.gateway === 'PAYHERE') {
+    return reconcilePayHereRefund(paymentIntentId)
+  }
+  return {
+    success: false,
+    status: 'REFUND_REQUIRED',
+    error: `Refund reconciliation is unsupported for provider ${intent.gateway}`,
+    code: 'PAYMENT_PROVIDER_REFUND_UNSUPPORTED',
   }
 }
 
@@ -1459,7 +2065,7 @@ export async function confirmManualExternalRefund(
 
   const intent = await prisma.paymentIntent.findUnique({
     where: { id: paymentIntentId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, gateway: true },
   })
   if (!intent) {
     return {
@@ -1481,7 +2087,23 @@ export async function confirmManualExternalRefund(
     }
   }
 
-  return finalizePayHereRefund(paymentIntentId, {
+  const provider =
+    intent.gateway === 'PAYPAL'
+      ? 'PAYPAL'
+      : intent.gateway === 'PAYHERE'
+        ? 'PAYHERE'
+        : null
+  if (!provider) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: `Manual external refund is unsupported for gateway ${intent.gateway}`,
+      code: 'PAYMENT_PROVIDER_REFUND_UNSUPPORTED',
+    }
+  }
+
+  return finalizeExternalProviderRefund(paymentIntentId, {
+    provider,
     gatewayStatus: 'MANUAL_REFUND_CONFIRMED',
     refundReference: reference,
     message: input.note?.trim().slice(0, 500) || 'Manual external refund confirmed by finance',

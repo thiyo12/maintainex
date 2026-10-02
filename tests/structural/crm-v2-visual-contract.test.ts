@@ -61,10 +61,12 @@ describe('CRM V2 visual contract', () => {
     const dashboard = readFileSync(resolve(process.cwd(), 'app/(admin)/admin/dashboard/page.tsx'), 'utf8')
 
     for (const marker of [
-      'Active Jobs',
-      'Escrow Held',
-      'Revenue',
+      'Total Jobs',
+      'In Progress',
+      'Completed',
       'Disputes',
+      'Total Revenue',
+      'Payouts Processed',
       'Jobs & Revenue Trend',
       'Job Status',
       'Recent Jobs',
@@ -97,6 +99,10 @@ describe('CRM V2 visual contract', () => {
       'Schedule',
       'Service Details',
       'Job Lifecycle',
+      'Provider transactions',
+      'Refund history',
+      'Provider event timeline',
+      'Unified financial timeline',
     ]) {
       expect(job360).toContain(marker)
     }

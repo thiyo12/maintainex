@@ -38,6 +38,8 @@ interface RefundItem {
   escrowId: string
   merchantOrderId: string
   paymentId?: string | null
+  gateway: string
+  refundId?: string | null
   amount: string
   currency: string
   status: string
@@ -161,6 +163,8 @@ export default function RefundQueuePage() {
       [
         item.merchantOrderId,
         item.paymentId,
+        item.gateway,
+        item.refundId,
         item.job?.title,
         item.job?.id,
         item.customer?.name,
@@ -366,13 +370,14 @@ export default function RefundQueuePage() {
         />
       ) : (
         <CrmTableFrame
-          title="PayHere and external refund operations"
-          description="Retry and manual confirmation create governed approval requests. Reconcile only synchronizes gateway state."
+          title="Provider and external refund operations"
+          description="PayPal and PayHere refund requests use the same governed approval path. Manual confirmation is approval-gated; reconciliation trusts verified provider truth, not the browser."
         >
-          <table className={`${crmTableClass} min-w-[1320px]`}>
+          <table className={`${crmTableClass} min-w-[1460px]`}>
             <thead>
               <tr>
                 <th className={crmThClass}>Payment</th>
+                <th className={crmThClass}>Provider</th>
                 <th className={crmThClass}>Customer</th>
                 <th className={crmThClass}>Job</th>
                 <th className={crmThClass}>Amount</th>
@@ -391,6 +396,20 @@ export default function RefundQueuePage() {
                     <div className="mt-1 font-mono text-[10px] text-slate-400">
                       {item.paymentId || item.id}
                     </div>
+                  </td>
+
+                  <td className={crmTdClass}>
+                    <CrmBadge
+                      tone={item.gateway === 'PAYPAL' ? 'info' : item.gateway === 'PAYHERE' ? 'amber' : 'neutral'}
+                      dot
+                    >
+                      {(item.gateway || 'UNKNOWN').replaceAll('_', ' ')}
+                    </CrmBadge>
+                    {item.refundId && (
+                      <div className="mt-1 max-w-[220px] truncate font-mono text-[10px] text-slate-400">
+                        Refund {item.refundId}
+                      </div>
+                    )}
                   </td>
 
                   <td className={crmTdClass}>
@@ -554,7 +573,7 @@ export default function RefundQueuePage() {
               value={manualReference}
               onChange={event => setManualReference(event.target.value.slice(0, 200))}
               className={crmInputClass}
-              placeholder="Bank / PayHere dashboard refund reference"
+              placeholder="Bank / provider dashboard refund reference"
             />
           </div>
 

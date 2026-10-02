@@ -36,6 +36,7 @@ interface PaymentItem {
   escrowId: string
   merchantOrderId: string
   paymentId?: string | null
+  gateway: string
   amount: string
   currency: string
   status: string
@@ -48,6 +49,17 @@ interface PaymentItem {
   escrowStatus?: string | null
   paymentMethod?: string | null
   disputeStatus?: string | null
+  providerTransactionId?: string | null
+  providerOrderId?: string | null
+  providerCaptureId?: string | null
+  providerTransactionStatus?: string | null
+  providerFee?: string | null
+  netSettlement?: string | null
+  reconciliationStatus?: string | null
+  reconciliationReference?: string | null
+  reconciledAt?: string | null
+  providerEventCount: number
+  providerFailedEventCount: number
   customer?: {
     id: string
     mxId?: string | null
@@ -72,6 +84,7 @@ interface Payload {
     total: number
     pages: number
   }
+  providers?: string[]
   actions: {
     refund: boolean
   }
@@ -105,6 +118,7 @@ function statusTone(status: string): CrmTone {
 export default function PaymentOperationsPage() {
   const [payload, setPayload] = useState<Payload | null>(null)
   const [status, setStatus] = useState('ALL')
+  const [provider, setProvider] = useState('ALL')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -116,6 +130,7 @@ export default function PaymentOperationsPage() {
         page: String(page),
         limit: '30',
         status,
+        provider,
       })
       const response = await fetch(`/api/admin/financial/payments?${params.toString()}`, {
         credentials: 'include',
@@ -135,7 +150,7 @@ export default function PaymentOperationsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, status])
+  }, [page, provider, status])
 
   useEffect(() => {
     load()
@@ -143,7 +158,7 @@ export default function PaymentOperationsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [status])
+  }, [provider, status])
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -154,6 +169,10 @@ export default function PaymentOperationsPage() {
         item.id,
         item.merchantOrderId,
         item.paymentId,
+        item.gateway,
+        item.providerOrderId,
+        item.providerCaptureId,
+        item.reconciliationReference,
         item.jobId,
         item.jobTitle,
         item.customer?.name,
@@ -222,6 +241,12 @@ export default function PaymentOperationsPage() {
         >
           Escrow Operations
         </Link>
+        <Link
+          href="/admin/financial/providers"
+          className="text-xs font-semibold text-amber-700 hover:text-amber-800"
+        >
+          Payment Providers
+        </Link>
       </div>
 
       {metrics.length ? metrics.map(row => (
@@ -289,6 +314,17 @@ export default function PaymentOperationsPage() {
           <option value="REFUNDED">Refunded</option>
           <option value="CHARGEDBACK">Chargeback</option>
         </select>
+        <select
+          value={provider}
+          onChange={event => setProvider(event.target.value)}
+          className={crmInputClass}
+          aria-label="Payment provider"
+        >
+          <option value="ALL">All providers</option>
+          <option value="PAYPAL">PayPal</option>
+          <option value="PAYHERE">PayHere</option>
+          <option value="MANUAL_BANK">Manual bank</option>
+        </select>
       </CrmFilterBar>
 
       {loading ? (
@@ -306,16 +342,20 @@ export default function PaymentOperationsPage() {
       ) : (
         <CrmTableFrame
           title="Payment intent operations"
-          description="Gateway request/response payloads are intentionally excluded. Status comes from canonical PaymentIntent state."
+          description="Provider secrets and raw gateway payloads stay hidden. This view joins canonical payment state to provider transaction economics, event health and reconciliation."
         >
-          <table className={`${crmTableClass} min-w-[1500px]`}>
+          <table className={`${crmTableClass} min-w-[2050px]`}>
             <thead>
               <tr>
                 <th className={crmThClass}>Payment</th>
                 <th className={crmThClass}>Customer</th>
                 <th className={crmThClass}>Job</th>
                 <th className={crmThClass}>Amount</th>
+                <th className={crmThClass}>Provider</th>
                 <th className={crmThClass}>Payment</th>
+                <th className={crmThClass}>Provider economics</th>
+                <th className={crmThClass}>Reconciliation</th>
+                <th className={crmThClass}>Events</th>
                 <th className={crmThClass}>Escrow</th>
                 <th className={crmThClass}>Risk</th>
                 <th className={crmThClass}>Timeline</th>
@@ -329,9 +369,12 @@ export default function PaymentOperationsPage() {
                 return (
                   <tr key={item.id} className="transition-colors hover:bg-[#fafbf9]">
                     <td className={crmTdClass}>
-                      <div className="font-mono text-xs font-semibold text-slate-800">
+                      <Link
+                        href={`/admin/financial/payments/${item.id}`}
+                        className="font-mono text-xs font-semibold text-slate-800 hover:text-amber-700"
+                      >
                         {item.merchantOrderId}
-                      </div>
+                      </Link>
                       <div className="mt-1 font-mono text-[10px] text-slate-400">
                         {item.paymentId || item.id}
                       </div>
@@ -373,11 +416,70 @@ export default function PaymentOperationsPage() {
                     </td>
 
                     <td className={crmTdClass}>
+                      <CrmBadge tone={item.gateway === 'PAYPAL' ? 'info' : item.gateway === 'PAYHERE' ? 'amber' : 'neutral'} dot>
+                        {(item.gateway || 'UNKNOWN').replaceAll('_', ' ')}
+                      </CrmBadge>
+                      <div className="mt-1 max-w-[220px] truncate font-mono text-[10px] text-slate-400">
+                        {item.providerOrderId || item.merchantOrderId}
+                      </div>
+                      {item.providerCaptureId && (
+                        <div className="mt-0.5 max-w-[220px] truncate font-mono text-[10px] text-slate-400">
+                          Capture {item.providerCaptureId}
+                        </div>
+                      )}
+                    </td>
+
+                    <td className={crmTdClass}>
                       <CrmBadge tone={statusTone(item.status)} dot>
                         {item.status.replaceAll('_', ' ')}
                       </CrmBadge>
                       <div className="mt-1 text-[10px] text-slate-400">
                         Method {item.paymentMethod || '—'}
+                      </div>
+                    </td>
+
+                    <td className={crmTdClass}>
+                      {item.providerTransactionId ? (
+                        <div className="space-y-1 text-[11px] text-slate-500">
+                          <div className="font-semibold text-slate-800">
+                            Gross {money(item.amount, item.currency)}
+                          </div>
+                          <div>Provider fee {item.providerFee ? money(item.providerFee, item.currency) : '—'}</div>
+                          <div>Provider net {item.netSettlement ? money(item.netSettlement, item.currency) : '—'}</div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400">No provider transaction yet</span>
+                      )}
+                    </td>
+
+                    <td className={crmTdClass}>
+                      <CrmBadge
+                        tone={
+                          item.reconciliationStatus === 'MATCHED'
+                            ? 'success'
+                            : item.reconciliationStatus === 'MISMATCH'
+                              ? 'danger'
+                              : item.reconciliationStatus === 'MANUAL_REVIEW'
+                                ? 'warning'
+                                : 'neutral'
+                        }
+                        dot={Boolean(item.reconciliationStatus)}
+                      >
+                        {(item.reconciliationStatus || 'UNRECONCILED').replaceAll('_', ' ')}
+                      </CrmBadge>
+                      <div className="mt-1 max-w-[220px] truncate text-[10px] text-slate-400">
+                        {item.reconciliationReference || (item.reconciledAt ? date(item.reconciledAt) : 'Awaiting reconciliation')}
+                      </div>
+                    </td>
+
+                    <td className={crmTdClass}>
+                      <div className="flex items-center gap-2">
+                        <CrmBadge tone={item.providerFailedEventCount > 0 ? 'danger' : item.providerEventCount > 0 ? 'success' : 'neutral'}>
+                          {item.providerEventCount} events
+                        </CrmBadge>
+                        {item.providerFailedEventCount > 0 && (
+                          <CrmBadge tone="danger">{item.providerFailedEventCount} failed</CrmBadge>
+                        )}
                       </div>
                     </td>
 
@@ -457,8 +559,8 @@ export default function PaymentOperationsPage() {
           <div>
             <div className="text-sm font-semibold text-amber-950">Payment control boundary</div>
             <p className="mt-1 text-xs leading-5 text-amber-900/75">
-              CRM observes canonical payment state and routes refund exceptions into governed workflows.
-              There is intentionally no “mark paid” control. Payment success comes from verified gateway callbacks or canonical payment services.
+              CRM observes canonical payment state, provider transaction economics, verified webhook history and reconciliation status, while routing refund exceptions into governed workflows.
+              There is intentionally no “mark paid” control. Payment success comes only from verified provider callbacks or canonical payment services.
             </p>
           </div>
         </div>

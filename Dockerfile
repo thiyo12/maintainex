@@ -20,6 +20,7 @@ COPY --from=installer /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/scripts/bootstrap-payment-providers.cjs ./scripts/bootstrap-payment-providers.cjs
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.js ./next.config.js
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
@@ -29,4 +30,4 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
-CMD npx prisma migrate deploy && npm start
+CMD npx prisma migrate deploy && node scripts/bootstrap-payment-providers.cjs && npm start

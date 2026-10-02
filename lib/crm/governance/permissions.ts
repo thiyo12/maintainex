@@ -18,6 +18,7 @@ export const CRM_PERMISSION_LEGACY_ALIASES: Readonly<Record<string, readonly str
   'messages:view': ['support:view'],
   'messages:respond': ['support:respond'],
   'finance:payments:view': ['wallets:view', 'commission:view'],
+  'finance:payments:reconcile': ['wallets:manage', 'commission:manage'],
   'finance:escrow:view': ['wallets:view'],
   'finance:wallets:view': ['wallets:view'],
   'finance:payouts:view': ['wallets:view'],

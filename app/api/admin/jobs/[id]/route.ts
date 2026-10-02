@@ -371,6 +371,83 @@ async function getV2Job(id: string, request: NextRequest) {
   const acceptedQuote = enrichedQuotes.find(quote => quote.status === 'ACCEPTED') || null
   const acceptedProvider = acceptedQuote?.provider || null
 
+  const paymentIntentIds = canFinance ? paymentIntents.map(intent => intent.id) : []
+  const [providerTransactions, providerRefunds, providerEvents] = canFinance
+    ? await Promise.all([
+        prisma.paymentProviderTransaction.findMany({
+          where: { jobId: id },
+          select: {
+            id: true,
+            paymentIntentId: true,
+            jobId: true,
+            countryCode: true,
+            provider: true,
+            providerOrderId: true,
+            providerAuthorizationId: true,
+            providerCaptureId: true,
+            status: true,
+            grossAmount: true,
+            providerFee: true,
+            netSettlement: true,
+            currency: true,
+            reconciliationStatus: true,
+            reconciliationReference: true,
+            reconciledAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+        paymentIntentIds.length
+          ? prisma.paymentProviderRefund.findMany({
+              where: { paymentIntentId: { in: paymentIntentIds } },
+              select: {
+                id: true,
+                paymentIntentId: true,
+                providerTransactionId: true,
+                countryCode: true,
+                provider: true,
+                providerRefundId: true,
+                amount: true,
+                currency: true,
+                status: true,
+                reason: true,
+                initiatedByAdminId: true,
+                approvalRequestId: true,
+                completedAt: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+              orderBy: { createdAt: 'desc' },
+            })
+          : Promise.resolve([]),
+        paymentIntentIds.length
+          ? prisma.paymentProviderEvent.findMany({
+              where: { paymentIntentId: { in: paymentIntentIds } },
+              select: {
+                id: true,
+                provider: true,
+                externalEventId: true,
+                paymentIntentId: true,
+                providerTransactionId: true,
+                countryCode: true,
+                eventType: true,
+                eventStatus: true,
+                signatureVerified: true,
+                processingStatus: true,
+                errorCode: true,
+                errorMessage: true,
+                occurredAt: true,
+                processedAt: true,
+                createdAt: true,
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 200,
+            })
+          : Promise.resolve([]),
+      ])
+    : [[], [], []]
+
   const ledgerReferenceIds = canFinance
     ? [id, escrow?.id, ...settlements.map(item => item.id)].filter(
         (value): value is string => Boolean(value)
@@ -419,6 +496,21 @@ async function getV2Job(id: string, request: NextRequest) {
         amount: money(intent.amount, intent.currency),
         gatewayResponse: undefined,
       })),
+      providerTransactions: providerTransactions.map(transaction => ({
+        ...transaction,
+        grossAmount: money(transaction.grossAmount, transaction.currency),
+        providerFee: transaction.providerFee === null
+          ? null
+          : money(transaction.providerFee, transaction.currency),
+        netSettlement: transaction.netSettlement === null
+          ? null
+          : money(transaction.netSettlement, transaction.currency),
+      })),
+      providerRefunds: providerRefunds.map(refund => ({
+        ...refund,
+        amount: money(refund.amount, refund.currency),
+      })),
+      providerEvents,
       settlements: settlements.map(settlement => ({
         ...settlement,
         jobAmount: money(settlement.jobAmount, settlement.currency),

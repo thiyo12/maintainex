@@ -13,7 +13,7 @@ import { createCrmApprovalRequest, evaluateActionInitiation } from '@/lib/crm/go
 import { resolveCurrentApprovalRisk } from '@/lib/crm/governance/current-risk'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import {
-  reconcilePayHereRefund,
+  reconcileProviderRefund,
 } from '@/lib/finance/payments/payment-service'
 
 const REFUND_STATUSES = ['REFUND_REQUIRED', 'REFUND_PROCESSING', 'REFUNDED'] as const
@@ -62,6 +62,8 @@ export async function GET(request: NextRequest) {
           escrowId: true,
           merchantOrderId: true,
           paymentId: true,
+          gateway: true,
+          refundId: true,
           amount: true,
           currency: true,
           status: true,
@@ -130,7 +132,7 @@ export async function PATCH(request: NextRequest) {
     if (!guard.ok) return guard.response
     const security = guard.context
 
-    const rateLimit = await requireFinancialRateLimit(request, 'payhere-refund-admin')
+    const rateLimit = await requireFinancialRateLimit(request, 'provider-refund-admin')
     if (rateLimit) return rateLimit
 
     const body = await request.json().catch(() => ({}))
@@ -166,6 +168,8 @@ export async function PATCH(request: NextRequest) {
         jobId: true,
         escrowId: true,
         status: true,
+        gateway: true,
+        refundId: true,
         merchantOrderId: true,
         paymentId: true,
         amount: true,
@@ -184,7 +188,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'RECONCILE') {
-      const result = await reconcilePayHereRefund(intent.id)
+      const result = await reconcileProviderRefund(intent.id)
 
       await createAuditLog({
         action: 'UPDATE',
@@ -195,7 +199,7 @@ export async function PATCH(request: NextRequest) {
         entityType: 'PaymentIntent',
         entityId: intent.id,
         entityName: intent.merchantOrderId,
-        description: 'CRM PayHere refund reconciliation',
+        description: `CRM ${intent.gateway} refund reconciliation`,
         oldValue: { status: intent.status },
         newValue: {
           status: result.status,
@@ -254,7 +258,7 @@ export async function PATCH(request: NextRequest) {
       note:
         action === 'CONFIRM_MANUAL'
           ? (note || 'Manual external refund confirmation requested')
-          : 'PayHere refund request submitted for approval',
+          : `${intent.gateway} refund request submitted for approval`,
       idempotencyKey,
       actionPayload:
         action === 'CONFIRM_MANUAL'

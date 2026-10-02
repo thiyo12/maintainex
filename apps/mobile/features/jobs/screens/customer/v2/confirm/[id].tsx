@@ -29,6 +29,7 @@ export default function V2ConfirmBookingScreen() {
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleSlot, setScheduleSlot] = useState('')
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null)
+  const [paymentProvider, setPaymentProvider] = useState<string | null>(null)
 
   useEffect(() => { loadData() }, [id])
 
@@ -54,6 +55,7 @@ export default function V2ConfirmBookingScreen() {
       setJob(jobRes.job)
       setEscrow(jobRes.job.escrow || null)
       setPaymentStatus(paymentRes.payment?.status || null)
+      setPaymentProvider(paymentRes.payment?.gateway || null)
       if (jobRes.job.preferredTimeSlot && !scheduleSlot) {
         setScheduleSlot(jobRes.job.preferredTimeSlot)
       }
@@ -74,6 +76,7 @@ export default function V2ConfirmBookingScreen() {
       const payment = await v2Payments.start(id)
       if (!payment.checkoutUrl) throw new Error('Secure checkout is not available')
       setPaymentStatus('PENDING')
+      setPaymentProvider(payment.gateway || null)
       await Linking.openURL(payment.checkoutUrl)
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message)
@@ -201,7 +204,15 @@ export default function V2ConfirmBookingScreen() {
               {actionLoading === 'escrow' ? (
                 <ActivityIndicator color={colors.ink} />
               ) : (
-                <Text style={styles.depositBtnText}>{paymentStatus === 'PENDING' ? 'Continue Secure Payment' : 'Pay Securely with PayHere'}</Text>
+                <Text style={styles.depositBtnText}>
+                  {paymentStatus === 'PENDING'
+                    ? 'Continue Secure Payment'
+                    : paymentProvider === 'PAYPAL'
+                      ? 'Pay Securely with PayPal'
+                      : paymentProvider === 'PAYHERE'
+                        ? 'Pay Securely with PayHere'
+                        : 'Pay Securely'}
+                </Text>
               )}
             </TouchableOpacity>
           )}

@@ -54,6 +54,9 @@ interface Job360Payload {
   finance?: {
     escrow?: any
     paymentIntents?: any[]
+    providerTransactions?: any[]
+    providerRefunds?: any[]
+    providerEvents?: any[]
     settlements?: any[]
     payouts?: any[]
     ledger?: any[]
@@ -833,41 +836,348 @@ function WorkspaceTab({ payload }: { payload: Job360Payload }) {
 function FinanceTab({ payload, currency }: { payload: Job360Payload; currency: string }) {
   const finance = payload.finance || {}
   if (payload.source === 'V1' && !(finance.ledger || []).length) {
-    return <Card title="Finance" subtitle="Classic job financial context"><EmptyState icon={FiCreditCard} title="No ledger records" text="No canonical financial ledger entries are linked to this classic job." /></Card>
+    return (
+      <Card title="Finance" subtitle="Classic job financial context">
+        <EmptyState
+          icon={FiCreditCard}
+          title="No ledger records"
+          text="No canonical financial ledger entries are linked to this classic job."
+        />
+      </Card>
+    )
   }
+
+  const latestPayment = finance.paymentIntents?.[0]
+  const latestTransaction = finance.providerTransactions?.[0]
+  const latestSettlement = finance.settlements?.[0]
+  const latestPayout = finance.payouts?.[0]
+  const providerFee = latestTransaction?.providerFee
+  const providerNet = latestTransaction?.netSettlement
+
+  const timeline = [
+    ...(finance.paymentIntents || []).map((item: any) => ({
+      id: `payment-${item.id}`,
+      time: item.paidAt || item.updatedAt || item.createdAt,
+      title: `Payment intent · ${label(item.status)}`,
+      detail: `${item.gateway || 'Gateway'} · ${item.merchantOrderId}`,
+      status: item.status,
+      type: 'Payment',
+    })),
+    ...(finance.providerTransactions || []).map((item: any) => ({
+      id: `provider-transaction-${item.id}`,
+      time: item.reconciledAt || item.updatedAt || item.createdAt,
+      title: `${item.provider} transaction · ${label(item.status)}`,
+      detail: item.providerCaptureId || item.providerOrderId || item.id,
+      status: item.reconciliationStatus || item.status,
+      type: 'Provider',
+    })),
+    ...(finance.providerRefunds || []).map((item: any) => ({
+      id: `provider-refund-${item.id}`,
+      time: item.completedAt || item.updatedAt || item.createdAt,
+      title: `${item.provider} refund · ${label(item.status)}`,
+      detail: item.providerRefundId || item.reason || item.id,
+      status: item.status,
+      type: 'Refund',
+    })),
+    ...(finance.providerEvents || []).map((item: any) => ({
+      id: `provider-event-${item.id}`,
+      time: item.occurredAt || item.processedAt || item.createdAt,
+      title: label(item.eventType),
+      detail: `${item.provider} · ${item.externalEventId}`,
+      status: item.processingStatus,
+      type: 'Event',
+    })),
+    ...(finance.settlements || []).map((item: any) => ({
+      id: `settlement-${item.id}`,
+      time: item.settledAt || item.updatedAt || item.createdAt,
+      title: `Commission · ${label(item.status)}`,
+      detail: `${formatMoney(item.commissionAmount, item.currency || currency)} MaintainEX commission`,
+      status: item.status,
+      type: 'Commission',
+    })),
+    ...(finance.payouts || []).map((item: any) => ({
+      id: `payout-${item.id}`,
+      time: item.clearedAt || item.createdAt,
+      title: `Payout · ${label(item.status)}`,
+      detail: formatMoney(item.amount, item.currency || currency),
+      status: item.status,
+      type: 'Payout',
+    })),
+  ].sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime())
 
   return (
     <>
-      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <FinanceMetric label="Escrow" value={finance.escrow?.status || 'None'} amount={finance.escrow ? formatMoney(finance.escrow.totalAmount, finance.escrow.currency || currency) : '—'} />
-        <FinanceMetric label="Payment" value={finance.paymentIntents?.[0]?.status || 'None'} amount={finance.paymentIntents?.[0] ? formatMoney(finance.paymentIntents[0].amount, finance.paymentIntents[0].currency || currency) : '—'} />
-        <FinanceMetric label="Commission" value={finance.settlements?.[0]?.status || 'None'} amount={finance.settlements?.[0] ? formatMoney(finance.settlements[0].commissionAmount, finance.settlements[0].currency || currency) : '—'} />
-        <FinanceMetric label="Payout" value={finance.payouts?.[0]?.status || 'None'} amount={finance.payouts?.[0] ? formatMoney(finance.payouts[0].amount, finance.payouts[0].currency || currency) : '—'} />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <FinanceMetric
+          label="Escrow"
+          value={finance.escrow?.status || 'None'}
+          amount={finance.escrow ? formatMoney(finance.escrow.totalAmount, finance.escrow.currency || currency) : '—'}
+        />
+        <FinanceMetric
+          label="Payment"
+          value={latestPayment?.status || 'None'}
+          amount={latestPayment ? formatMoney(latestPayment.amount, latestPayment.currency || currency) : '—'}
+        />
+        <FinanceMetric
+          label="Commission"
+          value={latestSettlement?.status || 'None'}
+          amount={latestSettlement ? formatMoney(latestSettlement.commissionAmount, latestSettlement.currency || currency) : '—'}
+        />
+        <FinanceMetric
+          label="Payout"
+          value={latestPayout?.status || 'None'}
+          amount={latestPayout ? formatMoney(latestPayout.amount, latestPayout.currency || currency) : '—'}
+        />
       </div>
 
-      <Card title="Payment intents" subtitle="Gateway request state without raw gateway secrets">
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+        <Card
+          title="Payment & provider"
+          subtitle="Canonical intent mapped to the external provider transaction"
+          action={
+            <Link href="/admin/financial/payments" className="text-xs font-semibold text-amber-700 hover:text-amber-800">
+              Open Payments →
+            </Link>
+          }
+        >
+          {latestPayment ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Provider" value={<StatusBadge value={latestPayment.gateway || 'UNKNOWN'} />} />
+                <Field label="Payment state" value={<StatusBadge value={latestPayment.status} />} />
+                <Field label="Provider order" value={latestTransaction?.providerOrderId || latestPayment.merchantOrderId} mono />
+                <Field label="Capture / payment ID" value={latestTransaction?.providerCaptureId || latestPayment.paymentId || '—'} mono />
+                <Field label="Authorized / captured" value={formatMoney(latestPayment.amount, latestPayment.currency || currency)} />
+                <Field label="Paid at" value={formatDate(latestPayment.paidAt)} />
+              </div>
+              {latestTransaction && (
+                <div className="grid gap-3 rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-4 sm:grid-cols-3">
+                  <Field
+                    label="Provider fee"
+                    value={providerFee == null ? '—' : formatMoney(providerFee, latestTransaction.currency || currency)}
+                  />
+                  <Field
+                    label="Provider net"
+                    value={providerNet == null ? '—' : formatMoney(providerNet, latestTransaction.currency || currency)}
+                  />
+                  <Field
+                    label="Reconciliation"
+                    value={<StatusBadge value={latestTransaction.reconciliationStatus || 'UNRECONCILED'} />}
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <EmptyState
+              icon={FiCreditCard}
+              title="No payment intent"
+              text="A payment has not been created for this job."
+            />
+          )}
+        </Card>
+
+        <Card title="Protected payment" subtitle="Escrow, commission and provider settlement split">
+          {finance.escrow ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Escrow state" value={<StatusBadge value={finance.escrow.status} />} />
+                <Field label="Payment method" value={label(finance.escrow.paymentMethod)} />
+                <Field label="Gross protected" value={formatMoney(finance.escrow.totalAmount, finance.escrow.currency || currency)} />
+                <Field label="Service fee" value={formatMoney(finance.escrow.serviceFee, finance.escrow.currency || currency)} />
+                <Field
+                  label="MaintainEX commission"
+                  value={latestSettlement ? formatMoney(latestSettlement.commissionAmount, latestSettlement.currency || currency) : '—'}
+                />
+                <Field
+                  label="Tasker / company amount"
+                  value={latestSettlement ? formatMoney(latestSettlement.jobAmount, latestSettlement.currency || currency) : '—'}
+                />
+              </div>
+              <div className="border-t border-slate-100 pt-3 text-[11px] leading-5 text-slate-400">
+                Provider fees are tracked separately from MaintainEX commission and do not overwrite canonical escrow or ledger values.
+              </div>
+            </div>
+          ) : (
+            <EmptyState icon={FiShield} title="No escrow" text="No canonical escrow record is linked to this job." />
+          )}
+        </Card>
+      </div>
+
+      <Card title="Payment intents" subtitle="All checkout attempts, including provider and canonical state">
         {finance.paymentIntents?.length ? (
           <div className="space-y-2">
             {finance.paymentIntents.map((intent: any) => (
-              <div key={intent.id} className="rounded-xl border border-slate-200 p-3 flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm font-medium text-slate-800">{intent.merchantOrderId}</div>
-                  <div className="text-xs text-slate-400 mt-1">{formatDate(intent.createdAt)}</div>
+              <div key={intent.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CrmBadge tone={intent.gateway === 'PAYPAL' ? 'info' : intent.gateway === 'PAYHERE' ? 'amber' : 'neutral'} dot>
+                      {label(intent.gateway || 'UNKNOWN')}
+                    </CrmBadge>
+                    <StatusBadge value={intent.status} />
+                  </div>
+                  <div className="mt-2 truncate font-mono text-xs font-semibold text-slate-700">{intent.merchantOrderId}</div>
+                  <div className="mt-1 text-xs text-slate-400">{formatDate(intent.createdAt)}</div>
                 </div>
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <div className="text-sm font-semibold text-slate-900">{formatMoney(intent.amount, intent.currency)}</div>
-                  <div className="mt-1"><StatusBadge value={intent.status} /></div>
+                  <div className="mt-1 font-mono text-[10px] text-slate-400">{intent.paymentId || intent.id}</div>
                 </div>
               </div>
             ))}
           </div>
-        ) : <EmptyState icon={FiCreditCard} title="No payment intents" text="A gateway payment has not been created for this job." />}
+        ) : (
+          <EmptyState icon={FiCreditCard} title="No payment intents" text="A gateway payment has not been created for this job." />
+        )}
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card title="Provider transactions" subtitle="Order / capture references, fees and reconciliation">
+          {finance.providerTransactions?.length ? (
+            <div className="space-y-3">
+              {finance.providerTransactions.map((transaction: any) => (
+                <div key={transaction.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <CrmBadge tone={transaction.provider === 'PAYPAL' ? 'info' : 'amber'} dot>
+                        {label(transaction.provider)}
+                      </CrmBadge>
+                      <StatusBadge value={transaction.status} />
+                    </div>
+                    <StatusBadge value={transaction.reconciliationStatus || 'UNRECONCILED'} />
+                  </div>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <Field label="Order ID" value={transaction.providerOrderId || '—'} mono />
+                    <Field label="Capture ID" value={transaction.providerCaptureId || '—'} mono />
+                    <Field label="Gross" value={formatMoney(transaction.grossAmount, transaction.currency)} />
+                    <Field label="Provider fee" value={transaction.providerFee == null ? '—' : formatMoney(transaction.providerFee, transaction.currency)} />
+                    <Field label="Provider net" value={transaction.netSettlement == null ? '—' : formatMoney(transaction.netSettlement, transaction.currency)} />
+                    <Field label="Reconciled" value={transaction.reconciledAt ? formatDate(transaction.reconciledAt) : 'Not yet'} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={FiCreditCard} title="No provider transaction" text="No external provider capture has been recorded yet." />
+          )}
+        </Card>
+
+        <Card title="Refund history" subtitle="Provider-side refund records and governed reconciliation">
+          {finance.providerRefunds?.length ? (
+            <div className="space-y-3">
+              {finance.providerRefunds.map((refund: any) => (
+                <div key={refund.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-mono text-xs font-semibold text-slate-700">{refund.providerRefundId || refund.id}</div>
+                      <div className="mt-1 text-xs text-slate-400">{refund.provider} · {formatDate(refund.createdAt)}</div>
+                    </div>
+                    <StatusBadge value={refund.status} />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-4">
+                    <span className="text-xs text-slate-500">{refund.reason || 'Provider refund'}</span>
+                    <span className="text-sm font-semibold text-slate-900">{formatMoney(refund.amount, refund.currency)}</span>
+                  </div>
+                  {refund.approvalRequestId && (
+                    <div className="mt-2 text-[10px] text-slate-400">Approval {refund.approvalRequestId}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={FiRefreshCw} title="No provider refunds" text="No provider-side refund is recorded for this job." />
+          )}
+        </Card>
+      </div>
+
+      <Card title="Provider event timeline" subtitle="Verified webhook and provider events; raw sensitive payloads remain hidden">
+        {finance.providerEvents?.length ? (
+          <div className="space-y-2">
+            {finance.providerEvents.map((event: any) => (
+              <div key={event.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-800">{label(event.eventType)}</div>
+                  <div className="mt-1 truncate font-mono text-[10px] text-slate-400">{event.externalEventId}</div>
+                  {event.errorMessage && <div className="mt-2 text-xs text-red-700">{event.errorMessage}</div>}
+                </div>
+                <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
+                  <StatusBadge value={event.processingStatus} />
+                  <div className="text-[10px] text-slate-400">{formatDate(event.occurredAt || event.createdAt)}</div>
+                  <div className="text-[10px] text-slate-400">
+                    Signature {event.signatureVerified ? 'verified' : 'not verified'}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState icon={FiActivity} title="No provider events" text="No provider webhook events are linked to this payment yet." />
+        )}
+      </Card>
+
+      <Card title="Settlement & payout" subtitle="MaintainEX commission and provider/tasker settlement state">
+        {(finance.settlements?.length || finance.payouts?.length) ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Commission settlements</div>
+              {(finance.settlements || []).map((settlement: any) => (
+                <div key={settlement.id} className="rounded-xl border border-slate-200 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <StatusBadge value={settlement.status} />
+                    <span className="text-xs text-slate-400">{formatDate(settlement.createdAt)}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <Field label="Commission" value={formatMoney(settlement.commissionAmount, settlement.currency)} />
+                    <Field label="Provider amount" value={formatMoney(settlement.jobAmount, settlement.currency)} />
+                  </div>
+                </div>
+              ))}
+              {!finance.settlements?.length && <div className="text-xs text-slate-400">No settlement recorded.</div>}
+            </div>
+            <div className="space-y-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Payouts</div>
+              {(finance.payouts || []).map((payout: any) => (
+                <div key={payout.id} className="rounded-xl border border-slate-200 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <StatusBadge value={payout.status} />
+                    <span className="text-sm font-semibold text-slate-900">{formatMoney(payout.amount, payout.currency)}</span>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-400">{label(payout.method)} · {formatDate(payout.clearedAt || payout.createdAt)}</div>
+                </div>
+              ))}
+              {!finance.payouts?.length && <div className="text-xs text-slate-400">No payout recorded.</div>}
+            </div>
+          </div>
+        ) : (
+          <EmptyState icon={FiDollarSign} title="No settlement or payout" text="No commission settlement or payout has been recorded yet." />
+        )}
+      </Card>
+
+      <Card title="Unified financial timeline" subtitle="Payment → provider → escrow → commission → refund/payout events in one place">
+        {timeline.length ? (
+          <div className="relative space-y-0 before:absolute before:bottom-3 before:left-[11px] before:top-3 before:w-px before:bg-slate-200">
+            {timeline.slice(0, 80).map(item => (
+              <div key={item.id} className="relative flex gap-4 py-3">
+                <div className="z-10 mt-1 h-[23px] w-[23px] shrink-0 rounded-full border-4 border-white bg-amber-400 shadow-sm" />
+                <div className="min-w-0 flex-1 rounded-xl border border-slate-100 bg-[#fafbf9] px-3 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-slate-800">{item.title}</div>
+                    <StatusBadge value={item.status} />
+                  </div>
+                  <div className="mt-1 break-all text-[11px] text-slate-500">{item.detail}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{item.type} · {formatDate(item.time)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState icon={FiActivity} title="No financial timeline" text="No financial lifecycle events have been recorded for this job." />
+        )}
       </Card>
 
       <Card title="Financial ledger" subtitle="Immutable accounting entries related to this job">
         {finance.ledger?.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-slate-400">
                   <th className="pb-3">Time</th>
@@ -880,7 +1190,7 @@ function FinanceTab({ payload, currency }: { payload: Job360Payload; currency: s
               <tbody className="divide-y divide-slate-100">
                 {finance.ledger.map((entry: any) => (
                   <tr key={entry.id}>
-                    <td className="py-3 text-xs text-slate-400 whitespace-nowrap">{formatDate(entry.createdAt)}</td>
+                    <td className="whitespace-nowrap py-3 text-xs text-slate-400">{formatDate(entry.createdAt)}</td>
                     <td className="py-3 text-slate-700">{label(entry.accountType)}</td>
                     <td className="py-3"><StatusBadge value={entry.entryType} /></td>
                     <td className="py-3 text-xs text-slate-500">{label(entry.referenceType)}</td>
@@ -890,12 +1200,13 @@ function FinanceTab({ payload, currency }: { payload: Job360Payload; currency: s
               </tbody>
             </table>
           </div>
-        ) : <EmptyState icon={FiDollarSign} title="No ledger entries" text="No immutable ledger postings are linked to this job." />}
+        ) : (
+          <EmptyState icon={FiDollarSign} title="No ledger entries" text="No immutable ledger postings are linked to this job." />
+        )}
       </Card>
     </>
   )
 }
-
 function RiskTab({ payload }: { payload: Job360Payload }) {
   const risks = payload.trust?.riskEvents || []
   const classicDisputes = payload.source === 'V1' ? payload.job.disputes || [] : []

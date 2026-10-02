@@ -27,6 +27,16 @@ import {
   FiUsers,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmCard,
+  CrmMetricCard,
+  CrmPageHeader,
+  CrmState,
+  CrmTabs,
+  type CrmTone,
+} from '@/components/crm/v2/CrmPrimitives'
 
 type TabKey = 'overview' | 'work' | 'finance' | 'trust' | 'activity'
 
@@ -87,27 +97,36 @@ function fmtMoney(value: unknown, currency = 'LKR') {
   }).format(Number.isFinite(number) ? number : 0)
 }
 
-function badgeClasses(value?: string) {
+function statusTone(value?: string | null): CrmTone {
   const v = String(value || '').toUpperCase()
-  if (['ACTIVE', 'VERIFIED', 'APPROVED', 'COMPLETED', 'CLEARED', 'SUCCESS'].includes(v)) return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  if (['BANNED', 'REJECTED', 'FAILED', 'CRITICAL'].includes(v)) return 'bg-red-50 text-red-700 border-red-200'
-  if (['SUSPENDED', 'PENDING', 'PROCESSING', 'HIGH'].includes(v)) return 'bg-amber-50 text-amber-700 border-amber-200'
-  return 'bg-slate-50 text-slate-600 border-slate-200'
+  if (['ACTIVE', 'VERIFIED', 'APPROVED', 'COMPLETED', 'CLEARED', 'SUCCESS'].includes(v)) return 'success'
+  if (['BANNED', 'REJECTED', 'FAILED', 'CRITICAL', 'SUSPICIOUS'].includes(v)) return 'danger'
+  if (['SUSPENDED', 'PENDING', 'PROCESSING', 'HIGH'].includes(v)) return 'warning'
+  if (['TASKER', 'COMPANY', 'CUSTOMER', 'USER'].includes(v)) return 'info'
+  return 'neutral'
 }
 
 function Badge({ value }: { value?: string | null }) {
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${badgeClasses(value || '')}`}>{String(value || '—').replaceAll('_', ' ')}</span>
+  return (
+    <CrmBadge tone={statusTone(value)} dot>
+      {String(value || '—').replaceAll('_', ' ')}
+    </CrmBadge>
+  )
 }
 
-function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Card({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  children: React.ReactNode
+}) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100">
-        <h2 className="font-semibold text-slate-900">{title}</h2>
-        {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
-      </div>
-      <div className="p-5">{children}</div>
-    </section>
+    <CrmCard title={title} description={subtitle}>
+      {children}
+    </CrmCard>
   )
 }
 
@@ -227,87 +246,97 @@ export default function User360Page() {
 
   if (loading) {
     return (
-      <div className="space-y-5 animate-pulse">
-        <div className="h-40 rounded-2xl bg-white border border-slate-200" />
-        <div className="grid xl:grid-cols-[minmax(0,1fr)_320px] gap-5">
-          <div className="h-[600px] rounded-2xl bg-white border border-slate-200" />
-          <div className="h-[420px] rounded-2xl bg-white border border-slate-200" />
-        </div>
-      </div>
+      <CrmState
+        type="loading"
+        title="Loading User 360"
+        description="Loading profile, marketplace work, finance, trust and audit context."
+      />
     )
   }
 
   if (!data || !account) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
-        <FiAlertTriangle className="mx-auto text-amber-500" size={34} />
-        <h1 className="mt-3 text-xl font-semibold text-slate-900">User unavailable</h1>
-        <p className="mt-1 text-sm text-slate-500">The record is missing or outside your assigned access scope.</p>
-      </div>
+      <CrmState
+        type="error"
+        title="User unavailable"
+        description="The record is missing or outside your assigned access scope."
+      />
     )
   }
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <div className="p-5 md:p-6">
-          <Link href={account.role === 'TASKER' ? '/admin/users/taskers' : account.role === 'COMPANY' ? '/admin/users/companies' : '/admin/users/customers'} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900">
-            <FiArrowLeft size={15} /> Back to people
-          </Link>
+      <CrmPageHeader
+        eyebrow="People · User 360"
+        title={account.name || account.mxId || 'User'}
+        description={`${account.mxId || account.id} · ${account.email || 'No email'} · ${account.countryCode || 'No market'}`}
+        context={
+          <>
+            <Badge value={account.role} />
+            <Badge value={accountState} />
+            <CrmBadge tone={account.identityStatus === 'APPROVED' ? 'success' : 'neutral'}>
+              Identity {String(account.identityStatus || 'NOT SUBMITTED').replaceAll('_', ' ')}
+            </CrmBadge>
+          </>
+        }
+        actions={
+          <CrmButton variant="secondary" onClick={load} disabled={actionLoading}>
+            <FiRefreshCw size={15} />
+            Refresh
+          </CrmButton>
+        }
+      />
 
-          <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex gap-4 min-w-0">
-              <div className="w-14 h-14 rounded-2xl bg-slate-950 text-amber-300 flex items-center justify-center text-xl font-semibold shrink-0">
-                {(account.name?.[0] || 'U').toUpperCase()}
-              </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">{account.name}</h1>
-                  <Badge value={account.role} />
-                  <Badge value={accountState} />
-                </div>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-                  <span>{account.mxId || account.id}</span>
-                  <span>{account.email}</span>
-                  <span>{account.countryCode}</span>
-                </div>
-              </div>
-            </div>
+      <div>
+        <Link
+          href={account.role === 'TASKER' ? '/admin/users/taskers' : account.role === 'COMPANY' ? '/admin/users/companies' : '/admin/users/customers'}
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-amber-700"
+        >
+          <FiArrowLeft size={13} />
+          Back to people
+        </Link>
+      </div>
 
-            <button
-              type="button"
-              onClick={load}
-              className="inline-flex items-center gap-2 h-10 px-3.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
-              <FiRefreshCw size={15} /> Refresh
-            </button>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 xl:grid-cols-4 gap-3">
-            <Summary icon={FiShield} label="Identity" value={account.identityStatus || 'NOT SUBMITTED'} />
-            <Summary icon={FiBriefcase} label="Work records" value={data.permissions.work ? String(workCount) : 'Restricted'} />
-            <Summary icon={FiMapPin} label="Market" value={account.countryCode || '—'} />
-            <Summary icon={FiClock} label="Member since" value={new Date(account.createdAt).toLocaleDateString('en-LK')} />
-          </div>
-        </div>
-
-        <div className="border-t border-slate-100 px-3 md:px-5 overflow-x-auto">
-          <div className="flex min-w-max">
-            {visibleTabs.map(item => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setTab(item.key)}
-                className={`px-3.5 py-3.5 text-sm font-medium border-b-2 transition ${
-                  tab === item.key ? 'border-amber-400 text-slate-950' : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <CrmMetricCard
+          label="Identity"
+          value={String(account.identityStatus || 'NOT SUBMITTED').replaceAll('_', ' ')}
+          helper="Canonical identity status"
+          icon={<FiShield size={16} />}
+          tone={account.identityStatus === 'APPROVED' ? 'success' : 'neutral'}
+        />
+        <CrmMetricCard
+          label="Work records"
+          value={data.permissions.work ? workCount : 'Restricted'}
+          helper="Jobs, quotes and assignments"
+          icon={<FiBriefcase size={16} />}
+          tone="info"
+        />
+        <CrmMetricCard
+          label="Market"
+          value={account.countryCode || '—'}
+          helper="Account country scope"
+          icon={<FiMapPin size={16} />}
+          tone="amber"
+        />
+        <CrmMetricCard
+          label="Member since"
+          value={new Date(account.createdAt).toLocaleDateString('en-LK')}
+          helper="Account creation date"
+          icon={<FiClock size={16} />}
+          tone="neutral"
+        />
       </section>
+
+      <CrmCard padding="none">
+        <div className="px-4 pt-2">
+          <CrmTabs
+            items={visibleTabs.map(item => ({ id: item.key, label: item.label }))}
+            active={tab}
+            onChange={id => setTab(id as TabKey)}
+          />
+        </div>
+      </CrmCard>
 
       <div className="grid xl:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
         <div className="space-y-5">

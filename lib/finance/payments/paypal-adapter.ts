@@ -26,6 +26,8 @@ export interface PayPalCaptureResult {
   captureStatus?: string
   amountValue?: string
   currency?: string
+  providerFeeValue?: string
+  netSettlementValue?: string
   body?: Record<string, unknown> | null
   error?: string
 }
@@ -158,11 +160,54 @@ function compactRequestId(seed: string): string {
   return crypto.createHash('sha256').update(seed).digest('hex').slice(0, 24)
 }
 
-export function formatPayPalAmount(amountMinor: bigint): string {
+export function getPayPalCurrencyExponent(currency: string): number {
+  const normalized = currency.trim().toUpperCase()
+  if (!/^[A-Z]{3}$/.test(normalized)) throw new Error('Invalid PayPal currency')
+  try {
+    const exponent = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: normalized,
+    }).resolvedOptions().maximumFractionDigits
+    if (
+      typeof exponent === 'number' &&
+      Number.isInteger(exponent) &&
+      exponent >= 0 &&
+      exponent <= 3
+    ) return exponent
+  } catch {
+    // The provider/market capability gate remains authoritative. This fallback
+    // is only for currencies whose ICU metadata is unavailable at runtime.
+  }
+  return 2
+}
+
+export function formatPayPalAmount(amountMinor: bigint, currency = 'USD'): string {
   if (amountMinor <= 0n) throw new Error('PayPal amount must be positive')
-  const whole = amountMinor / 100n
-  const fraction = (amountMinor % 100n).toString().padStart(2, '0')
+  const exponent = getPayPalCurrencyExponent(currency)
+  const divisor = 10n ** BigInt(exponent)
+  const whole = amountMinor / divisor
+  if (exponent === 0) return whole.toString()
+  const fraction = (amountMinor % divisor).toString().padStart(exponent, '0')
   return `${whole.toString()}.${fraction}`
+}
+
+export function parsePayPalAmountToMinor(
+  value: string,
+  currency: string
+): bigint | null {
+  const raw = value.trim()
+  const exponent = getPayPalCurrencyExponent(currency)
+  const match = raw.match(/^(\d+)(?:\.(\d+))?$/)
+  if (!match) return null
+
+  const fraction = match[2] || ''
+  if (fraction.length > exponent) return null
+  if (exponent === 0 && fraction) return null
+
+  const divisor = 10n ** BigInt(exponent)
+  const padded = fraction.padEnd(exponent, '0')
+  const minor = BigInt(match[1]) * divisor + BigInt(padded || '0')
+  return minor > 0n ? minor : null
 }
 
 function errorMessage(body: Record<string, unknown> | null, fallback: string): string {
@@ -230,7 +275,7 @@ export async function createPayPalOrder(input: {
           description: input.description.slice(0, 127),
           amount: {
             currency_code: input.currency.toUpperCase(),
-            value: formatPayPalAmount(input.amountMinor),
+            value: formatPayPalAmount(input.amountMinor, input.currency),
           },
         },
       ],
@@ -280,18 +325,64 @@ function firstCapture(
   return null
 }
 
+function moneyFromObject(value: unknown): {
+  value?: string
+  currency?: string
+} {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const record = value as Record<string, unknown>
+  return {
+    ...(typeof record.value === 'string' ? { value: record.value } : {}),
+    ...(typeof record.currency_code === 'string'
+      ? { currency: record.currency_code }
+      : {}),
+  }
+}
+
 function amountFromResource(resource: Record<string, unknown> | null): {
   value?: string
   currency?: string
 } {
+  return resource ? moneyFromObject(resource.amount) : {}
+}
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+}
+
+export function parsePayPalCaptureResource(
+  resource: Record<string, unknown> | null
+): {
+  captureId?: string
+  captureStatus?: string
+  orderId?: string
+  amountValue?: string
+  currency?: string
+  providerFeeValue?: string
+  netSettlementValue?: string
+} {
   if (!resource) return {}
-  const amount = resource.amount
-  if (!amount || typeof amount !== 'object' || Array.isArray(amount)) return {}
-  const value = (amount as Record<string, unknown>).value
-  const currency = (amount as Record<string, unknown>).currency_code
+  const amount = amountFromResource(resource)
+  const supplementary = objectValue(resource.supplementary_data)
+  const relatedIds = objectValue(supplementary?.related_ids)
+  const breakdown = objectValue(resource.seller_receivable_breakdown)
+  const fee = moneyFromObject(breakdown?.paypal_fee)
+  const net = moneyFromObject(breakdown?.net_amount)
+
   return {
-    ...(typeof value === 'string' ? { value } : {}),
-    ...(typeof currency === 'string' ? { currency } : {}),
+    ...(typeof resource.id === 'string' ? { captureId: resource.id } : {}),
+    ...(typeof resource.status === 'string'
+      ? { captureStatus: resource.status }
+      : {}),
+    ...(typeof relatedIds?.order_id === 'string'
+      ? { orderId: relatedIds.order_id }
+      : {}),
+    ...(amount.value ? { amountValue: amount.value } : {}),
+    ...(amount.currency ? { currency: amount.currency } : {}),
+    ...(fee.value ? { providerFeeValue: fee.value } : {}),
+    ...(net.value ? { netSettlementValue: net.value } : {}),
   }
 }
 
@@ -326,11 +417,9 @@ export async function capturePayPalOrder(
   )
 
   const capture = firstCapture(response.body)
-  const amount = amountFromResource(capture)
-  const captureId =
-    capture && typeof capture.id === 'string' ? capture.id : undefined
-  const captureStatus =
-    capture && typeof capture.status === 'string' ? capture.status : undefined
+  const financials = parsePayPalCaptureResource(capture)
+  const captureId = financials.captureId
+  const captureStatus = financials.captureStatus
 
   return {
     ok: response.ok && Boolean(captureId),
@@ -341,8 +430,10 @@ export async function capturePayPalOrder(
       typeof response.body?.status === 'string' ? response.body.status : undefined,
     captureId,
     captureStatus,
-    amountValue: amount.value,
-    currency: amount.currency,
+    amountValue: financials.amountValue,
+    currency: financials.currency,
+    providerFeeValue: financials.providerFeeValue,
+    netSettlementValue: financials.netSettlementValue,
     body: response.body,
     ...(!response.ok || !captureId
       ? { error: errorMessage(response.body, 'Unable to capture PayPal order') }
@@ -370,7 +461,7 @@ export async function getPayPalOrder(
   )
 
   const capture = firstCapture(response.body)
-  const amount = amountFromResource(capture)
+  const financials = parsePayPalCaptureResource(capture)
 
   return {
     ok: response.ok,
@@ -379,12 +470,12 @@ export async function getPayPalOrder(
       typeof response.body?.id === 'string' ? response.body.id : orderId,
     orderStatus:
       typeof response.body?.status === 'string' ? response.body.status : undefined,
-    captureId:
-      capture && typeof capture.id === 'string' ? capture.id : undefined,
-    captureStatus:
-      capture && typeof capture.status === 'string' ? capture.status : undefined,
-    amountValue: amount.value,
-    currency: amount.currency,
+    captureId: financials.captureId,
+    captureStatus: financials.captureStatus,
+    amountValue: financials.amountValue,
+    currency: financials.currency,
+    providerFeeValue: financials.providerFeeValue,
+    netSettlementValue: financials.netSettlementValue,
     body: response.body,
     ...(!response.ok
       ? { error: errorMessage(response.body, 'Unable to retrieve PayPal order') }
@@ -394,7 +485,12 @@ export async function getPayPalOrder(
 
 export async function refundPayPalCapture(
   captureId: string,
-  paymentIntentId: string
+  paymentIntentId: string,
+  options?: {
+    amountMinor?: bigint
+    currency?: string
+    refundRequestKey?: string
+  }
 ): Promise<PayPalRefundResult> {
   const token = await getPayPalAccessToken()
   if (!token) {
@@ -411,10 +507,17 @@ export async function refundPayPalCapture(
         Accept: 'application/json',
         Prefer: 'return=representation',
         'PayPal-Request-Id': compactRequestId(
-          `refund:${paymentIntentId}:${captureId}`
+          `refund:${paymentIntentId}:${captureId}:${options?.refundRequestKey || 'full'}`
         ),
       },
-      body: '{}',
+      body: options?.amountMinor && options.currency
+        ? JSON.stringify({
+            amount: {
+              currency_code: options.currency.toUpperCase(),
+              value: formatPayPalAmount(options.amountMinor, options.currency),
+            },
+          })
+        : '{}',
     }
   )
 

@@ -5,7 +5,7 @@ import {
   inspectCrmJobCancellation,
 } from '@/lib/crm/jobs/cancellation'
 import { buildApprovalPlan } from './approval-engine'
-import { confirmManualExternalRefund, requestRequiredPayHereRefund } from '@/lib/finance/payments/payment-service'
+import { confirmManualExternalRefund, requestRequiredProviderRefund } from '@/lib/finance/payments/payment-service'
 import { markProcessing, markSucceeded } from '@/lib/finance/payouts/payout-engine'
 import { releaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { tierAtLeast } from './action-registry'
@@ -241,7 +241,7 @@ export async function executeApprovedCrmRequest(
       const payload = parseRefundExecutionPayload(request.actionPayload)
       const result =
         payload.mode === 'REQUEST_GATEWAY_REFUND'
-          ? await requestRequiredPayHereRefund(request.targetId)
+          ? await requestRequiredProviderRefund(request.targetId, request.id)
           : await confirmManualExternalRefund(request.targetId, {
               actorId: actor.adminId,
               reference: payload.manualReference,
@@ -268,7 +268,7 @@ export async function executeApprovedCrmRequest(
         description:
           payload.mode === 'CONFIRM_MANUAL'
             ? 'Approved manual external refund confirmation executed'
-            : 'Approved PayHere refund request executed',
+            : 'Approved provider refund request executed',
         oldValue: {
           approvalRequestId: request.id,
         },

@@ -125,6 +125,7 @@ describe.skipIf(!isTestDb)('Release gate — cancellation/payment serialization'
         customerId,
         escrowId,
         merchantOrderId: `${prefix}-order`,
+        gateway: 'PAYHERE',
         amount: 10000n,
         currency: 'LKR',
         status: 'PENDING',
