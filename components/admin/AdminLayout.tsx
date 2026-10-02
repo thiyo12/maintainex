@@ -186,13 +186,12 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           }`}
         >
           <div className="flex h-full flex-col px-3 py-4">
-            <Link href="/admin/dashboard" className="flex items-center gap-3 px-2 py-2">
-              <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl bg-white">
-                <Image src="/logo.JPEG" alt="MaintainEX" width={36} height={36} className="h-9 w-9 object-cover" />
-              </div>
+            <Link href="/admin/dashboard" className="flex items-center gap-3 px-3 py-2.5">
               <div className="min-w-0">
-                <div className="text-[14px] font-bold tracking-[0.15em] text-white">MΛINTΛINEX</div>
-                <div className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500">
+                <div className="text-[18px] font-black tracking-[0.16em] text-white">
+                  M<span className="text-[var(--crm-accent)]">Λ</span>INTΛINEX
+                </div>
+                <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
                   Operations CRM
                 </div>
               </div>
@@ -232,13 +231,13 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                     href={item.href!}
                     className={`group flex h-10 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition-colors ${
                       active
-                        ? 'bg-[var(--crm-accent)] text-[#17191b]'
-                        : 'text-slate-400 hover:bg-white/[0.055] hover:text-white'
+                        ? 'border-l-2 border-[var(--crm-accent)] bg-[#292920] pl-[10px] text-[var(--crm-accent)]'
+                        : 'border-l-2 border-transparent text-slate-400 hover:bg-white/[0.055] hover:text-white'
                     }`}
                   >
                     <item.icon size={16} className="shrink-0" />
                     <span className="truncate">{item.name}</span>
-                    {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#17191b]/55" />}
+                    {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--crm-accent)]" />}
                   </Link>
                 )
               })}
@@ -356,8 +355,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="px-4 py-5 md:px-5 md:py-6 lg:px-6">
-            <div className="mx-auto w-full max-w-[1720px]">{children}</div>
+          <main className="px-4 py-4 md:px-5 md:py-5 lg:px-5">
+            <div className="mx-auto w-full max-w-[1760px]">{children}</div>
           </main>
         </div>
       </div>
