@@ -6,10 +6,7 @@ import toast from 'react-hot-toast'
 import {
   FiActivity,
   FiAlertTriangle,
-  FiArrowUpRight,
-  FiBriefcase,
   FiCheckCircle,
-  FiClock,
   FiCreditCard,
   FiDollarSign,
   FiServer,
@@ -365,9 +362,6 @@ export default function AdminDashboard() {
 
   const stats = data?.stats
   const caps = data?.capabilities
-  const financeRows = data?.financeByCurrency || []
-  const primaryFinance = financeRows.length === 1 ? financeRows[0] : null
-
   const jobStatus = useMemo(() => {
     const total = number(analytics?.summary?.totalJobs) || number(stats?.totalJobPostings)
     const open = number(analytics?.jobsByStatus?.open) || number(stats?.openJobs)
