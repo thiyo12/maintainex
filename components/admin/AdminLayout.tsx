@@ -7,7 +7,6 @@ import {
   FiAlertTriangle,
   FiBarChart2,
   FiBriefcase,
-  FiChevronDown,
   FiDollarSign,
   FiGrid,
   FiHome,
@@ -132,6 +131,9 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
   const roleLabel = user.role.replaceAll('_', ' ')
   const selectedMarketName = marketOptions.find(item => item.code === market)?.name || (market === 'ALL' ? 'All markets' : market)
+  const sessionExpiry = user.sessionExpiresAt
+    ? new Date(user.sessionExpiresAt).toLocaleTimeString('en-LK', { hour: '2-digit', minute: '2-digit' })
+    : null
 
   return (
     <CrmShellProvider value={{ market, setMarket, markets: marketOptions }}>
@@ -169,6 +171,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
                 <p className="mt-2 text-[10px] leading-4 text-slate-400">
                   {user.totpEnabled ? '2FA protected staff session.' : 'Enable 2FA for stronger staff protection.'}
+                  {sessionExpiry ? ` Session expires ${sessionExpiry}.` : ''}
                 </p>
                 <div className="mt-3 rounded-md bg-white/[0.05] px-2.5 py-2 text-[10px] text-slate-300">
                   {selectedMarketName}
@@ -210,7 +213,6 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                     <select value={market} onChange={event => setMarket(event.target.value)} aria-label="CRM market" className="max-w-[130px] bg-transparent text-[11px] font-semibold text-slate-700 outline-none">
                       {marketOptions.map(option => <option key={option.code} value={option.code}>{option.name}</option>)}
                     </select>
-                    <FiChevronDown size={12} className="text-slate-400" />
                   </div>
                 )}
 
@@ -224,7 +226,6 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                     <div className="truncate text-[11px] font-bold text-slate-900">{user.name || user.email}</div>
                     <div className="truncate text-[9px] text-slate-500">{roleLabel}</div>
                   </div>
-                  <FiChevronDown size={12} className="hidden text-slate-400 md:block" />
                 </div>
               </div>
             </div>
