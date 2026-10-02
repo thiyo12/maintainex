@@ -273,7 +273,7 @@ export function CrmTabs({
   onChange: (id: string) => void
 }) {
   return (
-    <div className="inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-[var(--crm-border)] bg-white p-1">
+    <div className="crm-scrollbar flex max-w-full items-center gap-1 overflow-x-auto border-b border-[var(--crm-border)]">
       {items.map(item => {
         const selected = item.id === active
         return (
@@ -281,18 +281,19 @@ export function CrmTabs({
             type="button"
             key={item.id}
             onClick={() => onChange(item.id)}
-            className={`flex h-8 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-colors ${
+            className={`relative flex h-10 items-center gap-2 whitespace-nowrap px-3 text-xs font-semibold transition-colors ${
               selected
-                ? 'bg-[#17191b] text-white shadow-sm'
-                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                ? 'text-slate-950'
+                : 'text-slate-500 hover:text-slate-900'
             }`}
           >
             {item.label}
             {typeof item.count === 'number' && (
-              <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${selected ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}`}>
+              <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${selected ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500'}`}>
                 {item.count}
               </span>
             )}
+            {selected && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-[var(--crm-accent)]" />}
           </button>
         )
       })}
