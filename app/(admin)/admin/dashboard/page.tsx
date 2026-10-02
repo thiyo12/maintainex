@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
+  FiActivity,
   FiAlertTriangle,
   FiArrowUpRight,
   FiBriefcase,
+  FiCalendar,
   FiCheckCircle,
   FiClock,
   FiCreditCard,
@@ -14,18 +16,12 @@ import {
   FiShield,
   FiTool,
   FiUserCheck,
-  FiUsers,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import {
-  CrmBadge,
-  CrmCard,
-  CrmMetricCard,
-  CrmPageHeader,
-  CrmState,
-} from '@/components/crm/v2/CrmPrimitives'
+import { useCrmShell } from '@/components/crm/v2/CrmShellContext'
+import { CrmBadge, CrmState } from '@/components/crm/v2/CrmPrimitives'
 
-interface DashboardStats {
+interface DashboardData {
   stats: {
     totalUsers: number
     totalTaskers: number
@@ -39,13 +35,14 @@ interface DashboardStats {
     totalCommissionOwed: number
     totalCommissionPaid: number
     pendingCheatingReports: number
+    openDisputes: number
     totalJobPostings: number
     openJobs: number
     completedJobs: number
     totalWalletBalance: number
     commissionRate: number
   }
-  financeByCurrency?: Array<{
+  financeByCurrency: Array<{
     currency: string
     pendingCommission: number
     paidCommission: number
@@ -57,6 +54,18 @@ interface DashboardStats {
     overdueCommission: number
     overdueCount: number
   }
+  recentJobs: Array<{
+    id: string
+    source: 'V1' | 'V2'
+    title: string
+    customer: string
+    provider: string
+    amount: number
+    currency: string
+    status: string
+    createdAt: string
+  }>
+  jobTrend: Array<{ date: string; jobsCreated: number }>
   capabilities: {
     jobs: boolean
     users: boolean
@@ -66,95 +75,224 @@ interface DashboardStats {
     kyc: boolean
     finance: boolean
     trust: boolean
+    disputes: boolean
     platform: boolean
+    health: boolean
   }
-  isSuperAdmin?: boolean
 }
 
-function formatCurrency(amount: number, currency = 'LKR') {
+interface HealthData {
+  status: string
+  release: string
+  database: { status: string; latencyMs: number }
+  queues: { jobMatchPending: number; offerMatchPending: number }
+  payments: { pending: number }
+  notifications: { createdLastHour: number }
+}
+
+function money(value: number, currency = 'LKR') {
   return new Intl.NumberFormat('en-LK', {
     style: 'currency',
     currency,
     maximumFractionDigits: 0,
-  }).format(Number(amount || 0))
+  }).format(Number(value || 0))
 }
 
-function number(value?: number) {
-  return Number(value || 0)
+function timeAgo(value: string) {
+  const ms = Date.now() - new Date(value).getTime()
+  const minutes = Math.max(0, Math.floor(ms / 60000))
+  if (minutes < 60) return `${minutes || 1}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
 }
 
-function ProgressRow({
+function statusTone(status: string) {
+  const value = status.toUpperCase()
+  if (['COMPLETED', 'PAID', 'RELEASED', 'VERIFIED'].includes(value)) return 'success' as const
+  if (['CANCELLED', 'FAILED', 'DISPUTED', 'REJECTED'].includes(value)) return 'danger' as const
+  if (['OPEN', 'PENDING', 'QUOTE_ACCEPTED'].includes(value)) return 'amber' as const
+  if (['IN_PROGRESS', 'ASSIGNED', 'PROCESSING'].includes(value)) return 'info' as const
+  return 'neutral' as const
+}
+
+function MetricCard({
+  icon,
   label,
   value,
-  total,
+  helper,
   tone,
 }: {
+  icon: React.ReactNode
   label: string
-  value: number
-  total: number
-  tone: 'amber' | 'success' | 'danger' | 'info'
+  value: React.ReactNode
+  helper: string
+  tone: 'green' | 'amber' | 'blue' | 'red'
 }) {
-  const percentage = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0
   const toneClass = {
-    amber: 'bg-[var(--crm-accent)]',
-    success: 'bg-[var(--crm-success)]',
-    danger: 'bg-[var(--crm-danger)]',
-    info: 'bg-[var(--crm-info)]',
+    green: 'bg-emerald-500 text-white',
+    amber: 'bg-[#f3b81a] text-white',
+    blue: 'bg-[#4a82ee] text-white',
+    red: 'bg-[#ef4562] text-white',
   }[tone]
 
   return (
-    <div>
-      <div className="flex items-center justify-between text-xs">
-        <span className="font-medium text-slate-600">{label}</span>
-        <span className="font-semibold text-slate-900">{value.toLocaleString()}</span>
+    <div className="crm-card p-3.5">
+      <div className="flex items-center gap-2.5">
+        <div className={`grid h-8 w-8 place-items-center rounded-lg ${toneClass}`}>{icon}</div>
+        <span className="text-[11px] font-semibold text-slate-600">{label}</span>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full rounded-full ${toneClass}`} style={{ width: `${percentage}%` }} />
-      </div>
+      <div className="mt-3 text-[22px] font-extrabold tracking-[-0.035em] text-slate-950">{value}</div>
+      <div className="mt-1.5 text-[10px] text-slate-400">{helper}</div>
     </div>
+  )
+}
+
+function TrendChart({ rows }: { rows: Array<{ date: string; jobsCreated: number }> }) {
+  const [range, setRange] = useState<7 | 30>(30)
+  const data = rows.slice(-range)
+  const max = Math.max(1, ...data.map(row => row.jobsCreated))
+  const width = 640
+  const height = 176
+  const plotTop = 14
+  const plotBottom = 144
+  const plotHeight = plotBottom - plotTop
+  const cell = data.length ? width / data.length : width
+  const moving = data.map((row, index) => {
+    const start = Math.max(0, index - 6)
+    const sample = data.slice(start, index + 1)
+    return sample.reduce((sum, item) => sum + item.jobsCreated, 0) / sample.length
+  })
+  const points = moving.map((value, index) => {
+    const x = cell * index + cell / 2
+    const y = plotBottom - (value / max) * plotHeight
+    return `${x},${y}`
+  }).join(' ')
+
+  return (
+    <section className="crm-card overflow-hidden">
+      <div className="flex items-center justify-between px-4 pt-3.5">
+        <div>
+          <h2 className="text-[12px] font-bold text-slate-900">Jobs Trend</h2>
+          <div className="mt-1 flex items-center gap-4 text-[9px] text-slate-500">
+            <span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#f3b81a]" />Jobs created</span>
+            <span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-[#263343]" />7-day average</span>
+          </div>
+        </div>
+        <div className="flex rounded-md border border-[#dfe4e8] bg-[#f8fafb] p-0.5">
+          {[7, 30].map(value => (
+            <button key={value} type="button" onClick={() => setRange(value as 7 | 30)} className={`h-6 rounded px-2 text-[9px] font-bold ${range === value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>
+              {value}D
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="px-3 pb-3 pt-2">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-[176px] w-full" role="img" aria-label="Jobs created trend">
+          {[0, 1, 2, 3].map(line => {
+            const y = plotTop + (plotHeight / 3) * line
+            return <line key={line} x1="0" x2={width} y1={y} y2={y} stroke="#e7ebef" strokeWidth="1" />
+          })}
+          {data.map((row, index) => {
+            const barHeight = (row.jobsCreated / max) * plotHeight
+            return (
+              <rect
+                key={row.date}
+                x={cell * index + Math.max(2, cell * 0.18)}
+                y={plotBottom - barHeight}
+                width={Math.max(3, cell * 0.52)}
+                height={Math.max(row.jobsCreated ? 3 : 0, barHeight)}
+                rx="2"
+                fill="#f3b81a"
+              />
+            )
+          })}
+          {points && <polyline points={points} fill="none" stroke="#263343" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />}
+          {range === 7 && data.map((row, index) => (
+            <text key={row.date} x={cell * index + cell / 2} y="166" textAnchor="middle" fontSize="8" fill="#94a3b8">
+              {new Date(row.date + 'T00:00:00Z').toLocaleDateString('en', { weekday: 'short' })}
+            </text>
+          ))}
+          {range === 30 && [0, 7, 14, 21, 29].map(index => data[index] && (
+            <text key={data[index].date} x={cell * index + cell / 2} y="166" textAnchor="middle" fontSize="8" fill="#94a3b8">
+              {new Date(data[index].date + 'T00:00:00Z').toLocaleDateString('en', { month: 'short', day: 'numeric' })}
+            </text>
+          ))}
+        </svg>
+      </div>
+    </section>
+  )
+}
+
+function StatusDonut({ total, open, completed }: { total: number; open: number; completed: number }) {
+  const other = Math.max(0, total - open - completed)
+  const safe = Math.max(1, total)
+  const openPct = (open / safe) * 100
+  const completedPct = (completed / safe) * 100
+  const first = openPct
+  const second = openPct + completedPct
+  const background = `conic-gradient(#31b86b 0 ${first}%, #4a82ee ${first}% ${second}%, #f3b81a ${second}% 100%)`
+
+  return (
+    <section className="crm-card h-full p-4">
+      <h2 className="text-[12px] font-bold text-slate-900">Job Status</h2>
+      <div className="mt-4 flex items-center gap-5">
+        <div className="relative h-[112px] w-[112px] shrink-0 rounded-full" style={{ background }}>
+          <div className="absolute inset-[19px] grid place-items-center rounded-full bg-white text-center">
+            <div>
+              <div className="text-[19px] font-extrabold text-slate-950">{total}</div>
+              <div className="text-[8px] text-slate-400">Total Jobs</div>
+            </div>
+          </div>
+        </div>
+        <div className="min-w-0 flex-1 space-y-2.5">
+          {[
+            ['Open', open, '#31b86b'],
+            ['Completed', completed, '#4a82ee'],
+            ['Other states', other, '#f3b81a'],
+          ].map(([label, value, color]) => (
+            <div key={String(label)} className="flex items-center justify-between gap-3 text-[10px]">
+              <span className="inline-flex items-center gap-2 text-slate-600"><i className="h-2 w-2 rounded-full" style={{ background: String(color) }} />{label}</span>
+              <span className="font-bold text-slate-900">{Number(value).toLocaleString()} <span className="font-medium text-slate-400">({Math.round((Number(value) / safe) * 100)}%)</span></span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }
 
 export default function AdminDashboard() {
   const { user } = useAdminSession()
-  const [data, setData] = useState<DashboardStats | null>(null)
+  const { market } = useCrmShell()
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [health, setHealth] = useState<HealthData | null>(null)
   const [approvalCount, setApprovalCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let mounted = true
-
-    async function loadDashboard() {
+    async function load() {
+      setLoading(true)
       try {
-        const [dashboardResponse, approvalsResponse] = await Promise.all([
-          fetch('/api/dashboard', {
-            credentials: 'include',
-            cache: 'no-store',
-          }),
-          fetch('/api/admin/approvals', {
-            credentials: 'include',
-            cache: 'no-store',
-          }),
+        const [dashboardResponse, approvalsResponse, healthResponse] = await Promise.all([
+          fetch(`/api/dashboard?market=${encodeURIComponent(market)}`, { credentials: 'include', cache: 'no-store' }),
+          fetch('/api/admin/approvals', { credentials: 'include', cache: 'no-store' }),
+          fetch('/api/admin/health', { credentials: 'include', cache: 'no-store' }),
         ])
 
         if (dashboardResponse.status === 401) {
           window.location.href = '/admin/login'
           return
         }
-
         if (!dashboardResponse.ok) throw new Error('Dashboard request failed')
-        const payload = await dashboardResponse.json()
-        if (payload.error) throw new Error(payload.error)
-
-        let approvals = 0
-        if (approvalsResponse.ok) {
-          const approvalPayload = await approvalsResponse.json().catch(() => ({}))
-          approvals = Number(approvalPayload?.total || 0)
-        }
-
+        const dashboard = await dashboardResponse.json()
+        const approvals = approvalsResponse.ok ? await approvalsResponse.json().catch(() => ({})) : {}
+        const healthPayload = healthResponse.ok ? await healthResponse.json().catch(() => null) : null
         if (mounted) {
-          setData(payload)
-          setApprovalCount(approvals)
+          setData(dashboard)
+          setApprovalCount(Number(approvals?.total || 0))
+          setHealth(healthPayload)
         }
       } catch (error) {
         console.error('CRM dashboard error:', error)
@@ -163,377 +301,170 @@ export default function AdminDashboard() {
         if (mounted) setLoading(false)
       }
     }
-
-    loadDashboard()
+    load()
     return () => { mounted = false }
-  }, [])
+  }, [market])
 
-  const stats = data?.stats
-  const caps = data?.capabilities
-  const financeRows = data?.financeByCurrency || []
-  const primaryFinance = financeRows.length === 1 ? financeRows[0] : null
-
-  const totals = useMemo(() => {
-    const jobs = number(stats?.totalJobPostings)
-    const completed = number(stats?.completedJobs)
-    const open = number(stats?.openJobs)
-    const otherJobs = Math.max(0, jobs - completed - open)
-    return { jobs, completed, open, otherJobs }
-  }, [stats])
-
+  const primaryFinance = data?.financeByCurrency?.length === 1 ? data.financeByCurrency[0] : null
   const attentionItems = useMemo(() => {
     if (!data) return []
-
     return [
-      approvalCount > 0 && {
-        label: 'Governed approvals',
-        value: approvalCount,
-        href: '/admin/approvals',
-        severity: 'red' as const,
-      },
-      caps?.kyc && {
-        label: 'KYC waiting for review',
-        value: number(stats?.pendingKYC),
-        href: '/admin/kyc',
-        severity: number(stats?.pendingKYC) > 0 ? 'amber' as const : 'green' as const,
-      },
-      caps?.finance && {
-        label: 'Overdue settlements',
-        value: number(stats?.overdueSettlements),
-        href: '/admin/financial/settlements',
-        severity: number(stats?.overdueSettlements) > 0 ? 'red' as const : 'green' as const,
-      },
-      caps?.trust && {
-        label: 'Trust reports',
-        value: number(stats?.pendingCheatingReports),
-        href: '/admin/trust-safety',
-        severity: number(stats?.pendingCheatingReports) > 0 ? 'red' as const : 'green' as const,
-      },
-      caps?.users && {
-        label: 'Banned users',
-        value: number(stats?.bannedUsers),
-        href: '/admin/users/customers',
-        severity: 'slate' as const,
-      },
-    ].filter(Boolean) as Array<{
-      label: string
-      value: number
-      href: string
-      severity: 'red' | 'amber' | 'green' | 'slate'
-    }>
-  }, [approvalCount, caps, data, stats])
+      approvalCount > 0 && { label: 'Governed approvals awaiting review', value: approvalCount, href: '/admin/approvals', tone: 'danger' as const },
+      data.capabilities.kyc && data.stats.pendingKYC > 0 && { label: 'KYC verifications pending', value: data.stats.pendingKYC, href: '/admin/kyc', tone: 'amber' as const },
+      data.capabilities.finance && data.stats.overdueSettlements > 0 && { label: 'Overdue settlements', value: data.stats.overdueSettlements, href: '/admin/financial/settlements', tone: 'danger' as const },
+      data.capabilities.disputes && data.stats.openDisputes > 0 && { label: 'Open disputes need attention', value: data.stats.openDisputes, href: '/admin/jobs/disputes', tone: 'danger' as const },
+      data.capabilities.trust && data.stats.pendingCheatingReports > 0 && { label: 'Trust & Safety reports', value: data.stats.pendingCheatingReports, href: '/admin/trust-safety', tone: 'amber' as const },
+    ].filter(Boolean) as Array<{ label: string; value: number; href: string; tone: 'danger' | 'amber' }>
+  }, [approvalCount, data])
 
-  if (loading) {
-    return (
-      <CrmState
-        type="loading"
-        title="Loading operations overview"
-        description="Loading scoped jobs, people, finance, trust and approval queues."
-      />
-    )
-  }
+  if (loading && !data) return <CrmState type="loading" title="Loading CRM dashboard" description="Loading scoped marketplace operations." />
+  if (!data) return <CrmState type="error" title="Dashboard unavailable" description="The CRM dashboard could not be loaded for this staff session." />
 
-  if (!data || !caps) {
-    return (
-      <CrmState
-        type="error"
-        title="Dashboard unavailable"
-        description="The CRM dashboard could not be loaded for the current staff session."
-      />
-    )
-  }
-
-  const attentionTotal = attentionItems.reduce((sum, item) => sum + item.value, 0)
+  const now = new Date()
+  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 18 ? 'Good afternoon' : 'Good evening'
 
   return (
-    <div className="space-y-5">
-      <CrmPageHeader
-        eyebrow="Operations overview"
-        title={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, ${user?.name || 'Admin'}`}
-        description="Marketplace, people, finance, trust and governed actions in one operational view."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {caps.jobs && (
-              <Link
-                href="/admin/jobs"
-                className="inline-flex h-10 items-center gap-2 rounded-[11px] bg-[#17191b] px-4 text-sm font-semibold text-white hover:bg-slate-800"
-              >
-                Open job queue
-                <FiArrowUpRight size={15} />
-              </Link>
-            )}
-            {approvalCount > 0 && (
-              <Link
-                href="/admin/approvals"
-                className="inline-flex h-10 items-center gap-2 rounded-[11px] border border-amber-300 bg-[var(--crm-accent-soft)] px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100"
-              >
-                Review approvals
-                <CrmBadge tone="amber">{approvalCount}</CrmBadge>
-              </Link>
-            )}
-          </div>
-        }
-      />
+    <div className="space-y-3.5">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-[22px] font-extrabold tracking-[-0.035em] text-slate-950">{greeting}, {user?.name || 'Admin'} 👋</h1>
+          <p className="mt-1 text-[11px] text-slate-500">Here&apos;s what&apos;s happening with your marketplace today.</p>
+        </div>
+        <div className="inline-flex h-9 items-center gap-2 self-start rounded-lg border border-[#dfe4e8] bg-white px-3 text-[10px] font-semibold text-slate-600">
+          <FiCalendar size={13} />
+          {now.toLocaleDateString('en-LK', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+        </div>
+      </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {caps.jobs && (
-          <CrmMetricCard
-            label="Open jobs"
-            value={number(stats?.openJobs).toLocaleString()}
-            helper={`${number(stats?.totalJobPostings).toLocaleString()} jobs recorded`}
-            icon={<FiTool size={16} />}
-            tone="success"
-          />
-        )}
-
-        {caps.finance && (
-          <CrmMetricCard
-            label="Pending commission"
-            value={
-              primaryFinance
-                ? formatCurrency(primaryFinance.pendingCommission, primaryFinance.currency)
-                : financeRows.length > 1
-                  ? `${financeRows.length} currencies`
-                  : formatCurrency(0)
-            }
-            helper={
-              financeRows.length > 1
-                ? 'Multi-market finance position'
-                : `${number(data.weeklySummary?.pendingCount)} settlement items`
-            }
-            icon={<FiDollarSign size={16} />}
-            tone="amber"
-          />
-        )}
-
-        {(caps.taskers || caps.companies) && (
-          <CrmMetricCard
-            label="Provider network"
-            value={number(stats?.totalTaskers).toLocaleString()}
-            helper={`${number(stats?.totalCompanies).toLocaleString()} companies onboarded`}
-            icon={<FiUserCheck size={16} />}
-            tone="info"
-          />
-        )}
-
-        <CrmMetricCard
-          label="Items needing attention"
-          value={attentionTotal.toLocaleString()}
-          helper="Authorized operator queues"
-          icon={<FiAlertTriangle size={16} />}
-          tone={attentionTotal > 0 ? 'danger' : 'success'}
-        />
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard icon={<FiActivity size={15} />} label="Active Jobs" value={data.stats.openJobs.toLocaleString()} helper={`${data.stats.totalJobPostings.toLocaleString()} total jobs`} tone="green" />
+        <MetricCard icon={<FiDollarSign size={15} />} label="Commission Pending" value={primaryFinance ? money(primaryFinance.pendingCommission, primaryFinance.currency) : data.financeByCurrency.length > 1 ? `${data.financeByCurrency.length} currencies` : money(0)} helper={`${data.weeklySummary.pendingCount} settlement items`} tone="amber" />
+        <MetricCard icon={<FiCreditCard size={15} />} label="Commission Collected" value={primaryFinance ? money(primaryFinance.paidCommission, primaryFinance.currency) : data.financeByCurrency.length > 1 ? `${data.financeByCurrency.length} currencies` : money(0)} helper={`${data.stats.commissionRate}% configured commission`} tone="blue" />
+        <MetricCard icon={<FiShield size={15} />} label="Open Disputes" value={data.stats.openDisputes.toLocaleString()} helper="Formal unresolved disputes" tone="red" />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-3">
-        {(caps.jobs || caps.kyc) && (
-          <CrmCard
-            className="xl:col-span-2"
-            title="Marketplace operations"
-            description="Current job and verification workload"
-            action={<CrmBadge tone="success" dot>Live data</CrmBadge>}
-          >
-            <div className="grid gap-7 md:grid-cols-2">
-              {caps.jobs && (
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-medium text-slate-500">Jobs recorded</div>
-                      <div className="mt-1 text-3xl font-semibold tracking-[-0.03em] text-slate-950">
-                        {totals.jobs.toLocaleString()}
-                      </div>
-                    </div>
-                    <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#17191b] text-[var(--crm-accent)]">
-                      <FiBriefcase size={19} />
-                    </div>
-                  </div>
-
-                  <ProgressRow label="Open" value={totals.open} total={Math.max(1, totals.jobs)} tone="amber" />
-                  <ProgressRow label="Completed" value={totals.completed} total={Math.max(1, totals.jobs)} tone="success" />
-                  <ProgressRow label="Other states" value={totals.otherJobs} total={Math.max(1, totals.jobs)} tone="info" />
-
-                  <Link
-                    href="/admin/jobs"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800"
-                  >
-                    Open Job Command Centre <FiArrowUpRight size={12} />
-                  </Link>
-                </div>
-              )}
-
-              {caps.kyc && (
-                <div className="space-y-5">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900">Verification pipeline</div>
-                    <div className="mt-1 text-xs text-slate-400">
-                      Identity document status across your assigned market scope
-                    </div>
-                  </div>
-                  <ProgressRow
-                    label="Verified"
-                    value={number(stats?.verifiedKYC)}
-                    total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
-                    tone="success"
-                  />
-                  <ProgressRow
-                    label="Pending review"
-                    value={number(stats?.pendingKYC)}
-                    total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
-                    tone="amber"
-                  />
-                  <ProgressRow
-                    label="Rejected"
-                    value={number(stats?.rejectedKYC)}
-                    total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
-                    tone="danger"
-                  />
-                </div>
-              )}
-            </div>
-          </CrmCard>
-        )}
-
-        <CrmCard
-          title="Pending actions"
-          description="Queues that need an authorized operator"
-          padding="none"
-        >
-          {attentionItems.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-400">No pending actions.</div>
-          ) : (
-            <div className="divide-y divide-[var(--crm-border)]">
-              {attentionItems.map(item => {
-                const tone =
-                  item.severity === 'red' ? 'danger' :
-                  item.severity === 'amber' ? 'warning' :
-                  item.severity === 'green' ? 'success' : 'neutral'
-
-                return (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-[#fafbf9]"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <CrmBadge tone={tone} dot>{item.label}</CrmBadge>
-                    </div>
-                    <span className="text-sm font-semibold text-slate-950">
-                      {item.value.toLocaleString()}
-                    </span>
-                  </Link>
-                )
-              })}
-            </div>
-          )}
-        </CrmCard>
+      <section className="grid gap-3.5 xl:grid-cols-[minmax(0,1.9fr)_minmax(300px,.8fr)]">
+        <TrendChart rows={data.jobTrend || []} />
+        <StatusDonut total={data.stats.totalJobPostings} open={data.stats.openJobs} completed={data.stats.completedJobs} />
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-3">
-        {caps.people && (
-          <CrmCard
-            title="People"
-            description="Marketplace account footprint"
-            action={<FiUsers size={18} className="text-slate-400" />}
-          >
-            <div className="grid grid-cols-3 divide-x divide-[var(--crm-border)]">
-              <div className="pr-3">
-                <div className="text-xl font-semibold text-slate-950">{number(stats?.totalUsers).toLocaleString()}</div>
-                <div className="mt-1 text-xs text-slate-400">Users</div>
-              </div>
-              <div className="px-3">
-                <div className="text-xl font-semibold text-slate-950">{number(stats?.totalTaskers).toLocaleString()}</div>
-                <div className="mt-1 text-xs text-slate-400">Taskers</div>
-              </div>
-              <div className="pl-3">
-                <div className="text-xl font-semibold text-slate-950">{number(stats?.totalCompanies).toLocaleString()}</div>
-                <div className="mt-1 text-xs text-slate-400">Companies</div>
-              </div>
-            </div>
-
-            {caps.users && (
-              <Link
-                href="/admin/users/customers"
-                className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800"
-              >
-                Open people management <FiArrowUpRight size={12} />
-              </Link>
-            )}
-          </CrmCard>
-        )}
-
-        {caps.finance && (
-          <CrmCard
-            title="Finance"
-            description="Commission and provider wallet position"
-            action={<FiCreditCard size={18} className="text-slate-400" />}
-          >
-            <div className="space-y-3">
-              {financeRows.length ? financeRows.map(row => (
-                <div key={row.currency} className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-3">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{row.currency}</div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-xs text-slate-500">Commission collected</span>
-                    <span className="text-xs font-semibold text-slate-900">{formatCurrency(row.paidCommission, row.currency)}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-xs text-slate-500">Commission pending</span>
-                    <span className="text-xs font-semibold text-slate-900">{formatCurrency(row.pendingCommission, row.currency)}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-xs text-slate-500">Provider wallet balance</span>
-                    <span className="text-xs font-semibold text-slate-900">{formatCurrency(row.providerWalletBalance, row.currency)}</span>
-                  </div>
-                </div>
+      <section className="crm-card overflow-hidden">
+        <div className="flex items-center justify-between border-b border-[#e5e9ed] px-4 py-3">
+          <h2 className="text-[12px] font-bold text-slate-900">Recent Jobs</h2>
+          <Link href="/admin/jobs" className="inline-flex items-center gap-1 text-[10px] font-bold text-[#3478d4] hover:text-[#245da7]">
+            View all <FiArrowUpRight size={11} />
+          </Link>
+        </div>
+        <div className="crm-scrollbar overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left">
+            <thead>
+              <tr className="bg-[#f8fafb] text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400">
+                <th className="px-4 py-2.5">ID</th>
+                <th className="px-4 py-2.5">Service</th>
+                <th className="px-4 py-2.5">Customer</th>
+                <th className="px-4 py-2.5">Provider</th>
+                <th className="px-4 py-2.5 text-right">Amount</th>
+                <th className="px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5 text-right">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.recentJobs?.length ? data.recentJobs.map(job => (
+                <tr key={job.id} className="border-t border-[#edf0f2] text-[10px] hover:bg-[#fbfcfd]">
+                  <td className="px-4 py-2.5 font-mono text-[9px] text-slate-500">
+                    <Link href={`/admin/jobs/${job.id}`} className="hover:text-slate-900">{job.id.slice(0, 14)}</Link>
+                  </td>
+                  <td className="px-4 py-2.5 font-semibold text-slate-800">{job.title}</td>
+                  <td className="px-4 py-2.5 text-slate-600">{job.customer}</td>
+                  <td className="px-4 py-2.5 text-slate-600">{job.provider}</td>
+                  <td className="px-4 py-2.5 text-right font-bold text-slate-800">{money(job.amount, job.currency)}</td>
+                  <td className="px-4 py-2.5"><CrmBadge tone={statusTone(job.status)} dot>{job.status.replaceAll('_', ' ')}</CrmBadge></td>
+                  <td className="px-4 py-2.5 text-right text-slate-400">{timeAgo(job.createdAt)}</td>
+                </tr>
               )) : (
-                <div className="text-xs text-slate-400">No finance balances are available for this market.</div>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-400">No jobs are visible in this market.</td></tr>
               )}
-            </div>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-            <Link
-              href="/admin/financial/wallets"
-              className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800"
-            >
-              Open finance operations <FiArrowUpRight size={12} />
-            </Link>
-          </CrmCard>
-        )}
-
-        <CrmCard className="bg-[#10151d] text-white" padding="md">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-semibold text-white">Control centre</h2>
-              <p className="mt-1 text-xs text-slate-400">CRM V2 operational foundation</p>
+      <section className="grid gap-3.5 xl:grid-cols-3">
+        <div className="crm-card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[#e5e9ed] px-4 py-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-[12px] font-bold text-slate-900">Alerts / Pending Actions</h2>
+              {attentionItems.length > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#ef4562] px-1 text-[9px] font-bold text-white">{attentionItems.length}</span>}
             </div>
-            <FiShield className="text-[var(--crm-accent)]" size={18} />
+            <Link href="/admin/approvals" className="text-[10px] font-bold text-[#3478d4]">View all</Link>
           </div>
+          <div className="divide-y divide-[#edf0f2]">
+            {attentionItems.length ? attentionItems.slice(0, 5).map(item => (
+              <Link key={item.label} href={item.href} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-[#fbfcfd]">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${item.tone === 'danger' ? 'bg-red-50 text-[#d9364f]' : 'bg-amber-50 text-[#b87500]'}`}>
+                    <FiAlertTriangle size={11} />
+                  </span>
+                  <span className="truncate text-[10px] font-medium text-slate-700">{item.value} {item.label}</span>
+                </div>
+                <FiArrowUpRight size={11} className="text-slate-300" />
+              </Link>
+            )) : (
+              <div className="p-6 text-center text-[10px] text-slate-400">No pending actions for this market.</div>
+            )}
+          </div>
+        </div>
 
-          <div className="mt-5 space-y-3">
-            {[
-              ['Live admin session', true],
-              ['Scoped marketplace data', true],
-              ['Server-issued permissions', true],
-              ['Job 360 workspace', true],
-              ['Governed approval queue', true],
-            ].map(([label, ready]) => (
-              <div key={String(label)} className="flex items-center justify-between gap-3">
-                <span className="text-xs text-slate-300">{String(label)}</span>
-                <span className={`inline-flex items-center gap-1.5 text-[11px] ${ready ? 'text-emerald-300' : 'text-slate-500'}`}>
-                  {ready ? <FiCheckCircle size={12} /> : <FiClock size={12} />}
-                  {ready ? 'Ready' : 'Pending'}
+        <div className="crm-card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[#e5e9ed] px-4 py-3">
+            <h2 className="text-[12px] font-bold text-slate-900">Live Activity</h2>
+            <Link href="/admin/jobs" className="text-[10px] font-bold text-[#3478d4]">View all</Link>
+          </div>
+          <div className="divide-y divide-[#edf0f2]">
+            {data.recentJobs?.slice(0, 5).map((job, index) => (
+              <Link key={job.id} href={`/admin/jobs/${job.id}`} className="flex gap-3 px-4 py-3 hover:bg-[#fbfcfd]">
+                <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full ${index % 3 === 0 ? 'bg-emerald-50 text-emerald-600' : index % 3 === 1 ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+                  <FiBriefcase size={11} />
                 </span>
-              </div>
+                <div className="min-w-0">
+                  <div className="truncate text-[10px] font-semibold text-slate-800">{job.title}</div>
+                  <div className="mt-0.5 truncate text-[9px] text-slate-400">{job.customer} · {job.status.replaceAll('_', ' ')} · {timeAgo(job.createdAt)}</div>
+                </div>
+              </Link>
             ))}
           </div>
+        </div>
 
-          {caps.platform && (
-            <Link
-              href="/admin/platform"
-              className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-[var(--crm-accent)] hover:text-amber-200"
-            >
-              Open platform controls <FiArrowUpRight size={12} />
-            </Link>
-          )}
-        </CrmCard>
+        <div className="crm-card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[#e5e9ed] px-4 py-3">
+            <h2 className="text-[12px] font-bold text-slate-900">System Health</h2>
+            {health && <CrmBadge tone={health.status === 'healthy' ? 'success' : 'warning'} dot>{health.status === 'healthy' ? 'Operational' : 'Degraded'}</CrmBadge>}
+          </div>
+          <div className="space-y-3 p-4">
+            {health ? (
+              <>
+                {[
+                  ['Database', health.database.status === 'healthy' ? `${health.database.latencyMs} ms` : health.database.status, health.database.status === 'healthy'],
+                  ['Job queue', health.queues.jobMatchPending.toLocaleString(), true],
+                  ['Offer queue', health.queues.offerMatchPending.toLocaleString(), true],
+                  ['Payment work', health.payments.pending.toLocaleString(), true],
+                  ['Notifications / hour', health.notifications.createdLastHour.toLocaleString(), true],
+                ].map(([label, value, ok]) => (
+                  <div key={String(label)} className="flex items-center justify-between text-[10px]">
+                    <span className="inline-flex items-center gap-2 text-slate-600"><i className={`h-2 w-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-amber-500'}`} />{label}</span>
+                    <span className="font-bold text-slate-800">{String(value)}</span>
+                  </div>
+                ))}
+                <div className="border-t border-[#edf0f2] pt-2 text-[8px] text-slate-400">Release {health.release?.slice(0, 12) || 'unknown'}</div>
+              </>
+            ) : (
+              <div className="py-5 text-center text-[10px] text-slate-400">
+                <FiCheckCircle className="mx-auto mb-2 text-emerald-500" size={18} />
+                Health details are restricted for this staff role.
+              </div>
+            )}
+          </div>
+        </div>
       </section>
     </div>
   )
