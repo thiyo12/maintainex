@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
+import { assertCrmCountryAllowed, getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 
 const SEASONS = new Set(['winter', 'spring', 'summer', 'fall', 'general'])
@@ -16,9 +16,10 @@ export async function GET(request: NextRequest) {
     if (!guard.ok) return guard.response
     const security = guard.context
 
-    const seasonalWhere = security.isSuperAdmin
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const seasonalWhere = scopedCountryCodes === null
       ? {}
-      : { country: { in: security.assignedCountries } }
+      : { country: { in: scopedCountryCodes } }
 
     const [seasonal, flash] = await Promise.all([
       prisma.seasonalOffer.findMany({
