@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
+  getCrmCountryCodes,
+  getCrmCountryFilter,
   guardCrmRequest,
   type CrmSecurityContext,
 } from '@/lib/crm/security'
@@ -30,9 +32,7 @@ export async function GET(request: NextRequest) {
     if (!guard.ok) return guard.response
     const security = guard.context
 
-    const countryFilter = security.isSuperAdmin
-      ? {}
-      : { countryCode: { in: security.assignedCountries } }
+    const countryFilter = getCrmCountryFilter(security)
 
     const [categories, services, templates, jobCategories] = await Promise.all([
       prisma.category.findMany({
@@ -111,10 +111,11 @@ export async function GET(request: NextRequest) {
       }),
     ])
 
-    const allowedJobCategories = security.isSuperAdmin
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const allowedJobCategories = scopedCountryCodes === null
       ? jobCategories
       : jobCategories.filter(category =>
-          security.assignedCountries.some(country =>
+          scopedCountryCodes.some(country =>
             category.countries.includes(country)
           )
         )
@@ -147,7 +148,9 @@ export async function POST(request: NextRequest) {
 
     const countryCode = typeof body?.countryCode === 'string'
       ? body.countryCode.trim().toUpperCase()
-      : security.assignedCountries[0] || 'LK'
+      : security.selectedMarket && security.selectedMarket !== 'ALL'
+        ? security.selectedMarket
+        : security.assignedCountries[0] || 'LK'
     if (!assertCrmCountryAllowed(security, countryCode)) {
       return NextResponse.json({ error: 'Forbidden country' }, { status: 403 })
     }
