@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
+  getCrmCountryCodes,
   getCrmCountryFilter,
   guardCrmAction,
   guardCrmRequest,
@@ -18,7 +19,8 @@ import {
 const REFUND_STATUSES = ['REFUND_REQUIRED', 'REFUND_PROCESSING', 'REFUNDED'] as const
 
 async function scopedJobIds(security: CrmSecurityContext) {
-  if (security.isSuperAdmin) return null
+  const scopedCountryCodes = getCrmCountryCodes(security)
+  if (scopedCountryCodes === null) return null
   return (await prisma.marketplaceJob.findMany({
     where: getCrmCountryFilter(security),
     select: { id: true },
