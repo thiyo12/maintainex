@@ -306,9 +306,9 @@ export default function Job360Page() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="overflow-hidden rounded-2xl border border-[var(--crm-border)] bg-white shadow-[var(--crm-shadow-card)]">
-        <div className="px-5 pt-4 md:px-6 md:pt-5">
+    <div className="space-y-4">
+      <section className="overflow-hidden rounded-[14px] border border-[var(--crm-border)] bg-white shadow-[var(--crm-shadow-card)]">
+        <div className="px-4 pt-3.5 md:px-5 md:pt-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0">
               <Link href="/admin/jobs" className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-900">
@@ -316,7 +316,7 @@ export default function Job360Page() {
                 Back to Jobs
               </Link>
 
-              <div className="mt-3 flex flex-wrap items-center gap-3">
+              <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => {
@@ -325,7 +325,7 @@ export default function Job360Page() {
                   }}
                   className="inline-flex items-center gap-2 text-left"
                 >
-                  <h1 className="text-[24px] font-bold tracking-[-0.025em] text-slate-950 md:text-[28px]">{job.id}</h1>
+                  <h1 className="text-[22px] font-bold tracking-[-0.025em] text-slate-950 md:text-[24px]">{job.id}</h1>
                   <FiCopy size={13} className="text-slate-300" />
                 </button>
                 <StatusBadge value={job.status} />
@@ -358,7 +358,7 @@ export default function Job360Page() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 border-t border-[var(--crm-border)] py-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid gap-2.5 border-t border-[var(--crm-border)] py-3 sm:grid-cols-2 xl:grid-cols-4">
             <SummaryTile icon={FiUser} label="Customer" value={customer?.name || 'Unknown'} meta={customer?.mxId || customer?.email} href={customer?.id ? `/admin/users/${customer.id}` : undefined} />
             <SummaryTile icon={FiTool} label="Provider" value={provider?.companyName || provider?.name || 'Not assigned'} meta={acceptedQuote ? `${label(acceptedQuote.providerType)} provider` : 'Awaiting accepted quote'} href={providerLink || undefined} />
             <SummaryTile icon={FiMapPin} label="Location" value={location || 'Not specified'} meta={job.countryCode || customer?.countryCode || '—'} />
@@ -379,8 +379,8 @@ export default function Job360Page() {
         </div>
       </section>
 
-      <div className="grid xl:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
-        <div className="space-y-5">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_286px]">
+        <div className="space-y-4">
           {activeTab === 'overview' && <OverviewTab payload={payload} location={location} />}
           {activeTab === 'lifecycle' && <LifecycleTab payload={payload} />}
           {activeTab === 'quotes' && <QuotesTab payload={payload} currency={currency} />}
@@ -390,8 +390,8 @@ export default function Job360Page() {
           {activeTab === 'audit' && payload.permissions.audit && <AuditTab rows={auditRows} />}
         </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-[84px]">
-          <Card title="Quick Actions" subtitle="Authorized controls for this job">
+        <aside className="space-y-3.5 xl:sticky xl:top-[72px]">
+          <Card title="Quick Actions" subtitle="Operational controls for this job">
             <div className="space-y-2">
               {customer?.id && (
                 <RailLink href={`/admin/users/${customer.id}`} icon={FiUser} label="Open customer 360" primary />
@@ -411,7 +411,7 @@ export default function Job360Page() {
 
           {payload.permissions.finance && (
             <Card title="Payment / Escrow" subtitle="Canonical financial state">
-              <div className="rounded-xl bg-amber-50 p-3">
+              <div className="rounded-[10px] border border-amber-100 bg-amber-50 p-3">
                 <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-700">Amount</div>
                 <div className="mt-1 text-xl font-bold text-slate-950">{formatMoney(amount, currency)}</div>
               </div>
@@ -424,15 +424,55 @@ export default function Job360Page() {
             </Card>
           )}
 
-          <Card title="Risk / Verification" subtitle="Safety and work-start signals">
+          {payload.permissions.finance && (
+            <Card title="Financials" subtitle="Service value and settlement split">
+              <div className="space-y-3">
+                <KeyValue label="Service amount" value={formatMoney(amount, currency)} />
+                <KeyValue
+                  label="MaintainEX commission"
+                  value={finance.settlements?.[0]
+                    ? formatMoney(finance.settlements[0].commissionAmount, finance.settlements[0].currency || currency)
+                    : '—'}
+                />
+                <KeyValue
+                  label="Provider amount"
+                  value={finance.settlements?.[0]
+                    ? formatMoney(finance.settlements[0].jobAmount, finance.settlements[0].currency || currency)
+                    : '—'}
+                />
+              </div>
+            </Card>
+          )}
+
+          <Card title="Risk Assessment" subtitle="Safety and verification signals">
             <div className="space-y-3">
               {payload.permissions.trust && <KeyValue label="Risk events" value={String(riskEvents.length)} />}
               <KeyValue label="PIN status" value={operations.verificationPin?.status || 'Not generated'} />
               <KeyValue label="Arrival verified" value={operations.verificationPin?.arrivalVerifiedAt ? 'Yes' : 'No'} />
               <KeyValue label="Work started" value={operations.verificationPin?.workStartVerifiedAt ? 'Yes' : 'No'} />
-              <KeyValue label="Completion verified" value={operations.verificationPin?.completionVerifiedAt ? 'Yes' : 'No'} />
+              <KeyValue label="Completion" value={operations.verificationPin?.completionVerifiedAt ? 'Verified' : 'Pending'} />
             </div>
           </Card>
+
+          <Card title="Schedule / SLA" subtitle="Timing and service urgency">
+            <div className="space-y-3">
+              <KeyValue label="Service date" value={formatDate(job.preferredDate || job.scheduledDate)} />
+              <KeyValue label="Time slot" value={job.preferredTimeSlot || 'Not set'} />
+              <KeyValue label="Urgency" value={job.urgency || 'Normal'} />
+              <KeyValue label="Job type" value={job.jobType || job.serviceType || 'On-site'} />
+            </div>
+          </Card>
+
+          {payload.permissions.audit && auditRows.length > 0 && (
+            <Card title="Internal Activity" subtitle="Latest staff-visible job note">
+              <div className="text-xs leading-5 text-slate-600">
+                {auditRows[0].description || label(auditRows[0].action)}
+              </div>
+              <div className="mt-2 text-[10px] text-slate-400">
+                {auditRows[0].actor || 'System'} · {formatDate(auditRows[0].createdAt)}
+              </div>
+            </Card>
+          )}
         </aside>
       </div>
 
@@ -452,13 +492,15 @@ export default function Job360Page() {
 
 function SummaryTile({ icon: Icon, label: tileLabel, value, meta, href }: { icon: any; label: string; value: string; meta?: string; href?: string }) {
   const body = (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 h-full">
-      <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
+    <div className="flex h-full items-center gap-3 rounded-[10px] border border-[var(--crm-border)] bg-[#fbfcfd] px-3 py-2.5">
+      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-slate-500 shadow-sm">
         <Icon size={14} />
-        {tileLabel}
       </div>
-      <div className="mt-2 text-sm font-semibold text-slate-900 line-clamp-2">{value}</div>
-      {meta && <div className="mt-1 text-xs text-slate-400 truncate">{meta}</div>}
+      <div className="min-w-0">
+        <div className="text-[10px] font-medium text-slate-400">{tileLabel}</div>
+        <div className="mt-0.5 line-clamp-1 text-[12px] font-semibold text-slate-900">{value}</div>
+        {meta && <div className="mt-0.5 truncate text-[10px] text-slate-400">{meta}</div>}
+      </div>
     </div>
   )
   return href ? <Link href={href} className="hover:opacity-80 transition">{body}</Link> : body
