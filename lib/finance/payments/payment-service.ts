@@ -18,12 +18,17 @@ import {
   getPayHereReturnUrl,
   getPayHereCancelUrl,
   getPayHereNotifyUrl,
+  generateMerchantOrderId,
   formatPayHereAmount,
   parsePayHereAmount,
   requestPayHereRefund,
   retrievePayHerePayment,
   type PayHereNotification,
 } from '@/lib/payment/payhere-adapter'
+import {
+  resolvePaymentProviderForMarket,
+  type ResolvedPaymentProvider,
+} from '@/lib/finance/payments/provider-registry'
 
 export type PaymentStatus =
   | 'CREATED'
@@ -55,13 +60,49 @@ export interface PaymentResult {
 export async function createPaymentIntent(params: CreatePaymentParams): Promise<PaymentResult> {
   const { jobId, customerId, baseUrl } = params
 
-  if (!getPayPalConfig()) {
+  const previewJob = await prisma.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: {
+      id: true,
+      customerId: true,
+      countryCode: true,
+      status: true,
+      title: true,
+    },
+  })
+  if (!previewJob) {
+    return { success: false, error: 'Job not found', code: 'JOB_NOT_FOUND' }
+  }
+  if (previewJob.customerId !== customerId) {
+    return { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }
+  }
+
+  const previewEscrow = await prisma.jobEscrow.findFirst({
+    where: { jobId },
+    select: { currency: true },
+  })
+  if (!previewEscrow) {
     return {
       success: false,
-      error: 'PayPal payment gateway is not configured',
-      code: 'PAYPAL_NOT_CONFIGURED',
+      error: 'Escrow not initialized',
+      code: 'ESCROW_NOT_INITIALIZED',
     }
   }
+
+  const provider = await resolvePaymentProviderForMarket({
+    countryCode: previewJob.countryCode,
+    currency: previewEscrow.currency,
+  })
+  if (!provider) {
+    return {
+      success: false,
+      error: 'No payment provider is enabled for this market and currency',
+      code: 'PAYMENT_PROVIDER_NOT_ENABLED',
+    }
+  }
+
+  const providerConfigError = validateProviderRuntimeConfig(provider)
+  if (providerConfigError) return providerConfigError
 
   type IntentDecision = {
     intent: {
@@ -69,6 +110,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       merchantOrderId: string
       amount: bigint
       currency: string
+      gateway: string
     } | null
     jobTitle: string | null
     failure: PaymentResult | null
@@ -76,9 +118,15 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
 
   const decision: IntentDecision = await prisma.$transaction(async tx => {
     const lockedJobs = await tx.$queryRaw<
-      { id: string; customerId: string; status: string; title: string }[]
+      {
+        id: string
+        customerId: string
+        status: string
+        title: string
+        countryCode: string
+      }[]
     >`
-      SELECT id, "customerId", status, title
+      SELECT id, "customerId", status, title, "countryCode"
       FROM "MarketplaceJob"
       WHERE id = ${jobId}
       FOR UPDATE
@@ -105,6 +153,17 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         failure: { success: false, error: 'Job is not payable', code: 'JOB_NOT_PAYABLE' },
       }
     }
+    if (job.countryCode !== provider.countryCode) {
+      return {
+        intent: null,
+        jobTitle: job.title,
+        failure: {
+          success: false,
+          error: 'Payment market changed while checkout was starting',
+          code: 'PAYMENT_MARKET_CHANGED',
+        },
+      }
+    }
 
     const escrow = await tx.jobEscrow.findFirst({ where: { jobId } })
     if (!escrow) {
@@ -129,6 +188,17 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         },
       }
     }
+    if (escrow.currency !== provider.currency) {
+      return {
+        intent: null,
+        jobTitle: job.title,
+        failure: {
+          success: false,
+          error: 'Payment currency changed while checkout was starting',
+          code: 'PAYMENT_CURRENCY_CHANGED',
+        },
+      }
+    }
 
     const expiryCutoff = new Date(Date.now() - 30 * 60 * 1000)
     await tx.paymentIntent.updateMany({
@@ -140,12 +210,12 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       data: { status: 'EXPIRED' },
     })
 
-    // The product has switched to PayPal. Do not issue a new PayHere checkout
-    // URL when the customer retries after the cutover.
+    // Only one provider owns a fresh checkout attempt. Stale pending attempts
+    // from another provider are expired before a new provider intent is issued.
     await tx.paymentIntent.updateMany({
       where: {
         jobId,
-        gateway: 'PAYHERE',
+        gateway: { not: provider.provider },
         status: { in: ['CREATED', 'PENDING'] },
       },
       data: { status: 'EXPIRED' },
@@ -154,7 +224,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     const existingPending = await tx.paymentIntent.findFirst({
       where: {
         jobId,
-        gateway: 'PAYPAL',
+        gateway: provider.provider,
         status: { in: ['CREATED', 'PENDING'] },
       },
       select: {
@@ -162,6 +232,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         merchantOrderId: true,
         amount: true,
         currency: true,
+        gateway: true,
       },
     })
     if (existingPending) {
@@ -169,15 +240,20 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     }
 
     const totalAmount = escrow.totalAmount ?? escrow.amount
+    const merchantOrderId =
+      provider.provider === 'PAYPAL'
+        ? `PP-PENDING-${crypto.randomUUID()}`
+        : generateMerchantOrderId(jobId)
+
     const paymentIntent = await tx.paymentIntent.create({
       data: {
         jobId,
         customerId,
         escrowId: escrow.id,
-        merchantOrderId: `PP-PENDING-${crypto.randomUUID()}`,
-        gateway: 'PAYPAL',
+        merchantOrderId,
+        gateway: provider.provider,
         amount: totalAmount,
-        currency: (escrow.currency || 'LKR') as Currency,
+        currency: escrow.currency,
         status: 'CREATED',
       },
       select: {
@@ -185,6 +261,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         merchantOrderId: true,
         amount: true,
         currency: true,
+        gateway: true,
       },
     })
 
@@ -197,6 +274,29 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       success: false,
       error: 'Could not create payment session',
       code: 'PAYMENT_INTENT_FAILED',
+    }
+  }
+
+  if (provider.provider === 'PAYHERE') {
+    const config = getPayHereConfig()!
+    return {
+      success: true,
+      paymentIntentId: decision.intent.id,
+      checkoutUrl: buildHostedCheckoutUrl(
+        baseUrl,
+        decision.intent.id,
+        config.merchantSecret
+      ),
+      merchantOrderId: decision.intent.merchantOrderId,
+    }
+  }
+
+  if (provider.provider !== 'PAYPAL') {
+    return {
+      success: false,
+      paymentIntentId: decision.intent.id,
+      error: 'Selected payment provider does not support hosted checkout',
+      code: 'PAYMENT_PROVIDER_CHECKOUT_UNSUPPORTED',
     }
   }
 
@@ -311,6 +411,56 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     paymentIntentId: intent.id,
     checkoutUrl: created.approvalUrl,
     merchantOrderId: created.orderId,
+  }
+}
+
+function validateProviderRuntimeConfig(
+  provider: ResolvedPaymentProvider
+): PaymentResult | null {
+  if (provider.provider === 'PAYPAL') {
+    const config = getPayPalConfig()
+    if (!config) {
+      return {
+        success: false,
+        error: 'PayPal payment gateway is not configured',
+        code: 'PAYPAL_NOT_CONFIGURED',
+      }
+    }
+    const runtimeEnvironment = config.sandbox ? 'SANDBOX' : 'LIVE'
+    if (runtimeEnvironment !== provider.environment) {
+      return {
+        success: false,
+        error: 'PayPal market configuration does not match runtime environment',
+        code: 'PAYPAL_ENVIRONMENT_MISMATCH',
+      }
+    }
+    return null
+  }
+
+  if (provider.provider === 'PAYHERE') {
+    const config = getPayHereConfig()
+    if (!config) {
+      return {
+        success: false,
+        error: 'PayHere payment gateway is not configured',
+        code: 'PAYHERE_NOT_CONFIGURED',
+      }
+    }
+    const runtimeEnvironment = config.sandbox ? 'SANDBOX' : 'LIVE'
+    if (runtimeEnvironment !== provider.environment) {
+      return {
+        success: false,
+        error: 'PayHere market configuration does not match runtime environment',
+        code: 'PAYHERE_ENVIRONMENT_MISMATCH',
+      }
+    }
+    return null
+  }
+
+  return {
+    success: false,
+    error: 'Selected payment provider does not support hosted checkout',
+    code: 'PAYMENT_PROVIDER_CHECKOUT_UNSUPPORTED',
   }
 }
 
