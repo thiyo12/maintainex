@@ -108,12 +108,13 @@ export interface V2Job {
 
 export interface V2PaymentStatus {
   id: string
-  status: 'CREATED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUND_REQUIRED' | 'CHARGEDBACK'
+  status: 'CREATED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUND_REQUIRED' | 'REFUND_PROCESSING' | 'REFUNDED' | 'CHARGEDBACK'
   amount: number
   amountMinor: string
   currency: string
   merchantOrderId: string
   paymentId: string | null
+  gateway: string
   createdAt: string
   paidAt: string | null
 }
