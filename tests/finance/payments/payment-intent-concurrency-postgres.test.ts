@@ -120,6 +120,7 @@ describe.skipIf(!isTestDb)('Release gate — PaymentIntent concurrency', () => {
         customerId,
         escrowId,
         merchantOrderId: `${prefix}-order-${suffix}`,
+        gateway: 'PAYHERE',
         amount: 550000n,
         currency: 'LKR',
         status: 'PENDING',
