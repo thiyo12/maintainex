@@ -81,9 +81,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid escrow status' }, { status: 400 })
     }
 
-    const countryClause = security.isSuperAdmin
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const countryClause = scopedCountryCodes === null
       ? Prisma.empty
-      : Prisma.sql`AND j."countryCode" IN (${Prisma.join(security.assignedCountries)})`
+      : scopedCountryCodes.length === 0
+        ? Prisma.sql`AND 1 = 0`
+        : Prisma.sql`AND j."countryCode" IN (${Prisma.join(scopedCountryCodes)})`
     const statusClause = status === 'ALL'
       ? Prisma.empty
       : Prisma.sql`AND e.status = ${status}`
