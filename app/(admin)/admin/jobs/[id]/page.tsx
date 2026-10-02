@@ -563,7 +563,7 @@ function OverviewTab({ payload, location }: { payload: Job360Payload; location: 
           <div className="space-y-0">
             {payload.lifecycle.slice(0, 7).map((event: any, index: number) => (
               <div key={event.id || `${event.event || event.status}-${index}`} className="relative grid grid-cols-[24px_minmax(0,1fr)_auto] gap-3 pb-4 last:pb-0">
-                {index < Math.min(payload.lifecycle.length, 7) - 1 && <span className="absolute left-[7px] top-4 h-full w-px bg-slate-200" />}
+                {index < Math.min(payload.lifecycle?.length ?? 0, 7) - 1 && <span className="absolute left-[7px] top-4 h-full w-px bg-slate-200" />}
                 <span className="relative mt-1.5 h-3 w-3 rounded-full bg-[var(--crm-success)] ring-4 ring-white" />
                 <div>
                   <div className="text-xs font-semibold text-slate-800">{label(event.event || event.status || event.action)}</div>
