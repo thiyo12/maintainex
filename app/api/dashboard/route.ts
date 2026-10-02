@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { crmHasPermission, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
+import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
+import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,15 +13,26 @@ export async function GET(request: NextRequest) {
     if (!guard.ok) return guard.response
     const security = guard.context
     const countryFilter = getCrmCountryFilter(security)
-    const canUsers = crmHasPermission(security.role, 'users:view')
-    const canTaskers = crmHasPermission(security.role, 'taskers:view')
-    const canCompanies = crmHasPermission(security.role, 'companies:view')
-    const canKyc = crmHasPermission(security.role, 'kyc:view')
-    const canJobs = crmHasPermission(security.role, 'jobs:view')
+    const can = (permission: string) => {
+      const entry = getPermissionCatalogEntry(permission)
+      return evaluateEffectivePermission({
+        role: security.role,
+        permission,
+        permissionClass: entry?.class,
+        overrides: security.permissionOverrides,
+      }).allowed
+    }
+
+    const canUsers = can('users:view') || can('customers:view')
+    const canTaskers = can('taskers:view')
+    const canCompanies = can('companies:view')
+    const canKyc = can('kyc:view') || can('kyc:review')
+    const canJobs = can('jobs:view')
     const canFinance =
-      crmHasPermission(security.role, 'commission:view') ||
-      crmHasPermission(security.role, 'wallets:view')
-    const canCheating = crmHasPermission(security.role, 'cheating:view')
+      can('commission:view') ||
+      can('wallets:view') ||
+      can('finance:payments:view')
+    const canCheating = can('cheating:view') || can('risk:view')
 
     const scopedUserIds = security.isSuperAdmin
       ? null
@@ -198,6 +210,17 @@ export async function GET(request: NextRequest) {
               overdueCount: 0,
             },
         isSuperAdmin: security.isSuperAdmin,
+        capabilities: {
+          jobs: canJobs,
+          users: canUsers,
+          taskers: canTaskers,
+          companies: canCompanies,
+          people: canUsers || canTaskers || canCompanies,
+          kyc: canKyc,
+          finance: canFinance,
+          trust: canCheating,
+          platform: can('settings:view') || can('market_config:read') || can('markets:view'),
+        },
         scope: {
           countries: security.isSuperAdmin ? [] : security.assignedCountries,
           classicJobs: canJobs ? classicTotal : 0,

@@ -32,15 +32,12 @@ npx prisma generate
 # 1.3 Clean macOS resource forks from .next
 find .next -name '._*' -type f -delete
 
-# 1.4 Set schema to PostgreSQL provider for production
-sed -i '' 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
-
-# 1.5 Verify schema is correct
+# 1.4 Verify the canonical schema is PostgreSQL
 grep 'provider' prisma/schema.prisma | head -1
 # Expected: provider = "postgresql"
 ```
 
-**Checkpoint**: Build must succeed, schema must show `postgresql`.
+**Checkpoint**: Build must succeed and the canonical schema must already show `postgresql`; do not rewrite the provider during deployment.
 
 ---
 
@@ -271,9 +268,6 @@ If any of these occur, initiate rollback (Step 7):
 ## Post-Deployment Cleanup
 
 ```bash
-# Revert local schema to SQLite for development
-sed -i '' 's/provider = "postgresql"/provider = "sqlite"/' prisma/schema.prisma
-
 # Clean up local tarball
 rm /tmp/maintainex-build.tar.gz
 

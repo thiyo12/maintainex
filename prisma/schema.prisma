@@ -1858,6 +1858,8 @@ model SubscriptionPlan {
   id          String   @id @default(cuid())
   name        String
   price       Float
+  currency    String   @default("LKR")
+  countryCode String   @default("LK")
   description String?
   features    String
   isActive    Boolean  @default(true)
@@ -1865,20 +1867,25 @@ model SubscriptionPlan {
   updatedAt   DateTime @updatedAt
 
   subscriptions CompanySubscription[]
+
+  @@index([countryCode, isActive])
 }
 
 model CompanySubscription {
-  id        String           @id @default(cuid())
-  companyId String
-  company   CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  planId    String
-  plan      SubscriptionPlan @relation(fields: [planId], references: [id])
-  status    String           @default("ACTIVE") // ACTIVE, PAST_DUE, CANCELLED, EXPIRED
-  startDate DateTime         @default(now())
-  endDate   DateTime?
-  autoRenew Boolean          @default(false)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id               String           @id @default(cuid())
+  companyId        String
+  company          CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  planId           String
+  plan             SubscriptionPlan @relation(fields: [planId], references: [id])
+  status           String           @default("ACTIVE") // ACTIVE, PAST_DUE, CANCELLED, EXPIRED
+  startDate        DateTime         @default(now())
+  endDate          DateTime?
+  autoRenew        Boolean          @default(false)
+  priceSnapshot    Float?
+  currency         String           @default("LKR")
+  planNameSnapshot String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([companyId])
   @@index([planId])
@@ -2044,8 +2051,21 @@ model FlashOffer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  claims FlashOfferClaim[]
+
   @@index([isActive])
   @@index([expiresAt])
+}
+
+model FlashOfferClaim {
+  id           String     @id @default(cuid())
+  flashOfferId String
+  flashOffer   FlashOffer @relation(fields: [flashOfferId], references: [id], onDelete: Cascade)
+  userId       String
+  claimedAt    DateTime   @default(now())
+
+  @@unique([flashOfferId, userId])
+  @@index([userId, claimedAt])
 }
 
 // ============================================
@@ -2415,7 +2435,7 @@ model AdminUser {
   id                  String    @id @default(cuid())
   email               String    @unique
   passwordHash        String
-  role                String    @default("ADMIN")
+  role                String
   firstName           String
   lastName            String
   totpSecret          String?
@@ -2433,8 +2453,129 @@ model AdminUser {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
+  permissionOverrides AdminPermissionOverride[] @relation("AdminPermissionOverrideSubject")
+
   @@index([email])
   @@index([parentId])
+}
+
+model AdminPermissionOverride {
+  id          String   @id @default(cuid())
+  adminUserId String
+  adminUser   AdminUser @relation("AdminPermissionOverrideSubject", fields: [adminUserId], references: [id], onDelete: Cascade)
+  permission  String
+  effect      String   // ALLOW, DENY
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([adminUserId, permission])
+  @@index([adminUserId, effect])
+  @@index([permission, effect])
+}
+
+model CrmEmergencyControl {
+  id            String   @id @default(cuid())
+  controlKey    String
+  market        String   @default("GLOBAL")
+  active        Boolean  @default(true)
+  reason        String
+  activatedBy   String
+  activatedAt   DateTime @default(now())
+  expiresAt     DateTime?
+  deactivatedBy String?
+  deactivatedAt DateTime?
+  updatedAt     DateTime @updatedAt
+
+  @@unique([controlKey, market])
+  @@index([active, expiresAt])
+  @@index([market, active])
+}
+
+model CrmStepUpGrant {
+  id          String    @id @default(cuid())
+  adminUserId String
+  sessionId   String
+  actionId    String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([adminUserId, sessionId, actionId])
+  @@index([expiresAt])
+  @@index([usedAt])
+}
+
+model CrmApprovalRequest {
+  id                   String   @id @default(cuid())
+  actionId             String
+  status               String   @default("DRAFT")
+  initiatorAdminId     String
+  market               String
+  targetType           String
+  targetId             String
+  amountMinor          BigInt?
+  currency             String?
+  tier                 String
+  reversibility        String
+  reasonCode           String?
+  note                 String?
+  riskFlags            String   @default("[]")
+  actionPayload        String?
+  policyVersion        String
+  idempotencyKey       String?  @unique
+  requiredApprovers    String   @default("[]")
+  expiresAt            DateTime?
+  executionRef         String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  decisions CrmApprovalDecision[]
+  events    CrmApprovalEvent[]
+
+  @@index([status, createdAt])
+  @@index([actionId, status])
+  @@index([initiatorAdminId, createdAt])
+  @@index([market, status])
+  @@index([targetType, targetId])
+  @@index([expiresAt])
+}
+
+model CrmApprovalDecision {
+  id        String   @id @default(cuid())
+  requestId String
+  request   CrmApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  adminId   String
+  adminRole String
+  decision  String   // APPROVE, REJECT
+  reason    String?
+  decidedAt DateTime @default(now())
+
+  @@unique([requestId, adminId])
+  @@index([requestId, decidedAt])
+  @@index([adminId, decidedAt])
+}
+
+model CrmApprovalEvent {
+  id            String   @id @default(cuid())
+  requestId     String
+  request       CrmApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  eventType     String
+  actorAdminId  String?
+  actorRole     String?
+  permission    String?
+  market        String?
+  targetType    String?
+  targetId      String?
+  correlationId String?
+  metadata      String?
+  createdAt     DateTime @default(now())
+
+  @@index([requestId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([actorAdminId, createdAt])
+  @@index([targetType, targetId])
+  @@index([correlationId])
 }
 
 model AdminNotification {
@@ -3427,6 +3568,8 @@ model PaymentIntent {
   escrowId        String
   merchantOrderId String    @unique
   paymentId       String?
+  gateway         String    @default("PAYPAL") // PAYPAL for new payments; PAYHERE retained for legacy transactions
+  refundId        String?
   amount          BigInt
   currency        String    @default("LKR")
   status          String    @default("CREATED") // CREATED, PENDING, SUCCESS, FAILED, CANCELLED, EXPIRED, REFUND_REQUIRED, REFUND_PROCESSING, REFUNDED, CHARGEDBACK
@@ -3438,5 +3581,6 @@ model PaymentIntent {
   @@index([jobId])
   @@index([customerId])
   @@index([status])
+  @@index([gateway, status])
   @@index([merchantOrderId])
 }

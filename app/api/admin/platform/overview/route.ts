@@ -22,7 +22,7 @@ function parseSetting(value: string, type: string) {
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'settings:view',
+      permission: 'platform:settings:view',
       level: 'read',
       requireCountryScope: true,
     })

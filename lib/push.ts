@@ -1,9 +1,13 @@
 import { prisma } from './prisma'
+import { getPlatformRuntimeConfig } from './runtime/platform-runtime'
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 
 export async function sendExpoPush(to: string, title: string, body: string, data: Record<string, unknown>): Promise<void> {
   try {
+    const runtime = await getPlatformRuntimeConfig()
+    if (!runtime.notifications.enabled) return
+
     const res = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

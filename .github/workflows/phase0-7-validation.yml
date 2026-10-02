@@ -1,4 +1,4 @@
-name: Phase 0-9 Validation
+name: CRM V2 Release Validation
 
 on:
   workflow_dispatch:
@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - feature/crm-job360
+      - feature/crm-v2-rebuild
       - phase0-7-integration-fix
       - phase8-country-engine
       - phase9-production-readiness
@@ -154,7 +155,16 @@ jobs:
           psql "$DATABASE_URL" -c "\di *countryCode*"
 
       - name: TypeScript
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit 2>&1 | tee /tmp/tsc.txt
+
+      - name: Upload TypeScript diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-diagnostics
+          path: /tmp/tsc.txt
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: Mobile TypeScript
         run: |
@@ -162,7 +172,7 @@ jobs:
           npx tsc --noEmit
 
       - name: Schema integrity tests
-        run: npx vitest run tests/structural/schema-integrity.test.ts tests/structural/migration-validation.test.ts --reporter=verbose 2>&1 | tee /tmp/schema-tests.txt
+        run: npx vitest run tests/structural/schema-integrity.test.ts tests/structural/migration-validation.test.ts tests/structural/crm-legacy-role-retirement.test.ts tests/structural/crm-app-web-v2.test.ts tests/structural/crm-legacy-customer-api-retirement.test.ts tests/structural/crm-v2-shell-permissions.test.ts tests/structural/crm-v2-visual-contract.test.ts tests/structural/crm-v2-migrated-page-contract.test.ts tests/structural/crm-v2-shell.test.ts tests/structural/crm-phase14-v2.test.ts tests/structural/crm-phase15-legacy-demolition.test.ts --reporter=verbose 2>&1 | tee /tmp/schema-tests.txt
         if: always()
 
       - name: Upload schema test diagnostics
@@ -205,7 +215,7 @@ jobs:
         if: always()
 
       - name: Phase 9 security tests
-        run: npx vitest run tests/security/crm-three-layer-security.test.ts tests/security/admin-session-token-lifecycle.test.ts tests/security/marketplace-lifecycle-bypass-regression.test.ts tests/security/legacy-marketplace-route-security.test.ts tests/security/payment-public-origin.test.ts --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
+        run: npx vitest run tests/security/phase11-offer-redemption.test.ts tests/security/crm-subscriptions-v2.test.ts tests/security/real-estate-public-privacy.test.ts tests/security/crm-real-estate-v2.test.ts tests/security/crm-three-layer-security.test.ts tests/security/crm-market-config-v2.test.ts tests/security/crm-catalog-v2.test.ts tests/security/crm-promotions-v2.test.ts tests/security/crm-settings-registry-v2.test.ts tests/security/crm-profession-taxonomy-v2.test.ts tests/security/crm-locations-v2.test.ts tests/security/mobile-taxonomy-source-v2.test.ts tests/security/crm-governance-policy.test.ts tests/security/crm-refund-approval-boundary.test.ts tests/security/crm-payment-escrow-control-boundary.test.ts tests/security/crm-financial-ledger-boundary.test.ts tests/security/crm-commission-control-boundary.test.ts tests/security/crm-approval-engine.test.ts tests/security/crm-approval-service.test.ts tests/security/crm-step-up-proof.test.ts tests/security/crm-permission-overrides.test.ts tests/security/crm-permission-catalog.test.ts tests/security/crm-staff-session-invalidation.test.ts tests/security/crm-staff-sessions-v2.test.ts tests/security/crm-staff-role-session-hardening.test.ts tests/security/crm-staff-step-up-enforcement.test.ts tests/security/crm-global-search-scope.test.ts tests/security/crm-platform-runtime-v2.test.ts tests/security/admin-staff-password-hashing.test.ts tests/security/admin-login-identity-boundary.test.ts tests/security/admin-session-token-lifecycle.test.ts tests/security/admin-totp-verification.test.ts tests/security/crm-kyc-privacy-boundary.test.ts tests/security/marketplace-lifecycle-bypass-regression.test.ts tests/security/legacy-marketplace-route-security.test.ts tests/security/payment-public-origin.test.ts --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
         if: always()
 
       - name: Upload Phase 9 security test diagnostics
@@ -234,7 +244,8 @@ jobs:
           tests/finance/payments/cancellation-payment-postgres.test.ts
           tests/finance/payments/payment-intent-concurrency-postgres.test.ts
           tests/finance/payments/payhere-refund-concurrency-contract.test.ts
-          tests/finance/commission-currency-isolation.test.ts
+          tests/finance/payouts/payout-engine.test.ts
+          tests/finance/commission-currency-isolation.test.ts tests/finance/commission-governance.test.ts tests/finance/commission-settlement-actions.test.ts tests/finance/settlement-history-v2.test.ts
           tests/quotes/change-order.test.ts
           --reporter=verbose 2>&1 | tee /tmp/financial-flow-tests.txt
         if: always()
@@ -261,6 +272,32 @@ jobs:
           path: /tmp/regression-tests.txt
           if-no-files-found: ignore
           retention-days: 3
+
+      - name: Immutable deploy script safety
+        shell: bash
+        run: |
+          bash -n deploy-rsync.sh
+          bash -n backup.sh
+          bash -n scripts/crm-v2-production-preflight.sh
+          grep -q 'CONFIRM_DB_CREDENTIAL_ROTATED' scripts/crm-v2-production-preflight.sh
+          grep -q 'process.env.DATABASE_URL' scripts/crm-v2-production-preflight.sh
+          grep -q 'current_database()' scripts/crm-v2-production-preflight.sh
+          grep -q 'BACKUP_TABLES' scripts/crm-v2-production-preflight.sh
+          grep -q 'gzip -t' scripts/crm-v2-production-preflight.sh
+          grep -q 'required environment names' scripts/crm-v2-production-preflight.sh
+          grep -q 'process.env.DATABASE_URL' deploy-rsync.sh
+          grep -q 'BACKUP_TABLES' deploy-rsync.sh
+          grep -q 'process.env.DATABASE_URL' backup.sh
+          ! grep -q 'pg_dump -U postgres -d postgres' scripts/crm-v2-production-preflight.sh
+          ! grep -q 'pg_dump -U postgres -d postgres' deploy-rsync.sh
+          ! grep -q 'pg_dump -U postgres -d postgres' backup.sh
+          grep -q 'docker build' deploy-rsync.sh
+          grep -q 'pg_dump' deploy-rsync.sh
+          grep -q 'gzip -t' deploy-rsync.sh
+          grep -q 'PREVIOUS_IMAGE' deploy-rsync.sh
+          grep -q 'docker service update --force --image' deploy-rsync.sh
+          ! grep -q 'sed -i.*provider' deploy-rsync.sh
+          ! grep -q 'docker cp.*CONTAINER:/app' deploy-rsync.sh
 
       - name: Production build
         env:

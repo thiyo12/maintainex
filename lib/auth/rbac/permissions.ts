@@ -27,6 +27,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'queue:view', 'queue:manage', 'queue:assign',
     'analytics:view',
     'admins:view', 'admins:create', 'admins:edit', 'admins:delete',
+    'staff:view',
     'settings:view', 'settings:edit',
     'security:view', 'security:audit',
     'trust:view',
@@ -37,6 +38,8 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'pricing_config:read', 'pricing_config:write',
     'market_config:read', 'market_config:write',
     'audit:read',
+    'subscriptions:view', 'subscriptions:manage',
+    'realestate:view', 'realestate:manage',
   ],
   MANAGER: [
     'dashboard:view',
@@ -48,12 +51,16 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'cheating:view', 'cheating:action',
     'queue:view', 'queue:manage', 'queue:assign',
     'analytics:view',
+    'staff:view',
     'wishlist:view', 'wishlist:manage',
     'professions:read', 'professions:write',
     'credentials:read', 'credentials:write',
     'risk_events:read', 'risk_events:resolve',
     'trust:view',
     'audit:read',
+    'subscriptions:view',
+    'realestate:view', 'realestate:manage',
+    'health:view',
   ],
   FINANCE: [
     'dashboard:view',
@@ -67,6 +74,9 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'pricing_config:read', 'pricing_config:write',
     'market_config:read', 'market_config:write',
     'audit:read',
+    'subscriptions:view',
+    'realestate:view',
+    'health:view',
   ],
   USER_MANAGEMENT: [
     'dashboard:view',
@@ -81,6 +91,8 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'risk_events:read', 'risk_events:resolve',
     'trust:view',
     'audit:read',
+    'realestate:view',
+    'health:view',
   ],
   SUPPORT: [
     'dashboard:view',
@@ -95,6 +107,8 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'risk_events:read',
     'trust:view',
     'audit:read',
+    'realestate:view',
+    'health:view',
   ],
   TECHNICAL: [
     'dashboard:view',
@@ -103,5 +117,6 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'queue:view',
     'analytics:view',
     'audit:read',
+    'health:view',
   ],
 }

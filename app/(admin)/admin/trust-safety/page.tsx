@@ -1,17 +1,25 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
   FiAlertTriangle,
   FiArrowUpRight,
-  FiFileText,
   FiFlag,
   FiRefreshCw,
   FiShield,
   FiUserCheck,
 } from 'react-icons/fi'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmCard,
+  CrmMetricCard,
+  CrmPageHeader,
+  CrmState,
+  type CrmTone,
+} from '@/components/crm/v2/CrmPrimitives'
 
 interface Payload {
   permissions: {
@@ -40,15 +48,30 @@ interface Payload {
 
 function date(value?: string | null) {
   if (!value) return '—'
-  return new Date(value).toLocaleString('en-LK', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(value).toLocaleString('en-LK', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
 }
 
-function badge(value?: string) {
-  const v = String(value || '').toUpperCase()
-  if (['HIGH', 'CRITICAL', 'OPEN', 'REJECTED', 'CONFIRMED'].includes(v)) return 'bg-red-50 text-red-700 border-red-200'
-  if (['PENDING', 'UNDER_REVIEW', 'MEDIUM'].includes(v)) return 'bg-amber-50 text-amber-700 border-amber-200'
-  if (['APPROVED', 'RESOLVED', 'DISMISSED', 'LOW'].includes(v)) return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  return 'bg-slate-50 text-slate-600 border-slate-200'
+function statusTone(value?: string): CrmTone {
+  const status = String(value || '').toUpperCase()
+  if (['HIGH', 'CRITICAL', 'OPEN', 'REJECTED', 'CONFIRMED'].includes(status)) return 'danger'
+  if (['PENDING', 'UNDER_REVIEW', 'MEDIUM'].includes(status)) return 'warning'
+  if (['APPROVED', 'RESOLVED', 'DISMISSED', 'LOW'].includes(status)) return 'success'
+  return 'neutral'
+}
+
+function Status({ value }: { value: string }) {
+  return (
+    <CrmBadge tone={statusTone(value)} dot>
+      {String(value).replaceAll('_', ' ')}
+    </CrmBadge>
+  )
+}
+
+function Empty({ text }: { text: string }) {
+  return <div className="py-8 text-center text-xs text-slate-400">{text}</div>
 }
 
 export default function TrustSafetyControlCentrePage() {
@@ -67,6 +90,7 @@ export default function TrustSafetyControlCentrePage() {
       setData(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load trust & safety')
+      setData(null)
     } finally {
       setLoading(false)
     }
@@ -76,171 +100,255 @@ export default function TrustSafetyControlCentrePage() {
     load()
   }, [load])
 
+  const urgent = useMemo(() => {
+    if (!data) return 0
+    return (
+      data.metrics.highRisk +
+      data.metrics.openDisputes +
+      data.metrics.pendingCheating +
+      data.metrics.suspiciousLogins
+    )
+  }, [data])
+
   if (loading) {
     return (
-      <div className="space-y-5 animate-pulse">
-        <div className="h-24 rounded-2xl bg-white border border-slate-200" />
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {[0,1,2,3].map(item => <div key={item} className="h-28 rounded-2xl bg-white border border-slate-200" />)}
-        </div>
-        <div className="h-[500px] rounded-2xl bg-white border border-slate-200" />
-      </div>
+      <CrmState
+        type="loading"
+        title="Loading Trust & Safety"
+        description="Loading KYC, disputes, marketplace risk and account-security signals."
+      />
     )
   }
 
-  if (!data) return null
+  if (!data) {
+    return (
+      <CrmState
+        type="error"
+        title="Trust & Safety unavailable"
+        description="The control centre could not be loaded for this staff session."
+        action={
+          <CrmButton variant="secondary" onClick={load}>
+            <FiRefreshCw size={14} />
+            Retry
+          </CrmButton>
+        }
+      />
+    )
+  }
 
-  const urgent =
-    data.metrics.highRisk +
-    data.metrics.openDisputes +
-    data.metrics.pendingCheating +
-    data.metrics.suspiciousLogins
+  const quickLinks = [
+    data.permissions.kyc && { href: '/admin/kyc', icon: FiUserCheck, label: 'KYC queue' },
+    data.permissions.disputes && { href: '/admin/jobs/disputes', icon: FiFlag, label: 'Dispute queue' },
+    data.permissions.risk && { href: '/admin/trust-safety/risk-events', icon: FiShield, label: 'Risk events' },
+    data.permissions.cheating && { href: '/admin/cheating', icon: FiAlertTriangle, label: 'Off-platform reports' },
+    data.permissions.security && { href: '/admin/analytics/security-monitor', icon: FiShield, label: 'Security monitor' },
+  ].filter(Boolean) as Array<{ href: string; icon: any; label: string }>
 
   return (
     <div className="space-y-5">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-[0.16em] text-amber-600 font-semibold">Marketplace protection</div>
-          <h1 className="mt-1 text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">Trust & Safety Control Centre</h1>
-          <p className="mt-1.5 text-sm text-slate-500">KYC, disputes, risk, off-platform behavior and account security in one operator workspace.</p>
-        </div>
-        <button type="button" onClick={load} className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50">
-          <FiRefreshCw size={15} /> Refresh
-        </button>
+      <CrmPageHeader
+        eyebrow="Marketplace protection"
+        title="Trust & Safety"
+        description="KYC, disputes, fraud signals, off-platform behavior and account security in one operator workspace."
+        actions={
+          <CrmButton variant="secondary" onClick={load}>
+            <FiRefreshCw size={14} />
+            Refresh
+          </CrmButton>
+        }
+        context={
+          <>
+            <CrmBadge tone={urgent > 0 ? 'danger' : 'success'} dot>
+              {urgent > 0 ? `${urgent} urgent signal${urgent === 1 ? '' : 's'}` : 'No urgent signals'}
+            </CrmBadge>
+            <CrmBadge tone="info">Market scoped</CrmBadge>
+          </>
+        }
+      />
+
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <CrmMetricCard
+          label="Urgent signals"
+          value={urgent.toLocaleString()}
+          helper="Risk, disputes, cheating, suspicious logins"
+          icon={<FiAlertTriangle size={16} />}
+          tone={urgent > 0 ? 'danger' : 'success'}
+        />
+        <CrmMetricCard
+          label="Pending KYC"
+          value={data.metrics.pendingKyc.toLocaleString()}
+          helper={`${data.metrics.rejectedKyc} rejected documents`}
+          icon={<FiUserCheck size={16} />}
+          tone="warning"
+        />
+        <CrmMetricCard
+          label="Open disputes"
+          value={data.metrics.openDisputes.toLocaleString()}
+          helper="Open / under review"
+          icon={<FiFlag size={16} />}
+          tone={data.metrics.openDisputes > 0 ? 'danger' : 'success'}
+        />
+        <CrmMetricCard
+          label="Pending risk events"
+          value={data.metrics.pendingRisk.toLocaleString()}
+          helper={`${data.metrics.highRisk} high or critical`}
+          icon={<FiShield size={16} />}
+          tone={data.metrics.highRisk > 0 ? 'danger' : 'info'}
+        />
       </section>
 
-      <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <Metric icon={FiAlertTriangle} label="Urgent signals" value={urgent} detail="High risk, disputes, cheating, suspicious logins" danger={urgent > 0} />
-        <Metric icon={FiUserCheck} label="Pending KYC" value={data.metrics.pendingKyc} detail={`${data.metrics.rejectedKyc} rejected documents`} />
-        <Metric icon={FiFlag} label="Open disputes" value={data.metrics.openDisputes} detail="Open / under review" />
-        <Metric icon={FiShield} label="Pending risk events" value={data.metrics.pendingRisk} detail={`${data.metrics.highRisk} high or critical`} danger={data.metrics.highRisk > 0} />
-      </section>
-
-      <section className="grid md:grid-cols-2 xl:grid-cols-5 gap-3">
-        {data.permissions.kyc && <Quick href="/admin/kyc" icon={FiUserCheck} label="KYC queue" />}
-        {data.permissions.disputes && <Quick href="/admin/jobs/disputes" icon={FiFlag} label="Dispute queue" />}
-        {data.permissions.risk && <Quick href="/admin/trust-safety/risk-events" icon={FiShield} label="Risk events" />}
-        {data.permissions.cheating && <Quick href="/admin/cheating" icon={FiAlertTriangle} label="Off-platform reports" />}
-        {data.permissions.security && <Quick href="/admin/analytics/security-monitor" icon={FiShield} label="Security monitor" />}
-      </section>
-
-      <section className="grid xl:grid-cols-2 gap-5">
-        {data.permissions.risk && (
-          <Panel title="Recent marketplace risk" subtitle="Anti-bypass and abnormal-behavior signals">
-            {data.recent.risk.length ? data.recent.risk.map(item => (
-              <Link key={item.id} href={item.job?.id ? `/admin/jobs/${item.job.id}` : '/admin/trust-safety/risk-events'} className="mb-2 last:mb-0 flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-3 hover:bg-slate-50">
-                <div>
-                  <div className="text-sm font-medium text-slate-800">{item.eventType.replaceAll('_', ' ')}</div>
-                  <div className="text-xs text-slate-400 mt-1">{item.job?.title || 'No job link'} · {date(item.createdAt)}</div>
+      {quickLinks.length > 0 && (
+        <CrmCard
+          title="Operator queues"
+          description="Open a queue permitted by your current staff role and market scope."
+          padding="md"
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {quickLinks.map(item => (
+              <Link key={item.href} href={item.href} className="group">
+                <div className="crm-subtle-card flex h-full items-center justify-between gap-3 p-3 transition-colors group-hover:bg-white group-hover:border-[var(--crm-border-strong)]">
+                  <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-700">
+                    <item.icon size={15} className="shrink-0 text-slate-400" />
+                    <span className="truncate">{item.label}</span>
+                  </span>
+                  <FiArrowUpRight size={13} className="shrink-0 text-slate-300 group-hover:text-slate-700" />
                 </div>
-                <Status value={item.severity} />
               </Link>
-            )) : <Empty text="No risk events are available in this market." />}
-          </Panel>
+            ))}
+          </div>
+        </CrmCard>
+      )}
+
+      <section className="grid gap-5 xl:grid-cols-2">
+        {data.permissions.risk && (
+          <CrmCard title="Recent marketplace risk" description="Anti-bypass and abnormal-behavior signals" padding="none">
+            {data.recent.risk.length ? (
+              <div className="divide-y divide-[var(--crm-border)]">
+                {data.recent.risk.map(item => (
+                  <Link
+                    key={item.id}
+                    href={item.job?.id ? `/admin/jobs/${item.job.id}` : '/admin/trust-safety/risk-events'}
+                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-[#fafbf9]"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-slate-800">
+                        {String(item.eventType || 'Risk event').replaceAll('_', ' ')}
+                      </div>
+                      <div className="mt-1 truncate text-xs text-slate-400">
+                        {item.job?.title || 'No job link'} · {date(item.createdAt)}
+                      </div>
+                    </div>
+                    <Status value={item.severity} />
+                  </Link>
+                ))}
+              </div>
+            ) : <Empty text="No risk events are available in this market." />}
+          </CrmCard>
         )}
 
         {data.permissions.disputes && (
-          <Panel title="Recent disputes" subtitle="Customer/provider dispute workload">
-            {data.recent.disputes.length ? data.recent.disputes.map(item => (
-              <Link key={item.id} href={item.job?.id ? `/admin/jobs/${item.job.id}` : '/admin/jobs/disputes'} className="mb-2 last:mb-0 flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-3 hover:bg-slate-50">
-                <div>
-                  <div className="text-sm font-medium text-slate-800">{item.reason}</div>
-                  <div className="text-xs text-slate-400 mt-1">{item.raisedBy?.name || 'User'} · {date(item.createdAt)}</div>
-                </div>
-                <Status value={item.status} />
-              </Link>
-            )) : <Empty text="No disputes are available in this market." />}
-          </Panel>
+          <CrmCard title="Recent disputes" description="Customer and provider dispute workload" padding="none">
+            {data.recent.disputes.length ? (
+              <div className="divide-y divide-[var(--crm-border)]">
+                {data.recent.disputes.map(item => (
+                  <Link
+                    key={item.id}
+                    href={item.job?.id ? `/admin/jobs/${item.job.id}` : '/admin/jobs/disputes'}
+                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-[#fafbf9]"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-slate-800">{item.reason}</div>
+                      <div className="mt-1 truncate text-xs text-slate-400">
+                        {item.raisedBy?.name || 'User'} · {date(item.createdAt)}
+                      </div>
+                    </div>
+                    <Status value={item.status} />
+                  </Link>
+                ))}
+              </div>
+            ) : <Empty text="No disputes are available in this market." />}
+          </CrmCard>
         )}
 
         {data.permissions.cheating && (
-          <Panel title="Off-platform reports" subtitle="Cheating / bypass reports">
-            {data.recent.cheating.length ? data.recent.cheating.map(item => (
-              <Link key={item.id} href="/admin/cheating" className="mb-2 last:mb-0 flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-3 hover:bg-slate-50">
-                <div>
-                  <div className="text-sm font-medium text-slate-800">{item.againstUserType} report</div>
-                  <div className="text-xs text-slate-400 mt-1">{item.evidence.slice(0, 80)}{item.evidence.length > 80 ? '…' : ''}</div>
-                </div>
-                <Status value={item.status} />
-              </Link>
-            )) : <Empty text="No off-platform reports are available." />}
-          </Panel>
+          <CrmCard title="Off-platform reports" description="Marketplace bypass and cheating reports" padding="none">
+            {data.recent.cheating.length ? (
+              <div className="divide-y divide-[var(--crm-border)]">
+                {data.recent.cheating.map(item => (
+                  <Link
+                    key={item.id}
+                    href="/admin/cheating"
+                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-[#fafbf9]"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-800">{item.againstUserType} report</div>
+                      <div className="mt-1 truncate text-xs text-slate-400">
+                        {String(item.evidence || '').slice(0, 90)}
+                        {String(item.evidence || '').length > 90 ? '…' : ''}
+                      </div>
+                    </div>
+                    <Status value={item.status} />
+                  </Link>
+                ))}
+              </div>
+            ) : <Empty text="No off-platform reports are available." />}
+          </CrmCard>
         )}
 
         {data.permissions.kyc && (
-          <Panel title="Recent KYC" subtitle="Latest identity document submissions">
-            {data.recent.kyc.length ? data.recent.kyc.map(item => (
-              <Link key={item.id} href={`/admin/users/${item.userId}`} className="mb-2 last:mb-0 flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-3 hover:bg-slate-50">
-                <div>
-                  <div className="text-sm font-medium text-slate-800">{item.user?.name || item.fullName || 'User'}</div>
-                  <div className="text-xs text-slate-400 mt-1">{item.docType} · {item.side} · {date(item.createdAt)}</div>
-                </div>
-                <Status value={item.status} />
-              </Link>
-            )) : <Empty text="No identity-document activity is available." />}
-          </Panel>
+          <CrmCard title="Recent KYC" description="Latest identity document submissions" padding="none">
+            {data.recent.kyc.length ? (
+              <div className="divide-y divide-[var(--crm-border)]">
+                {data.recent.kyc.map(item => (
+                  <Link
+                    key={item.id}
+                    href={`/admin/users/${item.userId}`}
+                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-[#fafbf9]"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-slate-800">
+                        {item.user?.name || item.fullName || 'User'}
+                      </div>
+                      <div className="mt-1 truncate text-xs text-slate-400">
+                        {item.docType} · {item.side} · {date(item.createdAt)}
+                      </div>
+                    </div>
+                    <Status value={item.status} />
+                  </Link>
+                ))}
+              </div>
+            ) : <Empty text="No identity-document activity is available." />}
+          </CrmCard>
         )}
       </section>
 
       {data.permissions.security && (
-        <section className="rounded-2xl border border-slate-200 bg-[#10151d] text-white p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-[0.14em] text-amber-300 font-semibold">Security posture</div>
-              <h2 className="mt-1 text-lg font-semibold">Suspicious logins in last 24 hours</h2>
-              <p className="mt-1 text-sm text-slate-400">Credential and device monitoring remains available in the dedicated security monitor.</p>
+        <CrmCard
+          title="Security posture"
+          description="Credential and device monitoring for suspicious access behavior."
+          action={<CrmBadge tone={data.metrics.suspiciousLogins > 0 ? 'danger' : 'success'} dot>{data.metrics.suspiciousLogins} suspicious / 24h</CrmBadge>}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#17191b] text-[var(--crm-accent)]">
+                <FiShield size={18} />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Admin security monitor</div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Review failed logins, security events and response actions.
+                </p>
+              </div>
             </div>
-            <div className="text-3xl font-semibold text-amber-300">{data.metrics.suspiciousLogins}</div>
+            <Link href="/admin/analytics/security-monitor">
+              <CrmButton variant="secondary">
+                Open monitor
+                <FiArrowUpRight size={13} />
+              </CrmButton>
+            </Link>
           </div>
-          <Link href="/admin/analytics/security-monitor" className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-amber-300">
-            Open security monitor <FiArrowUpRight size={14} />
-          </Link>
-        </section>
+        </CrmCard>
       )}
     </div>
   )
-}
-
-function Metric({ icon: Icon, label, value, detail, danger = false }: { icon: any; label: string; value: number; detail: string; danger?: boolean }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs text-slate-400">{label}</div>
-          <div className={`mt-2 text-2xl font-semibold ${danger ? 'text-red-700' : 'text-slate-950'}`}>{value.toLocaleString()}</div>
-          <div className="mt-1 text-[11px] text-slate-400">{detail}</div>
-        </div>
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${danger ? 'bg-red-50 text-red-600' : 'bg-slate-950 text-amber-300'}`}>
-          <Icon size={16} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Quick({ href, icon: Icon, label }: { href: string; icon: any; label: string }) {
-  return (
-    <Link href={href} className="rounded-xl border border-slate-200 bg-white px-3 py-3 flex items-center justify-between gap-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
-      <span className="flex items-center gap-2"><Icon size={15} className="text-slate-400" />{label}</span>
-      <FiArrowUpRight size={13} className="text-slate-400" />
-    </Link>
-  )
-}
-
-function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5">
-      <h2 className="font-semibold text-slate-900">{title}</h2>
-      <p className="text-xs text-slate-400 mt-1 mb-4">{subtitle}</p>
-      {children}
-    </section>
-  )
-}
-
-function Status({ value }: { value: string }) {
-  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge(value)}`}>{String(value).replaceAll('_', ' ')}</span>
-}
-
-function Empty({ text }: { text: string }) {
-  return <div className="py-6 text-center text-sm text-slate-400">{text}</div>
 }

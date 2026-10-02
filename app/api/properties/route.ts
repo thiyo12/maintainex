@@ -1,53 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
+import {
+  PUBLIC_REAL_ESTATE_STATUSES,
+  isSafePropertyMediaRef,
+  readPropertyMediaRefs,
+  sanitizePropertyMediaRefs,
+  toPublicListingDto,
+} from '@/lib/real-estate/visibility'
+
+const PROPERTY_TYPES = new Set(['house', 'apartment', 'commercial', 'land', 'rental'])
+const PURPOSES = new Set(['sale', 'rent', 'commercial', 'land'])
+const SORTS = new Set(['newest', 'price_asc', 'price_desc', 'most_viewed'])
+
+function finiteNumber(value: string | null): number | null {
+  if (value === null || value.trim() === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const country = searchParams.get('country') || searchParams.get('countryCode')
-    const district = searchParams.get('district')
-    const city = searchParams.get('city')
+    const district = searchParams.get('district')?.trim().slice(0, 120)
+    const city = searchParams.get('city')?.trim().slice(0, 120)
     const propertyType = searchParams.get('propertyType')
     const purpose = searchParams.get('purpose')
-    const status = searchParams.get('status') || 'approved'
-    const minPrice = searchParams.get('minPrice')
-    const maxPrice = searchParams.get('maxPrice')
-    const bedrooms = searchParams.get('bedrooms')
+    const minPrice = finiteNumber(searchParams.get('minPrice'))
+    const maxPrice = finiteNumber(searchParams.get('maxPrice'))
+    const bedrooms = finiteNumber(searchParams.get('bedrooms'))
     const isFurnished = searchParams.get('isFurnished')
-    const sortBy = searchParams.get('sortBy') || 'newest'
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const requestedSort = searchParams.get('sortBy') || 'newest'
+    const sortBy = SORTS.has(requestedSort) ? requestedSort : 'newest'
+    const requestedPage = Number.parseInt(searchParams.get('page') || '1', 10)
+    const requestedLimit = Number.parseInt(searchParams.get('limit') || '20', 10)
+    const page = Number.isFinite(requestedPage) ? Math.max(1, requestedPage) : 1
+    const limit = Number.isFinite(requestedLimit) ? Math.min(50, Math.max(1, requestedLimit)) : 20
     const myOnly = searchParams.get('myOnly') === 'true'
-    const search = searchParams.get('q')
+    const requestedStatus = searchParams.get('status')
+    const search = searchParams.get('q')?.trim().slice(0, 120)
 
     const where: any = {}
+    let includePrivateFields = false
 
-    // If myOnly, require auth
     if (myOnly) {
       const session = await getSession(request)
       if (!session) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
       where.postedBy = session.id
-      // Show all statuses for my listings
+      includePrivateFields = true
+      if (requestedStatus && ['draft', 'pending', 'approved', 'rejected', 'published'].includes(requestedStatus)) {
+        where.status = requestedStatus
+      }
     } else {
-      where.status = status
+      // Public discovery never accepts a caller-selected moderation state.
+      where.status = { in: [...PUBLIC_REAL_ESTATE_STATUSES] }
     }
 
-    if (country) where.countryCode = country
+    if (country && /^[A-Za-z]{2}$/.test(country)) where.countryCode = country.toUpperCase()
     if (district) where.district = { contains: district }
     if (city) where.city = { contains: city }
-    if (propertyType) where.propertyType = propertyType
-    if (purpose) where.purpose = purpose
+    if (propertyType && PROPERTY_TYPES.has(propertyType)) where.propertyType = propertyType
+    if (purpose && PURPOSES.has(purpose)) where.purpose = purpose
 
-    if (minPrice || maxPrice) {
+    if (minPrice !== null || maxPrice !== null) {
       where.priceLkr = {}
-      if (minPrice) where.priceLkr.gte = parseFloat(minPrice)
-      if (maxPrice) where.priceLkr.lte = parseFloat(maxPrice)
+      if (minPrice !== null && minPrice >= 0) where.priceLkr.gte = minPrice
+      if (maxPrice !== null && maxPrice >= 0) where.priceLkr.lte = maxPrice
     }
 
-    if (bedrooms) where.bedrooms = { gte: parseInt(bedrooms) }
+    if (bedrooms !== null && bedrooms >= 0) where.bedrooms = { gte: Math.floor(bedrooms) }
     if (isFurnished === 'true') where.isFurnished = true
 
     if (search) {
@@ -60,7 +84,6 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    // Sort
     let orderBy: any = { createdAt: 'desc' }
     if (sortBy === 'price_asc') orderBy = { priceLkr: 'asc' }
     else if (sortBy === 'price_desc') orderBy = { priceLkr: 'desc' }
@@ -82,19 +105,22 @@ export async function GET(request: NextRequest) {
       prisma.realEstateListing.count({ where }),
     ])
 
-    const parsed = listings.map(l => ({
-      ...l,
-      photos: l.photos ? JSON.parse(l.photos) : [],
-      amenities: l.amenities ? JSON.parse(l.amenities) : [],
-      contactPhone: myOnly ? l.contactPhone : undefined,
-      contactName: myOnly ? l.contactName : undefined,
-    }))
+    const data = includePrivateFields
+      ? listings.map(listing => ({
+          ...listing,
+          photos: readPropertyMediaRefs(listing.photos),
+          amenities: listing.amenities ? JSON.parse(listing.amenities) : [],
+        }))
+      : listings.map(listing => toPublicListingDto(listing))
 
-    return NextResponse.json({
-      success: true,
-      data: parsed,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    })
+    return NextResponse.json(
+      {
+        success: true,
+        data,
+        meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error: any) {
     console.error('Error fetching properties:', error)
     return NextResponse.json({ error: error?.message || 'Failed to fetch properties' }, { status: 500 })
@@ -108,51 +134,86 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const {
-      title, description, propertyType, purpose, priceLkr, pricePer,
-      countryCode, district, city, area, address, latitude, longitude,
-      bedrooms, bathrooms, parking, areaSqft, propertySize, landSize,
-      yearBuilt, isFurnished, isNewProperty, photos, amenities, videoUrl,
-      contactPhone, contactName,
-    } = body
+    const body = await request.json().catch(() => ({}))
+    const title = typeof body?.title === 'string' ? body.title.trim().slice(0, 180) : ''
+    const description = typeof body?.description === 'string' ? body.description.trim().slice(0, 5000) : null
+    const propertyType = typeof body?.propertyType === 'string' ? body.propertyType : ''
+    const purpose = typeof body?.purpose === 'string' ? body.purpose : ''
+    const priceLkr = Number(body?.priceLkr)
+    const countryCode = typeof body?.countryCode === 'string' ? body.countryCode.toUpperCase() : 'LK'
 
-    if (!title || !priceLkr || !propertyType || !purpose) {
-      return NextResponse.json({ error: 'Title, price, property type, and purpose are required' }, { status: 400 })
+    if (
+      title.length < 2 ||
+      !PROPERTY_TYPES.has(propertyType) ||
+      !PURPOSES.has(purpose) ||
+      !Number.isFinite(priceLkr) ||
+      priceLkr <= 0 ||
+      !/^[A-Z]{2}$/.test(countryCode)
+    ) {
+      return NextResponse.json(
+        { error: 'Valid title, price, property type, purpose and country are required' },
+        { status: 400 }
+      )
     }
+
+    const safeString = (value: unknown, max: number) =>
+      typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : null
+    const safeInt = (value: unknown) => {
+      if (value === null || value === undefined || value === '') return null
+      const parsed = Number(value)
+      return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : null
+    }
+    const safeFloat = (value: unknown) => {
+      if (value === null || value === undefined || value === '') return null
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed : null
+    }
+    const rawPhotos = Array.isArray(body?.photos) ? body.photos : []
+    if (rawPhotos.some((item: unknown) => !isSafePropertyMediaRef(item))) {
+      return NextResponse.json({ error: 'Invalid property media reference' }, { status: 400 })
+    }
+    const photos = sanitizePropertyMediaRefs(rawPhotos, 10)
+    const rawVideoUrl = typeof body?.videoUrl === 'string' ? body.videoUrl.trim() : ''
+    if (rawVideoUrl && !isSafePropertyMediaRef(rawVideoUrl)) {
+      return NextResponse.json({ error: 'Invalid property video reference' }, { status: 400 })
+    }
+    const videoUrl = rawVideoUrl || null
+    const amenities = Array.isArray(body?.amenities)
+      ? body.amenities.filter((item: unknown): item is string => typeof item === 'string').map((item: string) => item.slice(0, 120)).slice(0, 50)
+      : []
 
     const listing = await prisma.realEstateListing.create({
       data: {
         postedBy: session.id,
         title,
-        description: description || null,
-        type: purpose, // legacy field
+        description,
+        type: purpose,
         propertyType,
         purpose,
-        priceLkr: parseFloat(priceLkr),
-        pricePer: pricePer || null,
-        countryCode: countryCode || 'LK',
-        district: district || null,
-        city: city || null,
-        area: area || null,
-        address: address || null,
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        bedrooms: bedrooms ? parseInt(bedrooms) : null,
-        bathrooms: bathrooms ? parseInt(bathrooms) : null,
-        parking: parking ? parseInt(parking) : null,
-        areaSqft: areaSqft ? parseInt(areaSqft) : null,
-        propertySize: propertySize ? parseInt(propertySize) : null,
-        landSize: landSize ? parseInt(landSize) : null,
-        yearBuilt: yearBuilt ? parseInt(yearBuilt) : null,
-        isFurnished: isFurnished || false,
-        isNewProperty: isNewProperty !== false,
-        photos: photos ? JSON.stringify(photos) : null,
-        amenities: amenities ? JSON.stringify(amenities) : null,
-        videoUrl: videoUrl || null,
-        contactPhone: contactPhone || null,
-        contactName: contactName || null,
-        status: 'pending', // Requires admin review
+        priceLkr,
+        pricePer: safeString(body?.pricePer, 40),
+        countryCode,
+        district: safeString(body?.district, 120),
+        city: safeString(body?.city, 120),
+        area: safeString(body?.area, 120),
+        address: safeString(body?.address, 300),
+        latitude: safeFloat(body?.latitude),
+        longitude: safeFloat(body?.longitude),
+        bedrooms: safeInt(body?.bedrooms),
+        bathrooms: safeInt(body?.bathrooms),
+        parking: safeInt(body?.parking),
+        areaSqft: safeInt(body?.areaSqft),
+        propertySize: safeInt(body?.propertySize),
+        landSize: safeInt(body?.landSize),
+        yearBuilt: safeInt(body?.yearBuilt),
+        isFurnished: body?.isFurnished === true,
+        isNewProperty: body?.isNewProperty !== false,
+        photos: photos.length ? JSON.stringify(photos) : null,
+        amenities: amenities.length ? JSON.stringify(amenities) : null,
+        videoUrl,
+        contactPhone: safeString(body?.contactPhone, 50),
+        contactName: safeString(body?.contactName, 120),
+        status: 'pending',
       },
     })
 

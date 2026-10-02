@@ -60,6 +60,8 @@ function superGuard() {
       isSuperAdmin: true,
       ipAddress: '127.0.0.1',
       userAgent: null,
+      sessionId: 'session-admin-1',
+      permissionOverrides: [],
     },
   }
 }

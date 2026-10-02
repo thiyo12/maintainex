@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
 import { bigIntToSafeNumber, type Currency, getCurrencyForCountry } from '@/lib/shared/money/money'
+import { isPayoutExecutionFrozen } from '@/lib/crm/emergency-controls'
 
 export type PayoutStatus =
   | 'REQUESTED'
@@ -38,6 +39,35 @@ function isUniqueConstraintViolation(error: any): boolean {
 
 function safeMajorAmount(amountCents: bigint): number {
   return bigIntToSafeNumber(amountCents) / 100
+}
+
+async function assertPayoutNotFrozenInTransaction(
+  tx: any,
+  market: string,
+  now = new Date()
+): Promise<void> {
+  const normalizedMarket = /^[A-Z]{2}$/.test(market.toUpperCase())
+    ? market.toUpperCase()
+    : 'GLOBAL'
+
+  const frozen = await tx.crmEmergencyControl.findFirst({
+    where: {
+      controlKey: 'PAYOUTS_FROZEN',
+      active: true,
+      market: {
+        in: normalizedMarket === 'GLOBAL'
+          ? ['GLOBAL']
+          : ['GLOBAL', normalizedMarket],
+      },
+      OR: [
+        { expiresAt: null },
+        { expiresAt: { gt: now } },
+      ],
+    },
+    select: { id: true },
+  })
+
+  if (frozen) throw new Error('PAYOUTS_FROZEN')
 }
 
 async function readCompletedIdempotency(idempotencyKey: string): Promise<{ payoutId: string; status: PayoutStatus; payloadHash?: string } | null> {
@@ -96,8 +126,18 @@ export async function requestPayout(
   const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { countryCode: true } })
   const payoutCountry = userRecord?.countryCode || (currency === 'CAD' ? 'CA' : 'LK')
 
+  if (await isPayoutExecutionFrozen(payoutCountry)) {
+    return {
+      ok: false,
+      error: 'Payout execution is temporarily frozen',
+      code: 'PAYOUTS_FROZEN',
+    }
+  }
+
   try {
     const payout = await prisma.$transaction(async (tx) => {
+      await assertPayoutNotFrozenInTransaction(tx, payoutCountry)
+      // PAYOUT_REQUEST_TRANSACTION_FREEZE_CHECK
       const locked = await tx.$queryRawUnsafe<Array<{ available: number }>>(
         `SELECT "availableBalance" as available
          FROM "WalletBalance"
@@ -164,6 +204,9 @@ export async function requestPayout(
     if (error?.message === 'BALANCE_NOT_FOUND') {
       return { ok: false, error: 'Canonical balance not found', code: 'BALANCE_NOT_FOUND' }
     }
+    if (error?.message === 'PAYOUTS_FROZEN') {
+      return { ok: false, error: 'Payout execution is temporarily frozen', code: 'PAYOUTS_FROZEN' }
+    }
     if (error?.message === 'IDEMPOTENCY_RACE' || isUniqueConstraintViolation(error)) {
       const raced = await readCompletedIdempotency(idempotencyKey)
       if (raced?.payloadHash === payloadHash) {
@@ -193,21 +236,51 @@ async function transitionPayout(
   }
 
   return prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string; currency: string }>>(
-        `SELECT id, "userId", amount::text, status, currency FROM "Payout" WHERE id = $1 FOR UPDATE`,
-        payoutId,
-      )
-    if (rows.length === 0) throw new Error('NOT_FOUND')
+    const rows = await tx.$queryRawUnsafe<Array<{
+      id: string
+      userId: string
+      amount: string
+      status: string
+      currency: string
+      countryCode: string
+    }>>(
+      `SELECT id, "userId", amount::text, status, currency, "countryCode"
+       FROM "Payout"
+       WHERE id = $1
+       FOR UPDATE`,
+      payoutId,
+    )
 
+    if (rows.length === 0) throw new Error('NOT_FOUND')
     const row = rows[0]
+
     if (row.status === targetStatus) {
-      return { payout: { id: row.id, userId: row.userId, amount: BigInt(row.amount), status: row.status }, changed: false }
+      return {
+        payout: {
+          id: row.id,
+          userId: row.userId,
+          amount: BigInt(row.amount),
+          status: row.status,
+        },
+        changed: false,
+      }
     }
+
+    // Break-glass freezes block progression toward external money movement,
+    // but FAILED/CANCELLED paths remain available to restore reserved funds.
+    if (targetStatus === 'PROCESSING') {
+      await assertPayoutNotFrozenInTransaction(tx, row.countryCode)
+    }
+
     if (!isValidTransition(row.status as PayoutStatus, targetStatus)) {
       throw new Error(`INVALID_TRANSITION:${row.status}->${targetStatus}`)
     }
 
-    await tx.payout.update({ where: { id: payoutId }, data: { status: targetStatus, ...extra } })
+    await tx.payout.update({
+      where: { id: payoutId },
+      data: { status: targetStatus, ...extra },
+    })
+
     await tx.idempotencyRecord.create({
       data: {
         idempotencyKey,
@@ -219,7 +292,15 @@ async function transitionPayout(
       },
     })
 
-    return { payout: { id: row.id, userId: row.userId, amount: BigInt(row.amount), status: targetStatus }, changed: true }
+    return {
+      payout: {
+        id: row.id,
+        userId: row.userId,
+        amount: BigInt(row.amount),
+        status: targetStatus,
+      },
+      changed: true,
+    }
   })
 }
 
@@ -228,6 +309,23 @@ export async function markProcessing(
   actorId: string,
   idempotencyKey: string
 ): Promise<PayoutResult> {
+  const completed = await readCompletedIdempotency(idempotencyKey)
+  if (completed) return { ok: true, payoutId, status: completed.status }
+
+  const payoutMeta = await prisma.payout.findUnique({
+    where: { id: payoutId },
+    select: { countryCode: true },
+  })
+  if (!payoutMeta) return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
+  if (await isPayoutExecutionFrozen(payoutMeta.countryCode)) {
+    return {
+      ok: false,
+      error: 'Payout execution is temporarily frozen',
+      code: 'PAYOUTS_FROZEN',
+    }
+  }
+
+  // PAYOUT_PROCESSING_FROZEN_CHECK
   try {
     const { payout } = await transitionPayout(
       payoutId,
@@ -239,6 +337,9 @@ export async function markProcessing(
     return { ok: true, payoutId, status: payout.status as PayoutStatus }
   } catch (error: any) {
     if (error?.message === 'NOT_FOUND') return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
+    if (error?.message === 'PAYOUTS_FROZEN') {
+      return { ok: false, error: 'Payout execution is temporarily frozen', code: 'PAYOUTS_FROZEN' }
+    }
     if (error?.message?.startsWith('INVALID_TRANSITION')) {
       return { ok: false, error: error.message, code: 'INVALID_TRANSITION' }
     }
@@ -255,15 +356,32 @@ export async function markSucceeded(
   const existing = await readCompletedIdempotency(idempotencyKey)
   if (existing) return { ok: true, payoutId, status: existing.status }
 
+  const payoutMeta = await prisma.payout.findUnique({
+    where: { id: payoutId },
+    select: { countryCode: true },
+  })
+  if (!payoutMeta) return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
+  if (await isPayoutExecutionFrozen(payoutMeta.countryCode)) {
+    return {
+      ok: false,
+      error: 'Payout execution is temporarily frozen',
+      code: 'PAYOUTS_FROZEN',
+    }
+  }
+
+  // PAYOUT_SUCCESS_FROZEN_CHECK
   try {
     await prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string; currency: string }>>(
-        `SELECT id, "userId", amount::text, status, currency FROM "Payout" WHERE id = $1 FOR UPDATE`,
+      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string; currency: string; countryCode: string }>>(
+        `SELECT id, "userId", amount::text, status, currency, "countryCode" FROM "Payout" WHERE id = $1 FOR UPDATE`,
         payoutId,
       )
       if (rows.length === 0) throw new Error('NOT_FOUND')
       const payout = rows[0]
       if (payout.status === 'SUCCEEDED') return
+
+      await assertPayoutNotFrozenInTransaction(tx, payout.countryCode)
+      // PAYOUT_SUCCESS_TRANSACTION_FREEZE_CHECK
       if (!isValidTransition(payout.status as PayoutStatus, 'SUCCEEDED')) {
         throw new Error(`INVALID_TRANSITION:${payout.status}->SUCCEEDED`)
       }
@@ -304,6 +422,9 @@ export async function markSucceeded(
     return { ok: true, payoutId, status: 'SUCCEEDED' }
   } catch (error: any) {
     if (error?.message === 'NOT_FOUND') return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
+    if (error?.message === 'PAYOUTS_FROZEN') {
+      return { ok: false, error: 'Payout execution is temporarily frozen', code: 'PAYOUTS_FROZEN' }
+    }
     if (error?.message?.startsWith('INVALID_TRANSITION')) {
       return { ok: false, error: error.message, code: 'INVALID_TRANSITION' }
     }

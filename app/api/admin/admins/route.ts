@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { hash } from 'bcryptjs'
+import { checkPasswordStrength, hashPassword } from '@/lib/security/password'
 import { ADMIN_ROLES, type AdminRole } from '@/lib/admin-types'
-import { guardCrmRequest } from '@/lib/crm/security'
+import { guardCrmAction, guardCrmRequest } from '@/lib/crm/security'
+import { consumeCrmStepUpFromHeader } from '@/lib/crm/governance/step-up'
 import { createAuditLog } from '@/lib/crm/audit'
+import { evaluateActionInitiation } from '@/lib/crm/governance'
 
 const VALID_ROLES = new Set(Object.keys(ADMIN_ROLES))
 
@@ -60,10 +62,29 @@ async function activeSuperAdminCount() {
   })
 }
 
+function staffCapabilities(security: {
+  role: AdminRole
+  permissionOverrides: Array<{ permission: string; effect: 'ALLOW' | 'DENY' }>
+}) {
+  const allowed = (actionId: 'staff.create' | 'staff.account.update' | 'staff.delete' | 'staff.permission.change') =>
+    evaluateActionInitiation({
+      role: security.role,
+      actionId,
+      overrides: security.permissionOverrides,
+    }).allowed
+
+  return {
+    create: allowed('staff.create'),
+    edit: allowed('staff.account.update'),
+    delete: allowed('staff.delete'),
+    permissions: allowed('staff.permission.change'),
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'admins:view',
+      permission: 'staff:view',
       level: 'read',
     })
     if (!guard.ok) return guard.response
@@ -123,7 +144,10 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json(
-      { admins: result },
+      {
+        admins: result,
+        actions: staffCapabilities(guard.context),
+      },
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
@@ -134,10 +158,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const guard = await guardCrmRequest(request, {
-      permission: 'admins:create',
-      level: 'sensitive',
-    })
+    const guard = await guardCrmAction(request, 'staff.create')
     if (!guard.ok) return guard.response
     const security = guard.context
 
@@ -158,8 +179,15 @@ export async function POST(request: NextRequest) {
     if (!VALID_ROLES.has(role)) {
       return NextResponse.json({ error: 'Invalid admin role' }, { status: 400 })
     }
-    if (password.length < 8 || password.length > 200) {
-      return NextResponse.json({ error: 'Password must be between 8 and 200 characters' }, { status: 400 })
+    if (password.length > 200) {
+      return NextResponse.json({ error: 'Password is too long' }, { status: 400 })
+    }
+    const passwordStrength = checkPasswordStrength(password)
+    if (!passwordStrength.valid) {
+      return NextResponse.json(
+        { error: 'Password does not meet staff security requirements', details: passwordStrength.errors },
+        { status: 400 }
+      )
     }
     if (role !== 'SUPER_ADMIN' && assignedCountries.length === 0) {
       return NextResponse.json({ error: 'At least one country assignment is required' }, { status: 400 })
@@ -170,7 +198,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email already in use' }, { status: 409 })
     }
 
-    const passwordHash = await hash(password, 12)
+    const stepUp = await consumeCrmStepUpFromHeader({
+      headerValue: request.headers.get('x-crm-step-up'),
+      adminUserId: security.adminId,
+      sessionId: security.sessionId,
+      actionId: 'staff.create',
+    })
+    if (!stepUp) {
+      return NextResponse.json({ error: 'Step-up authentication required' }, { status: 403 })
+    }
+
+    const passwordHash = await hashPassword(password)
 
     const admin = existing
       ? await prisma.adminUser.update({
@@ -237,10 +275,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const guard = await guardCrmRequest(request, {
-      permission: 'admins:edit',
-      level: 'sensitive',
-    })
+    const guard = await guardCrmAction(request, 'staff.account.update')
     if (!guard.ok) return guard.response
     const security = guard.context
 
@@ -286,10 +321,17 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (body?.password !== undefined) {
-      if (typeof body.password !== 'string' || body.password.length < 8 || body.password.length > 200) {
-        return NextResponse.json({ error: 'Password must be between 8 and 200 characters' }, { status: 400 })
+      if (typeof body.password !== 'string' || body.password.length > 200) {
+        return NextResponse.json({ error: 'Invalid password' }, { status: 400 })
       }
-      updateData.passwordHash = await hash(body.password, 12)
+      const passwordStrength = checkPasswordStrength(body.password)
+      if (!passwordStrength.valid) {
+        return NextResponse.json(
+          { error: 'Password does not meet staff security requirements', details: passwordStrength.errors },
+          { status: 400 }
+        )
+      }
+      updateData.passwordHash = await hashPassword(body.password)
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -313,13 +355,39 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'You cannot deactivate your own active session account' }, { status: 409 })
     }
 
+    if (
+      id === security.adminId &&
+      (body?.role !== undefined || body?.assignedCountries !== undefined)
+    ) {
+      return NextResponse.json(
+        { error: 'You cannot change your own role or country scope through staff management' },
+        { status: 409 }
+      )
+    }
+
+    const stepUp = await consumeCrmStepUpFromHeader({
+      headerValue: request.headers.get('x-crm-step-up'),
+      adminUserId: security.adminId,
+      sessionId: security.sessionId,
+      actionId: 'staff.account.update',
+    })
+    if (!stepUp) {
+      return NextResponse.json({ error: 'Step-up authentication required' }, { status: 403 })
+    }
+
     const admin = await prisma.adminUser.update({
       where: { id },
       data: updateData,
       select: safeAdminSelect(),
     })
 
-    if (nextActive === false) {
+    const securitySensitiveChange =
+      nextActive === false ||
+      body?.role !== undefined ||
+      body?.assignedCountries !== undefined ||
+      body?.password !== undefined
+
+    if (securitySensitiveChange) {
       await prisma.adminSession.updateMany({
         where: { adminUserId: id, isRevoked: false },
         data: { isRevoked: true, revokedAt: new Date() },
@@ -366,10 +434,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const guard = await guardCrmRequest(request, {
-      permission: 'admins:delete',
-      level: 'sensitive',
-    })
+    const guard = await guardCrmAction(request, 'staff.delete')
     if (!guard.ok) return guard.response
     const security = guard.context
 
@@ -396,6 +461,16 @@ export async function DELETE(request: NextRequest) {
       (await activeSuperAdminCount()) <= 1
     ) {
       return NextResponse.json({ error: 'Cannot delete the last active SUPER_ADMIN' }, { status: 409 })
+    }
+
+    const stepUp = await consumeCrmStepUpFromHeader({
+      headerValue: request.headers.get('x-crm-step-up'),
+      adminUserId: security.adminId,
+      sessionId: security.sessionId,
+      actionId: 'staff.delete',
+    })
+    if (!stepUp) {
+      return NextResponse.json({ error: 'Step-up authentication required' }, { status: 403 })
     }
 
     await prisma.$transaction([

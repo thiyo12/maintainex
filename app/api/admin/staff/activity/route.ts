@@ -5,8 +5,7 @@ import { guardCrmRequest } from '@/lib/crm/security'
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'admins:view',
-      allowedRoles: ['SUPER_ADMIN'],
+      permission: 'staff:view',
       level: 'read',
     })
     if (!guard.ok) return guard.response

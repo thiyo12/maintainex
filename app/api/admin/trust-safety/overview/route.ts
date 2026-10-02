@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
-  crmHasPermission,
   getCrmCountryFilter,
   guardCrmRequest,
 } from '@/lib/crm/security'
+import { evaluateEffectivePermission } from '@/lib/crm/governance'
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,11 +16,18 @@ export async function GET(request: NextRequest) {
     if (!guard.ok) return guard.response
     const security = guard.context
 
-    const canKyc = crmHasPermission(security.role, 'kyc:view')
-    const canDisputes = crmHasPermission(security.role, 'disputes:view')
-    const canRisk = crmHasPermission(security.role, 'risk_events:read')
-    const canCheating = crmHasPermission(security.role, 'cheating:view')
-    const canSecurity = crmHasPermission(security.role, 'security:view')
+    const allowed = (permission: string) =>
+      evaluateEffectivePermission({
+        role: security.role,
+        permission,
+        overrides: security.permissionOverrides,
+      }).allowed
+
+    const canKyc = allowed('kyc:view')
+    const canDisputes = allowed('disputes:view')
+    const canRisk = allowed('risk_events:read')
+    const canCheating = allowed('cheating:view')
+    const canSecurity = allowed('security:view')
 
     if (!canKyc && !canDisputes && !canRisk && !canCheating && !canSecurity) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

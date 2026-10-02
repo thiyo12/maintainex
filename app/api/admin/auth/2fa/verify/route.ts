@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account not active or 2FA not configured' }, { status: 401 })
     }
 
-    if (!verifyTotp(totpCode, adminUser.totpSecret)) {
+    if (!(await verifyTotp(totpCode, adminUser.totpSecret))) {
       return NextResponse.json({ error: 'Invalid verification code' }, { status: 401 })
     }
 
@@ -115,12 +115,14 @@ export async function POST(request: NextRequest) {
       maxAge: 7 * 24 * 60 * 60,
     })
 
-    response.cookies.set('refresh_token', refreshToken, {
+    // Remove the historical narrower cookie to avoid duplicate same-name
+    // refresh cookies being sent to the refresh endpoint.
+    response.cookies.set('refresh_token', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       path: '/api/admin/auth/refresh',
-      maxAge: 7 * 24 * 60 * 60,
+      maxAge: 0,
     })
 
     return response

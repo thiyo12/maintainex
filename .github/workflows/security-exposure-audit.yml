@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/crm-job360
+      - feature/crm-v2-rebuild
   workflow_dispatch:
 
 permissions:
@@ -39,15 +40,50 @@ jobs:
           literal_secret = re.compile(
               r"""(?ix)
               \b(?:password|passwd|secret|token|api[_-]?key|merchant[_-]?secret|private[_-]?key)
-              \s*[:=]\s*["']?
-              (?!\$\{|process\.env|<|your[-_ ]|change[-_ ]|generate[-_ ]|example|test\b|ci[-_ ]only)
-              [A-Za-z0-9+/_=.:-]{16,}
+              \s*[:=]\s*
+              ["'`]
+              (?!\$\{|process\.env|<|your[-_ ]|change[-_ ]|generate[-_ ]|example|test\b|ci[-_ ]only|maintainex_dev_)
+              [^"'`\r\n]{20,}
+              ["'`]
+              """
+          )
+          markdown_secret = re.compile(
+              r"""(?ix)
+              \|\s*(?:db[-_ ]?password|password|passwd|secret|token|api[_-]?key|merchant[_-]?secret|private[_-]?key)
+              \s*\|\s*
+              `
+              (?!<|example|test\b|maintainex_dev_)
+              (?![A-Z][A-Z0-9_]{7,}`)
+              [A-Za-z0-9+_.:-]{20,}
+              `
+              """
+          )
+          unquoted_random_secret = re.compile(
+              r"""(?ix)
+              \b(?:password|passwd|secret|token|api[_-]?key|merchant[_-]?secret|private[_-]?key)
+              \s*[:=]\s*
+              (?!\$\{|process\.env|<|your[-_ ]|change[-_ ]|generate[-_ ]|example|test\b|ci[-_ ]only|maintainex_dev_)
+              [A-F0-9]{32,}
+              \b
               """
           )
 
           def classify(line):
               hits = [name for name, rx in patterns if rx.search(line)]
-              if literal_secret.search(line):
+              literal_match = literal_secret.search(line)
+              markdown_match = markdown_secret.search(line)
+              random_match = unquoted_random_secret.search(line)
+              if literal_match:
+                  candidate = literal_match.group(0)
+                  generated = any(marker in candidate for marker in (
+                      "${",
+                      "process.env",
+                      "randomBytes(",
+                      "Date.now(",
+                  ))
+                  if not generated:
+                      hits.append("possible-hardcoded-secret")
+              if markdown_match or random_match:
                   hits.append("possible-hardcoded-secret")
               for m in re.finditer(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", line):
                   ip=m.group(0)
@@ -107,4 +143,24 @@ jobs:
           print("CURRENT_FINDINGS_JSON="+json.dumps(current, separators=(",",":")))
           print("HISTORY_COUNTS_JSON="+json.dumps(dict(hist), separators=(",",":")))
           print("HISTORY_FIRST_LOCATION_JSON="+json.dumps(first, separators=(",",":")))
+
+          blocking = {
+              "private-key-material",
+              "github-token",
+              "aws-access-key",
+              "google-api-key",
+              "stripe-live-key",
+              "slack-token",
+              "possible-hardcoded-secret",
+          }
+          current_blocking = [
+              item for item in current if item["category"] in blocking
+          ]
+          if current_blocking:
+              safe = [
+                  {"category": item["category"], "path": item["path"], "line": item["line"]}
+                  for item in current_blocking
+              ]
+              print("BLOCKING_CURRENT_FINDINGS_JSON="+json.dumps(safe, separators=(",",":")))
+              raise SystemExit(1)
           PY

@@ -732,3 +732,147 @@ input, select, textarea { font-size: 16px; }
   color: #9ca3af;
   margin-left: 2px;
 }
+
+
+/* ===== MAINTAINEX CRM V2 TOKENS ===== */
+.crm-v2 {
+  --crm-rail: #121416;
+  --crm-rail-soft: #1a1d20;
+  --crm-canvas: #f4f5f3;
+  --crm-surface: #ffffff;
+  --crm-surface-soft: #f8f9f7;
+  --crm-text: #17191b;
+  --crm-text-muted: #687078;
+  --crm-border: #e2e5e1;
+  --crm-border-strong: #cfd4ce;
+  --crm-accent: #f4b223;
+  --crm-accent-strong: #dc9610;
+  --crm-accent-soft: #fff7df;
+  --crm-success: #17845b;
+  --crm-success-soft: #eaf7f0;
+  --crm-warning: #b86f0d;
+  --crm-warning-soft: #fff5e5;
+  --crm-danger: #c03a3a;
+  --crm-danger-soft: #fff0f0;
+  --crm-info: #2f68b1;
+  --crm-info-soft: #edf4fd;
+  --crm-radius-sm: 10px;
+  --crm-radius-md: 14px;
+  --crm-radius-lg: 18px;
+  --crm-shadow-card: 0 1px 2px rgba(18, 20, 22, 0.04), 0 8px 24px rgba(18, 20, 22, 0.04);
+  --crm-shadow-float: 0 24px 70px -28px rgba(18, 20, 22, 0.35);
+  min-height: 100vh;
+  background: var(--crm-canvas);
+  color: var(--crm-text);
+}
+
+.crm-v2 :focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--crm-accent) 42%, transparent);
+  outline-offset: 2px;
+}
+
+.crm-v2 ::selection {
+  background: color-mix(in srgb, var(--crm-accent) 30%, white);
+  color: var(--crm-text);
+}
+
+.crm-v2 .crm-card {
+  background: var(--crm-surface);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  box-shadow: var(--crm-shadow-card);
+}
+
+.crm-v2 .crm-subtle-card {
+  background: var(--crm-surface-soft);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+}
+
+.crm-v2 .crm-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #c6cbc5 transparent;
+}
+
+.crm-v2 .crm-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.crm-v2 .crm-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.crm-v2 .crm-scrollbar::-webkit-scrollbar-thumb {
+  background: #c6cbc5;
+  border-radius: 999px;
+}
+
+
+/* ===== CRM V2 TEMPORARY LEGACY VISUAL BRIDGE =====
+   Transitional only. Keeps unmigrated admin pages visually consistent with
+   the approved CRM V2 reference while each module is rewritten on native
+   CrmPrimitives. Remove selectors module-by-module; delete this bridge in the
+   final legacy-demolition phase. */
+.crm-v2 main [class*="bg-[#15161E]"],
+.crm-v2 main [class*="bg-[#0B0C12]"] {
+  background: var(--crm-surface) !important;
+  border-color: var(--crm-border) !important;
+  color: var(--crm-text) !important;
+  box-shadow: var(--crm-shadow-card);
+}
+
+.crm-v2 main [class*="border-white/"] {
+  border-color: var(--crm-border) !important;
+}
+
+.crm-v2 main [class*="bg-white/"] {
+  background: var(--crm-surface-soft) !important;
+}
+
+.crm-v2 main .text-white {
+  color: var(--crm-text) !important;
+}
+
+.crm-v2 main .text-gray-300 {
+  color: #475569 !important;
+}
+
+.crm-v2 main .text-gray-400 {
+  color: var(--crm-text-muted) !important;
+}
+
+.crm-v2 main .text-gray-500,
+.crm-v2 main .text-gray-600 {
+  color: #94a3b8 !important;
+}
+
+.crm-v2 main .text-red-300,
+.crm-v2 main .text-red-400 {
+  color: var(--crm-danger) !important;
+}
+
+.crm-v2 main .text-green-300,
+.crm-v2 main .text-green-400 {
+  color: var(--crm-success) !important;
+}
+
+.crm-v2 main .text-amber-300,
+.crm-v2 main .text-amber-400 {
+  color: var(--crm-warning) !important;
+}
+
+.crm-v2 main .text-blue-300,
+.crm-v2 main .text-blue-400 {
+  color: var(--crm-info) !important;
+}
+
+.crm-v2 main [class*="hover:bg-white/"]:hover {
+  background: #f8fafc !important;
+}
+
+.crm-v2 main input,
+.crm-v2 main select,
+.crm-v2 main textarea {
+  color-scheme: light;
+}

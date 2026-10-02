@@ -17,7 +17,13 @@ import {
   FiUsers,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import {
+  CrmBadge,
+  CrmCard,
+  CrmMetricCard,
+  CrmPageHeader,
+  CrmState,
+} from '@/components/crm/v2/CrmPrimitives'
 
 interface DashboardStats {
   stats: {
@@ -51,6 +57,17 @@ interface DashboardStats {
     overdueCommission: number
     overdueCount: number
   }
+  capabilities: {
+    jobs: boolean
+    users: boolean
+    taskers: boolean
+    companies: boolean
+    people: boolean
+    kyc: boolean
+    finance: boolean
+    trust: boolean
+    platform: boolean
+  }
   isSuperAdmin?: boolean
 }
 
@@ -66,63 +83,33 @@ function number(value?: number) {
   return Number(value || 0)
 }
 
-function StatCard({
-  label,
-  value,
-  detail,
-  icon: Icon,
-  tone,
-}: {
-  label: string
-  value: string
-  detail: string
-  icon: any
-  tone: 'amber' | 'blue' | 'green' | 'red'
-}) {
-  const tones = {
-    amber: 'bg-amber-50 text-amber-700 border-amber-100',
-    blue: 'bg-blue-50 text-blue-700 border-blue-100',
-    green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    red: 'bg-red-50 text-red-700 border-red-100',
-  }
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-sm text-slate-500">{label}</div>
-          <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{value}</div>
-          <div className="mt-1 text-xs text-slate-400">{detail}</div>
-        </div>
-        <div className={`w-10 h-10 rounded-xl border flex items-center justify-center ${tones[tone]}`}>
-          <Icon size={18} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function ProgressRow({
   label,
   value,
   total,
-  tone = 'bg-amber-400',
+  tone,
 }: {
   label: string
   value: number
   total: number
-  tone?: string
+  tone: 'amber' | 'success' | 'danger' | 'info'
 }) {
   const percentage = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0
+  const toneClass = {
+    amber: 'bg-[var(--crm-accent)]',
+    success: 'bg-[var(--crm-success)]',
+    danger: 'bg-[var(--crm-danger)]',
+    info: 'bg-[var(--crm-info)]',
+  }[tone]
 
   return (
     <div>
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-slate-600">{label}</span>
-        <span className="font-medium text-slate-900">{value.toLocaleString()}</span>
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-medium text-slate-600">{label}</span>
+        <span className="font-semibold text-slate-900">{value.toLocaleString()}</span>
       </div>
-      <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden">
-        <div className={`h-full rounded-full ${tone}`} style={{ width: `${percentage}%` }} />
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${toneClass}`} style={{ width: `${percentage}%` }} />
       </div>
     </div>
   )
@@ -130,10 +117,8 @@ function ProgressRow({
 
 export default function AdminDashboard() {
   const { user } = useAdminSession()
-  const role = (user?.role || 'SUPPORT') as AdminRole
-  const permissions = ROLE_PERMISSIONS[role] || []
-  const can = (permission: string) => permissions.includes(permission)
   const [data, setData] = useState<DashboardStats | null>(null)
+  const [approvalCount, setApprovalCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -141,18 +126,36 @@ export default function AdminDashboard() {
 
     async function loadDashboard() {
       try {
-        const response = await fetch('/api/dashboard', { credentials: 'include' })
+        const [dashboardResponse, approvalsResponse] = await Promise.all([
+          fetch('/api/dashboard', {
+            credentials: 'include',
+            cache: 'no-store',
+          }),
+          fetch('/api/admin/approvals', {
+            credentials: 'include',
+            cache: 'no-store',
+          }),
+        ])
 
-        if (response.status === 401) {
+        if (dashboardResponse.status === 401) {
           window.location.href = '/admin/login'
           return
         }
 
-        if (!response.ok) throw new Error('Dashboard request failed')
-
-        const payload = await response.json()
+        if (!dashboardResponse.ok) throw new Error('Dashboard request failed')
+        const payload = await dashboardResponse.json()
         if (payload.error) throw new Error(payload.error)
-        if (mounted) setData(payload)
+
+        let approvals = 0
+        if (approvalsResponse.ok) {
+          const approvalPayload = await approvalsResponse.json().catch(() => ({}))
+          approvals = Number(approvalPayload?.total || 0)
+        }
+
+        if (mounted) {
+          setData(payload)
+          setApprovalCount(approvals)
+        }
       } catch (error) {
         console.error('CRM dashboard error:', error)
         toast.error('Failed to load CRM dashboard')
@@ -166,6 +169,7 @@ export default function AdminDashboard() {
   }, [])
 
   const stats = data?.stats
+  const caps = data?.capabilities
   const financeRows = data?.financeByCurrency || []
   const primaryFinance = financeRows.length === 1 ? financeRows[0] : null
 
@@ -174,321 +178,362 @@ export default function AdminDashboard() {
     const completed = number(stats?.completedJobs)
     const open = number(stats?.openJobs)
     const otherJobs = Math.max(0, jobs - completed - open)
-
     return { jobs, completed, open, otherJobs }
   }, [stats])
 
-  const canPeople = can('users:view') || can('taskers:view') || can('companies:view')
-  const canFinance = can('commission:view') || can('wallets:view')
-  const canOperations = can('jobs:view') || can('kyc:view')
+  const attentionItems = useMemo(() => {
+    if (!data) return []
 
-  const attentionItems = [
-    can('kyc:view') && {
-      label: 'KYC waiting for review',
-      value: number(stats?.pendingKYC),
-      href: '/admin/kyc',
-      severity: number(stats?.pendingKYC) > 0 ? 'amber' : 'green',
-    },
-    can('commission:view') && {
-      label: 'Overdue settlements',
-      value: number(stats?.overdueSettlements),
-      href: '/admin/financial/settlements',
-      severity: number(stats?.overdueSettlements) > 0 ? 'red' : 'green',
-    },
-    can('cheating:view') && {
-      label: 'Cheating reports',
-      value: number(stats?.pendingCheatingReports),
-      href: '/admin/cheating',
-      severity: number(stats?.pendingCheatingReports) > 0 ? 'red' : 'green',
-    },
-    can('users:view') && {
-      label: 'Banned users',
-      value: number(stats?.bannedUsers),
-      href: '/admin/users/customers',
-      severity: 'slate',
-    },
-  ].filter(Boolean) as Array<{ label: string; value: number; href: string; severity: 'red' | 'amber' | 'green' | 'slate' }>
+    return [
+      approvalCount > 0 && {
+        label: 'Governed approvals',
+        value: approvalCount,
+        href: '/admin/approvals',
+        severity: 'red' as const,
+      },
+      caps?.kyc && {
+        label: 'KYC waiting for review',
+        value: number(stats?.pendingKYC),
+        href: '/admin/kyc',
+        severity: number(stats?.pendingKYC) > 0 ? 'amber' as const : 'green' as const,
+      },
+      caps?.finance && {
+        label: 'Overdue settlements',
+        value: number(stats?.overdueSettlements),
+        href: '/admin/financial/settlements',
+        severity: number(stats?.overdueSettlements) > 0 ? 'red' as const : 'green' as const,
+      },
+      caps?.trust && {
+        label: 'Trust reports',
+        value: number(stats?.pendingCheatingReports),
+        href: '/admin/trust-safety',
+        severity: number(stats?.pendingCheatingReports) > 0 ? 'red' as const : 'green' as const,
+      },
+      caps?.users && {
+        label: 'Banned users',
+        value: number(stats?.bannedUsers),
+        href: '/admin/users/customers',
+        severity: 'slate' as const,
+      },
+    ].filter(Boolean) as Array<{
+      label: string
+      value: number
+      href: string
+      severity: 'red' | 'amber' | 'green' | 'slate'
+    }>
+  }, [approvalCount, caps, data, stats])
 
   if (loading) {
     return (
-      <div className="space-y-5 animate-pulse">
-        <div className="h-20 rounded-2xl bg-white border border-slate-200" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {[0, 1, 2, 3].map(item => <div key={item} className="h-32 rounded-2xl bg-white border border-slate-200" />)}
-        </div>
-        <div className="grid lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2 h-80 rounded-2xl bg-white border border-slate-200" />
-          <div className="h-80 rounded-2xl bg-white border border-slate-200" />
-        </div>
-      </div>
+      <CrmState
+        type="loading"
+        title="Loading operations overview"
+        description="Loading scoped jobs, people, finance, trust and approval queues."
+      />
     )
   }
 
+  if (!data || !caps) {
+    return (
+      <CrmState
+        type="error"
+        title="Dashboard unavailable"
+        description="The CRM dashboard could not be loaded for the current staff session."
+      />
+    )
+  }
+
+  const attentionTotal = attentionItems.reduce((sum, item) => sum + item.value, 0)
+
   return (
     <div className="space-y-5">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-[0.16em] text-amber-600 font-semibold">Operations overview</div>
-          <h1 className="mt-1 text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, {user?.name || 'Admin'}
-          </h1>
-          <p className="mt-1.5 text-sm text-slate-500">
-            Marketplace, people, finance and trust queues in one operational view.
-          </p>
-        </div>
+      <CrmPageHeader
+        eyebrow="Operations overview"
+        title={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, ${user?.name || 'Admin'}`}
+        description="Marketplace, people, finance, trust and governed actions in one operational view."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {caps.jobs && (
+              <Link
+                href="/admin/jobs"
+                className="inline-flex h-10 items-center gap-2 rounded-[11px] bg-[#17191b] px-4 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                Open job queue
+                <FiArrowUpRight size={15} />
+              </Link>
+            )}
+            {approvalCount > 0 && (
+              <Link
+                href="/admin/approvals"
+                className="inline-flex h-10 items-center gap-2 rounded-[11px] border border-amber-300 bg-[var(--crm-accent-soft)] px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+              >
+                Review approvals
+                <CrmBadge tone="amber">{approvalCount}</CrmBadge>
+              </Link>
+            )}
+          </div>
+        }
+      />
 
-        <div className="flex flex-wrap gap-2">
-          {can('jobs:view') && (
-            <Link
-              href="/admin/jobs"
-              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-slate-950 text-white text-sm font-medium hover:bg-slate-800"
-            >
-              Open job queue
-              <FiArrowUpRight size={15} />
-            </Link>
-          )}
-          {can('settings:view') && (
-            <Link
-              href="/admin/platform"
-              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50"
-            >
-              Platform management
-            </Link>
-          )}
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {can('jobs:view') && (
-          <StatCard
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {caps.jobs && (
+          <CrmMetricCard
             label="Open jobs"
             value={number(stats?.openJobs).toLocaleString()}
-            detail={`${number(stats?.totalJobPostings).toLocaleString()} jobs recorded`}
-            icon={FiTool}
-            tone="green"
+            helper={`${number(stats?.totalJobPostings).toLocaleString()} jobs recorded`}
+            icon={<FiTool size={16} />}
+            tone="success"
           />
         )}
-        {canFinance && (
-          <StatCard
+
+        {caps.finance && (
+          <CrmMetricCard
             label="Pending commission"
-            value={primaryFinance
-              ? formatCurrency(primaryFinance.pendingCommission, primaryFinance.currency)
-              : financeRows.length > 1
-                ? `${financeRows.length} currencies`
-                : formatCurrency(0)}
-            detail={financeRows.length > 1
-              ? financeRows.map(row => `${row.currency} ${formatCurrency(row.pendingCommission, row.currency)}`).join(' · ')
-              : `${number(data?.weeklySummary?.pendingCount)} settlement items`}
-            icon={FiDollarSign}
+            value={
+              primaryFinance
+                ? formatCurrency(primaryFinance.pendingCommission, primaryFinance.currency)
+                : financeRows.length > 1
+                  ? `${financeRows.length} currencies`
+                  : formatCurrency(0)
+            }
+            helper={
+              financeRows.length > 1
+                ? 'Multi-market finance position'
+                : `${number(data.weeklySummary?.pendingCount)} settlement items`
+            }
+            icon={<FiDollarSign size={16} />}
             tone="amber"
           />
         )}
-        {(can('taskers:view') || can('companies:view')) && (
-          <StatCard
+
+        {(caps.taskers || caps.companies) && (
+          <CrmMetricCard
             label="Provider network"
             value={number(stats?.totalTaskers).toLocaleString()}
-            detail={`${number(stats?.totalCompanies).toLocaleString()} companies onboarded`}
-            icon={FiUserCheck}
-            tone="blue"
+            helper={`${number(stats?.totalCompanies).toLocaleString()} companies onboarded`}
+            icon={<FiUserCheck size={16} />}
+            tone="info"
           />
         )}
-        {attentionItems.length > 0 && (
-          <StatCard
-            label="Items needing attention"
-            value={attentionItems.reduce((sum, item) => sum + item.value, 0).toLocaleString()}
-            detail="Authorized operator queues"
-            icon={FiAlertTriangle}
-            tone="red"
-          />
-        )}
+
+        <CrmMetricCard
+          label="Items needing attention"
+          value={attentionTotal.toLocaleString()}
+          helper="Authorized operator queues"
+          icon={<FiAlertTriangle size={16} />}
+          tone={attentionTotal > 0 ? 'danger' : 'success'}
+        />
       </section>
 
-      <section className="grid xl:grid-cols-3 gap-5">
-        {canOperations && <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-slate-900">Marketplace operations</h2>
-              <p className="text-xs text-slate-400 mt-1">Current job and verification workload</p>
-            </div>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-              Live data
-            </span>
-          </div>
-
-          <div className="p-5 grid md:grid-cols-2 gap-7">
-            {can('jobs:view') && <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-slate-500">Jobs recorded</div>
-                  <div className="mt-1 text-3xl font-semibold text-slate-950">{totals.jobs.toLocaleString()}</div>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-slate-950 text-amber-300 flex items-center justify-center">
-                  <FiBriefcase size={20} />
-                </div>
-              </div>
-              <ProgressRow label="Open" value={totals.open} total={Math.max(1, totals.jobs)} tone="bg-amber-400" />
-              <ProgressRow label="Completed" value={totals.completed} total={Math.max(1, totals.jobs)} tone="bg-emerald-500" />
-              <ProgressRow label="Other states" value={totals.otherJobs} total={Math.max(1, totals.jobs)} tone="bg-blue-500" />
-            </div>}
-
-            {can('kyc:view') && <div className="space-y-5">
-              <div>
-                <div className="text-sm font-medium text-slate-800">Verification pipeline</div>
-                <div className="text-xs text-slate-400 mt-1">Identity document status across the marketplace</div>
-              </div>
-              <ProgressRow
-                label="Verified"
-                value={number(stats?.verifiedKYC)}
-                total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
-                tone="bg-emerald-500"
-              />
-              <ProgressRow
-                label="Pending review"
-                value={number(stats?.pendingKYC)}
-                total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
-                tone="bg-amber-400"
-              />
-              <ProgressRow
-                label="Rejected"
-                value={number(stats?.rejectedKYC)}
-                total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
-                tone="bg-red-500"
-              />
-            </div>}
-          </div>
-        </div>}
-
-        {attentionItems.length > 0 && <div className="rounded-2xl border border-slate-200 bg-white">
-          <div className="px-5 py-4 border-b border-slate-100">
-            <h2 className="font-semibold text-slate-900">Pending actions</h2>
-            <p className="text-xs text-slate-400 mt-1">Queues that need an operator</p>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {attentionItems.map(item => {
-              const dotClass =
-                item.severity === 'red' ? 'bg-red-500' :
-                item.severity === 'amber' ? 'bg-amber-400' :
-                item.severity === 'green' ? 'bg-emerald-500' : 'bg-slate-400'
-
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`w-2 h-2 rounded-full ${dotClass}`} />
-                    <span className="text-sm text-slate-600">{item.label}</span>
+      <section className="grid gap-5 xl:grid-cols-3">
+        {(caps.jobs || caps.kyc) && (
+          <CrmCard
+            className="xl:col-span-2"
+            title="Marketplace operations"
+            description="Current job and verification workload"
+            action={<CrmBadge tone="success" dot>Live data</CrmBadge>}
+          >
+            <div className="grid gap-7 md:grid-cols-2">
+              {caps.jobs && (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-medium text-slate-500">Jobs recorded</div>
+                      <div className="mt-1 text-3xl font-semibold tracking-[-0.03em] text-slate-950">
+                        {totals.jobs.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#17191b] text-[var(--crm-accent)]">
+                      <FiBriefcase size={19} />
+                    </div>
                   </div>
-                  <span className="text-sm font-semibold text-slate-900">{item.value.toLocaleString()}</span>
-                </Link>
-              )
-            })}
-          </div>
-        </div>}
+
+                  <ProgressRow label="Open" value={totals.open} total={Math.max(1, totals.jobs)} tone="amber" />
+                  <ProgressRow label="Completed" value={totals.completed} total={Math.max(1, totals.jobs)} tone="success" />
+                  <ProgressRow label="Other states" value={totals.otherJobs} total={Math.max(1, totals.jobs)} tone="info" />
+
+                  <Link
+                    href="/admin/jobs"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800"
+                  >
+                    Open Job Command Centre <FiArrowUpRight size={12} />
+                  </Link>
+                </div>
+              )}
+
+              {caps.kyc && (
+                <div className="space-y-5">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">Verification pipeline</div>
+                    <div className="mt-1 text-xs text-slate-400">
+                      Identity document status across your assigned market scope
+                    </div>
+                  </div>
+                  <ProgressRow
+                    label="Verified"
+                    value={number(stats?.verifiedKYC)}
+                    total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
+                    tone="success"
+                  />
+                  <ProgressRow
+                    label="Pending review"
+                    value={number(stats?.pendingKYC)}
+                    total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
+                    tone="amber"
+                  />
+                  <ProgressRow
+                    label="Rejected"
+                    value={number(stats?.rejectedKYC)}
+                    total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
+                    tone="danger"
+                  />
+                </div>
+              )}
+            </div>
+          </CrmCard>
+        )}
+
+        <CrmCard
+          title="Pending actions"
+          description="Queues that need an authorized operator"
+          padding="none"
+        >
+          {attentionItems.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-400">No pending actions.</div>
+          ) : (
+            <div className="divide-y divide-[var(--crm-border)]">
+              {attentionItems.map(item => {
+                const tone =
+                  item.severity === 'red' ? 'danger' :
+                  item.severity === 'amber' ? 'warning' :
+                  item.severity === 'green' ? 'success' : 'neutral'
+
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-[#fafbf9]"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <CrmBadge tone={tone} dot>{item.label}</CrmBadge>
+                    </div>
+                    <span className="text-sm font-semibold text-slate-950">
+                      {item.value.toLocaleString()}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </CrmCard>
       </section>
 
-      <section className="grid lg:grid-cols-3 gap-5">
-        {canPeople && <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="font-semibold text-slate-900">People</h2>
-              <p className="text-xs text-slate-400 mt-1">Marketplace account footprint</p>
-            </div>
-            <FiUsers className="text-slate-400" size={19} />
-          </div>
-          <div className="mt-5 grid grid-cols-3 divide-x divide-slate-100">
-            <div className="pr-3">
-              <div className="text-xl font-semibold text-slate-950">{number(stats?.totalUsers).toLocaleString()}</div>
-              <div className="text-xs text-slate-400 mt-1">Users</div>
-            </div>
-            <div className="px-3">
-              <div className="text-xl font-semibold text-slate-950">{number(stats?.totalTaskers).toLocaleString()}</div>
-              <div className="text-xs text-slate-400 mt-1">Taskers</div>
-            </div>
-            <div className="pl-3">
-              <div className="text-xl font-semibold text-slate-950">{number(stats?.totalCompanies).toLocaleString()}</div>
-              <div className="text-xs text-slate-400 mt-1">Companies</div>
-            </div>
-          </div>
-          {can('users:view') && (
-            <Link href="/admin/users/customers" className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-800">
-              Open people management <FiArrowUpRight size={14} />
-            </Link>
-          )}
-        </div>}
-
-        {canFinance && <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="font-semibold text-slate-900">Finance</h2>
-              <p className="text-xs text-slate-400 mt-1">Commission and provider wallet position</p>
-            </div>
-            <FiCreditCard className="text-slate-400" size={19} />
-          </div>
-          <div className="mt-5 space-y-3">
-            {financeRows.length ? financeRows.map(row => (
-              <div key={row.currency} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-400">{row.currency}</div>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-sm text-slate-500">Commission collected</span>
-                  <span className="text-sm font-semibold text-slate-900">{formatCurrency(row.paidCommission, row.currency)}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-sm text-slate-500">Commission pending</span>
-                  <span className="text-sm font-semibold text-slate-900">{formatCurrency(row.pendingCommission, row.currency)}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-sm text-slate-500">Provider wallet balance</span>
-                  <span className="text-sm font-semibold text-slate-900">{formatCurrency(row.providerWalletBalance, row.currency)}</span>
-                </div>
+      <section className="grid gap-5 lg:grid-cols-3">
+        {caps.people && (
+          <CrmCard
+            title="People"
+            description="Marketplace account footprint"
+            action={<FiUsers size={18} className="text-slate-400" />}
+          >
+            <div className="grid grid-cols-3 divide-x divide-[var(--crm-border)]">
+              <div className="pr-3">
+                <div className="text-xl font-semibold text-slate-950">{number(stats?.totalUsers).toLocaleString()}</div>
+                <div className="mt-1 text-xs text-slate-400">Users</div>
               </div>
-            )) : (
-              <div className="text-sm text-slate-400">No finance balances are available for this market.</div>
-            )}
-          </div>
-          {can('wallets:view') && (
-            <Link href="/admin/financial/wallets" className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-800">
-              Open finance operations <FiArrowUpRight size={14} />
-            </Link>
-          )}
-        </div>}
-
-        <div className="rounded-2xl border border-slate-200 bg-[#10151d] text-white p-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="font-semibold">Control centre</h2>
-              <p className="text-xs text-slate-400 mt-1">CRM foundation status</p>
+              <div className="px-3">
+                <div className="text-xl font-semibold text-slate-950">{number(stats?.totalTaskers).toLocaleString()}</div>
+                <div className="mt-1 text-xs text-slate-400">Taskers</div>
+              </div>
+              <div className="pl-3">
+                <div className="text-xl font-semibold text-slate-950">{number(stats?.totalCompanies).toLocaleString()}</div>
+                <div className="mt-1 text-xs text-slate-400">Companies</div>
+              </div>
             </div>
-            <FiShield className="text-amber-300" size={19} />
+
+            {caps.users && (
+              <Link
+                href="/admin/users/customers"
+                className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800"
+              >
+                Open people management <FiArrowUpRight size={12} />
+              </Link>
+            )}
+          </CrmCard>
+        )}
+
+        {caps.finance && (
+          <CrmCard
+            title="Finance"
+            description="Commission and provider wallet position"
+            action={<FiCreditCard size={18} className="text-slate-400" />}
+          >
+            <div className="space-y-3">
+              {financeRows.length ? financeRows.map(row => (
+                <div key={row.currency} className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{row.currency}</div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-xs text-slate-500">Commission collected</span>
+                    <span className="text-xs font-semibold text-slate-900">{formatCurrency(row.paidCommission, row.currency)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-xs text-slate-500">Commission pending</span>
+                    <span className="text-xs font-semibold text-slate-900">{formatCurrency(row.pendingCommission, row.currency)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-xs text-slate-500">Provider wallet balance</span>
+                    <span className="text-xs font-semibold text-slate-900">{formatCurrency(row.providerWalletBalance, row.currency)}</span>
+                  </div>
+                </div>
+              )) : (
+                <div className="text-xs text-slate-400">No finance balances are available for this market.</div>
+              )}
+            </div>
+
+            <Link
+              href="/admin/financial/wallets"
+              className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-800"
+            >
+              Open finance operations <FiArrowUpRight size={12} />
+            </Link>
+          </CrmCard>
+        )}
+
+        <CrmCard className="bg-[#10151d] text-white" padding="md">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Control centre</h2>
+              <p className="mt-1 text-xs text-slate-400">CRM V2 operational foundation</p>
+            </div>
+            <FiShield className="text-[var(--crm-accent)]" size={18} />
           </div>
 
           <div className="mt-5 space-y-3">
             {[
-              ['Admin session', true],
-              ['Marketplace data API', Boolean(data)],
-              ['Role-aware navigation', true],
+              ['Live admin session', true],
+              ['Scoped marketplace data', true],
+              ['Server-issued permissions', true],
               ['Job 360 workspace', true],
+              ['Governed approval queue', true],
             ].map(([label, ready]) => (
-              <div key={String(label)} className="flex items-center justify-between">
-                <span className="text-sm text-slate-300">{String(label)}</span>
-                <span className={`inline-flex items-center gap-1.5 text-xs ${ready ? 'text-emerald-300' : 'text-slate-500'}`}>
-                  {ready ? <FiCheckCircle size={13} /> : <FiClock size={13} />}
+              <div key={String(label)} className="flex items-center justify-between gap-3">
+                <span className="text-xs text-slate-300">{String(label)}</span>
+                <span className={`inline-flex items-center gap-1.5 text-[11px] ${ready ? 'text-emerald-300' : 'text-slate-500'}`}>
+                  {ready ? <FiCheckCircle size={12} /> : <FiClock size={12} />}
                   {ready ? 'Ready' : 'Pending'}
                 </span>
               </div>
             ))}
           </div>
 
-          {can('settings:view') && (
+          {caps.platform && (
             <Link
               href="/admin/platform"
-              className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-300 hover:text-amber-200"
+              className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-[var(--crm-accent)] hover:text-amber-200"
             >
-              Open platform controls <FiArrowUpRight size={14} />
+              Open platform controls <FiArrowUpRight size={12} />
             </Link>
           )}
-        </div>
+        </CrmCard>
       </section>
     </div>
   )

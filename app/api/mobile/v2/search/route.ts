@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { aiSearch, getAutocompleteSuggestions } from '@/lib/ai-search'
 import { logSearch, getPopularSearches } from '@/lib/search-engine'
 import { prisma } from '@/lib/prisma'
+import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,6 +12,23 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || 'all'
     const popular = searchParams.get('popular')
     const suggest = searchParams.get('suggest')
+    const country = searchParams.get('country')
+    const runtime = await getPlatformRuntimeConfig(country)
+    if (
+      runtime.maintenance.enabled ||
+      !runtime.channels.mobile ||
+      !runtime.catalog.visible ||
+      !runtime.market.available
+    ) {
+      return NextResponse.json({
+        query: q || '',
+        lang,
+        categories: [],
+        subServices: [],
+        totalResults: 0,
+        unavailable: true,
+      }, { headers: { 'Cache-Control': 'no-store' } })
+    }
 
     if (popular === 'true') {
       const results = await getPopularSearches()

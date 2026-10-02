@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 
 function parseQuestions(questionsJson: string | null | undefined): any[] {
   if (!questionsJson) return []
@@ -18,7 +19,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const jobCategoryId = searchParams.get('jobCategoryId')
     const slug = searchParams.get('slug')
-    const country = searchParams.get('country') || 'LK'
+    const country = (searchParams.get('country') || 'LK').toUpperCase()
+    const runtime = await getPlatformRuntimeConfig(country)
+    if (
+      runtime.maintenance.enabled ||
+      !runtime.channels.mobile ||
+      !runtime.catalog.visible ||
+      !runtime.market.available
+    ) {
+      return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } })
+    }
 
     const where: any = { isActive: true, countryCode: country }
     if (jobCategoryId) where.jobCategoryId = jobCategoryId

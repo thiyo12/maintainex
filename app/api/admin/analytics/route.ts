@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
+import { evaluateEffectivePermission } from '@/lib/crm/governance'
 import type { AdminSession } from '@/lib/admin-types'
 
 function sessionFromGuard(context: {
@@ -31,6 +32,17 @@ export async function GET(request: NextRequest) {
     if (!guard.ok) return guard.response
     const security = guard.context
 
+    const allowed = (permission: string) =>
+      evaluateEffectivePermission({
+        role: security.role,
+        permission,
+        overrides: security.permissionOverrides,
+      }).allowed
+
+    const canFinance = allowed('finance:payments:view')
+    const canRealEstate = allowed('realestate:view')
+    const canDisputes = allowed('disputes:view')
+
     const countryFilter = getCrmCountryFilter(security)
     const branchScopeResult = await resolveReportBranchScope(sessionFromGuard(security), null)
     if (!branchScopeResult.ok) {
@@ -38,6 +50,7 @@ export async function GET(request: NextRequest) {
     }
     const branchIds = branchScopeResult.scope.branchIds
     const activityWhere = branchIds === null ? {} : { branchId: { in: branchIds } }
+    const staleCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
     const [
       totalUsers,
@@ -47,9 +60,14 @@ export async function GET(request: NextRequest) {
       openJobs,
       completedJobs,
       cancelledJobs,
+      staleJobs,
       commissionData,
       usersByRole,
       recentActivity,
+      openDisputes,
+      realEstateTotal,
+      realEstatePending,
+      avgTaskerResponse,
     ] = await Promise.all([
       prisma.user.count({ where: { isActive: true, ...countryFilter } }),
       prisma.taskerProfile.count({ where: { isVerified: true, ...countryFilter } }),
@@ -58,11 +76,20 @@ export async function GET(request: NextRequest) {
       prisma.marketplaceJob.count({ where: { status: 'OPEN', ...countryFilter } }),
       prisma.marketplaceJob.count({ where: { status: 'COMPLETED', ...countryFilter } }),
       prisma.marketplaceJob.count({ where: { status: 'CANCELLED', ...countryFilter } }),
-      prisma.commissionSettlement.aggregate({
-        _sum: { commissionAmount: true, jobAmount: true },
-        _count: true,
-        where: countryFilter,
+      prisma.marketplaceJob.count({
+        where: {
+          ...countryFilter,
+          status: { in: ['OPEN', 'QUOTE_ACCEPTED', 'IN_PROGRESS'] },
+          updatedAt: { lt: staleCutoff },
+        },
       }),
+      canFinance
+        ? prisma.commissionSettlement.aggregate({
+            _sum: { commissionAmount: true, jobAmount: true },
+            _count: true,
+            where: countryFilter,
+          })
+        : Promise.resolve({ _sum: { commissionAmount: null, jobAmount: null }, _count: 0 }),
       prisma.user.groupBy({
         by: ['role'],
         _count: true,
@@ -82,13 +109,37 @@ export async function GET(request: NextRequest) {
           createdAt: true,
         },
       }),
+      canDisputes
+        ? prisma.marketplaceDispute.count({
+            where: {
+              ...countryFilter,
+              status: { in: ['OPEN', 'UNDER_REVIEW', 'RESOLVING'] },
+            },
+          })
+        : Promise.resolve(0),
+      canRealEstate
+        ? prisma.realEstateListing.count({ where: countryFilter })
+        : Promise.resolve(0),
+      canRealEstate
+        ? prisma.realEstateListing.count({ where: { ...countryFilter, status: 'pending' } })
+        : Promise.resolve(0),
+      prisma.taskerProfile.aggregate({
+        where: { isVerified: true, ...countryFilter },
+        _avg: { avgResponseMin: true },
+      }),
     ])
 
-    const totalRevenue = Number(commissionData._sum.jobAmount || 0) / 100
-    const totalCommission = Number(commissionData._sum.commissionAmount || 0) / 100
+    const totalRevenue = canFinance ? Number(commissionData._sum.jobAmount || 0) / 100 : null
+    const totalCommission = canFinance ? Number(commissionData._sum.commissionAmount || 0) / 100 : null
+    const completionRate = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0
 
     return NextResponse.json(
       {
+        visibility: {
+          finance: canFinance,
+          realEstate: canRealEstate,
+          disputes: canDisputes,
+        },
         summary: {
           totalUsers,
           activeTaskers,
@@ -97,9 +148,15 @@ export async function GET(request: NextRequest) {
           openJobs,
           completedJobs,
           cancelledJobs,
+          staleJobs,
+          completionRate,
+          openDisputes,
+          realEstateTotal,
+          realEstatePending,
+          avgTaskerResponseMin: Math.round(Number(avgTaskerResponse._avg.avgResponseMin || 0)),
           totalRevenue,
           totalCommission,
-          commissionCount: commissionData._count,
+          commissionCount: canFinance ? commissionData._count : null,
         },
         jobsByStatus: {
           open: openJobs,

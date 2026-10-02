@@ -6,6 +6,7 @@ import {
   redactCrmSensitiveData,
 } from '@/lib/crm/security'
 import { getCrmSectionAccess } from '@/lib/crm/section-access'
+import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 
 function safeJson(value: unknown) {
   return redactCrmSensitiveData(
@@ -15,6 +16,22 @@ function safeJson(value: unknown) {
       )
     )
   )
+}
+
+function canLivePermission(
+  security: {
+    role: any
+    permissionOverrides: Array<{ permission: string; effect: 'ALLOW' | 'DENY' }>
+  },
+  permission: string
+): boolean {
+  const entry = getPermissionCatalogEntry(permission)
+  return evaluateEffectivePermission({
+    role: security.role,
+    permission,
+    permissionClass: entry?.class,
+    overrides: security.permissionOverrides,
+  }).allowed
 }
 
 export async function GET(
@@ -103,7 +120,7 @@ export async function GET(
       finance: canFinance,
       trust: canTrust,
       audit: canAudit,
-    } = getCrmSectionAccess(security.role, security.isSuperAdmin)
+    } = getCrmSectionAccess(security.role, security.isSuperAdmin, security.permissionOverrides)
 
     const [
       documents,
@@ -298,6 +315,10 @@ export async function GET(
           finance: canFinance,
           trust: canTrust,
           audit: canAudit,
+          actions: {
+            suspend: canLivePermission(security, 'companies:status:manage'),
+            verify: canLivePermission(security, 'companies:verify'),
+          },
         },
         company: companyView,
         documents,

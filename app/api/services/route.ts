@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
+import { getRegionFromHost } from '@/lib/regions'
+
+function requestCountry(request: NextRequest): string {
+  const requested = new URL(request.url).searchParams.get('country')?.trim().toUpperCase()
+  if (requested && /^[A-Z]{2}$/.test(requested)) return requested
+  return getRegionFromHost(request.headers.get('host') || '')
+}
 
 function serializeService(service: any) {
   return {
     ...service,
-    price: service.price ? Number(service.price) : null,
+    title: service.name,
+    price: service.price === null ? null : Number(service.price),
+    duration: service.duration === null ? null : Number(service.duration),
   }
 }
 
@@ -14,124 +23,44 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const categorySlug = searchParams.get('category')
     const includeReviews = searchParams.get('reviews') === 'true'
-    const includeAll = searchParams.get('all') === 'true'
+    const country = requestCountry(request)
+    const runtime = await getPlatformRuntimeConfig(country)
 
-    // Test simple query first
-    const testCount = await prisma.service.count()
-    console.log('Service count:', testCount)
+    if (!runtime.catalog.visible || !runtime.market.available) {
+      return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } })
+    }
 
-    // Public API: only active services
-    // Admin API (all=true): include all services
-    const where: any = includeAll ? {} : { isActive: true }
+    const where: any = {
+      isActive: true,
+      countryCode: country,
+    }
     if (categorySlug) {
-      where.category = { slug: categorySlug }
+      where.category = { slug: categorySlug, countryCode: country }
     }
 
     const services = await prisma.service.findMany({
       where,
-      include: { 
+      include: {
         category: true,
-        reviews: includeReviews ? {
-          where: { status: 'APPROVED' }
-        } : false
+        reviews: includeReviews
+          ? { where: { status: 'APPROVED' } }
+          : false,
       },
       orderBy: [
         { category: { displayOrder: 'asc' } },
-        { displayOrder: 'asc' }
-      ]
+        { displayOrder: 'asc' },
+      ],
     })
 
-    const serializedServices = services.map(serializeService)
-
-    return NextResponse.json(serializedServices, {
+    return NextResponse.json(services.map(serializeService), {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
     })
   } catch (error) {
-    console.error('Services fetch error:', error)
+    console.error('Public services GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch services' }, { status: 500 })
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const isSuperAdmin = session.role === 'SUPER_ADMIN'
-    const canManage = isSuperAdmin || session.canEditServices
-
-    const body = await request.json()
-    const { type } = body
-
-    if (type === 'category') {
-      if (!isSuperAdmin) {
-        return NextResponse.json({ error: 'Only Super Admin can manage categories' }, { status: 403 })
-      }
-
-      if (!body.name || body.name.trim().length < 2) {
-        return NextResponse.json({ error: 'Category name must be at least 2 characters' }, { status: 400 })
-      }
-
-      const category = await prisma.category.create({
-        data: {
-          name: body.name,
-          slug: body.slug?.toLowerCase().replace(/\s+/g, '-') || body.name.toLowerCase().replace(/\s+/g, '-'),
-          icon: body.icon || null,
-          image: body.image || null,
-          isActive: body.isActive ?? true
-        }
-      })
-      return NextResponse.json(category, { status: 201 })
-    }
-
-    if (type === 'service') {
-      if (!canManage) {
-        return NextResponse.json({ error: 'Only Super Admin or authorized admins can manage services' }, { status: 403 })
-      }
-
-      if (!body.name || body.name.trim().length < 2) {
-        return NextResponse.json({ error: 'Service name must be at least 2 characters' }, { status: 400 })
-      }
-
-      if (!body.categoryId) {
-        return NextResponse.json({ error: 'Category is required' }, { status: 400 })
-      }
-
-      if (body.price && (isNaN(parseFloat(body.price)) || parseFloat(body.price) < 0)) {
-        return NextResponse.json({ error: 'Price must be a positive number' }, { status: 400 })
-      }
-
-      if (body.duration && (isNaN(parseInt(body.duration)) || parseInt(body.duration) < 0)) {
-        return NextResponse.json({ error: 'Duration must be a positive number' }, { status: 400 })
-      }
-      
-      const service = await prisma.service.create({
-        data: {
-          name: body.name,
-          description: body.description || '',
-          shortDescription: body.shortDescription || body.description || null,
-          image: body.image || null,
-          price: body.price ? parseFloat(body.price) : 0,
-          duration: body.duration ? parseInt(body.duration) : 0,
-          categoryId: body.categoryId,
-          displayOrder: body.displayOrder ? parseInt(body.displayOrder) : 0,
-          features: JSON.stringify(body.features || []),
-          isActive: body.isActive ?? true
-        },
-        include: { category: true }
-      })
-
-      return NextResponse.json(serializeService(service), { status: 201 })
-    }
-
-    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
-  } catch {
-    return NextResponse.json({ error: 'Failed to create resource' }, { status: 500 })
   }
 }

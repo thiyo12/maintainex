@@ -1,111 +1,607 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { FiArrowLeft, FiClock, FiPlus, FiRefreshCw, FiTag, FiZap } from 'react-icons/fi'
+import {
+  FiArrowLeft,
+  FiClock,
+  FiPlus,
+  FiRefreshCw,
+  FiTag,
+  FiZap,
+} from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmCard,
+  CrmField,
+  CrmMetricCard,
+  CrmPageHeader,
+  CrmState,
+  CrmTabs,
+  crmInputClass,
+} from '@/components/crm/v2/CrmPrimitives'
+import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 
-interface Payload { seasonal:any[]; flash:any[]; canManageGlobalFlash:boolean }
-
-export default function OffersManagementPage(){
-  const {user}=useAdminSession()
-  const role=(user?.role||'SUPPORT') as AdminRole
-  const canEdit=(ROLE_PERMISSIONS[role]||[]).includes('settings:edit')
-  const [data,setData]=useState<Payload>({seasonal:[],flash:[],canManageGlobalFlash:false})
-  const [loading,setLoading]=useState(true)
-  const [busy,setBusy]=useState<string|null>(null)
-  const [show,setShow]=useState(false)
-  const [type,setType]=useState<'seasonal'|'flash'>('seasonal')
-  const [form,setForm]=useState<any>({title:'',description:'',season:'general',country:'LK',discountType:'PERCENTAGE',discountValue:'10',startsAt:'',expiresAt:'',isActive:true})
-
-  const load=useCallback(async()=>{
-    setLoading(true)
-    try{
-      const r=await fetch('/api/admin/platform/offers',{credentials:'include',cache:'no-store'})
-      const b=await r.json().catch(()=>({}))
-      if(!r.ok)throw new Error(b?.error||'Unable to load offers')
-      setData(b)
-    }catch(e){toast.error(e instanceof Error?e.message:'Failed to load offers')}
-    finally{setLoading(false)}
-  },[])
-  useEffect(()=>{load()},[load])
-
-  async function toggle(kind:'seasonal'|'flash',item:any){
-    setBusy(item.id)
-    try{
-      const r=await fetch('/api/admin/platform/offers',{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:kind,id:item.id,isActive:!item.isActive})})
-      const b=await r.json().catch(()=>({}))
-      if(!r.ok)throw new Error(b?.error||'Update failed')
-      toast.success(`${item.title} ${item.isActive?'deactivated':'activated'}`)
-      await load()
-    }catch(e){toast.error(e instanceof Error?e.message:'Update failed')}
-    finally{setBusy(null)}
-  }
-
-  async function create(){
-    setBusy('create')
-    try{
-      const payload=type==='seasonal'
-        ? {type,title:form.title,description:form.description,season:form.season,country:form.country,isActive:form.isActive}
-        : {type,title:form.title,description:form.description,discountType:form.discountType,discountValue:Number(form.discountValue),startsAt:form.startsAt,expiresAt:form.expiresAt,isActive:form.isActive}
-      const r=await fetch('/api/admin/platform/offers',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-      const b=await r.json().catch(()=>({}))
-      if(!r.ok)throw new Error(b?.error||'Create failed')
-      toast.success('Offer created')
-      setShow(false)
-      setForm({title:'',description:'',season:'general',country:'LK',discountType:'PERCENTAGE',discountValue:'10',startsAt:'',expiresAt:'',isActive:true})
-      await load()
-    }catch(e){toast.error(e instanceof Error?e.message:'Create failed')}
-    finally{setBusy(null)}
-  }
-
-  if(loading)return <div className="h-[560px] rounded-2xl border border-slate-200 bg-white animate-pulse"/>
-
-  return <div className="space-y-5">
-    <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div><Link href="/admin/platform" className="inline-flex items-center gap-2 text-sm text-slate-500"><FiArrowLeft/> Platform management</Link><div className="mt-3 text-xs uppercase tracking-[0.16em] text-amber-600 font-semibold">Campaign operations</div><h1 className="mt-1 text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">Offers & Promotions</h1><p className="mt-1.5 text-sm text-slate-500">Manage real seasonal and flash promotion records used by MaintainEX.</p></div>
-      <div className="flex gap-2"><button onClick={load} className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-sm inline-flex items-center gap-2"><FiRefreshCw/> Refresh</button>{canEdit&&<button onClick={()=>setShow(true)} className="h-10 px-4 rounded-xl bg-slate-950 text-white text-sm font-semibold inline-flex items-center gap-2"><FiPlus/> New offer</button>}</div>
-    </section>
-
-    <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-      <Metric label="Seasonal offers" value={data.seasonal.length}/>
-      <Metric label="Active seasonal" value={data.seasonal.filter(x=>x.isActive).length}/>
-      <Metric label="Flash offers" value={data.flash.length}/>
-      <Metric label="Active flash" value={data.flash.filter(x=>x.isActive&&new Date(x.expiresAt)>new Date()).length}/>
-    </section>
-
-    <div className="grid xl:grid-cols-2 gap-5">
-      <Panel title="Seasonal offers" icon={FiTag}>
-        {data.seasonal.length?data.seasonal.map(item=><OfferRow key={item.id} item={item} meta={`${item.country} · ${item.season} · ${item._count?.jobs||0} jobs`} canEdit={canEdit} busy={busy===item.id} onToggle={()=>toggle('seasonal',item)}/>):<Empty/>}
-      </Panel>
-      <Panel title="Flash offers" icon={FiZap}>
-        {data.flash.length?data.flash.map(item=><OfferRow key={item.id} item={item} meta={`${item.discountType} ${item.discountValue} · expires ${date(item.expiresAt)}`} canEdit={canEdit&&data.canManageGlobalFlash} busy={busy===item.id} onToggle={()=>toggle('flash',item)}/>):<Empty/>}
-        {!data.canManageGlobalFlash&&<div className="mt-3 text-xs text-slate-400">Global flash offers are visible but only SUPER_ADMIN can modify them.</div>}
-      </Panel>
-    </div>
-
-    {show&&<div className="fixed inset-0 z-50 bg-slate-950/60 p-4 flex items-center justify-center" onClick={()=>setShow(false)}><div className="w-full max-w-xl rounded-2xl bg-white border border-slate-200 shadow-2xl" onClick={e=>e.stopPropagation()}>
-      <div className="p-5 border-b border-slate-100"><h2 className="font-semibold text-slate-900">Create offer</h2><p className="text-xs text-slate-400 mt-1">This action is rate-limited and audited.</p></div>
-      <div className="p-5 space-y-4">
-        <div className="flex gap-2"><button onClick={()=>setType('seasonal')} className={`px-3 py-2 rounded-xl text-sm ${type==='seasonal'?'bg-slate-950 text-white':'bg-slate-100'}`}>Seasonal</button>{data.canManageGlobalFlash&&<button onClick={()=>setType('flash')} className={`px-3 py-2 rounded-xl text-sm ${type==='flash'?'bg-slate-950 text-white':'bg-slate-100'}`}>Flash</button>}</div>
-        <Input label="Title" value={form.title} onChange={v=>setForm((x:any)=>({...x,title:v}))}/><Input label="Description" value={form.description} onChange={v=>setForm((x:any)=>({...x,description:v}))}/>
-        {type==='seasonal'?<div className="grid grid-cols-2 gap-3"><Select label="Season" value={form.season} options={['general','spring','summer','fall','winter']} onChange={v=>setForm((x:any)=>({...x,season:v}))}/><Input label="Country" value={form.country} onChange={v=>setForm((x:any)=>({...x,country:v.toUpperCase()}))}/></div>:<>
-          <div className="grid grid-cols-2 gap-3"><Select label="Discount type" value={form.discountType} options={['PERCENTAGE','FLAT']} onChange={v=>setForm((x:any)=>({...x,discountType:v}))}/><Input label="Discount value" value={form.discountValue} onChange={v=>setForm((x:any)=>({...x,discountValue:v}))}/></div>
-          <div className="grid grid-cols-2 gap-3"><Input label="Starts at (ISO/date)" value={form.startsAt} onChange={v=>setForm((x:any)=>({...x,startsAt:v}))}/><Input label="Expires at (ISO/date)" value={form.expiresAt} onChange={v=>setForm((x:any)=>({...x,expiresAt:v}))}/></div>
-        </>}
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isActive} onChange={e=>setForm((x:any)=>({...x,isActive:e.target.checked}))} className="accent-amber-500"/> Active immediately</label>
-      </div>
-      <div className="p-5 border-t border-slate-100 flex justify-end gap-2"><button onClick={()=>setShow(false)} className="h-10 px-4 rounded-xl border border-slate-200 text-sm">Cancel</button><button disabled={busy==='create'} onClick={create} className="h-10 px-4 rounded-xl bg-slate-950 text-white text-sm font-semibold disabled:opacity-50">Create</button></div>
-    </div></div>}
-  </div>
+interface SeasonalOffer {
+  id: string
+  title: string
+  description?: string | null
+  season: string
+  country: string
+  isActive: boolean
+  createdAt: string
+  _count?: { jobs: number }
 }
 
-function date(v:string){return new Date(v).toLocaleDateString('en-LK')}
-function Metric({label,value}:{label:string;value:number}){return <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-400">{label}</div><div className="mt-2 text-2xl font-semibold text-slate-950">{value}</div></div>}
-function Panel({title,icon:Icon,children}:{title:string;icon:any;children:React.ReactNode}){return <section className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2"><Icon className="text-amber-600"/><h2 className="font-semibold text-slate-900">{title}</h2></div><div className="mt-4 space-y-2">{children}</div></section>}
-function OfferRow({item,meta,canEdit,busy,onToggle}:{item:any;meta:string;canEdit:boolean;busy:boolean;onToggle:()=>void}){return <div className="rounded-xl border border-slate-200 p-3 flex items-center justify-between gap-4"><div><div className="font-medium text-slate-800">{item.title}</div><div className="text-xs text-slate-400 mt-1">{meta}</div></div><div className="flex items-center gap-2"><span className={`text-[10px] px-2 py-1 rounded-full border ${item.isActive?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-slate-50 text-slate-500 border-slate-200'}`}>{item.isActive?'ACTIVE':'INACTIVE'}</span>{canEdit&&<button disabled={busy} onClick={onToggle} className="px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold disabled:opacity-50">{item.isActive?'Deactivate':'Activate'}</button>}</div></div>}
-function Empty(){return <div className="py-8 text-center text-sm text-slate-400"><FiClock className="mx-auto mb-2"/>No offers in this group.</div>}
-function Input({label,value,onChange}:{label:string;value:string;onChange:(v:string)=>void}){return <label className="block"><span className="text-xs text-slate-600">{label}</span><input value={value} onChange={e=>onChange(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm"/></label>}
-function Select({label,value,options,onChange}:{label:string;value:string;options:string[];onChange:(v:string)=>void}){return <label className="block"><span className="text-xs text-slate-600">{label}</span><select value={value} onChange={e=>onChange(e.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm">{options.map(o=><option key={o}>{o}</option>)}</select></label>}
+interface FlashOffer {
+  id: string
+  title: string
+  description?: string | null
+  discountType: 'PERCENTAGE' | 'FLAT' | string
+  discountValue: number
+  startsAt: string
+  expiresAt: string
+  currentClaims: number
+  maxClaims: number
+  isActive: boolean
+  createdAt: string
+}
+
+interface Payload {
+  seasonal: SeasonalOffer[]
+  flash: FlashOffer[]
+  canManageGlobalFlash: boolean
+}
+
+interface OfferForm {
+  title: string
+  description: string
+  season: string
+  country: string
+  discountType: 'PERCENTAGE' | 'FLAT'
+  discountValue: string
+  startsAt: string
+  expiresAt: string
+  isActive: boolean
+}
+
+const EMPTY_FORM: OfferForm = {
+  title: '',
+  description: '',
+  season: 'general',
+  country: 'LK',
+  discountType: 'PERCENTAGE',
+  discountValue: '10',
+  startsAt: '',
+  expiresAt: '',
+  isActive: false,
+}
+
+export default function OffersManagementPage() {
+  const { user } = useAdminSession()
+  const canView = Boolean(user?.permissions?.includes('promotions:view'))
+  const canManage = Boolean(user?.permissions?.includes('promotions:manage'))
+
+  const markets = useMemo(() => {
+    if (!user) return ['LK']
+    const scoped = user.assignedCountries || []
+    const known = user.markets?.map(market => market.code) || []
+    const merged = Array.from(new Set([...scoped, ...known]))
+    return merged.length ? merged : ['LK']
+  }, [user])
+
+  const [data, setData] = useState<Payload>({
+    seasonal: [],
+    flash: [],
+    canManageGlobalFlash: false,
+  })
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [type, setType] = useState<'seasonal' | 'flash'>('seasonal')
+  const [form, setForm] = useState<OfferForm>(EMPTY_FORM)
+
+  const load = useCallback(async () => {
+    if (!canView) {
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch('/api/admin/platform/offers', {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body?.error || 'Unable to load offers')
+      setData({
+        seasonal: body.seasonal || [],
+        flash: body.flash || [],
+        canManageGlobalFlash: Boolean(body.canManageGlobalFlash),
+      })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load offers')
+    } finally {
+      setLoading(false)
+    }
+  }, [canView])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  useEffect(() => {
+    if (!markets.includes(form.country)) {
+      setForm(current => ({ ...current, country: markets[0] }))
+    }
+  }, [form.country, markets])
+
+  const activeSeasonal = data.seasonal.filter(item => item.isActive).length
+  const activeFlash = data.flash.filter(
+    item => item.isActive && new Date(item.expiresAt) > new Date()
+  ).length
+
+  async function toggle(kind: 'seasonal' | 'flash', item: SeasonalOffer | FlashOffer) {
+    if (!canManage) return
+    if (kind === 'flash' && !data.canManageGlobalFlash) return
+
+    setBusy(item.id)
+    try {
+      const response = await fetch('/api/admin/platform/offers', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: kind,
+          id: item.id,
+          isActive: !item.isActive,
+        }),
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body?.error || 'Promotion update failed')
+      toast.success(`${item.title} ${item.isActive ? 'deactivated' : 'activated'}`)
+      await load()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Promotion update failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  function openCreate() {
+    if (!canManage) return
+    setType('seasonal')
+    setForm({
+      ...EMPTY_FORM,
+      country: markets[0] || 'LK',
+    })
+    setShowCreate(true)
+  }
+
+  async function create() {
+    if (!canManage) return
+    if (!form.title.trim()) {
+      toast.error('Offer title is required')
+      return
+    }
+
+    if (type === 'flash') {
+      const discount = Number(form.discountValue)
+      if (!Number.isFinite(discount) || discount <= 0) {
+        toast.error('Enter a valid discount value')
+        return
+      }
+      if (form.discountType === 'PERCENTAGE' && discount > 100) {
+        toast.error('Percentage discounts cannot exceed 100%')
+        return
+      }
+      if (!form.startsAt || !form.expiresAt) {
+        toast.error('Flash offers require a start and expiry time')
+        return
+      }
+    }
+
+    setBusy('create')
+    try {
+      const payload =
+        type === 'seasonal'
+          ? {
+              type,
+              title: form.title.trim(),
+              description: form.description.trim(),
+              season: form.season,
+              country: form.country,
+              isActive: form.isActive,
+            }
+          : {
+              type,
+              title: form.title.trim(),
+              description: form.description.trim(),
+              discountType: form.discountType,
+              discountValue: Number(form.discountValue),
+              startsAt: form.startsAt,
+              expiresAt: form.expiresAt,
+              isActive: form.isActive,
+            }
+
+      const response = await fetch('/api/admin/platform/offers', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body?.error || 'Promotion creation failed')
+
+      toast.success('Promotion created and audited')
+      setShowCreate(false)
+      await load()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Promotion creation failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  if (!canView && user) {
+    return (
+      <CrmState
+        type="permission"
+        title="Promotion access required"
+        description="Your current staff permissions do not allow this promotions workspace."
+      />
+    )
+  }
+
+  if (loading) {
+    return (
+      <CrmState
+        type="loading"
+        title="Loading promotions"
+        description="Loading seasonal and flash campaigns available to your staff scope."
+      />
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <CrmPageHeader
+        eyebrow="App & Web · Promotions"
+        title="Offers & promotions"
+        description="Operate real seasonal and flash campaigns with market scoping, owner-only global controls and audited mutations."
+        actions={
+          <>
+            <CrmButton variant="secondary" onClick={load}>
+              <FiRefreshCw size={14} />
+              Refresh
+            </CrmButton>
+            {canManage && (
+              <CrmButton variant="primary" onClick={openCreate}>
+                <FiPlus size={14} />
+                New offer
+              </CrmButton>
+            )}
+          </>
+        }
+        context={
+          <>
+            <Link
+              href="/admin/platform"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900"
+            >
+              <FiArrowLeft size={12} />
+              App & Web
+            </Link>
+            <CrmBadge tone={canManage ? 'success' : 'neutral'} dot>
+              {canManage ? 'Campaign management' : 'Read-only'}
+            </CrmBadge>
+            <CrmBadge tone={data.canManageGlobalFlash ? 'amber' : 'neutral'}>
+              {data.canManageGlobalFlash ? 'Global flash authority' : 'Market-scoped'}
+            </CrmBadge>
+          </>
+        }
+      />
+
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <CrmMetricCard
+          label="Seasonal offers"
+          value={data.seasonal.length.toLocaleString()}
+          helper={`${activeSeasonal} active`}
+          icon={<FiTag size={16} />}
+          tone="info"
+        />
+        <CrmMetricCard
+          label="Active seasonal"
+          value={activeSeasonal.toLocaleString()}
+          helper="Visible campaigns"
+          icon={<FiTag size={16} />}
+          tone="success"
+        />
+        <CrmMetricCard
+          label="Flash offers"
+          value={data.flash.length.toLocaleString()}
+          helper="Global campaigns"
+          icon={<FiZap size={16} />}
+          tone="amber"
+        />
+        <CrmMetricCard
+          label="Live flash"
+          value={activeFlash.toLocaleString()}
+          helper="Active and unexpired"
+          icon={<FiClock size={16} />}
+          tone={activeFlash > 0 ? 'warning' : 'neutral'}
+        />
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-2">
+        <CrmCard
+          title="Seasonal offers"
+          description="Country-scoped campaigns and seasonal merchandising."
+          action={<CrmBadge tone="info">{data.seasonal.length} total</CrmBadge>}
+        >
+          {data.seasonal.length === 0 ? (
+            <Empty label="No seasonal offers" />
+          ) : (
+            <div className="space-y-2">
+              {data.seasonal.map(item => (
+                <OfferRow
+                  key={item.id}
+                  title={item.title}
+                  meta={`${item.country} · ${item.season} · ${item._count?.jobs || 0} linked jobs`}
+                  active={item.isActive}
+                  canManage={canManage}
+                  busy={busy === item.id}
+                  onToggle={() => toggle('seasonal', item)}
+                />
+              ))}
+            </div>
+          )}
+        </CrmCard>
+
+        <CrmCard
+          title="Flash offers"
+          description="Global high-visibility campaigns. Mutation is owner-only."
+          action={<CrmBadge tone="amber">{data.flash.length} total</CrmBadge>}
+        >
+          {data.flash.length === 0 ? (
+            <Empty label="No flash offers" />
+          ) : (
+            <div className="space-y-2">
+              {data.flash.map(item => (
+                <OfferRow
+                  key={item.id}
+                  title={item.title}
+                  meta={`${item.discountType} ${item.discountValue} · ${item.currentClaims}/${item.maxClaims} claims · expires ${formatDate(item.expiresAt)}`}
+                  active={item.isActive && new Date(item.expiresAt) > new Date()}
+                  canManage={canManage && data.canManageGlobalFlash}
+                  busy={busy === item.id}
+                  onToggle={() => toggle('flash', item)}
+                />
+              ))}
+            </div>
+          )}
+
+          {!data.canManageGlobalFlash && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+              Global flash offers are visible for operational awareness, but only SUPER_ADMIN can create or modify them.
+            </div>
+          )}
+        </CrmCard>
+      </section>
+
+      <CrmModal
+        open={showCreate}
+        onClose={() => {
+          if (busy !== 'create') setShowCreate(false)
+        }}
+        title="Create promotion"
+        description="Campaign creation is permission-gated, validated and audited."
+        footer={
+          <>
+            <CrmButton
+              variant="secondary"
+              disabled={busy === 'create'}
+              onClick={() => setShowCreate(false)}
+            >
+              Cancel
+            </CrmButton>
+            <CrmButton
+              variant="primary"
+              disabled={busy === 'create'}
+              onClick={create}
+            >
+              {busy === 'create' ? 'Creating…' : 'Create promotion'}
+            </CrmButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <CrmTabs
+            items={[
+              { id: 'seasonal', label: 'Seasonal' },
+              ...(data.canManageGlobalFlash ? [{ id: 'flash', label: 'Flash' }] : []),
+            ]}
+            active={type}
+            onChange={id => setType(id as 'seasonal' | 'flash')}
+          />
+
+          <CrmField label="Title">
+            <input
+              value={form.title}
+              onChange={event => setForm(current => ({ ...current, title: event.target.value }))}
+              maxLength={160}
+              className={crmInputClass}
+              placeholder="Campaign title"
+            />
+          </CrmField>
+
+          <CrmField label="Description">
+            <textarea
+              value={form.description}
+              onChange={event => setForm(current => ({ ...current, description: event.target.value }))}
+              maxLength={1500}
+              rows={3}
+              className={`${crmInputClass} h-auto min-h-[90px] resize-y py-2.5`}
+            />
+          </CrmField>
+
+          {type === 'seasonal' ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <CrmField label="Season">
+                <select
+                  value={form.season}
+                  onChange={event => setForm(current => ({ ...current, season: event.target.value }))}
+                  className={crmInputClass}
+                >
+                  {['general', 'spring', 'summer', 'fall', 'winter'].map(season => (
+                    <option key={season} value={season}>{season}</option>
+                  ))}
+                </select>
+              </CrmField>
+              <CrmField label="Market">
+                <select
+                  value={form.country}
+                  onChange={event => setForm(current => ({ ...current, country: event.target.value }))}
+                  className={crmInputClass}
+                >
+                  {markets.map(code => (
+                    <option key={code} value={code}>
+                      {user?.markets?.find(market => market.code === code)?.name || code}
+                    </option>
+                  ))}
+                </select>
+              </CrmField>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <CrmField label="Discount type">
+                  <select
+                    value={form.discountType}
+                    onChange={event => setForm(current => ({
+                      ...current,
+                      discountType: event.target.value as 'PERCENTAGE' | 'FLAT',
+                    }))}
+                    className={crmInputClass}
+                  >
+                    <option value="PERCENTAGE">Percentage</option>
+                    <option value="FLAT">Flat</option>
+                  </select>
+                </CrmField>
+                <CrmField
+                  label="Discount value"
+                  hint={form.discountType === 'PERCENTAGE' ? 'Maximum 100%.' : 'Global flat value configured by owner.'}
+                >
+                  <input
+                    type="number"
+                    min="0"
+                    max={form.discountType === 'PERCENTAGE' ? 100 : undefined}
+                    step="0.01"
+                    value={form.discountValue}
+                    onChange={event => setForm(current => ({ ...current, discountValue: event.target.value }))}
+                    className={crmInputClass}
+                  />
+                </CrmField>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <CrmField label="Starts at">
+                  <input
+                    type="datetime-local"
+                    value={form.startsAt}
+                    onChange={event => setForm(current => ({ ...current, startsAt: event.target.value }))}
+                    className={crmInputClass}
+                  />
+                </CrmField>
+                <CrmField label="Expires at">
+                  <input
+                    type="datetime-local"
+                    value={form.expiresAt}
+                    onChange={event => setForm(current => ({ ...current, expiresAt: event.target.value }))}
+                    className={crmInputClass}
+                  />
+                </CrmField>
+              </div>
+            </>
+          )}
+
+          <label className="flex items-start justify-between gap-4 rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-4">
+            <div>
+              <div className="text-sm font-semibold text-slate-800">Activate immediately</div>
+              <div className="mt-1 text-xs leading-5 text-slate-500">
+                Disabled campaigns remain stored but are not active.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={event => setForm(current => ({ ...current, isActive: event.target.checked }))}
+              className="mt-0.5 h-5 w-5 accent-amber-500"
+            />
+          </label>
+        </div>
+      </CrmModal>
+    </div>
+  )
+}
+
+function OfferRow({
+  title,
+  meta,
+  active,
+  canManage,
+  busy,
+  onToggle,
+}: {
+  title: string
+  meta: string
+  active: boolean
+  canManage: boolean
+  busy: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-[var(--crm-border)] p-3.5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold text-slate-800">{title}</div>
+        <div className="mt-1 text-[11px] leading-5 text-slate-400">{meta}</div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <CrmBadge tone={active ? 'success' : 'neutral'} dot>
+          {active ? 'ACTIVE' : 'INACTIVE'}
+        </CrmBadge>
+        {canManage && (
+          <CrmButton
+            size="sm"
+            variant={active ? 'secondary' : 'primary'}
+            disabled={busy}
+            onClick={onToggle}
+          >
+            {active ? 'Deactivate' : 'Activate'}
+          </CrmButton>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Empty({ label }: { label: string }) {
+  return (
+    <div className="py-10 text-center text-xs text-slate-400">
+      <FiClock className="mx-auto mb-2" size={17} />
+      {label}
+    </div>
+  )
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('en-LK', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}

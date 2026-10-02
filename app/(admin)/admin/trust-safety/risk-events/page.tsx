@@ -4,7 +4,19 @@ import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiAlertTriangle, FiCheck, FiX, FiArrowUp, FiRefreshCw, FiMinus } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmPageHeader,
+  CrmState,
+  CrmTableFrame,
+  CrmTabs,
+  crmTableClass,
+  crmTdClass,
+  crmThClass,
+  type CrmTone,
+} from '@/components/crm/v2/CrmPrimitives'
+import { CrmPagination } from '@/components/crm/v2/CrmOperational'
 
 interface RiskEvent {
   id: string
@@ -20,18 +32,18 @@ interface RiskEvent {
   createdAt: string
 }
 
-const SEVERITY_COLORS: Record<string, string> = {
-  CRITICAL: 'bg-red-500/20 text-red-400 border-red-500/30',
-  HIGH: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  MEDIUM: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  LOW: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+function severityTone(value: string): CrmTone {
+  if (value === 'CRITICAL' || value === 'HIGH') return 'danger'
+  if (value === 'MEDIUM') return 'warning'
+  if (value === 'LOW') return 'info'
+  return 'neutral'
 }
 
-const RESOLUTION_COLORS: Record<string, string> = {
-  CONFIRMED: 'bg-red-500/20 text-red-400 border-red-500/30',
-  DISMISSED: 'bg-green-500/20 text-green-400 border-green-500/30',
-  ESCALATED: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  NO_ACTION: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+function resolutionTone(value?: string): CrmTone {
+  if (value === 'CONFIRMED') return 'danger'
+  if (value === 'DISMISSED' || value === 'NO_ACTION') return 'success'
+  if (value === 'ESCALATED') return 'warning'
+  return 'neutral'
 }
 
 export default function RiskEventsPage() {
@@ -40,9 +52,7 @@ export default function RiskEventsPage() {
 
 function RiskEventsContent() {
   const { user: admin } = useAdminSession()
-  const role = (admin?.role || 'SUPPORT') as AdminRole
-  const permissions = ROLE_PERMISSIONS[role] || []
-  const canResolve = permissions.includes('risk_events:resolve')
+  const canResolve = Boolean(admin?.permissions?.includes('risk:resolve'))
   const [events, setEvents] = useState<RiskEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('pending')
@@ -90,60 +100,73 @@ function RiskEventsContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center space-x-3">
-          <FiAlertTriangle className="w-6 h-6 text-orange-500" />
-          <h1 className="text-2xl font-bold text-white">Risk Events</h1>
-        </div>
-        <button onClick={fetchEvents} className="flex items-center space-x-2 px-3 py-2 bg-[#1A1B26] text-gray-300 rounded-lg hover:bg-[#24263a]">
-          <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /><span>Refresh</span>
-        </button>
-      </div>
+      <CrmPageHeader
+        eyebrow="Trust & Safety"
+        title="Risk events"
+        description="Review marketplace risk signals, linked jobs and governed response outcomes."
+        actions={
+          <CrmButton variant="secondary" onClick={fetchEvents} disabled={loading}>
+            <FiRefreshCw className={loading ? 'animate-spin' : ''} size={14} />
+            Refresh
+          </CrmButton>
+        }
+        context={
+          <>
+            <CrmBadge tone={canResolve ? 'success' : 'neutral'} dot>
+              {canResolve ? 'Resolution access' : 'Read-only access'}
+            </CrmBadge>
+            <CrmBadge tone="info">{total.toLocaleString()} records</CrmBadge>
+          </>
+        }
+      />
 
-      <div className="flex space-x-1 bg-[#15161E] rounded-lg p-1 overflow-x-auto">
-        {[{ key: 'pending', label: 'Pending Review' }, { key: 'reviewed', label: 'Reviewed' }, { key: 'all', label: 'All' }].map(f => (
-          <button key={f.key} onClick={() => { setStatusFilter(f.key); setPage(1) }}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${statusFilter === f.key ? 'bg-amber-500 text-[#0B0C12]' : 'text-gray-400 hover:text-white'}`}>
-            {f.label}
-          </button>
-        ))}
-      </div>
+      <CrmTabs
+        items={[
+          { id: 'pending', label: 'Pending review' },
+          { id: 'reviewed', label: 'Reviewed' },
+          { id: 'all', label: 'All' },
+        ]}
+        active={statusFilter}
+        onChange={id => { setStatusFilter(id); setPage(1) }}
+      />
 
-      <div className="bg-[#15161E] rounded-xl overflow-x-auto">
-        <table className="w-full min-w-[860px]">
+      <CrmTableFrame title="Risk event queue" description="Scoped marketplace and security signals">
+        <table className={`${crmTableClass} min-w-[860px]`}>
           <thead><tr className="border-b border-gray-800">
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Type</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Severity</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Actor</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Job</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Created</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Actions</th>
+            <th className={crmThClass}>Type</th>
+            <th className={crmThClass}>Severity</th>
+            <th className={crmThClass}>Actor</th>
+            <th className={crmThClass}>Job</th>
+            <th className={crmThClass}>Status</th>
+            <th className={crmThClass}>Created</th>
+            <th className={crmThClass}>Actions</th>
           </tr></thead>
-          <tbody className="divide-y divide-gray-800">
+          <tbody className="divide-y divide-[var(--crm-border)]">
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-500">
-                <div className="flex items-center justify-center space-x-2"><FiRefreshCw className="animate-spin" /><span>Loading...</span></div>
+              <tr><td colSpan={7} className="p-4">
+                <CrmState type="loading" title="Loading risk events" />
               </td></tr>
             ) : events.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-500">No risk events found</td></tr>
+              <tr><td colSpan={7} className="p-4">
+                <CrmState type="empty" title="No risk events found" />
+              </td></tr>
             ) : events.map(e => (
-              <tr key={e.id} className="hover:bg-[#1A1B26]">
-                <td className="px-4 py-3 text-sm text-white font-medium">{e.eventType}</td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${SEVERITY_COLORS[e.severity] || 'bg-gray-500/20 text-gray-400'}`}>{e.severity}</span>
+              <tr key={e.id} className="hover:bg-[#fafbf9]">
+                <td className={`${crmTdClass} font-semibold text-slate-900`}>{e.eventType}</td>
+                <td className={crmTdClass}>
+                  <CrmBadge tone={severityTone(e.severity)} dot>{e.severity}</CrmBadge>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-300">{e.actorUserId.slice(0, 8)}...</td>
-                <td className="px-4 py-3 text-sm text-gray-300">{e.job ? e.job.title : (e.jobId ? e.jobId.slice(0, 8) + '...' : '-')}</td>
-                <td className="px-4 py-3">
+                <td className={crmTdClass}>{e.actorUserId.slice(0, 8)}...</td>
+                <td className={crmTdClass}>{e.job ? e.job.title : (e.jobId ? e.jobId.slice(0, 8) + '...' : '-')}</td>
+                <td className={crmTdClass}>
                   {e.resolution ? (
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${RESOLUTION_COLORS[e.resolution] || ''}`}>{e.resolution}</span>
+                    <CrmBadge tone={resolutionTone(e.resolution)} dot>{e.resolution}</CrmBadge>
                   ) : (
-                    <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">PENDING</span>
+                    <CrmBadge tone="warning" dot>PENDING</CrmBadge>
                   )}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-400">{new Date(e.createdAt).toLocaleDateString()}</td>
-                <td className="px-4 py-3">
+                <td className={`${crmTdClass} text-xs text-slate-500`}>{new Date(e.createdAt).toLocaleDateString()}</td>
+                <td className={crmTdClass}>
                   {!e.reviewedAt && canResolve && (
                     <div className="flex items-center space-x-1">
                       <button onClick={() => handleReview(e.id, 'CONFIRMED', 'Confirmed by admin')} disabled={actionLoading === e.id}
@@ -166,18 +189,17 @@ function RiskEventsContent() {
             ))}
           </tbody>
         </table>
-      </div>
+      </CrmTableFrame>
 
       {totalPages > 1 && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-sm text-gray-400">{total} total</span>
-          <div className="flex items-center space-x-2">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              className="px-3 py-1.5 bg-[#1A1B26] text-gray-300 rounded-lg hover:bg-[#24263a] disabled:opacity-50 text-sm">Prev</button>
-            <span className="text-sm text-gray-400">Page {page} of {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              className="px-3 py-1.5 bg-[#1A1B26] text-gray-300 rounded-lg hover:bg-[#24263a] disabled:opacity-50 text-sm">Next</button>
-          </div>
+        <div className="crm-card overflow-hidden">
+          <CrmPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={20}
+            onPageChange={setPage}
+          />
         </div>
       )}
     </div>

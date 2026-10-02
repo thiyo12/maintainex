@@ -31,6 +31,7 @@ export async function createProfession(
       i18nKey: input.i18nKey,
       description: input.description,
       sortOrder: input.sortOrder ?? 0,
+      isActive: input.isActive ?? false,
     },
   })
 }
@@ -115,6 +116,7 @@ export async function createProfessionSkill(
       i18nKey: input.i18nKey,
       description: input.description,
       sortOrder: input.sortOrder ?? 0,
+      isActive: input.isActive ?? false,
     },
   })
 }

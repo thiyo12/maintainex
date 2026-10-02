@@ -1,187 +1,81 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
+import { getRegionFromHost } from '@/lib/regions'
 
-function serializeService(service: any) {
+function requestCountry(request: NextRequest): string {
+  const requested = new URL(request.url).searchParams.get('country')?.trim().toUpperCase()
+  if (requested && /^[A-Z]{2}$/.test(requested)) return requested
+  return getRegionFromHost(request.headers.get('host') || '')
+}
+
+function serializeService(service: {
+  id: string
+  name: string
+  slug: string | null
+  description: string | null
+  image: string | null
+  price: number | null
+  duration: number | null
+}) {
   return {
     id: service.id,
     name: service.name,
+    title: service.name,
     slug: service.slug || '',
     description: service.description || '',
     image: service.image || null,
-    price: service.price ? Number(service.price) : null,
-    duration: service.duration ? Number(service.duration) : null
+    price: service.price === null ? null : Number(service.price),
+    duration: service.duration === null ? null : Number(service.duration),
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const country = requestCountry(request)
+    const runtime = await getPlatformRuntimeConfig(country)
+    if (!runtime.catalog.visible || !runtime.market.available) {
+      return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } })
+    }
+
     const categories = await prisma.category.findMany({
-      where: { isActive: true },
+      where: { isActive: true, countryCode: country },
       include: {
         services: {
-          where: { isActive: true },
-          orderBy: { displayOrder: 'asc' }
+          where: { isActive: true, countryCode: country },
+          orderBy: { displayOrder: 'asc' },
         },
         _count: {
-          select: { services: true }
-        }
+          select: { services: true },
+        },
       },
-      orderBy: { displayOrder: 'asc' }
+      orderBy: { displayOrder: 'asc' },
     })
 
-    const serializedCategories = categories.map(cat => ({
-      id: cat.id,
-      name: cat.name,
-      slug: cat.slug,
-      description: cat.description,
-      icon: cat.icon,
-      image: cat.image,
-      displayOrder: cat.displayOrder,
-      _count: {
-        services: cat._count.services
-      },
-      services: cat.services.map(serializeService)
-    }))
-
-    return NextResponse.json(serializedCategories as any[], {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
+    return NextResponse.json(
+      categories.map(category => ({
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        description: category.description,
+        icon: category.icon,
+        image: category.image,
+        countryCode: category.countryCode,
+        displayOrder: category.displayOrder,
+        serviceCount: category.services.length,
+        _count: { services: category.services.length },
+        services: category.services.map(serializeService),
+      })),
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
       }
-    })
-  } catch {
+    )
+  } catch (error) {
+    console.error('Public categories GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 })
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getSession(request)
-    if (!session || session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { name, slug, description, icon, image, displayOrder } = body
-
-    if (!name || !slug) {
-      return NextResponse.json({ error: 'Name and slug are required' }, { status: 400 })
-    }
-
-    const existing = await prisma.category.findFirst({
-      where: {
-        OR: [
-          { name },
-          { slug }
-        ]
-      }
-    })
-
-    if (existing) {
-      return NextResponse.json({ error: 'Category with this name or slug already exists' }, { status: 400 })
-    }
-
-    // Get max displayOrder if not provided
-    let order = displayOrder
-    if (order === undefined) {
-      const maxOrder = await prisma.category.aggregate({
-        _max: { displayOrder: true }
-      })
-      order = (maxOrder._max.displayOrder || 0) + 1
-    }
-
-    const category = await prisma.category.create({
-      data: {
-        name,
-        slug,
-        description: description || null,
-        icon: icon || null,
-        image: image || null,
-        displayOrder: order,
-        isActive: true
-      },
-      include: {
-        services: true,
-        _count: { select: { services: true } }
-      }
-    })
-
-    return NextResponse.json(category, { status: 201 })
-  } catch (error) {
-    console.error('Error creating category:', error)
-    return NextResponse.json({ error: 'Failed to create category' }, { status: 500 })
-  }
-}
-
-export async function PUT(request: NextRequest) {
-  try {
-    const session = await getSession(request)
-    if (!session || session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { id, name, slug, description, icon, image, isActive, displayOrder } = body
-
-    if (!id) {
-      return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })
-    }
-
-    const category = await prisma.category.update({
-      where: { id },
-      data: {
-        ...(name && { name }),
-        ...(slug && { slug }),
-        ...(description !== undefined && { description }),
-        ...(icon !== undefined && { icon }),
-        ...(image !== undefined && { image }),
-        ...(isActive !== undefined && { isActive }),
-        ...(displayOrder !== undefined && { displayOrder })
-      },
-      include: {
-        services: true,
-        _count: { select: { services: true } }
-      }
-    })
-
-    return NextResponse.json(category)
-  } catch (error) {
-    console.error('Error updating category:', error)
-    return NextResponse.json({ error: 'Failed to update category' }, { status: 500 })
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getSession(request)
-    if (!session || session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-
-    if (!id) {
-      return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })
-    }
-
-    const services = await prisma.service.count({
-      where: { categoryId: id }
-    })
-
-    if (services > 0) {
-      return NextResponse.json({ error: 'Cannot delete category with existing services' }, { status: 400 })
-    }
-
-    await prisma.category.delete({
-      where: { id }
-    })
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting category:', error)
-    return NextResponse.json({ error: 'Failed to delete category' }, { status: 500 })
   }
 }

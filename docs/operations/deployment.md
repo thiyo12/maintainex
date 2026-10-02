@@ -37,8 +37,12 @@ Stage 3: runtime (node:20-slim)
 | Variable | Purpose | Required |
 |----------|---------|----------|
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `JWT_SECRET` / `NEXTAUTH_SECRET` | JWT signing key (used for both admin and mobile) | Yes |
-| `INTERNAL_SYNC_SECRET` | Auth for internal API endpoints (readiness, IP blocklist) | Yes |
+| `MARKETPLACE_JWT_SECRET` | Marketplace access-token signing | Yes |
+| `STAFF_JWT_SECRET` | Staff/admin access-token signing | Yes |
+| `PASSWORD_PEPPER` | Password hashing pepper | Yes |
+| `CRON_SECRET` | Scheduled job authentication | Yes |
+| `INTERNAL_SYNC_SECRET` | Internal readiness/security synchronization auth | Yes |
+| `JWT_SECRET` / `NEXTAUTH_SECRET` | Legacy compatibility where still required | Compatibility-dependent |
 | `NODE_ENV` | `production` for prod builds | Yes |
 | `APP_RELEASE_SHA` | Git commit SHA for health/status endpoints | Recommended |
 | `LOG_LEVEL` | Override default log level | Optional |
@@ -135,24 +139,37 @@ npx prisma migrate resolve --rolled-back <migration_name>
 
 - [ ] `APP_RELEASE_SHA` set to current commit
 - [ ] `DATABASE_URL` accessible from container network
-- [ ] `JWT_SECRET` / `NEXTAUTH_SECRET` set
+- [ ] `MARKETPLACE_JWT_SECRET` set
+- [ ] `STAFF_JWT_SECRET` set
+- [ ] `PASSWORD_PEPPER` set
+- [ ] `CRON_SECRET` set
 - [ ] `INTERNAL_SYNC_SECRET` set
-- [ ] Local schema has `provider = "postgresql"` (not `sqlite`)
+- [ ] Canonical schema remains `provider = "postgresql"`
 - [ ] `.next` directory cleaned of macOS resource forks: `find .next -name '._*' -type f -delete`
 - [ ] `npm run build` succeeds locally
 - [ ] `npx prisma generate` succeeds
 - [ ] Docker image builds without errors
 - [ ] Health check passes: `curl http://localhost:3000/api/health`
 - [ ] Readiness check passes: `curl http://localhost:3000/api/internal/readiness -H "x-internal-sync: $SECRET"`
-- [ ] Known test account works: `test@test.com` / `test123`
+- [ ] Dedicated non-privileged production smoke account works; credentials are managed outside Git
+
+## Deployment Trigger Policy
+
+Only one production activation path may be active for a release:
+
+1. **Dokploy auto-deploy from `main`** — if enabled, merging the release PR is the deploy trigger. Complete credential rotation, backup, rollback capture, and environment verification **before merge**. Do not run `deploy-rsync.sh` in parallel.
+2. **Manual immutable deployment** — pause/disable the Dokploy `main` auto-deploy first, then run `deploy-rsync.sh` from the exact merged `main` commit.
+
+Never combine both paths for the same release.
 
 ## Deploy Script (`deploy-rsync.sh`)
 
 Automated deployment via rsync to VPS:
-1. Build locally
-2. Rsync artifacts to VPS
-3. Rebuild Docker image
-4. Update Swarm service
+1. Rsync source to VPS staging
+2. Copy source into the current app container
+3. Generate Prisma client and run the production build
+4. Commit the validated container and force-update the Swarm service
+5. Container startup runs `prisma migrate deploy` before `npm start`
 
 **Manual deployment steps** (per `AGENTS.md`):
 
@@ -160,8 +177,8 @@ Automated deployment via rsync to VPS:
 # 1. Clean macOS resource forks
 find .next -name '._*' -type f -delete
 
-# 2. Set schema provider
-sed -i '' 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
+# 2. Verify canonical PostgreSQL provider
+grep 'provider = "postgresql"' prisma/schema.prisma
 
 # 3. Package
 tar czf /tmp/maintainex-build.tar.gz .next package.json package-lock.json prisma public/
@@ -178,6 +195,4 @@ docker exec <container> npx prisma generate
 docker commit <container> maintainex-mx-vcaohy:prod-latest
 docker service update --force --image maintainex-mx-vcaohy:prod-latest maintainex-mx-vcaohy
 
-# 6. Revert schema locally
-sed -i '' 's/provider = "postgresql"/provider = "sqlite"/' prisma/schema.prisma
 ```

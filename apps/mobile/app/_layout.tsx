@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from '@/features/auth/context/auth'
 import i18next, { initI18n } from '../lib/i18n'
 import { ThemeProvider } from '../lib/theme'
 import { CountryProvider } from '../lib/country'
+import { RuntimeGate, RuntimeProvider, useRuntimeConfig } from '../lib/runtime'
 import { registerForPushNotifications, addNotificationListeners, getLastNotificationResponse } from '@/features/notifications/platform'
 
 SplashScreen.preventAutoHideAsync()
@@ -42,10 +43,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: any }> {
 function NotificationBootstrap() {
   const router = useRouter()
   const { user } = useAuth()
+  const { config } = useRuntimeConfig()
   const handledResponseId = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!user?.id) return
+    if (!user?.id || !config.notifications.enabled) return
 
     registerForPushNotifications().catch(() => {})
 
@@ -94,7 +96,7 @@ function NotificationBootstrap() {
     }).catch(() => {})
 
     return unsubscribe
-  }, [router, user?.id, user?.role])
+  }, [config.notifications.enabled, router, user?.id, user?.role])
 
   return null
 }
@@ -147,22 +149,26 @@ export default function RootLayout() {
     <ErrorBoundary>
     <ThemeProvider>
       <AuthProvider>
-        <NotificationBootstrap />
         <CountryProvider>
-        <I18nextProvider i18n={i18next}>
-          <StatusBar style="light" />
-          <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(customer)" />
-          <Stack.Screen name="(tasker)" />
-          <Stack.Screen name="(company)" />
-          <Stack.Screen name="(chat)" />
-          <Stack.Screen name="company-invite" />
-        </Stack>
-      </I18nextProvider>
-      </CountryProvider>
-    </AuthProvider>
+          <RuntimeProvider>
+            <NotificationBootstrap />
+            <RuntimeGate>
+              <I18nextProvider i18n={i18next}>
+                <StatusBar style="light" />
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(customer)" />
+                  <Stack.Screen name="(tasker)" />
+                  <Stack.Screen name="(company)" />
+                  <Stack.Screen name="(chat)" />
+                  <Stack.Screen name="company-invite" />
+                </Stack>
+              </I18nextProvider>
+            </RuntimeGate>
+          </RuntimeProvider>
+        </CountryProvider>
+      </AuthProvider>
     </ThemeProvider>
     </ErrorBoundary>
     </GestureHandlerRootView>

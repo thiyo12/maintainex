@@ -195,25 +195,22 @@ export async function POST(request: NextRequest) {
       maxAge: 7 * 24 * 60 * 60,
     })
 
-    response.cookies.set('refresh_token', refreshToken, {
+    // Remove the historical narrower cookie to avoid duplicate same-name
+    // refresh cookies being sent to the refresh endpoint.
+    response.cookies.set('refresh_token', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       path: '/api/admin/auth/refresh',
-      maxAge: 7 * 24 * 60 * 60,
+      maxAge: 0,
     })
 
     await recordLoginAttempt({ adminUserId: adminUser.id, email, ipAddress: ip, userAgent, success: true })
 
-    // Record device
-    try {
-      const ua = userAgent || 'unknown'
-      await prisma.userDevice.upsert({
-        where: { userId_deviceId: { userId: adminUser.id, deviceId: ua } },
-        update: { pushToken: null },
-        create: { userId: adminUser.id, deviceId: ua, platform: 'web' }
-      })
-    } catch (e) {}
+    // Admin device/session context is intentionally recorded through
+    // AdminSession + AdminLoginAttempt + SecurityAudit. Do not write the
+    // AdminUser ID into UserDevice: UserDevice belongs to the marketplace
+    // User model and its foreign key must never be used for staff identities.
 
     // Record successful login event
     try {

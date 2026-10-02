@@ -1,18 +1,36 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
   FiAlertTriangle,
   FiArrowLeft,
+  FiArrowUpRight,
+  FiCheckCircle,
+  FiClock,
   FiCreditCard,
   FiRefreshCw,
   FiRotateCw,
   FiSearch,
+  FiShield,
 } from 'react-icons/fi'
-import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmFilterBar,
+  CrmMetricCard,
+  CrmPageHeader,
+  CrmState,
+  CrmTableFrame,
+  crmInputClass,
+  crmTableClass,
+  crmTdClass,
+  crmThClass,
+  type CrmTone,
+} from '@/components/crm/v2/CrmPrimitives'
+import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { CrmPagination } from '@/components/crm/v2/CrmOperational'
 
 interface RefundItem {
   id: string
@@ -48,7 +66,12 @@ interface Payload {
     total: number
     pages: number
   }
+  actions: {
+    refund: boolean
+  }
 }
+
+type RefundAction = 'RETRY' | 'RECONCILE' | 'CONFIRM_MANUAL'
 
 function money(minor: string, currency: string) {
   const amount = Number(minor || 0) / 100
@@ -59,95 +82,159 @@ function money(minor: string, currency: string) {
   }).format(Number.isFinite(amount) ? amount : 0)
 }
 
-function date(value: string) {
+function date(value?: string | null) {
+  if (!value) return '—'
   return new Date(value).toLocaleString('en-LK', {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
 }
 
-function statusClass(status: string) {
-  if (status === 'REFUNDED') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  if (status === 'REFUND_PROCESSING') return 'bg-blue-50 text-blue-700 border-blue-200'
-  return 'bg-amber-50 text-amber-700 border-amber-200'
+function toneForStatus(status: string): CrmTone {
+  if (status === 'REFUNDED') return 'success'
+  if (status === 'REFUND_PROCESSING') return 'info'
+  if (status === 'CHARGEDBACK') return 'danger'
+  return 'warning'
+}
+
+function newIdempotencyKey(item: RefundItem, action: RefundAction) {
+  const nonce =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  return `crm-refund:${item.id}:${action.toLowerCase()}:${nonce}`
 }
 
 export default function RefundQueuePage() {
-  const { user } = useAdminSession()
-  const role = (user?.role || 'SUPPORT') as AdminRole
-  const canManage = (ROLE_PERMISSIONS[role] || []).includes('wallets:manage')
-
   const [payload, setPayload] = useState<Payload | null>(null)
   const [status, setStatus] = useState('')
   const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string | null>(null)
+  const [manualTarget, setManualTarget] = useState<RefundItem | null>(null)
+  const [manualReference, setManualReference] = useState('')
+  const [manualNote, setManualNote] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: '30',
+      })
       if (status) params.set('status', status)
-      params.set('limit', '100')
 
       const response = await fetch(`/api/admin/financial/refunds?${params.toString()}`, {
         credentials: 'include',
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
+
+      if (response.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
       if (!response.ok) throw new Error(body?.error || 'Unable to load refund queue')
+
       setPayload(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load refund queue')
     } finally {
       setLoading(false)
     }
-  }, [status])
+  }, [page, status])
 
   useEffect(() => {
     load()
   }, [load])
 
-  async function act(item: RefundItem, action: 'RETRY' | 'RECONCILE' | 'CONFIRM_MANUAL') {
-    if (!canManage) return
+  useEffect(() => {
+    setPage(1)
+  }, [status])
 
-    let manualReference = ''
-    let note = ''
-    if (action === 'CONFIRM_MANUAL') {
-      manualReference = window.prompt(
-        'Enter the bank transfer / PayHere dashboard refund reference. This permanently marks the external refund complete.'
-      )?.trim() || ''
-      if (manualReference.length < 4) {
-        toast.error('A manual refund reference is required')
-        return
-      }
-      note = window.prompt('Optional finance note:')?.trim() || ''
-      if (!window.confirm('Confirm the customer has actually received or been issued this external refund?')) {
-        return
-      }
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return payload?.refunds || []
+
+    return (payload?.refunds || []).filter(item =>
+      [
+        item.merchantOrderId,
+        item.paymentId,
+        item.job?.title,
+        item.job?.id,
+        item.customer?.name,
+        item.customer?.email,
+        item.customer?.mxId,
+      ].some(value => String(value || '').toLowerCase().includes(q))
+    )
+  }, [payload, query])
+
+  const metrics = useMemo(() => {
+    const all = payload?.refunds || []
+    return {
+      required: all.filter(item => item.status === 'REFUND_REQUIRED').length,
+      processing: all.filter(item => item.status === 'REFUND_PROCESSING').length,
+      refunded: all.filter(item => item.status === 'REFUNDED').length,
+      amount: all
+        .filter(item => item.status !== 'REFUNDED')
+        .reduce((sum, item) => sum + Number(item.amount || 0), 0),
+    }
+  }, [payload])
+
+  async function submitAction(
+    item: RefundItem,
+    action: RefundAction,
+    input?: { manualReference?: string; note?: string }
+  ) {
+    if (acting) return
+    if (!payload?.actions?.refund) {
+      toast.error('Your live staff permissions do not allow refund actions')
+      return
     }
 
     setActing(item.id)
     try {
+      const body: Record<string, unknown> = {
+        paymentIntentId: item.id,
+        action,
+      }
+
+      if (action !== 'RECONCILE') {
+        body.idempotencyKey = newIdempotencyKey(item, action)
+      }
+      if (action === 'CONFIRM_MANUAL') {
+        body.manualReference = input?.manualReference
+        body.note = input?.note
+      }
+
       const response = await fetch('/api/admin/financial/refunds', {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paymentIntentId: item.id,
-          action,
-          ...(manualReference ? { manualReference, note } : {}),
-        }),
+        body: JSON.stringify(body),
       })
-      const body = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        throw new Error(body?.result?.error || body?.error || 'Refund action failed')
+      const result = await response.json().catch(() => ({}))
+
+      if (!response.ok && response.status !== 202) {
+        throw new Error(result?.error || result?.result?.error || 'Refund action failed')
       }
-      toast.success(
-        body?.result?.status === 'REFUNDED'
-          ? 'PayHere refund confirmed'
-          : 'Refund status updated'
-      )
+
+      if (result?.mode === 'APPROVAL_REQUIRED') {
+        toast.success(
+          `Refund approval created · ${result.approval?.tier || 'review required'}`
+        )
+      } else {
+        toast.success(
+          result?.result?.status === 'REFUNDED'
+            ? 'Gateway refund state reconciled as refunded'
+            : 'Refund state reconciled'
+        )
+      }
+
+      setManualTarget(null)
+      setManualReference('')
+      setManualNote('')
       await load()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Refund action failed')
@@ -156,170 +243,340 @@ export default function RefundQueuePage() {
     }
   }
 
-  const q = query.trim().toLowerCase()
-  const rows = (payload?.refunds || []).filter(item => {
-    if (!q) return true
-    return [
-      item.merchantOrderId,
-      item.paymentId,
-      item.job?.title,
-      item.job?.id,
-      item.customer?.name,
-      item.customer?.email,
-      item.customer?.mxId,
-    ].some(value => String(value || '').toLowerCase().includes(q))
-  })
+  function openManual(item: RefundItem) {
+    setManualTarget(item)
+    setManualReference('')
+    setManualNote('')
+  }
+
+  async function submitManual() {
+    if (!manualTarget) return
+    if (manualReference.trim().length < 4) {
+      toast.error('Enter the external refund reference')
+      return
+    }
+
+    await submitAction(manualTarget, 'CONFIRM_MANUAL', {
+      manualReference: manualReference.trim(),
+      note: manualNote.trim(),
+    })
+  }
 
   return (
     <div className="space-y-5">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Link href="/admin/financial" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900">
-            <FiArrowLeft size={15} /> Finance Control Centre
-          </Link>
-          <div className="mt-3 text-xs uppercase tracking-[0.16em] text-amber-600 font-semibold">Payment recovery</div>
-          <h1 className="mt-1 text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">PayHere Refund Queue</h1>
-          <p className="mt-1.5 text-sm text-slate-500">
-            External card refunds stay here until PayHere reports the payment as REFUNDED.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={load}
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600"
+      <CrmPageHeader
+        eyebrow="Finance · Payment recovery"
+        title="Refund Queue"
+        description="Reconcile external gateway truth or submit refund execution for maker-checker approval. CRM never directly edits payment status."
+        actions={
+          <>
+            <Link href="/admin/approvals">
+              <CrmButton variant="secondary">
+                <FiShield size={14} />
+                Approval queue
+              </CrmButton>
+            </Link>
+            <CrmButton variant="secondary" onClick={load} disabled={loading}>
+              <FiRefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </CrmButton>
+          </>
+        }
+      />
+
+      <div>
+        <Link
+          href="/admin/financial"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-amber-700"
         >
-          <FiRefreshCw size={15} /> Refresh
-        </button>
+          <FiArrowLeft size={13} />
+          Finance Control Centre
+        </Link>
+      </div>
+
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <CrmMetricCard
+          label="Refund required"
+          value={metrics.required}
+          helper="Needs refund initiation"
+          icon={<FiAlertTriangle size={16} />}
+          tone={metrics.required > 0 ? 'warning' : 'neutral'}
+        />
+        <CrmMetricCard
+          label="Processing"
+          value={metrics.processing}
+          helper="Gateway/external processing"
+          icon={<FiClock size={16} />}
+          tone="info"
+        />
+        <CrmMetricCard
+          label="Confirmed"
+          value={metrics.refunded}
+          helper="Refund completed"
+          icon={<FiCheckCircle size={16} />}
+          tone="success"
+        />
+        <CrmMetricCard
+          label="Open value on page"
+          value={money(String(metrics.amount), payload?.refunds?.[0]?.currency || 'LKR')}
+          helper="Informational only; approvals use server amounts"
+          icon={<FiCreditCard size={16} />}
+          tone="neutral"
+        />
       </section>
 
-      <section className="grid grid-cols-3 gap-4">
-        <Metric label="Refund required" value={(payload?.refunds || []).filter(item => item.status === 'REFUND_REQUIRED').length} />
-        <Metric label="Processing" value={(payload?.refunds || []).filter(item => item.status === 'REFUND_PROCESSING').length} />
-        <Metric label="Confirmed" value={(payload?.refunds || []).filter(item => item.status === 'REFUNDED').length} />
-      </section>
+      <CrmFilterBar>
+        <div className="relative min-w-0 flex-1">
+          <FiSearch
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            size={15}
+          />
+          <input
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="Search order, payment, job or customer…"
+            className={`${crmInputClass} pl-9`}
+          />
+        </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-1">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <select
+          value={status}
+          onChange={event => setStatus(event.target.value)}
+          className={crmInputClass}
+          aria-label="Refund state"
+        >
+          <option value="">All refund states</option>
+          <option value="REFUND_REQUIRED">Refund required</option>
+          <option value="REFUND_PROCESSING">Processing</option>
+          <option value="REFUNDED">Refunded</option>
+        </select>
+      </CrmFilterBar>
+
+      {loading ? (
+        <CrmState
+          type="loading"
+          title="Loading refund queue"
+          description="Loading country-scoped payment intents and refund state."
+        />
+      ) : rows.length === 0 ? (
+        <CrmState
+          type="empty"
+          title="No refunds match this view"
+          description="No payment intents in this market match the current search and status filter."
+        />
+      ) : (
+        <CrmTableFrame
+          title="PayHere and external refund operations"
+          description="Retry and manual confirmation create governed approval requests. Reconcile only synchronizes gateway state."
+        >
+          <table className={`${crmTableClass} min-w-[1320px]`}>
+            <thead>
+              <tr>
+                <th className={crmThClass}>Payment</th>
+                <th className={crmThClass}>Customer</th>
+                <th className={crmThClass}>Job</th>
+                <th className={crmThClass}>Amount</th>
+                <th className={crmThClass}>State</th>
+                <th className={crmThClass}>Updated</th>
+                <th className={`${crmThClass} text-right`}>Controls</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(item => (
+                <tr key={item.id} className="transition-colors hover:bg-[#fafbf9]">
+                  <td className={crmTdClass}>
+                    <div className="font-mono text-xs font-semibold text-slate-800">
+                      {item.merchantOrderId}
+                    </div>
+                    <div className="mt-1 font-mono text-[10px] text-slate-400">
+                      {item.paymentId || item.id}
+                    </div>
+                  </td>
+
+                  <td className={crmTdClass}>
+                    {item.customer?.id ? (
+                      <Link
+                        href={`/admin/users/${item.customer.id}`}
+                        className="font-semibold text-slate-800 hover:text-amber-700"
+                      >
+                        {item.customer.name || item.customer.mxId || 'Customer'}
+                      </Link>
+                    ) : (
+                      <span className="text-slate-500">Unknown customer</span>
+                    )}
+                    <div className="mt-1 max-w-[220px] truncate text-xs text-slate-400">
+                      {item.customer?.email || '—'}
+                    </div>
+                  </td>
+
+                  <td className={crmTdClass}>
+                    <Link
+                      href={`/admin/jobs/${item.jobId}`}
+                      className="font-semibold text-slate-800 hover:text-amber-700"
+                    >
+                      {item.job?.title || item.jobId}
+                    </Link>
+                    <div className="mt-1 text-xs text-slate-400">
+                      {item.job?.countryCode || '—'} · {item.job?.status || '—'}
+                    </div>
+                  </td>
+
+                  <td className={crmTdClass}>
+                    <div className="font-semibold text-slate-900">
+                      {money(item.amount, item.currency)}
+                    </div>
+                    <div className="mt-1 text-[10px] uppercase tracking-[0.08em] text-slate-400">
+                      {item.currency}
+                    </div>
+                  </td>
+
+                  <td className={crmTdClass}>
+                    <CrmBadge tone={toneForStatus(item.status)} dot>
+                      {item.status.replaceAll('_', ' ')}
+                    </CrmBadge>
+                  </td>
+
+                  <td className={crmTdClass}>
+                    <div className="text-xs text-slate-600">{date(item.updatedAt)}</div>
+                    <div className="mt-1 text-[10px] text-slate-400">
+                      Paid: {date(item.paidAt)}
+                    </div>
+                  </td>
+
+                  <td className={`${crmTdClass} text-right`}>
+                    <div className="flex items-center justify-end gap-2">
+                      {payload?.actions?.refund ? (
+                        <>
+                          <CrmButton
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => submitAction(item, 'RECONCILE')}
+                            disabled={acting === item.id}
+                          >
+                            <FiRefreshCw size={13} />
+                            Reconcile
+                          </CrmButton>
+
+                          {item.status === 'REFUND_REQUIRED' && (
+                            <CrmButton
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => submitAction(item, 'RETRY')}
+                              disabled={acting === item.id}
+                            >
+                              <FiRotateCw size={13} />
+                              Request refund
+                            </CrmButton>
+                          )}
+
+                          {item.status !== 'REFUNDED' && (
+                            <CrmButton
+                              variant="primary"
+                              size="sm"
+                              onClick={() => openManual(item)}
+                              disabled={acting === item.id}
+                            >
+                              Confirm external
+                            </CrmButton>
+                          )}
+                        </>
+                      ) : (
+                        <CrmBadge>Read only</CrmBadge>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <CrmPagination
+            page={payload?.pagination.page || page}
+            totalPages={payload?.pagination.pages || 1}
+            total={payload?.pagination.total || 0}
+            pageSize={payload?.pagination.limit || 30}
+            onPageChange={setPage}
+          />
+        </CrmTableFrame>
+      )}
+
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <div className="flex items-start gap-3">
+          <FiShield className="mt-0.5 shrink-0 text-amber-700" size={16} />
+          <div>
+            <div className="text-sm font-semibold text-amber-950">Refund safety model</div>
+            <p className="mt-1 text-xs leading-5 text-amber-900/75">
+              Amount, market, refundable state and dispute status are recalculated on the server.
+              T1–T4 approval, maker-checker separation and TOTP step-up are applied in the Approval Queue.
+              An active dispute places refund execution on hold.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <CrmModal
+        open={Boolean(manualTarget)}
+        onClose={() => {
+          if (!acting) setManualTarget(null)
+        }}
+        title="Confirm external refund"
+        description={
+          manualTarget
+            ? `${manualTarget.merchantOrderId} · ${money(manualTarget.amount, manualTarget.currency)}`
+            : undefined
+        }
+        maxWidth="max-w-lg"
+        footer={
+          <>
+            <CrmButton
+              variant="secondary"
+              onClick={() => setManualTarget(null)}
+              disabled={Boolean(acting)}
+            >
+              Cancel
+            </CrmButton>
+            <CrmButton
+              variant="primary"
+              onClick={submitManual}
+              disabled={Boolean(acting)}
+            >
+              {acting ? 'Submitting…' : 'Submit for approval'}
+            </CrmButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+              External refund reference
+            </label>
             <input
-              value={query}
-              onChange={event => setQuery(event.target.value)}
-              placeholder="Search order, payment, job or customer…"
-              className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none"
+              value={manualReference}
+              onChange={event => setManualReference(event.target.value.slice(0, 200))}
+              className={crmInputClass}
+              placeholder="Bank / PayHere dashboard refund reference"
             />
           </div>
-          <select
-            value={status}
-            onChange={event => setStatus(event.target.value)}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"
-          >
-            <option value="">All refund states</option>
-            <option value="REFUND_REQUIRED">Refund required</option>
-            <option value="REFUND_PROCESSING">Refund processing</option>
-            <option value="REFUNDED">Refunded</option>
-          </select>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+              Finance note
+            </label>
+            <textarea
+              value={manualNote}
+              onChange={event => setManualNote(event.target.value.slice(0, 500))}
+              rows={4}
+              className="w-full resize-none rounded-[11px] border border-[var(--crm-border)] bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-amber-300 focus:ring-2 focus:ring-amber-100"
+              placeholder="Evidence or reconciliation note…"
+            />
+          </div>
+
+          <div className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-3 text-xs leading-5 text-slate-500">
+            This does not mark the payment refunded immediately. It creates a finance approval request.
+            The external reference is executed only after the required approval slots and live risk checks pass.
+          </div>
         </div>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        {loading ? (
-          <div className="py-20 flex justify-center">
-            <div className="w-8 h-8 rounded-full border-[3px] border-amber-400 border-t-transparent animate-spin" />
-          </div>
-        ) : rows.length ? (
-          <div className="divide-y divide-slate-100">
-            {rows.map(item => (
-              <div key={item.id} className="p-4 md:p-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <FiCreditCard className="text-slate-400" />
-                    <span className="font-semibold text-slate-900">{item.job?.title || item.jobId}</span>
-                    <span className={`text-[10px] rounded-full border px-2 py-1 font-semibold ${statusClass(item.status)}`}>
-                      {item.status.replaceAll('_', ' ')}
-                    </span>
-                  </div>
-                  <div className="mt-2 text-xs text-slate-500">
-                    {item.customer?.name || item.customer?.mxId || item.customer?.email || item.customer?.id || 'Unknown customer'}
-                    {' · '}
-                    {item.job?.countryCode || '—'}
-                    {' · '}
-                    updated {date(item.updatedAt)}
-                  </div>
-                  <div className="mt-1 text-[11px] text-slate-400 break-all">
-                    Order {item.merchantOrderId}
-                    {item.paymentId ? ` · Payment ${item.paymentId}` : ''}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 xl:justify-end">
-                  <div className="text-right mr-2">
-                    <div className="text-sm font-semibold text-slate-900">{money(item.amount, item.currency)}</div>
-                    <Link href={`/admin/jobs/${item.jobId}`} className="text-xs text-amber-700 hover:text-amber-800">
-                      Open Job 360
-                    </Link>
-                  </div>
-
-                  {canManage && item.status === 'REFUND_REQUIRED' && (
-                    <button
-                      type="button"
-                      disabled={acting === item.id}
-                      onClick={() => act(item, 'RETRY')}
-                      className="inline-flex items-center gap-2 h-9 px-3 rounded-xl bg-slate-950 text-white text-xs font-semibold disabled:opacity-50"
-                    >
-                      <FiRotateCw size={13} /> Submit refund
-                    </button>
-                  )}
-
-                  {canManage && item.status === 'REFUND_PROCESSING' && (
-                    <button
-                      type="button"
-                      disabled={acting === item.id}
-                      onClick={() => act(item, 'RECONCILE')}
-                      className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold disabled:opacity-50"
-                    >
-                      <FiRefreshCw size={13} /> Reconcile
-                    </button>
-                  )}
-
-                  {canManage && ['REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(item.status) && (
-                    <button
-                      type="button"
-                      disabled={acting === item.id}
-                      onClick={() => act(item, 'CONFIRM_MANUAL')}
-                      className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs font-semibold disabled:opacity-50"
-                      title="Use only after the external refund has actually been issued"
-                    >
-                      <FiAlertTriangle size={13} /> Confirm manual
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-20 text-center">
-            <FiAlertTriangle className="mx-auto text-slate-300" size={28} />
-            <div className="mt-3 text-sm font-semibold text-slate-700">No refunds in this view</div>
-            <div className="mt-1 text-xs text-slate-400">PayHere refunds requiring attention will appear here.</div>
-          </div>
-        )}
-      </section>
-
-      {!canManage && (
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-          Your finance role can view refund status but cannot submit or reconcile gateway refunds.
-        </div>
-      )}
-    </div>
-  )
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="text-xs text-slate-400">{label}</div>
-      <div className="mt-2 text-2xl font-semibold text-slate-950">{value.toLocaleString()}</div>
+      </CrmModal>
     </div>
   )
 }

@@ -3,6 +3,14 @@ import { prisma } from '@/lib/prisma'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 
+const DELEGATED_SETTINGS = new Set([
+  'commissionRate',
+  'currency',
+  'minTaskerStaff',
+  'weeklySettlementDay',
+  'autoApproveKyc',
+])
+
 const DEFAULT_SETTINGS: Record<string, { value: string; type: string; label: string; description: string; groupName: string }> = {
   commissionRate: { value: '10', type: 'number', label: 'Commission Rate (%)', description: 'Platform commission percentage charged per completed job', groupName: 'billing' },
   platformName: { value: 'MaintainEX', type: 'string', label: 'Platform Name', description: 'Display name of the platform', groupName: 'general' },
@@ -11,7 +19,6 @@ const DEFAULT_SETTINGS: Record<string, { value: string; type: string; label: str
   minTaskerStaff: { value: '3', type: 'number', label: 'Minimum Tasker Staff', description: 'Minimum staff required for company verification', groupName: 'taskers' },
   weeklySettlementDay: { value: 'monday', type: 'string', label: 'Weekly Settlement Day', description: 'Day of the week for automatic settlements', groupName: 'billing' },
   autoApproveKyc: { value: 'false', type: 'boolean', label: 'Auto-Approve KYC', description: 'Automatically approve identity verification documents', groupName: 'security' },
-  maintenanceMode: { value: 'false', type: 'boolean', label: 'Maintenance Mode', description: 'Enable maintenance mode to restrict public access', groupName: 'general' },
 }
 
 function parseSettingValue(value: string, type: string): string | number | boolean {
@@ -43,7 +50,7 @@ function validateSetting(key: string, value: unknown): string | null {
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'settings:view',
+      permission: 'platform:settings:view',
       level: 'read',
     })
     if (!guard.ok) return guard.response
@@ -81,7 +88,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'settings:edit',
+      permission: 'platform:settings:manage',
       level: 'sensitive',
     })
     if (!guard.ok) return guard.response
@@ -100,6 +107,13 @@ export async function PUT(request: NextRequest) {
 
     const validated: Array<[string, unknown]> = []
     for (const [key, value] of entries) {
+      if (DELEGATED_SETTINGS.has(key)) {
+        return NextResponse.json(
+          { error: `${key} must be changed through its canonical domain control` },
+          { status: 409 }
+        )
+      }
+
       const error = validateSetting(key, value)
       if (error) {
         return NextResponse.json({ error: `${key}: ${error}` }, { status: 400 })
@@ -152,7 +166,7 @@ export async function PUT(request: NextRequest) {
       newValue: updated,
       ipAddress: security.ipAddress,
       userAgent: security.userAgent || undefined,
-      riskLevel: validated.some(([key]) => ['commissionRate', 'maintenanceMode', 'autoApproveKyc'].includes(key)) ? 'HIGH' : 'MEDIUM',
+      riskLevel: validated.some(([key]) => ['commissionRate', 'autoApproveKyc'].includes(key)) ? 'HIGH' : 'MEDIUM',
     })
 
     return NextResponse.json({ settings: updated })

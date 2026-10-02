@@ -3,15 +3,27 @@ import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
   guardCrmRequest,
+  type CrmSecurityContext,
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
+import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 
 const ENTITY_TYPES = new Set(['category', 'service', 'template'])
+
+function canPublishCatalog(security: CrmSecurityContext): boolean {
+  const entry = getPermissionCatalogEntry('catalog:publish')
+  return evaluateEffectivePermission({
+    role: security.role,
+    permission: 'catalog:publish',
+    permissionClass: entry?.class,
+    overrides: security.permissionOverrides,
+  }).allowed
+}
 
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'settings:view',
+      permission: 'catalog:view',
       level: 'read',
       requireCountryScope: true,
     })
@@ -120,7 +132,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'settings:edit',
+      permission: 'catalog:edit',
       level: 'sensitive',
       requireCountryScope: true,
     })
@@ -140,6 +152,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden country' }, { status: 403 })
     }
 
+    const requestedActive = body?.isActive !== false
+    if (requestedActive && !canPublishCatalog(security)) {
+      return NextResponse.json(
+        { error: 'Publishing permission is required to create an active catalog item' },
+        { status: 403 }
+      )
+    }
+
     if (type === 'category') {
       const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 120) : ''
       const slug = typeof body?.slug === 'string'
@@ -156,7 +176,7 @@ export async function POST(request: NextRequest) {
           description: typeof body?.description === 'string' ? body.description.trim().slice(0, 1000) : null,
           countryCode,
           displayOrder: Number.isFinite(Number(body?.displayOrder)) ? Number(body.displayOrder) : 0,
-          isActive: body?.isActive !== false,
+          isActive: requestedActive,
         },
       })
 
@@ -213,7 +233,7 @@ export async function POST(request: NextRequest) {
         countryCode,
         displayOrder: Number.isFinite(Number(body?.displayOrder)) ? Number(body.displayOrder) : 0,
         isTrending: Boolean(body?.isTrending),
-        isActive: body?.isActive !== false,
+        isActive: requestedActive,
       },
       include: { category: true },
     })
@@ -244,7 +264,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'settings:edit',
+      permission: 'catalog:publish',
       level: 'sensitive',
       requireCountryScope: true,
     })

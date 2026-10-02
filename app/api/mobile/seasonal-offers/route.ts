@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const country = searchParams.get('country') || 'LK'
     const season = searchParams.get('season') || 'general'
+    const runtime = await getPlatformRuntimeConfig(country)
+    if (
+      runtime.maintenance.enabled ||
+      !runtime.channels.mobile ||
+      !runtime.offers.visible ||
+      !runtime.market.available
+    ) {
+      return NextResponse.json([], {
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+      })
+    }
 
     let offers = await prisma.seasonalOffer.findMany({
       where: { isActive: true, country, season },

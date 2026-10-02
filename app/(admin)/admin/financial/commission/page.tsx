@@ -1,10 +1,36 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { FiDollarSign, FiClock, FiAlertTriangle, FiCheckCircle, FiFilter, FiRefreshCw } from 'react-icons/fi'
-import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import {
+  FiAlertTriangle,
+  FiArrowLeft,
+  FiCheckCircle,
+  FiClock,
+  FiDollarSign,
+  FiRefreshCw,
+  FiSearch,
+  FiShield,
+  FiUserX,
+} from 'react-icons/fi'
+import {
+  CrmBadge,
+  CrmButton,
+  CrmFilterBar,
+  CrmMetricCard,
+  CrmPageHeader,
+  CrmState,
+  CrmTableFrame,
+  CrmTabs,
+  crmInputClass,
+  crmTableClass,
+  crmTdClass,
+  crmThClass,
+  type CrmTone,
+} from '@/components/crm/v2/CrmPrimitives'
+import { CrmPagination } from '@/components/crm/v2/CrmOperational'
+import { CrmStepUpModal } from '@/components/crm/v2/CrmStepUpModal'
 
 interface Settlement {
   id: string
@@ -16,18 +42,20 @@ interface Settlement {
   commissionRate: number
   commissionOwed: number
   commissionPaid: boolean
-  paidAt?: string
+  paidAt?: string | null
   dueAt: string
   status: string
   currency: string
   countryCode: string
-  suspendedAt?: string
-  notes?: string
+  suspendedAt?: string | null
   provider?: {
-    name: string
-    email: string
-    mxId?: string
-  }
+    id?: string
+    name?: string | null
+    email?: string | null
+    mxId?: string | null
+    isSuspended?: boolean
+    suspensionReason?: string | null
+  } | null
 }
 
 interface CurrencySummary {
@@ -41,345 +69,663 @@ interface CurrencySummary {
   paidCount: number
 }
 
+interface SettlementPayload {
+  settlements: Settlement[]
+  summaryByCurrency: CurrencySummary[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
+  actions: {
+    enforce: boolean
+    remind: boolean
+  }
+}
+
+interface CommissionPayment {
+  id: string
+  providerId: string
+  weeklySettlementId: string
+  referenceNumber: string
+  amountDue: number
+  method: string
+  status: string
+  confirmedAt?: string | null
+  currency: string
+  countryCode: string
+  createdAt: string
+  weeklySettlement: {
+    id: string
+    providerId: string
+    weekStart: string
+    weekEnd: string
+    commissionOwed: number
+    commissionPaid: boolean
+    status: string
+    currency: string
+    countryCode: string
+    dueAt: string
+  }
+}
+
+interface PaymentPayload {
+  payments: CommissionPayment[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
+  actions: {
+    reconcile: boolean
+  }
+}
+
+type StepUpTarget =
+  | { type: 'settlement'; id: string; action: 'SUSPEND' | 'UNSUSPEND' }
+  | { type: 'payment'; id: string; action: 'CONFIRM' }
+
+function money(amount: number, currency: string) {
+  return new Intl.NumberFormat(currency === 'CAD' ? 'en-CA' : 'en-LK', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(amount) ? amount : 0)
+}
+
+function date(value?: string | null) {
+  if (!value) return '—'
+  return new Date(value).toLocaleString('en-LK', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}
+
+function settlementTone(status: string): CrmTone {
+  if (status === 'PAID') return 'success'
+  if (status === 'OVERDUE') return 'danger'
+  if (status === 'SUSPENDED') return 'warning'
+  return 'info'
+}
+
+function paymentTone(status: string): CrmTone {
+  return status === 'CONFIRMED' ? 'success' : 'warning'
+}
+
 export default function CommissionPage() {
-  const { user: admin } = useAdminSession()
-  const canManageCommission = !!admin && (ROLE_PERMISSIONS[admin.role as AdminRole] || []).includes('commission:manage')
-  const [settlements, setSettlements] = useState<Settlement[]>([])
+  const [tab, setTab] = useState<'obligations' | 'payments'>('obligations')
+  const [settlements, setSettlements] = useState<SettlementPayload | null>(null)
+  const [payments, setPayments] = useState<PaymentPayload | null>(null)
+  const [status, setStatus] = useState('ALL')
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<string>('ALL')
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [summaryByCurrency, setSummaryByCurrency] = useState<CurrencySummary[]>([])
+  const [acting, setActing] = useState<string | null>(null)
+  const [stepUpTarget, setStepUpTarget] = useState<StepUpTarget | null>(null)
 
-  useEffect(() => {
-    fetchSettlements()
-  }, [filter])
-
-  const fetchSettlements = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/financial/commission?status=${filter}`, {
-        headers: { }
-      })
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
+      if (tab === 'obligations') {
+        const params = new URLSearchParams({
+          status,
+          page: String(page),
+          limit: '30',
+        })
+        const response = await fetch(
+          `/api/admin/financial/commission?${params.toString()}`,
+          { credentials: 'include', cache: 'no-store' }
+        )
+        const body = await response.json().catch(() => ({}))
+        if (response.status === 401) {
+          window.location.href = '/admin/login'
+          return
+        }
+        if (!response.ok) throw new Error(body?.error || 'Unable to load commission obligations')
+        setSettlements(body)
+      } else {
+        const params = new URLSearchParams({
+          status: status === 'ALL' ? 'ALL' : status,
+          page: String(page),
+          limit: '30',
+        })
+        const response = await fetch(
+          `/api/admin/financial/commission/payments?${params.toString()}`,
+          { credentials: 'include', cache: 'no-store' }
+        )
+        const body = await response.json().catch(() => ({}))
+        if (response.status === 401) {
+          window.location.href = '/admin/login'
+          return
+        }
+        if (!response.ok) throw new Error(body?.error || 'Unable to load commission payments')
+        setPayments(body)
       }
-      const data = await res.json()
-      if (data.error) {
-        toast.error(data.error)
-        return
-      }
-      setSettlements(data.settlements || [])
-      setSummaryByCurrency(
-        Array.isArray(data.summaryByCurrency)
-          ? data.summaryByCurrency
-          : data.summary
-            ? [data.summary]
-            : []
-      )
     } catch (error) {
-      console.error('Failed to fetch settlements:', error)
-      toast.error('Failed to load commission data')
+      toast.error(error instanceof Error ? error.message : 'Failed to load commission data')
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, status, tab])
 
-  const handleAction = async (settlementId: string, action: string) => {
-    if (!canManageCommission) {
-      toast.error('You do not have permission to manage commission settlements')
-      return
-    }
-    setActionLoading(settlementId)
+  useEffect(() => {
+    load()
+  }, [load])
+
+  useEffect(() => {
+    setPage(1)
+    setStatus('ALL')
+    setQuery('')
+  }, [tab])
+
+  const obligationRows = useMemo(() => {
+    const rows = settlements?.settlements || []
+    const q = query.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter(item =>
+      [
+        item.provider?.name,
+        item.provider?.email,
+        item.provider?.mxId,
+        item.providerId,
+        item.id,
+      ].some(value => String(value || '').toLowerCase().includes(q))
+    )
+  }, [query, settlements])
+
+  const paymentRows = useMemo(() => {
+    const rows = payments?.payments || []
+    const q = query.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter(item =>
+      [
+        item.referenceNumber,
+        item.providerId,
+        item.weeklySettlementId,
+        item.id,
+      ].some(value => String(value || '').toLowerCase().includes(q))
+    )
+  }, [payments, query])
+
+  async function settlementAction(
+    settlementId: string,
+    action: 'SEND_REMINDER' | 'SUSPEND' | 'UNSUSPEND',
+    proof?: string
+  ) {
+    if (acting) return
+    setActing(settlementId)
     try {
-      const res = await fetch('/api/admin/financial/commission', {
+      const response = await fetch('/api/admin/financial/commission', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settlementId, action })
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(proof ? { 'X-CRM-Step-Up': proof } : {}),
+        },
+        body: JSON.stringify({ settlementId, action }),
       })
-      const data = await res.json()
-      if (data.error) {
-        toast.error(data.error)
-      } else {
-        toast.success(`Settlement ${action === 'MARK_PAID' ? 'marked as paid' : action === 'SUSPEND' ? 'suspended' : 'updated'}`)
-        fetchSettlements()
-      }
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body?.error || 'Commission action failed')
+
+      toast.success(
+        action === 'SEND_REMINDER'
+          ? 'Commission reminder sent'
+          : action === 'SUSPEND'
+            ? 'Provider suspended for overdue commission'
+            : 'Commission suspension reactivated; debt remains'
+      )
+      setStepUpTarget(null)
+      await load()
     } catch (error) {
-      console.error('Failed to perform action:', error)
-      toast.error('Action failed')
+      toast.error(error instanceof Error ? error.message : 'Commission action failed')
     } finally {
-      setActionLoading(null)
+      setActing(null)
     }
   }
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat(currency === 'CAD' ? 'en-CA' : 'en-LK', {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
+  async function confirmPayment(paymentId: string, proof: string) {
+    if (acting) return
+    setActing(paymentId)
+    try {
+      const response = await fetch('/api/admin/financial/commission/payments', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CRM-Step-Up': proof,
+        },
+        body: JSON.stringify({ paymentId }),
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body?.error || 'Payment confirmation failed')
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
-
-  const isOverdue = (dueAt: string) => new Date(dueAt) < new Date()
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PAID': return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-      case 'PENDING': return 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-      case 'OVERDUE': return 'bg-red-500/20 text-red-400 border border-red-500/30'
-      case 'SUSPENDED': return 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
-      default: return 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+      toast.success('Commission payment confirmed and settlement reconciled')
+      setStepUpTarget(null)
+      await load()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Payment confirmation failed')
+    } finally {
+      setActing(null)
     }
   }
 
-  const stats = summaryByCurrency.flatMap((summary) => [
-    {
-      key: `${summary.currency}-owed`,
-      label: `Commission Owed · ${summary.currency}`,
-      value: formatCurrency(summary.totalCommissionOwed, summary.currency),
-      icon: FiDollarSign,
-      color: 'bg-amber-500/20',
-      iconColor: 'text-amber-400',
-      sub: `${summary.pendingCount} pending · ${summary.overdueCount} overdue · ${summary.suspendedCount} suspended`,
-    },
-    {
-      key: `${summary.currency}-paid`,
-      label: `Commission Paid · ${summary.currency}`,
-      value: formatCurrency(summary.totalCommissionPaid, summary.currency),
-      icon: FiCheckCircle,
-      color: 'bg-emerald-500/20',
-      iconColor: 'text-emerald-400',
-      sub: `${summary.paidCount} settled`,
-    },
-    {
-      key: `${summary.currency}-pending`,
-      label: `Pending This Week · ${summary.currency}`,
-      value: formatCurrency(summary.pendingThisWeek, summary.currency),
-      icon: FiClock,
-      color: 'bg-blue-500/20',
-      iconColor: 'text-blue-400',
-      sub: 'Due this cycle',
-    },
-    {
-      key: `${summary.currency}-overdue`,
-      label: `Overdue · ${summary.currency}`,
-      value: summary.overdueCount.toString(),
-      icon: FiAlertTriangle,
-      color: 'bg-red-500/20',
-      iconColor: 'text-red-400',
-      sub: 'Requires finance action',
-    },
-  ])
+  const metrics = settlements?.summaryByCurrency || []
 
   return (
-    <>
-      <div className="p-4 md:p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Commission Management</h1>
-            <p className="text-gray-400 mt-1">Manage weekly settlements and provider commissions</p>
-          </div>
-          <button
-            onClick={fetchSettlements}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-[#15161E] border border-white/10 rounded-lg text-gray-300 hover:text-white hover:border-white/20 transition-colors disabled:opacity-50"
-          >
-            <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+    <div className="space-y-5">
+      <CrmPageHeader
+        eyebrow="Finance · Provider obligations"
+        title="Commission Control"
+        description="Monitor weekly provider commission debt, enforce overdue obligations, and reconcile recorded payments. CRM never clears commission debt without a matching payment record."
+        actions={
+          <>
+            <Link href="/admin/approvals">
+              <CrmButton variant="secondary">
+                <FiShield size={14} />
+                Approval queue
+              </CrmButton>
+            </Link>
+            <CrmButton variant="secondary" onClick={load} disabled={loading}>
+              <FiRefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </CrmButton>
+          </>
+        }
+      />
+
+      <div>
+        <Link
+          href="/admin/financial"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-amber-700"
+        >
+          <FiArrowLeft size={13} />
+          Finance Control Centre
+        </Link>
+      </div>
+
+      {metrics.length > 0 && (
+        <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          {metrics.flatMap(summary => [
+            <CrmMetricCard
+              key={`${summary.currency}-owed`}
+              label={`Commission owed · ${summary.currency}`}
+              value={money(summary.totalCommissionOwed, summary.currency)}
+              helper={`${summary.pendingCount} pending · ${summary.overdueCount} overdue`}
+              icon={<FiDollarSign size={16} />}
+              tone={summary.overdueCount > 0 ? 'warning' : 'neutral'}
+            />,
+            <CrmMetricCard
+              key={`${summary.currency}-paid`}
+              label={`Commission paid · ${summary.currency}`}
+              value={money(summary.totalCommissionPaid, summary.currency)}
+              helper={`${summary.paidCount} settled`}
+              icon={<FiCheckCircle size={16} />}
+              tone="success"
+            />,
+            <CrmMetricCard
+              key={`${summary.currency}-week`}
+              label={`Pending this week · ${summary.currency}`}
+              value={money(summary.pendingThisWeek, summary.currency)}
+              helper="Current collection cycle"
+              icon={<FiClock size={16} />}
+              tone="info"
+            />,
+            <CrmMetricCard
+              key={`${summary.currency}-risk`}
+              label={`Enforcement cases · ${summary.currency}`}
+              value={summary.overdueCount + summary.suspendedCount}
+              helper={`${summary.suspendedCount} currently suspended`}
+              icon={<FiAlertTriangle size={16} />}
+              tone={summary.overdueCount + summary.suspendedCount > 0 ? 'danger' : 'neutral'}
+            />,
+          ])}
+        </section>
+      )}
+
+      <CrmTabs
+        active={tab}
+        onChange={id => setTab(id as 'obligations' | 'payments')}
+        items={[
+          {
+            id: 'obligations',
+            label: 'Weekly obligations',
+            count: settlements?.pagination.total,
+          },
+          {
+            id: 'payments',
+            label: 'Payment confirmations',
+            count: payments?.pagination.total,
+          },
+        ]}
+      />
+
+      <CrmFilterBar>
+        <div className="relative min-w-0 flex-1">
+          <FiSearch
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            size={15}
+          />
+          <input
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            className={`${crmInputClass} pl-9`}
+            placeholder={
+              tab === 'obligations'
+                ? 'Search provider, MX ID or settlement…'
+                : 'Search reference, provider or settlement…'
+            }
+          />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat) => (
-            <div key={stat.key} className="bg-[#15161E] border border-white/5 rounded-xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className={`w-10 h-10 ${stat.color} rounded-lg flex items-center justify-center`}>
-                  <stat.icon className={`w-5 h-5 ${stat.iconColor}`} />
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-white">{stat.value}</div>
-              <div className="text-sm text-gray-400 mt-1">{stat.label}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{stat.sub}</div>
-            </div>
-          ))}
-        </div>
+        <select
+          value={status}
+          onChange={event => {
+            setStatus(event.target.value)
+            setPage(1)
+          }}
+          className={crmInputClass}
+          aria-label="Commission status"
+        >
+          {tab === 'obligations' ? (
+            <>
+              <option value="ALL">All obligations</option>
+              <option value="PENDING">Pending</option>
+              <option value="OVERDUE">Overdue</option>
+              <option value="SUSPENDED">Suspended</option>
+              <option value="PAID">Paid</option>
+            </>
+          ) : (
+            <>
+              <option value="ALL">All payment records</option>
+              <option value="PENDING">Pending confirmation</option>
+              <option value="CONFIRMED">Confirmed</option>
+            </>
+          )}
+        </select>
+      </CrmFilterBar>
 
-        <div className="bg-[#15161E] border border-white/5 rounded-xl p-1.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <FiFilter className="w-4 h-4 text-gray-500 ml-2" />
-            {['ALL', 'PENDING', 'PAID', 'OVERDUE', 'SUSPENDED'].map((status) => (
-              <button
-                key={status}
-                onClick={() => setFilter(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  filter === status
-                    ? 'bg-amber-500 text-[#0B0C12]'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {status}
-              </button>
-            ))}
-            <div className="ml-auto flex items-center gap-2 px-3">
-              <span className="text-xs text-gray-500">Rates:</span>
-              <span className="text-sm font-semibold text-amber-400">Provider / market configured</span>
-            </div>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : settlements.length === 0 ? (
-          <div className="bg-[#15161E] border border-white/5 rounded-xl py-16 text-center">
-            <FiDollarSign className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400 text-lg">No settlements found</p>
-            <p className="text-gray-600 text-sm mt-1">Settlements will appear here once providers complete jobs</p>
-          </div>
+      {loading ? (
+        <CrmState
+          type="loading"
+          title="Loading commission controls"
+          description="Loading country-scoped commission obligations and payment evidence."
+        />
+      ) : tab === 'obligations' ? (
+        obligationRows.length === 0 ? (
+          <CrmState
+            type="empty"
+            title="No commission obligations match this view"
+            description="No provider settlements match the current status and search filters."
+          />
         ) : (
-          <div className="bg-[#15161E] border border-white/5 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/5">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Provider</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Week</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Earnings</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Commission</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Due Date</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">{canManageCommission ? 'Actions' : 'Access'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {settlements.map((s) => (
-                    <tr key={s.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-white">{s.provider?.name || s.providerId.slice(0, 8) + '...'}</div>
-                        <div className="text-xs text-gray-500">{s.provider?.mxId || s.providerId.slice(0, 12)}</div>
+          <CrmTableFrame
+            title="Weekly commission obligations"
+            description="Suspension/reactivation requires one-time TOTP step-up. Debt can only be cleared by confirming a recorded commission payment."
+          >
+            <table className={`${crmTableClass} min-w-[1260px]`}>
+              <thead>
+                <tr>
+                  <th className={crmThClass}>Provider</th>
+                  <th className={crmThClass}>Week</th>
+                  <th className={crmThClass}>Earnings</th>
+                  <th className={crmThClass}>Commission</th>
+                  <th className={crmThClass}>Status</th>
+                  <th className={crmThClass}>Due</th>
+                  <th className={`${crmThClass} text-right`}>Controls</th>
+                </tr>
+              </thead>
+              <tbody>
+                {obligationRows.map(item => {
+                  const overdue = new Date(item.dueAt).getTime() < Date.now()
+                  return (
+                    <tr key={item.id} className="transition-colors hover:bg-[#fafbf9]">
+                      <td className={crmTdClass}>
+                        <div className="font-semibold text-slate-900">
+                          {item.provider?.name || item.providerId}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          {item.provider?.mxId || item.provider?.email || item.providerId}
+                        </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          s.providerType === 'COMPANY'
-                            ? 'bg-purple-500/20 text-purple-400'
-                            : 'bg-blue-500/20 text-blue-400'
-                        }`}>
-                          {s.providerType === 'COMPANY' ? 'Company' : 'Tasker'}
-                        </span>
+                      <td className={crmTdClass}>
+                        <div className="text-xs font-medium text-slate-700">{date(item.weekStart)}</div>
+                        <div className="mt-1 text-[10px] text-slate-400">to {date(item.weekEnd)}</div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-300">{formatDate(s.weekStart)}</div>
-                        <div className="text-xs text-gray-500">to {formatDate(s.weekEnd)}</div>
+                      <td className={crmTdClass}>
+                        <div className="font-semibold text-slate-900">
+                          {money(item.totalEarnings, item.currency)}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-300">{formatCurrency(s.totalEarnings, s.currency)}</td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-white">{formatCurrency(s.commissionOwed, s.currency)}</div>
-                        <div className="text-xs text-gray-500">{s.commissionRate}%</div>
+                      <td className={crmTdClass}>
+                        <div className="font-semibold text-slate-900">
+                          {money(item.commissionOwed, item.currency)}
+                        </div>
+                        <div className="mt-1 text-[10px] text-slate-400">
+                          {item.commissionRate}% · {item.currency}
+                        </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${getStatusColor(s.status)}`}>
-                          {s.status}
-                        </span>
+                      <td className={crmTdClass}>
+                        <CrmBadge tone={settlementTone(item.status)} dot>
+                          {item.status}
+                        </CrmBadge>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-sm ${isOverdue(s.dueAt) && s.status !== 'PAID' ? 'text-red-400 font-medium' : 'text-gray-300'}`}>
-                          {formatDate(s.dueAt)}
-                        </span>
+                      <td className={crmTdClass}>
+                        <div className={overdue && !item.commissionPaid ? 'font-semibold text-red-700' : 'text-slate-700'}>
+                          {date(item.dueAt)}
+                        </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className={`${crmTdClass} text-right`}>
                         <div className="flex items-center justify-end gap-2">
-                          {!canManageCommission && <span className="text-xs text-gray-500">Read only</span>}
-                          {canManageCommission && s.status === 'PENDING' && (
-                            <>
-                              <button
-                                onClick={() => handleAction(s.id, 'MARK_PAID')}
-                                disabled={!canManageCommission || actionLoading === s.id}
-                                className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50 font-medium"
-                              >
-                                {actionLoading === s.id ? '...' : 'Mark Paid'}
-                              </button>
-                              <button
-                                onClick={() => handleAction(s.id, 'SEND_REMINDER')}
-                                disabled={!canManageCommission || actionLoading === s.id}
-                                className="px-3 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-lg hover:bg-blue-500/30 transition-colors disabled:opacity-50 font-medium"
-                              >
-                                {actionLoading === s.id ? '...' : 'Remind'}
-                              </button>
-                              {isOverdue(s.dueAt) && (
-                                <button
-                                  onClick={() => handleAction(s.id, 'SUSPEND')}
-                                  disabled={!canManageCommission || actionLoading === s.id}
-                                  className="px-3 py-1 bg-red-500/20 text-red-400 text-xs rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 font-medium"
-                                >
-                                  {actionLoading === s.id ? '...' : 'Suspend'}
-                                </button>
-                              )}
-                            </>
+                          {!item.commissionPaid && settlements?.actions.remind && (
+                            <CrmButton
+                              size="sm"
+                              variant="secondary"
+                              disabled={acting === item.id}
+                              onClick={() => settlementAction(item.id, 'SEND_REMINDER')}
+                            >
+                              Remind
+                            </CrmButton>
                           )}
-                          {canManageCommission && s.status === 'OVERDUE' && (
-                            <>
-                              <button
-                                onClick={() => handleAction(s.id, 'MARK_PAID')}
-                                disabled={!canManageCommission || actionLoading === s.id}
-                                className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50 font-medium"
+
+                          {overdue &&
+                            !item.commissionPaid &&
+                            item.status !== 'SUSPENDED' &&
+                            settlements?.actions.enforce && (
+                              <CrmButton
+                                size="sm"
+                                variant="danger"
+                                disabled={acting === item.id}
+                                onClick={() =>
+                                  setStepUpTarget({
+                                    type: 'settlement',
+                                    id: item.id,
+                                    action: 'SUSPEND',
+                                  })
+                                }
                               >
-                                {actionLoading === s.id ? '...' : 'Mark Paid'}
-                              </button>
-                              <button
-                                onClick={() => handleAction(s.id, 'SUSPEND')}
-                                disabled={!canManageCommission || actionLoading === s.id}
-                                className="px-3 py-1 bg-red-500/20 text-red-400 text-xs rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 font-medium"
-                              >
-                                {actionLoading === s.id ? '...' : 'Suspend'}
-                              </button>
-                            </>
+                                <FiUserX size={13} />
+                                Suspend
+                              </CrmButton>
+                            )}
+
+                          {item.status === 'SUSPENDED' && settlements?.actions.enforce && (
+                            <CrmButton
+                              size="sm"
+                              variant="secondary"
+                              disabled={acting === item.id}
+                              onClick={() =>
+                                setStepUpTarget({
+                                  type: 'settlement',
+                                  id: item.id,
+                                  action: 'UNSUSPEND',
+                                })
+                              }
+                            >
+                              Reactivate · debt stays
+                            </CrmButton>
                           )}
-                          {canManageCommission && s.status === 'SUSPENDED' && (
-                            <>
-                              <button
-                                onClick={() => handleAction(s.id, 'MARK_PAID')}
-                                disabled={!canManageCommission || actionLoading === s.id}
-                                className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50 font-medium"
-                                title="Record commission payment and reactivate the provider if this settlement caused the suspension"
-                              >
-                                {actionLoading === s.id ? '...' : 'Mark Paid'}
-                              </button>
-                              <button
-                                onClick={() => handleAction(s.id, 'UNSUSPEND')}
-                                disabled={!canManageCommission || actionLoading === s.id}
-                                className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50 font-medium"
-                                title="Reactivate the provider without clearing the unpaid commission debt"
-                              >
-                                {actionLoading === s.id ? '...' : 'Reactivate · debt stays'}
-                              </button>
-                            </>
-                          )}
-                          {s.status === 'PAID' && (
-                            <span className="text-xs text-gray-500">
-                              {s.paidAt ? formatDate(s.paidAt) : 'Paid'}
-                            </span>
+
+                          {item.status === 'PAID' && (
+                            <CrmBadge tone="success">Reconciled</CrmBadge>
                           )}
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            <CrmPagination
+              page={settlements?.pagination.page || page}
+              totalPages={settlements?.pagination.pages || 1}
+              total={settlements?.pagination.total || 0}
+              pageSize={settlements?.pagination.limit || 30}
+              onPageChange={setPage}
+            />
+          </CrmTableFrame>
+        )
+      ) : paymentRows.length === 0 ? (
+        <CrmState
+          type="empty"
+          title="No commission payment records match this view"
+          description="A provider payment must be recorded before Finance can confirm and clear the matching commission debt."
+        />
+      ) : (
+        <CrmTableFrame
+          title="Recorded commission payments"
+          description="Confirmation checks provider, settlement, market, currency and exact amount, then atomically reconciles the settlement."
+        >
+          <table className={`${crmTableClass} min-w-[1180px]`}>
+            <thead>
+              <tr>
+                <th className={crmThClass}>Reference</th>
+                <th className={crmThClass}>Provider</th>
+                <th className={crmThClass}>Method</th>
+                <th className={crmThClass}>Amount</th>
+                <th className={crmThClass}>Settlement</th>
+                <th className={crmThClass}>Status</th>
+                <th className={`${crmThClass} text-right`}>Control</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paymentRows.map(item => (
+                <tr key={item.id} className="transition-colors hover:bg-[#fafbf9]">
+                  <td className={crmTdClass}>
+                    <div className="font-mono text-xs font-semibold text-slate-900">
+                      {item.referenceNumber}
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-400">{date(item.createdAt)}</div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <div className="font-mono text-xs text-slate-700">{item.providerId}</div>
+                    <div className="mt-1 text-[10px] text-slate-400">{item.countryCode}</div>
+                  </td>
+                  <td className={crmTdClass}>{item.method}</td>
+                  <td className={crmTdClass}>
+                    <div className="font-semibold text-slate-900">
+                      {money(item.amountDue, item.currency)}
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-400">{item.currency}</div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <div className="font-mono text-xs text-slate-700">
+                      {item.weeklySettlement.id}
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-400">
+                      Owed: {money(item.weeklySettlement.commissionOwed, item.weeklySettlement.currency)}
+                    </div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <CrmBadge tone={paymentTone(item.status)} dot>
+                      {item.status}
+                    </CrmBadge>
+                  </td>
+                  <td className={`${crmTdClass} text-right`}>
+                    {item.status === 'PENDING' && payments?.actions.reconcile ? (
+                      <CrmButton
+                        size="sm"
+                        variant="primary"
+                        disabled={acting === item.id}
+                        onClick={() =>
+                          setStepUpTarget({
+                            type: 'payment',
+                            id: item.id,
+                            action: 'CONFIRM',
+                          })
+                        }
+                      >
+                        <FiCheckCircle size={13} />
+                        Confirm payment
+                      </CrmButton>
+                    ) : (
+                      <CrmBadge tone={item.status === 'CONFIRMED' ? 'success' : 'neutral'}>
+                        {item.status === 'CONFIRMED' ? 'Confirmed' : 'Read only'}
+                      </CrmBadge>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <CrmPagination
+            page={payments?.pagination.page || page}
+            totalPages={payments?.pagination.pages || 1}
+            total={payments?.pagination.total || 0}
+            pageSize={payments?.pagination.limit || 30}
+            onPageChange={setPage}
+          />
+        </CrmTableFrame>
+      )}
+
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <div className="flex items-start gap-3">
+          <FiShield className="mt-0.5 shrink-0 text-amber-700" size={16} />
+          <div>
+            <div className="text-sm font-semibold text-amber-950">Commission safety model</div>
+            <p className="mt-1 text-xs leading-5 text-amber-900/75">
+              CRM cannot directly mark weekly debt paid. Finance confirms an existing payment reference after
+              server-side provider, amount, currency and market checks. Suspension/reactivation uses a one-time
+              TOTP proof and never clears the debt itself.
+            </p>
           </div>
-        )}
+        </div>
       </div>
-    </>
+
+      <CrmStepUpModal
+        open={Boolean(stepUpTarget)}
+        actionId={
+          stepUpTarget?.type === 'payment'
+            ? 'finance.commission.reconcile'
+            : 'finance.commission.enforce'
+        }
+        title={
+          stepUpTarget?.type === 'payment'
+            ? 'Verify commission payment confirmation'
+            : stepUpTarget?.action === 'SUSPEND'
+              ? 'Verify provider suspension'
+              : 'Verify provider reactivation'
+        }
+        description={
+          stepUpTarget?.type === 'payment'
+            ? 'Confirming payment clears the matching commission debt and may reactivate the provider. Enter your authenticator code.'
+            : 'This changes provider marketplace access. The commission debt itself is not edited.'
+        }
+        onClose={() => {
+          if (!acting) setStepUpTarget(null)
+        }}
+        onVerified={async proof => {
+          if (!stepUpTarget) return
+          if (stepUpTarget.type === 'payment') {
+            await confirmPayment(stepUpTarget.id, proof)
+          } else {
+            await settlementAction(stepUpTarget.id, stepUpTarget.action, proof)
+          }
+        }}
+      />
+    </div>
   )
 }

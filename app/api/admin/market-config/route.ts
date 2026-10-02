@@ -2,7 +2,33 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { updateMarketConfig } from '@/lib/domain/market-config'
 import { assertCrmCountryAllowed, guardCrmRequest, type CrmSecurityContext } from '@/lib/crm/security'
+import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 import type { AdminSession } from '@/lib/admin-types'
+
+const PRICING_FIELDS = new Set([
+  'commissionRateBps',
+  'urgentModifierBps',
+  'emergencyModifierBps',
+  'urgencyCapBps',
+  'minJobAmountCents',
+  'maxJobAmountCents',
+  'minBenchmarkSample',
+  'benchmarkPercentileLow',
+  'benchmarkPercentileHigh',
+  'benchmarkOutlierIqrMult',
+  'benchmarkFallbackEnabled',
+  'benchmarkResearchIntervalMonths',
+])
+
+function can(context: CrmSecurityContext, permission: string): boolean {
+  const entry = getPermissionCatalogEntry(permission)
+  return evaluateEffectivePermission({
+    role: context.role,
+    permission,
+    permissionClass: entry?.class,
+    overrides: context.permissionOverrides,
+  }).allowed
+}
 
 function sessionFromGuard(context: CrmSecurityContext): AdminSession {
   return {
@@ -19,7 +45,7 @@ function sessionFromGuard(context: CrmSecurityContext): AdminSession {
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'market_config:read',
+      permission: 'markets:view',
       level: 'read',
       requireCountryScope: true,
     })
@@ -47,7 +73,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'market_config:write',
+      permission: 'markets:manage',
       level: 'sensitive',
       requireCountryScope: true,
     })
@@ -60,6 +86,13 @@ export async function PATCH(request: NextRequest) {
       : ''
     const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 2000) : undefined
     const { countryCode: _countryCode, reason: _reason, ...changes } = body || {}
+
+    if (Object.keys(changes).some(key => PRICING_FIELDS.has(key)) && !can(security, 'pricing:manage')) {
+      return NextResponse.json(
+        { error: 'Pricing-affecting market changes require pricing:manage' },
+        { status: 403 }
+      )
+    }
 
     if (!countryCode) {
       return NextResponse.json({ error: 'countryCode is required' }, { status: 400 })

@@ -7,6 +7,7 @@ import {
 } from '@/lib/crm/security'
 import { getCurrencyForCountry, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
 import { getCrmSectionAccess } from '@/lib/crm/section-access'
+import { evaluateActionInitiation } from '@/lib/crm/governance'
 
 function money(
   value: bigint | number | null | undefined,
@@ -50,7 +51,12 @@ async function getV2Job(id: string, request: NextRequest) {
 
   const currency = getCurrencyForCountry(job.countryCode)
   const { finance: canFinance, trust: canTrust, audit: canAudit } =
-    getCrmSectionAccess(security.role, security.isSuperAdmin)
+    getCrmSectionAccess(security.role, security.isSuperAdmin, security.permissionOverrides)
+  const canCancel = evaluateActionInitiation({
+    role: security.role,
+    actionId: 'jobs.cancel',
+    overrides: security.permissionOverrides,
+  }).allowed
 
   const [
     customer,
@@ -384,6 +390,7 @@ async function getV2Job(id: string, request: NextRequest) {
       finance: canFinance,
       trust: canTrust,
       audit: canAudit,
+      cancel: canCancel,
     },
     job: {
       ...job,
@@ -475,7 +482,12 @@ async function getV1Job(id: string, request: NextRequest) {
   if (!guard.ok) return { response: guard.response }
   const security = guard.context
   const { finance: canFinance, trust: canTrust, audit: canAudit } =
-    getCrmSectionAccess(security.role, security.isSuperAdmin)
+    getCrmSectionAccess(security.role, security.isSuperAdmin, security.permissionOverrides)
+  const canCancel = evaluateActionInitiation({
+    role: security.role,
+    actionId: 'jobs.cancel',
+    overrides: security.permissionOverrides,
+  }).allowed
 
   const job = await prisma.jobPosting.findUnique({
     where: { id },
@@ -577,6 +589,7 @@ async function getV1Job(id: string, request: NextRequest) {
         finance: canFinance,
         trust: canTrust,
         audit: canAudit,
+        cancel: canCancel,
       },
       job,
       audit: { canonical: auditLogs, activity: activityLogs },
