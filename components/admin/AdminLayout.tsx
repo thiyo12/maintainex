@@ -192,23 +192,20 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     <CrmShellProvider value={{ market, setMarket, markets: marketOptions }}>
       <div className="crm-v2 min-h-screen bg-[var(--crm-canvas)] text-[var(--crm-text)]">
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-[248px] border-r border-white/[0.06] bg-[var(--crm-rail)] transition-transform duration-200 lg:translate-x-0 ${
+          className={`crm-reference-rail fixed inset-y-0 left-0 z-50 w-[218px] border-r border-white/[0.06] transition-transform duration-200 lg:translate-x-0 ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="flex h-full flex-col px-3 py-4">
-            <Link href="/admin/dashboard" className="flex items-center gap-3 px-3 py-2.5">
+          <div className="flex h-full flex-col px-3 py-3">
+            <Link href="/admin/dashboard" className="flex items-center gap-3 px-3 py-3">
               <div className="min-w-0">
-                <div className="text-[18px] font-black tracking-[0.16em] text-white">
+                <div className="text-[16px] font-black tracking-[0.15em] text-white">
                   M<span className="text-[var(--crm-accent)]">Λ</span>INTΛINEX
-                </div>
-                <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                  Operations CRM
                 </div>
               </div>
             </Link>
 
-            <div className="mx-2 my-4 h-px bg-white/[0.07]" />
+            <div className="mx-2 mb-3 mt-2 h-px bg-white/[0.07]" />
 
             <nav className="crm-scrollbar flex-1 space-y-0.5 overflow-y-auto px-1">
               {navigation.map(item => {
@@ -222,11 +219,11 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                   return (
                     <div
                       key={item.name}
-                      className="flex h-10 items-center gap-3 rounded-xl px-3 text-slate-600"
+                      className="flex h-[38px] items-center gap-3 rounded-[9px] px-3 text-slate-600"
                       title="Module migration is scheduled for a later CRM V2 phase."
                     >
                       <item.icon size={16} className="shrink-0" />
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{item.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{item.name}</span>
                       {item.badge && (
                         <span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-slate-600">
                           {item.badge}
@@ -240,9 +237,9 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                   <Link
                     key={item.name}
                     href={item.href!}
-                    className={`group flex h-10 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition-colors ${
+                    className={`group flex h-[38px] items-center gap-3 rounded-[9px] px-3 text-[12px] font-medium transition-colors ${
                       active
-                        ? 'border-l-2 border-[var(--crm-accent)] bg-[#292920] pl-[10px] text-[var(--crm-accent)]'
+                        ? 'border-l-2 border-[var(--crm-accent)] bg-[#2a291e] pl-[10px] text-[var(--crm-accent)]'
                         : 'border-l-2 border-transparent text-slate-400 hover:bg-white/[0.055] hover:text-white'
                     }`}
                   >
@@ -255,7 +252,22 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             </nav>
 
             <div className="mt-3 border-t border-white/[0.07] px-1 pt-3">
-              <div className="mb-2 rounded-xl border border-white/[0.07] bg-white/[0.035] p-3">
+              <div className="mb-2 rounded-[10px] border border-white/[0.08] bg-white/[0.035] p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--crm-accent)]">
+                  MaintainEX Control
+                </div>
+                <div className="mt-1 text-[11px] leading-4 text-slate-400">
+                  Marketplace operations, finance and trust controls.
+                </div>
+                <Link
+                  href="/admin/platform"
+                  className="mt-3 flex h-8 items-center justify-center rounded-[8px] bg-[var(--crm-accent)] px-3 text-[10px] font-bold text-[#111315] transition-colors hover:bg-[#ffc943]"
+                >
+                  Platform settings
+                </Link>
+              </div>
+
+              <div className="mb-2 rounded-[10px] border border-white/[0.07] bg-white/[0.035] p-3">
                 <div className="flex items-center gap-2">
                   <span className={`h-2 w-2 rounded-full ${user.totpEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                   <span className="text-[11px] font-semibold text-slate-300">
@@ -287,9 +299,9 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           />
         )}
 
-        <div className="min-h-screen lg:pl-[248px]">
-          <header className="sticky top-0 z-30 border-b border-[var(--crm-border)] bg-white/96 backdrop-blur">
-            <div className="flex min-h-[68px] items-center gap-3 px-4 md:px-5 lg:px-6">
+        <div className="min-h-screen lg:pl-[218px]">
+          <header className="crm-reference-topbar sticky top-0 z-30 border-b border-[var(--crm-border)] backdrop-blur">
+            <div className="flex min-h-[58px] items-center gap-3 px-4 md:px-5">
               <button
                 type="button"
                 onClick={() => setSidebarOpen(value => !value)}
@@ -299,18 +311,13 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                 {sidebarOpen ? <FiX size={18} /> : <FiMenu size={18} />}
               </button>
 
-              <div className="hidden min-w-[136px] lg:block">
-                <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">Workspace</div>
-                <div className="mt-0.5 truncate text-sm font-semibold text-slate-900">{activeTitle}</div>
-              </div>
-
-              <div className="min-w-0 flex-1 lg:max-w-[620px]">
+              <div className="min-w-0 flex-1 lg:max-w-[720px]">
                 <CrmGlobalSearch market={market} />
               </div>
 
               <div className="ml-auto flex shrink-0 items-center gap-2">
                 {marketOptions.length > 0 && (
-                  <div className="hidden h-10 items-center gap-2 rounded-xl border border-[var(--crm-border)] bg-white px-2.5 sm:flex">
+                  <div className="hidden h-9 items-center gap-2 rounded-[9px] border border-[var(--crm-border)] bg-white px-2.5 sm:flex">
                     <FiMapPin size={14} className="text-slate-400" />
                     <select
                       aria-label="CRM market"
@@ -329,23 +336,11 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
                 <CrmNotificationBell />
 
-                <div className="hidden h-10 items-center gap-2 rounded-xl border border-[var(--crm-border)] bg-white px-2.5 xl:flex">
-                  <FiShield size={14} className={user.totpEnabled ? 'text-emerald-600' : 'text-amber-600'} />
-                  <div className="leading-tight">
-                    <div className="text-[10px] font-semibold text-slate-700">
-                      {user.totpEnabled ? '2FA on' : '2FA off'}
-                    </div>
-                    <div className="text-[9px] text-slate-400">
-                      {sessionExpiry ? `Session · ${sessionExpiry}` : 'Live session'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex h-10 items-center gap-2 pl-1">
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-[#17191b] text-xs font-bold text-[var(--crm-accent)]">
+                <div className="flex h-9 items-center gap-2 rounded-[9px] border border-[var(--crm-border)] bg-white px-2 pl-1">
+                  <div className="grid h-8 w-8 place-items-center rounded-full bg-[#171d22] text-[11px] font-bold text-[var(--crm-accent)]">
                     {(user.name?.[0] || user.email?.[0] || 'A').toUpperCase()}
                   </div>
-                  <div className="hidden max-w-[150px] leading-tight 2xl:block">
+                  <div className="hidden max-w-[150px] leading-tight xl:block">
                     <div className="truncate text-xs font-semibold text-slate-800">{user.name || user.email}</div>
                     <div className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400">
                       {roleLabel}
@@ -366,8 +361,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="px-4 py-4 md:px-5 md:py-5 lg:px-5">
-            <div className="mx-auto w-full max-w-[1760px]">{children}</div>
+          <main className="px-4 py-4 md:px-5 md:py-4">
+            <div className="mx-auto w-full max-w-[1580px]">{children}</div>
           </main>
         </div>
       </div>
