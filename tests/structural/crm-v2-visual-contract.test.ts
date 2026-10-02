@@ -33,6 +33,17 @@ describe('CRM V2 visual contract', () => {
     expect(css).toContain('.crm-v2 .crm-dark-surface')
   })
 
+  it('does not reintroduce obvious unreadable CRM button color combinations', () => {
+    const primitives = readFileSync(resolve(process.cwd(), 'components/crm/v2/CrmPrimitives.tsx'), 'utf8')
+    const dashboard = readFileSync(resolve(process.cwd(), 'app/(admin)/admin/dashboard/page.tsx'), 'utf8')
+    const job360 = readFileSync(resolve(process.cwd(), 'app/(admin)/admin/jobs/[id]/page.tsx'), 'utf8')
+    const source = [primitives, dashboard, job360].join('\n')
+
+    expect(source).not.toContain('bg-[var(--crm-accent)] text-white')
+    expect(source).not.toContain('bg-white text-white')
+    expect(source).not.toContain('bg-[#17191b] text-[#17191b]')
+  })
+
   it('uses the V2 shell on every admin page through the admin route-group layout', () => {
     const layout = readFileSync(resolve(process.cwd(), 'app/(admin)/layout.tsx'), 'utf8')
     const shell = readFileSync(resolve(process.cwd(), 'components/admin/AdminLayout.tsx'), 'utf8')
