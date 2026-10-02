@@ -78,19 +78,20 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const marketOptions = useMemo<CrmMarketOption[]>(() => {
     if (!user) return []
     const configured = user.markets || []
-    return user.role === 'SUPER_ADMIN'
-      ? [{ code: 'ALL', name: 'All markets' }, ...configured]
-      : configured
+    return [
+      {
+        code: 'ALL',
+        name: user.role === 'SUPER_ADMIN' ? 'All markets' : 'All assigned markets',
+      },
+      ...configured,
+    ]
   }, [user])
 
   useEffect(() => {
     if (!user) return
 
     const allowed = new Set(marketOptions.map(item => item.code))
-    const fallback =
-      user.role === 'SUPER_ADMIN'
-        ? 'ALL'
-        : marketOptions[0]?.code || 'ALL'
+    const fallback = 'ALL'
 
     const stored =
       typeof window !== 'undefined'
@@ -100,12 +101,20 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const next = stored && allowed.has(stored) ? stored : fallback
     setMarketState(next)
     window.sessionStorage.setItem('maintainex.crm.market', next)
+    const secure = window.location.protocol === 'https:' ? '; Secure' : ''
+    document.cookie = `maintainex_crm_market=${encodeURIComponent(next)}; Path=/; Max-Age=2592000; SameSite=Lax${secure}`
   }, [marketOptions, user])
 
   const setMarket = useCallback((next: string) => {
     if (!marketOptions.some(item => item.code === next)) return
     setMarketState(next)
     window.sessionStorage.setItem('maintainex.crm.market', next)
+    const secure = window.location.protocol === 'https:' ? '; Secure' : ''
+    document.cookie = `maintainex_crm_market=${encodeURIComponent(next)}; Path=/; Max-Age=2592000; SameSite=Lax${secure}`
+
+    // Reload once so every guarded CRM read/mutation shares the same server-validated
+    // market scope, including modules that do not carry an explicit ?market= parameter.
+    window.location.reload()
   }, [marketOptions])
 
   const handleLogout = useCallback(async () => {
