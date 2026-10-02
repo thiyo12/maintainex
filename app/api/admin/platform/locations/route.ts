@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { LOCATIONS } from '@/lib/locations'
 import {
   assertCrmCountryAllowed,
+  getCrmCountryCodes,
   guardCrmRequest,
   type CrmSecurityContext,
 } from '@/lib/crm/security'
@@ -21,7 +22,7 @@ function cleanCode(value: unknown): string {
 }
 
 function canAccessMarket(context: CrmSecurityContext, countryCode: string): boolean {
-  return context.isSuperAdmin || assertCrmCountryAllowed(context, countryCode)
+  return assertCrmCountryAllowed(context, countryCode)
 }
 
 async function entityMarket(type: LocationType, id: string): Promise<string | null> {
@@ -69,9 +70,10 @@ export async function GET(request: NextRequest) {
     if (!guard.ok) return guard.response
     const security = guard.context
 
-    const where = security.isSuperAdmin
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const where = scopedCountryCodes === null
       ? undefined
-      : { code: { in: security.assignedCountries } }
+      : { code: { in: scopedCountryCodes } }
 
     const databaseCountries = await prisma.country.findMany({
       where,
@@ -91,9 +93,9 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const scopedFallback = LOCATIONS.filter(country =>
-      security.isSuperAdmin || security.assignedCountries.includes(country.code)
-    )
+    const scopedFallback = scopedCountryCodes === null
+      ? LOCATIONS
+      : LOCATIONS.filter(country => scopedCountryCodes.includes(country.code))
     const databaseCodes = new Set(databaseCountries.map(country => country.code))
     const fallbackCountries = scopedFallback
       .filter(country => !databaseCodes.has(country.code))

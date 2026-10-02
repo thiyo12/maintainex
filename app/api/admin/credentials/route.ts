@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { guardCrmRequest } from '@/lib/crm/security'
+import { getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,14 +30,15 @@ export async function GET(request: NextRequest) {
     if (status !== 'ALL') filters.push({ verificationStatus: status })
     if (holderType) filters.push({ holderType })
 
-    if (!security.isSuperAdmin) {
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    if (scopedCountryCodes !== null) {
       const [users, companies] = await Promise.all([
         prisma.user.findMany({
-          where: { countryCode: { in: security.assignedCountries } },
+          where: { countryCode: { in: scopedCountryCodes } },
           select: { id: true },
         }),
         prisma.companyProfile.findMany({
-          where: { countryCode: { in: security.assignedCountries } },
+          where: { countryCode: { in: scopedCountryCodes } },
           select: { id: true },
         }),
       ])

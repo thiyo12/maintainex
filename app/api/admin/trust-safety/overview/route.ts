@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
+  getCrmCountryCodes,
   getCrmCountryFilter,
   guardCrmRequest,
 } from '@/lib/crm/security'
@@ -34,12 +35,17 @@ export async function GET(request: NextRequest) {
     }
 
     const countryFilter = getCrmCountryFilter(security)
-    const jobCountryFilter = security.isSuperAdmin
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const jobCountryFilter = scopedCountryCodes === null
       ? {}
-      : { job: { countryCode: { in: security.assignedCountries } } }
-    const loginCountryFilter = security.isSuperAdmin
+      : scopedCountryCodes.length === 0
+        ? { id: '__NONE__' }
+        : { job: { countryCode: { in: scopedCountryCodes } } }
+    const loginCountryFilter = scopedCountryCodes === null
       ? {}
-      : { user: { countryCode: { in: security.assignedCountries } } }
+      : scopedCountryCodes.length === 0
+        ? { id: '__NONE__' }
+        : { user: { countryCode: { in: scopedCountryCodes } } }
 
     const [
       pendingKyc,

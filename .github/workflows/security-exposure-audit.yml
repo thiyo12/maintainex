@@ -3,8 +3,13 @@ name: Security Exposure Audit
 on:
   push:
     branches:
+      - main
       - feature/crm-job360
       - feature/crm-v2-rebuild
+      - feature/crm-reference-ui-parity
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:

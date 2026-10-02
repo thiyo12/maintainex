@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
+import { getCrmCountryCodes, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 
 export async function GET(request: NextRequest) {
@@ -47,9 +47,13 @@ export async function GET(request: NextRequest) {
     const documentWhere: any = { ...countryFilter }
     const settlementWhere: any = { ...countryFilter }
     const marketplaceWhere: any = { ...countryFilter }
-    const classicJobWhere: any = security.isSuperAdmin
-      ? {}
-      : { customer: { countryCode: { in: security.assignedCountries } } }
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const classicJobWhere: any =
+      scopedCountryCodes === null
+        ? {}
+        : scopedCountryCodes.length === 0
+          ? { id: '__NONE__' }
+          : { customer: { countryCode: { in: scopedCountryCodes } } }
     const walletWhere: any = scopedUserIds ? { userId: { in: scopedUserIds } } : {}
 
     const [

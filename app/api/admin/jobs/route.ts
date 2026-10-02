@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { guardCrmAction, guardCrmRequest, getCrmCountryFilter, assertCrmCountryAllowed } from '@/lib/crm/security'
+import { guardCrmAction, guardCrmRequest, getCrmCountryCodes, getCrmCountryFilter, assertCrmCountryAllowed } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { transitionMarketplaceJob, type JobStatus } from '@/lib/domain/job-lifecycle'
 import {
@@ -31,6 +31,11 @@ interface UnifiedJob {
     name: string
     email: string
   }
+  provider: {
+    id: string
+    name: string
+    type: 'INDIVIDUAL' | 'COMPANY'
+  } | null
   createdAt: string
 }
 
@@ -95,11 +100,12 @@ export async function GET(request: NextRequest) {
     const v1Filters: any[] = []
     if (status && status !== 'ALL') v1Filters.push({ status })
 
-    if (!security.isSuperAdmin) {
-      if (security.assignedCountries.length === 0) {
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    if (scopedCountryCodes !== null) {
+      if (scopedCountryCodes.length === 0) {
         v1Filters.push({ id: '__NONE__' })
       } else {
-        v1Filters.push({ customer: { countryCode: { in: security.assignedCountries } } })
+        v1Filters.push({ customer: { countryCode: { in: scopedCountryCodes } } })
       }
     }
 
@@ -136,6 +142,18 @@ export async function GET(request: NextRequest) {
               email: true,
             },
           },
+          assignments: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              tasker: {
+                select: {
+                  userId: true,
+                  user: { select: { name: true } },
+                },
+              },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: fetchWindow,
@@ -151,11 +169,12 @@ export async function GET(request: NextRequest) {
 
     const totalCombined = v1Total + v2Total
 
+    const v2JobIds = v2Jobs.map(job => job.id)
     const v2CustomerIds = [...new Set(v2Jobs.map(job => job.customerId))]
     const v2CategoryIds = [...new Set(v2Jobs.map(job => job.categoryId))]
     const v2AreaIds = [...new Set(v2Jobs.filter(job => job.areaId).map(job => job.areaId!))]
 
-    const [v2Customers, v2Categories, v2Areas] = await Promise.all([
+    const [v2Customers, v2Categories, v2Areas, acceptedQuotes] = await Promise.all([
       v2CustomerIds.length > 0
         ? prisma.user.findMany({
             where: { id: { in: v2CustomerIds } },
@@ -174,8 +193,49 @@ export async function GET(request: NextRequest) {
             select: { id: true, name: true },
           })
         : [],
+      v2JobIds.length > 0
+        ? prisma.jobQuote.findMany({
+            where: { jobId: { in: v2JobIds }, status: 'ACCEPTED' },
+            orderBy: { createdAt: 'desc' },
+            select: { jobId: true, providerId: true, providerType: true },
+          })
+        : [],
     ])
 
+    const acceptedQuoteByJob = new Map<string, { providerId: string; providerType: string }>()
+    for (const quote of acceptedQuotes) {
+      if (!acceptedQuoteByJob.has(quote.jobId)) {
+        acceptedQuoteByJob.set(quote.jobId, {
+          providerId: quote.providerId,
+          providerType: quote.providerType,
+        })
+      }
+    }
+
+    const individualProviderIds = [...new Set(
+      acceptedQuotes.filter(quote => quote.providerType === 'INDIVIDUAL').map(quote => quote.providerId)
+    )]
+    const companyProviderIds = [...new Set(
+      acceptedQuotes.filter(quote => quote.providerType === 'COMPANY').map(quote => quote.providerId)
+    )]
+
+    const [individualProviders, companyProviders] = await Promise.all([
+      individualProviderIds.length
+        ? prisma.user.findMany({
+            where: { id: { in: individualProviderIds } },
+            select: { id: true, name: true },
+          })
+        : [],
+      companyProviderIds.length
+        ? prisma.companyProfile.findMany({
+            where: { id: { in: companyProviderIds } },
+            select: { id: true, companyName: true },
+          })
+        : [],
+    ])
+
+    const individualProviderMap = new Map(individualProviders.map(provider => [provider.id, provider.name]))
+    const companyProviderMap = new Map(companyProviders.map(provider => [provider.id, provider.companyName]))
     const customerMap = new Map(v2Customers.map(customer => [customer.id, customer]))
     const categoryMap = new Map(v2Categories.map(category => [category.id, category.name]))
     const areaMap = new Map(v2Areas.map(area => [area.id, area.name]))
@@ -195,12 +255,33 @@ export async function GET(request: NextRequest) {
         urgency: 'NORMAL',
         source: 'V1',
         customer: job.customer,
+        provider: job.assignments[0]?.tasker
+          ? {
+              id: job.assignments[0].tasker.userId,
+              name: job.assignments[0].tasker.user.name || 'Assigned tasker',
+              type: 'INDIVIDUAL',
+            }
+          : null,
         createdAt: job.createdAt.toISOString(),
       })
     }
 
     for (const job of v2Jobs) {
       const customer = customerMap.get(job.customerId)
+      const acceptedQuote = acceptedQuoteByJob.get(job.id)
+      const provider = acceptedQuote
+        ? acceptedQuote.providerType === 'COMPANY'
+          ? {
+              id: acceptedQuote.providerId,
+              name: companyProviderMap.get(acceptedQuote.providerId) || 'Company provider',
+              type: 'COMPANY' as const,
+            }
+          : {
+              id: acceptedQuote.providerId,
+              name: individualProviderMap.get(acceptedQuote.providerId) || 'Tasker',
+              type: 'INDIVIDUAL' as const,
+            }
+        : null
       unifiedJobs.push({
         id: job.id,
         title: job.title,
@@ -215,6 +296,7 @@ export async function GET(request: NextRequest) {
         customer: customer
           ? { id: customer.id, mxId: customer.mxId, name: customer.name, email: customer.email }
           : { id: job.customerId, mxId: null, name: 'Unknown', email: '' },
+        provider,
         createdAt: job.createdAt.toISOString(),
       })
     }
@@ -418,10 +500,8 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 })
       }
 
-      if (!security.isSuperAdmin) {
-        if (!assertCrmCountryAllowed(security, job.countryCode || 'LK')) {
-          return NextResponse.json({ error: 'Forbidden: job belongs to a different country' }, { status: 403 })
-        }
+      if (!assertCrmCountryAllowed(security, job.countryCode || 'LK')) {
+        return NextResponse.json({ error: 'Forbidden: job belongs to a different market scope' }, { status: 403 })
       }
 
       try {
@@ -466,13 +546,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    if (!security.isSuperAdmin) {
-      if (security.assignedCountries.length === 0) {
-        return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
-      }
-      if (!assertCrmCountryAllowed(security, job.customer.countryCode || 'LK')) {
-        return NextResponse.json({ error: 'Forbidden: job belongs to a different country' }, { status: 403 })
-      }
+    if (!assertCrmCountryAllowed(security, job.customer.countryCode || 'LK')) {
+      return NextResponse.json({ error: 'Forbidden: job belongs to a different market scope' }, { status: 403 })
     }
 
     if (job.status === status) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { guardCrmRequest } from '@/lib/crm/security'
+import { getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
 import {
   CRM_ACTIONS,
   canRoleFillPendingApprovalSlot,
@@ -21,19 +21,25 @@ export async function GET(request: NextRequest) {
     if (!guard.ok) return guard.response
     const security = guard.context
 
-    if (!security.isSuperAdmin && security.assignedCountries.length === 0) {
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    if (scopedCountryCodes !== null && scopedCountryCodes.length === 0) {
       return NextResponse.json(
         { approvals: [], total: 0 },
         { headers: { 'Cache-Control': 'no-store' } }
       )
     }
 
+    const approvalMarkets =
+      scopedCountryCodes === null
+        ? undefined
+        : security.isSuperAdmin
+          ? ['GLOBAL', ...scopedCountryCodes]
+          : scopedCountryCodes
+
     const approvals = await prisma.crmApprovalRequest.findMany({
       where: {
         status: { in: ['PENDING_APPROVAL', 'ON_HOLD'] },
-        ...(security.isSuperAdmin
-          ? {}
-          : { market: { in: security.assignedCountries } }),
+        ...(approvalMarkets ? { market: { in: approvalMarkets } } : {}),
       },
       include: {
         decisions: {

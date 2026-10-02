@@ -23,6 +23,8 @@ export interface CrmSecurityContext {
   userAgent: string | null
   sessionId: string
   permissionOverrides: PermissionOverride[]
+  /** Validated operator-selected market. ALL means every market allowed by the live staff assignment. */
+  selectedMarket?: string
 }
 
 export interface CrmGuardOptions {
@@ -361,6 +363,56 @@ export async function guardCrmRequest(
     )
   }
 
+  // The operator market selector is an authorization scope, not a presentation hint.
+  // Query/header takes precedence for explicit API calls; otherwise the CRM shell cookie
+  // keeps all guarded reads and mutations on the same market after navigation/reload.
+  const requestedMarket = (
+    request.nextUrl.searchParams.get('market') ||
+    request.headers.get('x-crm-market') ||
+    request.cookies.get('maintainex_crm_market')?.value ||
+    'ALL'
+  ).trim().toUpperCase()
+
+  if (requestedMarket !== 'ALL' && !/^[A-Z]{2}$/.test(requestedMarket)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: { code: 'CRM_MARKET_INVALID', message: 'Invalid CRM market.' } },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } }
+      ),
+    }
+  }
+
+  if (
+    requestedMarket !== 'ALL' &&
+    !isSuperAdmin &&
+    !assignedCountries.includes(requestedMarket)
+  ) {
+    return deny(
+      403,
+      'CRM_MARKET_FORBIDDEN',
+      'Selected market is outside the staff account scope.',
+      request,
+      { role, requestedMarket }
+    )
+  }
+
+  if (requestedMarket !== 'ALL') {
+    const country = await prisma.country.findUnique({
+      where: { code: requestedMarket },
+      select: { code: true },
+    })
+    if (!country) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: { code: 'CRM_MARKET_UNKNOWN', message: 'Selected CRM market is not configured.' } },
+          { status: 400, headers: { 'Cache-Control': 'no-store' } }
+        ),
+      }
+    }
+  }
+
   return {
     ok: true,
     context: {
@@ -369,6 +421,7 @@ export async function guardCrmRequest(
       role,
       assignedCountries,
       isSuperAdmin,
+      selectedMarket: requestedMarket,
       ipAddress: getIp(request),
       userAgent: request.headers.get('user-agent'),
       sessionId: liveSession.id,
@@ -382,19 +435,29 @@ export type CrmCountryFilter = {
   countryCode?: { in: string[] }
 }
 
+export function getCrmCountryCodes(context: CrmSecurityContext): string[] | null {
+  const selectedMarket = (context.selectedMarket || 'ALL').toUpperCase()
+  if (selectedMarket !== 'ALL') return [selectedMarket]
+  if (context.isSuperAdmin) return null
+  return context.assignedCountries
+}
+
 export function getCrmCountryFilter(context: CrmSecurityContext): CrmCountryFilter {
-  if (context.isSuperAdmin) return {}
-  if (context.assignedCountries.length === 0) return { id: '__NONE__' }
-  return { countryCode: { in: context.assignedCountries } }
+  const countries = getCrmCountryCodes(context)
+  if (countries === null) return {}
+  if (countries.length === 0) return { id: '__NONE__' }
+  return { countryCode: { in: countries } }
 }
 
 export function assertCrmCountryAllowed(
   context: CrmSecurityContext,
   countryCode: string | null | undefined
 ): boolean {
-  if (context.isSuperAdmin) return true
   if (!countryCode) return false
-  return context.assignedCountries.includes(countryCode.toUpperCase())
+  const normalized = countryCode.toUpperCase()
+  const countries = getCrmCountryCodes(context)
+  if (countries === null) return true
+  return countries.includes(normalized)
 }
 
 

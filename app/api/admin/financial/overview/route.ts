@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
+import { getCrmCountryCodes, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 
 type MoneyGroup = {
   status: string
@@ -21,9 +21,12 @@ export async function GET(request: NextRequest) {
     const security = guard.context
 
     const countryFilter = getCrmCountryFilter(security)
-    const countryWhere = security.isSuperAdmin
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const countryWhere = scopedCountryCodes === null
       ? Prisma.empty
-      : Prisma.sql`WHERE j."countryCode" IN (${Prisma.join(security.assignedCountries)})`
+      : scopedCountryCodes.length === 0
+        ? Prisma.sql`WHERE 1 = 0`
+        : Prisma.sql`WHERE j."countryCode" IN (${Prisma.join(scopedCountryCodes)})`
 
     const [
       settlementsByStatus,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { guardCrmRequest } from '@/lib/crm/security'
+import { getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
 import { evaluateActionInitiation } from '@/lib/crm/governance'
 
 const VALID_STATUSES = new Set([
@@ -69,9 +69,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid payment status' }, { status: 400 })
     }
 
-    const countryClause = security.isSuperAdmin
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const countryClause = scopedCountryCodes === null
       ? Prisma.empty
-      : Prisma.sql`AND j."countryCode" IN (${Prisma.join(security.assignedCountries)})`
+      : scopedCountryCodes.length === 0
+        ? Prisma.sql`AND 1 = 0`
+        : Prisma.sql`AND j."countryCode" IN (${Prisma.join(scopedCountryCodes)})`
     const statusClause = status === 'ALL'
       ? Prisma.empty
       : Prisma.sql`AND p.status = ${status}`

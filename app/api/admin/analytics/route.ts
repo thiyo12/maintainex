@@ -1,26 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
-import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
+import { getCrmCountryCodes, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 import { evaluateEffectivePermission } from '@/lib/crm/governance'
-import type { AdminSession } from '@/lib/admin-types'
-
-function sessionFromGuard(context: {
-  adminId: string
-  email: string
-  role: AdminSession['role']
-  assignedCountries: string[]
-}): AdminSession {
-  return {
-    id: context.adminId,
-    email: context.email,
-    role: context.role,
-    firstName: '',
-    lastName: '',
-    assignedCountries: context.assignedCountries,
-    authType: 'adminUser',
-  }
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,13 +26,18 @@ export async function GET(request: NextRequest) {
     const canDisputes = allowed('disputes:view')
 
     const countryFilter = getCrmCountryFilter(security)
-    const branchScopeResult = await resolveReportBranchScope(sessionFromGuard(security), null)
-    if (!branchScopeResult.ok) {
-      return NextResponse.json({ error: branchScopeResult.error }, { status: branchScopeResult.status })
-    }
-    const branchIds = branchScopeResult.scope.branchIds
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const branchIds = scopedCountryCodes === null
+      ? null
+      : (await prisma.branch.findMany({
+          where: { region: { in: scopedCountryCodes } },
+          select: { id: true },
+        })).map(branch => branch.id)
     const activityWhere = branchIds === null ? {} : { branchId: { in: branchIds } }
     const staleCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const trendStart = new Date()
+    trendStart.setUTCDate(trendStart.getUTCDate() - 29)
+    trendStart.setUTCHours(0, 0, 0, 0)
 
     const [
       totalUsers,
@@ -132,6 +119,56 @@ export async function GET(request: NextRequest) {
     const totalRevenue = canFinance ? Number(commissionData._sum.jobAmount || 0) / 100 : null
     const totalCommission = canFinance ? Number(commissionData._sum.commissionAmount || 0) / 100 : null
     const completionRate = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0
+    const trendCountryClause =
+      scopedCountryCodes === null
+        ? Prisma.empty
+        : scopedCountryCodes.length === 0
+          ? Prisma.sql`AND 1 = 0`
+          : Prisma.sql`AND "countryCode" IN (${Prisma.join(scopedCountryCodes)})`
+
+    type JobTrendRow = { day: Date; count: bigint }
+    type RevenueTrendRow = { day: Date; amount: bigint }
+
+    const [jobTrendRows, revenueTrendRows] = await Promise.all([
+      prisma.$queryRaw<JobTrendRow[]>(Prisma.sql`
+        SELECT date_trunc('day', "createdAt") AS day, COUNT(*)::bigint AS count
+        FROM "MarketplaceJob"
+        WHERE "createdAt" >= ${trendStart}
+        ${trendCountryClause}
+        GROUP BY 1
+        ORDER BY 1
+      `),
+      canFinance
+        ? prisma.$queryRaw<RevenueTrendRow[]>(Prisma.sql`
+            SELECT date_trunc('day', "createdAt") AS day,
+                   COALESCE(SUM("commissionAmount"), 0)::bigint AS amount
+            FROM "CommissionSettlement"
+            WHERE "createdAt" >= ${trendStart}
+            ${trendCountryClause}
+            GROUP BY 1
+            ORDER BY 1
+          `)
+        : Promise.resolve([] as RevenueTrendRow[]),
+    ])
+
+    const jobTrendMap = new Map(
+      jobTrendRows.map(row => [new Date(row.day).toISOString().slice(0, 10), Number(row.count)])
+    )
+    const revenueTrendMap = new Map(
+      revenueTrendRows.map(row => [new Date(row.day).toISOString().slice(0, 10), Number(row.amount) / 100])
+    )
+
+    const trend = Array.from({ length: 30 }, (_, index) => {
+      const date = new Date(trendStart)
+      date.setUTCDate(trendStart.getUTCDate() + index)
+      const key = date.toISOString().slice(0, 10)
+      return {
+        date: key,
+        jobs: jobTrendMap.get(key) || 0,
+        revenue: canFinance ? revenueTrendMap.get(key) || 0 : null,
+      }
+    })
+
 
     return NextResponse.json(
       {
@@ -169,6 +206,7 @@ export async function GET(request: NextRequest) {
           return acc
         }, {}),
         recentActivity,
+        trend,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     )

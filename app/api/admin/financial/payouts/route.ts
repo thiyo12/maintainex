@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
+import { getCrmCountryCodes, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 import { evaluateActionInitiation } from '@/lib/crm/governance'
 
 const VALID_STATUSES = new Set([
@@ -39,9 +39,10 @@ export async function GET(request: NextRequest) {
     if (status !== 'ALL') where.status = status
 
     const now = new Date()
-    const freezeMarkets = security.isSuperAdmin
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const freezeMarkets = scopedCountryCodes === null
       ? undefined
-      : ['GLOBAL', ...security.assignedCountries]
+      : ['GLOBAL', ...scopedCountryCodes]
 
     const [payouts, total, stats, activeFreezes] = await Promise.all([
       prisma.payout.findMany({

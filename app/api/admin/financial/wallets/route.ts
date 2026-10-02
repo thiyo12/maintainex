@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
+  getCrmCountryCodes,
   getCrmCountryFilter,
   guardCrmAction,
   guardCrmRequest,
@@ -40,7 +41,8 @@ export async function GET(request: NextRequest) {
     }
 
     const countryFilter = getCrmCountryFilter(security)
-    const userIds = security.isSuperAdmin ? null : await scopedUserIds(countryFilter)
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const userIds = scopedCountryCodes === null ? null : await scopedUserIds(countryFilter)
     const userWhere = userIds ? { userId: { in: userIds } } : {}
 
     const [

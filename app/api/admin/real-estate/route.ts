@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
+import { assertCrmCountryAllowed, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { evaluateEffectivePermission } from '@/lib/crm/governance/permissions'
 import { safeParseJsonArr } from '@/lib/db-utils'
@@ -41,9 +41,7 @@ export async function GET(request: NextRequest) {
 
     const scopeWhere: any = requestedCountry
       ? { countryCode: requestedCountry }
-      : security.isSuperAdmin
-        ? {}
-        : { countryCode: { in: security.assignedCountries } }
+      : getCrmCountryFilter(security)
 
     const listingWhere: any = { ...scopeWhere }
     if (status) listingWhere.status = status

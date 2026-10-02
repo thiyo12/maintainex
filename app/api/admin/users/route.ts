@@ -107,8 +107,8 @@ export async function GET(request: NextRequest) {
     const where: any = { ...getCrmCountryFilter(security) }
 
     if (country) {
-      if (!security.isSuperAdmin && !security.assignedCountries.includes(country)) {
-        return NextResponse.json({ error: 'Forbidden country filter' }, { status: 403 })
+      if (!assertCrmCountryAllowed(security, country)) {
+        return NextResponse.json({ error: 'Forbidden market filter' }, { status: 403 })
       }
       where.countryCode = country
     }
