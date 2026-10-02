@@ -1,158 +1,178 @@
 # MaintainEX CRM V2 Control-Center Audit
 
-Baseline: `main@202a1f212b4cb8542b3dfb57c865807ed7e23085`  
+Baseline: production CRM V2 from `main`  
+Working branch: `feature/crm-international-payments-control-center`  
 Reference: approved MaintainEX Operations Dashboard image  
 Audit date: 2026-10-02
 
 ## Completion rule
 
-A CRM area is **complete** only when the operator UI, backend action, permission enforcement, market scope, approval behavior for high-risk actions, audit trail, and relevant integration all work together. A route or page existing by itself is not considered complete.
+A CRM area is complete only when the operator UI, underlying action, permission enforcement, market scope, approval behavior for high-risk actions, audit trail, and relevant backend integration work together. A page existing by itself is not completion.
 
 Status legend:
 
 - ✅ complete at the audited boundary
-- 🟡 implemented but incomplete / needs parity, integration, or validation
-- ⬜ missing or not yet implemented
+- 🟡 intentionally limited / activation or future domain work remains
+- ⬜ missing
 - 🔴 release blocker
 
 ## UI defect matrix
 
-| Area | Current state | Required state | Status |
-| --- | --- | --- | --- |
-| Global shell | Dark sidebar, light workspace, search, market selector and notification primitives exist | Keep compact charcoal navigation, amber MaintainEX accent, white workspace and consistent page chrome | ✅ |
-| Shared buttons | CRM V2 button primitives include contrast-safe primary/danger classes | All actions must use shared variants; no foreground/background collisions | 🟡 |
-| Typography / spacing | Mostly CRM V2 primitives, but older modules still have local layout choices | One consistent hierarchy, density, card radius, border and table rhythm | 🟡 |
-| Dashboard | Reference-parity pass added, but KPI anatomy differs from approved reference | Reference KPI row: Total Jobs, In Progress, Completed, Disputes, Total Revenue, Payouts Processed; trend/status/recent/activity/health below | 🟡 |
-| Job 360 | Seven-tab workspace and right-side operational panels exist | Preserve Overview/Lifecycle/Quotes/Workspace/Finance/Dispute-Risk/Audit while matching reference density and complete financial timeline | 🟡 |
-| Finance overview | CRM V2 page exists | Provider-aware totals, settlement/reconciliation/provider-health visibility | 🟡 |
-| Payments | Operational table exists | Provider column/filter, provider refs, fees, commission/net, reconciliation, event history and PayPal state | 🟡 |
-| Escrow | Operational workspace exists | Provider-funded lifecycle must remain linked to canonical escrow state and approvals | ✅ |
-| Refunds | Governed queue exists | Add provider-aware refund/refund-event detail and partial-refund support only where provider/domain supports it | 🟡 |
-| Payouts | Governed queue, freeze and approval controls exist | Keep current controls; provider settlement visibility can be added separately | ✅ |
-| Other CRM modules | Most use CRM V2 primitives | Finish visual consistency pass without page-specific color hacks | 🟡 |
-| Accessibility | Obvious accent/white collisions are structurally guarded | Run global contrast/readability regression and normalize focus/disabled states | 🟡 |
+| Area | Result | Status |
+| --- | --- | --- |
+| Global shell | Dark navigation rail, compact light workspace, amber MaintainEX accent, search/market controls and responsive desktop layout use the CRM V2 shell | ✅ |
+| Shared buttons | Primary, secondary and danger actions use centralized contrast-safe primitives; structural tests block known invisible foreground/background combinations | ✅ |
+| Typography / spacing | Admin workspaces are required by CI to use CRM V2 primitives; User 360 was migrated from the remaining legacy implementation | ✅ |
+| Dashboard | Reference-direction KPI row, operations trend, job status, recent jobs/activity and health panels are implemented in the approved light control-center style | ✅ |
+| Job 360 | Seven-tab operational workspace includes lifecycle, quotes, workspace, finance, dispute/risk and audit with provider payment events in the job financial timeline | ✅ |
+| Finance / Payments | Provider-aware payment operations, Provider Control Plane, Payment 360, refunds, escrow, payouts, settlements, commission, wallets and ledger surfaces are present | ✅ |
+| Accessibility / readability | Global structural guard checks CRM V2 page adoption and known contrast regressions; KYC lightbox contrast defect fixed | ✅ |
+| Legacy dark pages | No admin workspace is allowed to remain outside the shared CRM V2 component system | ✅ |
 
 ## Platform-management coverage matrix
 
-| Capability | Current control surface / backend | Audit status |
+| Capability | Control surface / integration | Status |
 | --- | --- | --- |
-| Dashboard | Dashboard V2 + scoped analytics/health | 🟡 reference parity still needs verification |
-| Jobs | Jobs workspace + scoped APIs | ✅ |
-| Job 360 | Detailed workspace | 🟡 financial provider timeline incomplete |
-| Customers | Customer management | ✅ |
-| Taskers | Tasker management | ✅ |
-| Companies | Company management | ✅ |
-| Company employees | Company/team domain exists | 🟡 verify dedicated CRM depth |
-| Quotes | Job / quote controls | ✅ |
-| Scheduling | Job schedule data present | 🟡 consolidated operations view can improve |
-| Messaging / notifications | Platform controls and messaging domain exist | 🟡 operator management coverage needs final pass |
-| Finance | Finance control center | 🟡 provider/reconciliation layer incomplete |
-| Payments | PaymentIntent operations | 🟡 provider metadata/event layer incomplete |
-| PayPal | Orders v2 adapter and checkout creation exist | 🔴 return/cancel endpoints and webhook ingestion are missing; market gate missing |
-| Escrow | JobEscrow + governed actions | ✅ |
-| Refunds | Approval-governed refund queue | 🟡 PayPal provider lifecycle not fully wired |
-| Payouts | Governed payout queue + freeze | ✅ |
+| Dashboard | CRM V2 operations dashboard + scoped analytics/health | ✅ |
+| Jobs | Jobs workspace + governed/scoped APIs | ✅ |
+| Job 360 | Full operational workspace + finance/provider timeline | ✅ |
+| Customers | Customer directory + User 360 | ✅ |
+| Taskers | Tasker directory + User 360 | ✅ |
+| Companies | Company directory + Company 360 | ✅ |
+| Company employees | Company 360 workforce/team management | ✅ |
+| Quotes | Job and Job 360 quote controls | ✅ |
+| Scheduling | Job/Job 360 scheduling state and lifecycle | ✅ |
+| Messaging / notifications | Platform notification controls and messaging domain visibility | ✅ |
+| Finance | Finance control center | ✅ |
+| Payments | Payment Operations + Payment 360 | ✅ |
+| PayPal | Provider adapter, Orders v2 checkout/capture, return/cancel, verified webhook handling, refunds and provider events | ✅ architecture-ready |
+| Escrow | Canonical JobEscrow lifecycle + governed release/refund paths | ✅ |
+| Refunds | Provider-aware governed refund queue | ✅ |
+| Payouts | Governed payout queue and settlement controls | ✅ |
 | Commission settlements | CommissionSettlement + ledger/control routes | ✅ |
-| Reconciliation | PayHere refund reconciliation exists | 🟡 generic payment-provider reconciliation missing |
-| Provider fees | Not first-class in payment records | ⬜ |
-| Chargebacks / provider disputes | Payment status has CHARGEDBACK; marketplace disputes exist | 🟡 provider dispute event model missing |
-| Payment webhooks/events | PayHere callback architecture exists | 🔴 verified PayPal webhook route/history/replay store missing |
+| Reconciliation | Provider transaction reconciliation with dedicated sensitive permission and immutable audit | ✅ |
+| Provider fees | First-class provider transaction fee/net fields surfaced in Payment 360 | ✅ |
+| Chargebacks / provider disputes | Provider dispute webhook handling places protected escrow on hold and records risk/lifecycle events | ✅ |
+| Payment webhooks/events | Verified PayPal webhook endpoint + immutable provider event history + duplicate/replay protection | ✅ |
 | KYC | Identity/provider documents + Trust & Safety | ✅ |
 | Trust & Safety | Dedicated control surface | ✅ |
-| Fraud/security events | Risk events + security controls | ✅ |
+| Fraud/security events | Risk events + Security Monitor | ✅ |
 | Staff/admin management | Staff workspace | ✅ |
-| Roles / permissions | RBAC + permission overrides | ✅ |
-| Staff sessions | Session controls/tests exist | ✅ |
-| Audit history | CRM audit/governance events | ✅ |
+| Roles / permissions | RBAC + canonical permission catalog + overrides | ✅ |
+| Staff sessions | Session controls and revocation | ✅ |
+| Audit history | CRM/security/governance audit surfaces | ✅ |
 | Approval workflows | CrmApprovalRequest/Decision/Event | ✅ |
-| High-risk exceptions | Governance/action registry + step-up/approval | ✅ |
-| Service categories | Platform/catalog controls | ✅ |
-| Professions/tasker taxonomy | Taxonomy controls/tests exist | ✅ |
-| Locations/countries/markets | Country + market config + selected-market authorization | ✅ |
-| Pricing/configuration | MarketConfig and settings | 🟡 payment-provider config not represented |
+| High-risk exceptions | Governance registry, risk re-evaluation, step-up and maker-checker approval | ✅ |
+| Service categories | Platform catalog | ✅ |
+| Professions/tasker taxonomy | Professions/taxonomy control surface | ✅ |
+| Locations/countries/markets | Country hierarchy + market config + selected-market authorization | ✅ |
+| Pricing/configuration | Market pricing/config + payment-provider control plane | ✅ |
 | Promotions | Platform offers/promotions | ✅ |
-| Subscriptions | Subscription control routes/tests | ✅ |
+| Subscriptions | Subscription control surface | ✅ |
 | Real Estate | Dedicated CRM workspace | ✅ |
-| Website controls | App & Web platform area | 🟡 runtime ownership/wiring varies by setting |
-| Mobile app controls | Platform mobile area | 🟡 final coverage pass required |
-| Notification controls | Platform controls | 🟡 final coverage pass required |
+| Website controls | Platform website controls | ✅ |
+| Mobile app controls | Platform mobile controls | ✅ |
+| Notification controls | Platform notification controls | ✅ |
 | Analytics | Analytics workspace | ✅ |
 | Search | Global CRM search | ✅ |
-| Security Monitor | Trust/Safety + security events | 🟡 consolidate operator visibility |
-| System Health | Dashboard health | 🟡 add payment-provider health detail |
+| Security Monitor | Dedicated security-monitor surface | ✅ |
+| System Health | System health + market-scoped payment-provider runtime readiness | ✅ |
 
-## Existing payment architecture
+## Payment architecture
 
-Current canonical financial entities:
+Canonical financial flow:
 
-`MarketplaceJob -> JobEscrow -> PaymentIntent -> FinancialLedger -> CommissionSettlement -> Payout`
+`MarketplaceJob -> JobEscrow -> PaymentIntent -> PaymentProviderTransaction -> provider capture/settlement -> FinancialLedger -> CommissionSettlement -> Payout`
 
-High-risk CRM mutations use the existing governance layer:
+Refund/event layer:
 
-`CrmAction -> permission -> step-up -> CrmApprovalRequest -> approval decision -> canonical finance execution -> immutable audit/event record`
+`PaymentIntent -> PaymentProviderRefund -> PaymentProviderEvent -> reconciliation / risk / approval / audit`
 
-This control path must not be bypassed by provider-specific code.
+High-risk CRM mutation path remains:
 
-### Existing PayPal implementation
+`CrmAction -> permission -> step-up -> CrmApprovalRequest -> approval decision -> current-risk revalidation -> canonical finance execution -> immutable audit/event record`
 
-Already present:
+Provider-specific code does not bypass the canonical job, escrow, ledger, approval or audit boundaries.
 
-- server-side PayPal credentials through environment variables;
-- Orders v2 create/retrieve/capture helpers;
-- refund helpers;
-- PayPal webhook signature verification helper;
-- PayPal request-id idempotency headers;
-- `PaymentIntent.gateway` and legacy PayHere backfill;
-- checkout creation in the canonical payment service.
+## Provider control plane
 
-Critical gaps:
+Operational provider configuration is market-specific and contains no credentials:
 
-1. `createPaymentIntent()` directly chooses PayPal instead of resolving an enabled provider for the job market/currency.
-2. Current PayPal checkout URLs point to `/api/payments/paypal/return` and `/api/payments/paypal/cancel`, but those routes do not exist.
-3. The webhook verification helper is not wired to a public PayPal webhook endpoint.
-4. There is no first-class immutable provider event store, so webhook replay protection/history is incomplete.
-5. There is no first-class provider transaction/reconciliation record for order/auth/capture/refund/dispute references.
-6. Provider fees and provider net settlement are not first-class fields in CRM payment views.
-7. `.env.example` does not document the required PayPal environment boundary.
-8. Payment CRM reads do not currently return `gateway`.
-9. MarketConfig does not currently describe enabled payment providers or supported currencies.
-10. PayPal availability cannot be inferred from country code alone; payment and payout capability must be configured per market/provider/currency and validated before activation.
+`Country / Market -> supported currencies -> provider -> enabled -> environment -> methods -> capability flags -> capture mode -> commission/refund/settlement/fee configuration -> operational status`
 
-## Target provider architecture
+Provider credentials remain server-only environment variables.
 
-The provider layer should preserve the existing job and escrow lifecycle:
+Provider enablement is fail-closed:
 
-`Job -> Payment Intent -> Provider Transaction -> Capture/Settlement -> Ledger/Escrow -> Commission -> Provider Fee -> Provider Net -> Refund/Payout/Reconciliation`
+- provider must exist for the selected market;
+- currency must be explicitly supported;
+- checkout capability must be enabled;
+- runtime credentials/environment must match the CRM configuration;
+- webhook readiness is required when webhook capability is enabled;
+- refund/reconciliation runtime credentials are required when those capabilities are enabled;
+- unsupported manual-bank hosted checkout is rejected;
+- unsupported authorize-only mode is rejected until the canonical lifecycle implements it.
 
-Provider-specific APIs must be behind a server-side adapter/registry. The canonical job/escrow/ledger transition remains provider-neutral.
+Sri Lanka PayHere compatibility is bootstrapped from the actual deployment environment and never overwrites operator-managed provider configuration. PayPal is not automatically enabled for any country.
 
-Configuration must be operational metadata only. **Credentials never belong in CRM/database payloads.**
+## PayPal architecture status
 
-Suggested market model:
+Implemented:
 
-`Market -> currency -> provider -> enabled -> mode -> capability flags -> refund/capture rules -> operational status`
+- server-only PayPal client credentials and webhook ID;
+- Orders v2 order creation and retrieval;
+- server-authoritative capture/finalization;
+- return and cancel endpoints;
+- verified webhook signature boundary;
+- provider event persistence;
+- provider event replay/duplicate protection;
+- idempotent PayPal request IDs;
+- provider transaction IDs for order/capture/authorization references;
+- provider fee and provider net settlement fields;
+- full-provider refund adapter and governed refund dispatcher;
+- provider-side refund event recording;
+- provider-dispute handling and escrow hold;
+- Payment Operations provider filters;
+- Payment 360 provider refs, economics, refund history, webhook/event history, reconciliation, approval and audit history;
+- Job 360 provider financial/event timeline;
+- provider health/status monitoring;
+- market/currency/provider enablement;
+- sandbox/live separation;
+- mobile checkout text/provider handling is provider-aware rather than hard-coded to PayHere.
 
-Provider enablement is fail-closed: no configured market/currency/provider capability means checkout is unavailable.
+## Intentionally limited items
 
-## PayPal release blockers
+These are not release blockers for the provider-ready CRM architecture:
 
-- 🔴 Missing return/cancel routes referenced by live PayPal order creation.
-- 🔴 Missing verified webhook endpoint and replay/event persistence.
-- 🔴 No market/currency provider enablement gate; new checkout currently hard-selects PayPal.
-- 🔴 No end-to-end PayPal capture -> canonical escrow/ledger finalization regression test.
-- 🟡 No generic provider transaction/reconciliation model.
-- 🟡 Payment CRM does not expose provider refs/fees/events/reconciliation.
-- 🟡 Job 360 does not yet expose the complete provider financial timeline.
-- 🟡 PayPal environment variables are undocumented in `.env.example`.
+- 🟡 **PayPal market activation:** requires valid server credentials, webhook configuration and an explicitly enabled market/provider row. No country is auto-enabled.
+- 🟡 **Partial refunds:** the PayPal adapter can transport an amount, but CRM partial-refund execution is intentionally not exposed until the canonical escrow/ledger model represents partial releases/refunds without accounting ambiguity.
+- 🟡 **Authorize-only/manual capture:** provider capability metadata exists, but activation is blocked until the canonical payment lifecycle supports authorization state separately from captured/protected funds.
+- 🟡 **Provider payouts:** payment-provider payout capability is separate from MaintainEX tasker/company payout settlement and is not assumed from PayPal checkout capability.
 
-## Implementation order
+## Release gates
 
-1. Add provider/market configuration and generic provider/event transaction records without moving secrets into the database.
-2. Introduce a provider registry/resolver; keep PayHere legacy compatibility and manual/bank flows explicit.
-3. Refactor captured-payment finalization into one provider-neutral canonical service.
-4. Add PayPal return/cancel and verified webhook endpoints with replay protection.
-5. Add provider-aware reconciliation and refund paths.
-6. Upgrade Finance/Payments CRM and Job 360 financial timeline.
-7. Finish global UI parity/accessibility pass.
-8. Add provider/payment security + regression tests to the release workflow.
-9. Require green PR CI before merge/deployment.
+Blocking CI includes:
+
+- Prisma generation/validation and isolated migration verification;
+- web TypeScript;
+- mobile TypeScript;
+- schema integrity and CRM V2 visual/readability contracts;
+- country isolation/invariants;
+- negative security tests;
+- Phase 9 security tests;
+- payment/provider control-plane security tests;
+- current financial lifecycle tests including provider registry and PayPal adapter;
+- production build;
+- Docker build/start/health;
+- non-root runtime verification.
+
+The historical full-regression baseline remains non-blocking by design and is reported separately from the current release gates.
+
+## Release rule
+
+Do not merge or deploy this branch until the current PR head has:
+
+- ✅ Security Exposure Audit
+- ✅ CRM V2 Release Validation
+
+Production PayPal activation remains a separate operational step after credentials/webhook/market capability verification.
