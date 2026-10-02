@@ -32,14 +32,14 @@ export function CrmActivityFeed({
       {items.map(item => {
         const tone = item.tone || 'neutral'
         return (
-          <div key={item.id} className="flex gap-3 px-4 py-3.5">
-            <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500">
+          <div key={item.id} className="flex gap-3 px-4 py-3">
+            <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-[9px] bg-slate-100 text-slate-500">
               {item.icon || <FiFileText size={14} />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-slate-800">{item.title}</div>
+                  <div className="truncate text-[13px] font-semibold text-slate-800">{item.title}</div>
                   {item.description && (
                     <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p>
                   )}
@@ -98,16 +98,16 @@ export function CrmNotesPanel({
 
   return (
     <div className="crm-card overflow-hidden">
-      <div className="flex items-center justify-between border-b border-[var(--crm-border)] px-4 py-3.5">
+      <div className="flex items-center justify-between border-b border-[var(--crm-border)] px-4 py-3">
         <div>
-          <div className="text-sm font-semibold text-slate-900">Internal notes</div>
+          <div className="text-[13px] font-semibold text-slate-900">Internal notes</div>
           <div className="mt-0.5 text-[11px] text-slate-400">{notes.length} recorded</div>
         </div>
         <FiMessageSquare size={16} className="text-slate-400" />
       </div>
 
       {canAdd && onAdd && (
-        <div className="border-b border-[var(--crm-border)] bg-[#fafbf9] p-4">
+        <div className="border-b border-[var(--crm-border)] bg-[#fafbfc] p-3.5">
           <label className="sr-only" htmlFor="crm-note-draft">Internal note</label>
           <textarea
             id="crm-note-draft"
@@ -116,7 +116,7 @@ export function CrmNotesPanel({
             maxLength={2000}
             rows={3}
             placeholder="Add an internal operational note…"
-            className="w-full resize-none rounded-xl border border-[var(--crm-border)] bg-white px-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-amber-300 focus:ring-2 focus:ring-amber-100"
+            className="w-full resize-none rounded-[10px] border border-[var(--crm-border)] bg-white px-3 py-2.5 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-amber-300 focus:ring-2 focus:ring-amber-100"
           />
           <div className="mt-2 flex items-center justify-between gap-3">
             <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
@@ -144,7 +144,7 @@ export function CrmNotesPanel({
         ) : (
           <div className="divide-y divide-[var(--crm-border)]">
             {notes.map(note => (
-              <article key={note.id} className="px-4 py-3.5">
+              <article key={note.id} className="px-4 py-3">
                 <div className="flex items-center gap-2">
                   {note.type && <CrmBadge>{note.type}</CrmBadge>}
                   {note.private && (
@@ -206,7 +206,7 @@ export function CrmPagination({
       : null
 
   return (
-    <div className="flex flex-col gap-3 border-t border-[var(--crm-border)] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 border-t border-[var(--crm-border)] bg-white px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
       <div className="text-xs text-slate-400">
         {start !== null && end !== null && typeof total === 'number'
           ? `Showing ${start}–${end} of ${total}`
