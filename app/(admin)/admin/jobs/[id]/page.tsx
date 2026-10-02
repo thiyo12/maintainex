@@ -17,13 +17,9 @@ import {
   FiActivity,
   FiAlertTriangle,
   FiArrowLeft,
-  FiBriefcase,
   FiCalendar,
-  FiChevronRight,
   FiCheck,
-  FiCheckCircle,
   FiClock,
-  FiCopy,
   FiCreditCard,
   FiDollarSign,
   FiExternalLink,
@@ -507,20 +503,6 @@ function RailState({ label: railLabel, value }: { label: string; value: string }
       <CrmBadge tone={tone} dot>{label(value)}</CrmBadge>
     </div>
   )
-}
-
-function SummaryTile({ icon: Icon, label: tileLabel, value, meta, href }: { icon: any; label: string; value: string; meta?: string; href?: string }) {
-  const body = (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 h-full">
-      <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-        <Icon size={14} />
-        {tileLabel}
-      </div>
-      <div className="mt-2 text-sm font-semibold text-slate-900 line-clamp-2">{value}</div>
-      {meta && <div className="mt-1 text-xs text-slate-400 truncate">{meta}</div>}
-    </div>
-  )
-  return href ? <Link href={href} className="hover:opacity-80 transition">{body}</Link> : body
 }
 
 function RailLink({ href, icon: Icon, label: linkLabel }: { href: string; icon: any; label: string }) {
