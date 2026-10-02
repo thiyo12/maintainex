@@ -6,7 +6,10 @@ import {
   guardCrmRequest,
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
-import { getPayHereConfig } from '@/lib/payment/payhere-adapter'
+import {
+  getPayHereConfig,
+  getPayHereMerchantApiConfig,
+} from '@/lib/payment/payhere-adapter'
 import { getPayPalConfig } from '@/lib/finance/payments/paypal-adapter'
 import {
   normalizePaymentProvider,
@@ -54,20 +57,33 @@ function runtimeState(provider: string) {
       configured: Boolean(config),
       environment: config ? (config.sandbox ? 'SANDBOX' : 'LIVE') : null,
       webhookConfigured: Boolean(config?.webhookId),
+      refundConfigured: Boolean(config),
     }
   }
   if (provider === 'PAYHERE') {
     const config = getPayHereConfig()
+    const merchantApi = getPayHereMerchantApiConfig()
     return {
       configured: Boolean(config),
       environment: config ? (config.sandbox ? 'SANDBOX' : 'LIVE') : null,
       webhookConfigured: Boolean(config),
+      refundConfigured: Boolean(merchantApi),
     }
   }
   if (provider === 'MANUAL_BANK') {
-    return { configured: true, environment: 'LIVE', webhookConfigured: false }
+    return {
+      configured: true,
+      environment: 'LIVE',
+      webhookConfigured: false,
+      refundConfigured: false,
+    }
   }
-  return { configured: false, environment: null, webhookConfigured: false }
+  return {
+    configured: false,
+    environment: null,
+    webhookConfigured: false,
+    refundConfigured: false,
+  }
 }
 
 function serializeConfig(config: any) {
@@ -191,8 +207,30 @@ export async function PATCH(request: NextRequest) {
     if (enabled && (!runtime.configured || runtime.environment !== environment)) {
       return NextResponse.json({ error: provider + ' cannot be enabled until its server runtime is configured for ' + environment }, { status: 409 })
     }
+    if (enabled && captureMode !== 'CAPTURE') {
+      return NextResponse.json(
+        { error: provider + ' authorize-only mode is not implemented in the canonical checkout flow' },
+        { status: 409 }
+      )
+    }
+    if (enabled && provider === 'MANUAL_BANK' && capabilityMap.checkout === true) {
+      return NextResponse.json(
+        { error: 'MANUAL_BANK cannot be enabled for hosted checkout until a canonical bank-transfer payment flow is implemented' },
+        { status: 409 }
+      )
+    }
     if (enabled && capabilityMap.webhooks === true && !runtime.webhookConfigured) {
       return NextResponse.json({ error: provider + ' webhook verification is not configured' }, { status: 409 })
+    }
+    if (
+      enabled &&
+      (capabilityMap.refund === true || capabilityMap.reconciliation === true) &&
+      !runtime.refundConfigured
+    ) {
+      return NextResponse.json(
+        { error: provider + ' refund/reconciliation runtime is not configured' },
+        { status: 409 }
+      )
     }
 
     const before = await prisma.paymentProviderConfig.findUnique({
