@@ -1,26 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
-import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
+import { getCrmCountryCodes, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 import { evaluateEffectivePermission } from '@/lib/crm/governance'
-import type { AdminSession } from '@/lib/admin-types'
-
-function sessionFromGuard(context: {
-  adminId: string
-  email: string
-  role: AdminSession['role']
-  assignedCountries: string[]
-}): AdminSession {
-  return {
-    id: context.adminId,
-    email: context.email,
-    role: context.role,
-    firstName: '',
-    lastName: '',
-    assignedCountries: context.assignedCountries,
-    authType: 'adminUser',
-  }
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,11 +25,13 @@ export async function GET(request: NextRequest) {
     const canDisputes = allowed('disputes:view')
 
     const countryFilter = getCrmCountryFilter(security)
-    const branchScopeResult = await resolveReportBranchScope(sessionFromGuard(security), null)
-    if (!branchScopeResult.ok) {
-      return NextResponse.json({ error: branchScopeResult.error }, { status: branchScopeResult.status })
-    }
-    const branchIds = branchScopeResult.scope.branchIds
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    const branchIds = scopedCountryCodes === null
+      ? null
+      : (await prisma.branch.findMany({
+          where: { region: { in: scopedCountryCodes } },
+          select: { id: true },
+        })).map(branch => branch.id)
     const activityWhere = branchIds === null ? {} : { branchId: { in: branchIds } }
     const staleCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
