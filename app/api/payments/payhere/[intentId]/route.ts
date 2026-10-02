@@ -1,77 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPaymentCheckoutForm } from '@/lib/payment/payment-service'
-import { resolvePaymentPublicOrigin } from '@/lib/finance/payments/public-origin'
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
+/**
+ * Legacy PayHere hosted checkout.
+ *
+ * MaintainEX runs PayPal as the only active online payment provider, so this
+ * route can no longer start a new PayHere checkout. It is retained so that any
+ * historical checkout link resolves to a clear, explicit unavailable state
+ * instead of a raw 404, and so legacy PayHere payment records stay auditable.
+ *
+ * Historical PayHere intents, refunds and ledger entries remain readable through
+ * the CRM. This endpoint never renders a payment form and never collects card
+ * details.
+ */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ intentId: string }> }
 ) {
   const { intentId } = await params
-  const token = request.nextUrl.searchParams.get('token') || ''
-  const baseUrl = resolvePaymentPublicOrigin(request.url)
-  if (!baseUrl) {
-    return new NextResponse('Payment public URL is not configured.', {
-      status: 503,
-      headers: { 'Cache-Control': 'no-store' },
-    })
-  }
 
-  const checkout = await getPaymentCheckoutForm(intentId, token, baseUrl)
-  if (!checkout) {
-    return new NextResponse('Payment session is invalid or no longer available.', {
-      status: 404,
-      headers: { 'Cache-Control': 'no-store' },
-    })
-  }
+  console.warn('[payments] blocked legacy PayHere checkout request', {
+    intentId,
+    reason: 'PAYHERE_DISABLED_FOR_NEW_CHECKOUT',
+  })
 
-  const fields = Object.entries(checkout.fields)
-    .map(([name, value]) => `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" />`)
-    .join('\n')
-
-  const actionOrigin = new URL(checkout.actionUrl).origin
   const html = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Redirecting to secure payment</title>
+  <title>Payment method unavailable</title>
   <style>
     body{font-family:system-ui,-apple-system,sans-serif;background:#0d0d0d;color:#fff;display:grid;place-items:center;min-height:100vh;margin:0}
     main{max-width:420px;padding:32px;text-align:center}
-    button{background:#f5a623;border:0;border-radius:12px;padding:14px 20px;font-weight:700;color:#111;cursor:pointer}
-    p{color:#bdbdbd;line-height:1.5}
+    h1{font-size:20px;margin:0 0 12px}
+    p{color:#bdbdbd;line-height:1.6}
   </style>
 </head>
 <body>
   <main>
-    <h1>Secure payment</h1>
-    <p>Redirecting you to PayHere. Do not close this page until the payment screen opens.</p>
-    <form id="payhere-form" method="post" action="${escapeHtml(checkout.actionUrl)}">
-      ${fields}
-      <button type="submit">Continue to PayHere</button>
-    </form>
+    <h1>Payment method no longer available</h1>
+    <p>This payment session uses a retired payment method and can no longer be completed.</p>
+    <p>Please return to your job and start a new payment to continue.</p>
   </main>
-  <script>document.getElementById('payhere-form').submit();</script>
 </body>
 </html>`
 
   return new NextResponse(html, {
-    status: 200,
+    status: 410,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store, max-age=0',
       'Referrer-Policy': 'no-referrer',
       'X-Frame-Options': 'DENY',
-      'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action ${actionOrigin}; base-uri 'none'; frame-ancestors 'none'`,
+      'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'`,
     },
   })
 }

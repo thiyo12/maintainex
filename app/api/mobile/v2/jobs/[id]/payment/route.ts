@@ -38,12 +38,10 @@ export async function POST(
         result.code === 'UNAUTHORIZED' ? 403 :
         result.code === 'JOB_NOT_FOUND' ? 404 :
         [
-          'PAYPAL_NOT_CONFIGURED',
-          'PAYHERE_NOT_CONFIGURED',
-          'PAYMENT_PROVIDER_NOT_ENABLED',
-          'PAYPAL_ENVIRONMENT_MISMATCH',
-          'PAYHERE_ENVIRONMENT_MISMATCH',
-          'PAYMENT_PROVIDER_CHECKOUT_UNSUPPORTED',
+'PAYPAL_NOT_CONFIGURED',
+            'PAYMENT_PROVIDER_NOT_AVAILABLE',
+            'PAYPAL_ENVIRONMENT_MISMATCH',
+            'PAYMENT_PROVIDER_CHECKOUT_UNSUPPORTED',
         ].includes(result.code || '') ? 503 :
         result.code === 'CUSTOMER_PAYMENT_DETAILS_REQUIRED' ? 400 :
         409

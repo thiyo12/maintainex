@@ -17,12 +17,12 @@ export default function PaymentScreen() {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start()
   }, [])
 
-  const methods = [
-    { name: t('payment.methodVisa'), icon: 'card-outline' as const },
-    { name: t('payment.methodMastercard'), icon: 'card-outline' as const },
-    { name: t('payment.methodPayHere'), icon: 'wallet-outline' as const },
-    { name: t('payment.methodStripe'), icon: 'link-outline' as const },
-  ]
+const methods = [
+      { name: t('payment.methodVisa'), icon: 'card-outline' as const },
+      { name: t('payment.methodMastercard'), icon: 'card-outline' as const },
+      { name: t('payment.methodPayPal'), icon: 'wallet-outline' as const },
+      { name: t('payment.methodStripe'), icon: 'link-outline' as const },
+    ]
 
   return (
     <SafeAreaView style={styles.container}>

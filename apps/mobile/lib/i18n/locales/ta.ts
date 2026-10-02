@@ -346,7 +346,7 @@ const ta: Record<string, any> = {
     title: 'கட்டணம்',
     methodVisa: 'விசா',
     methodMastercard: 'மாஸ்டர்கார்டு',
-    methodPayHere: 'பேஹியர் (இலங்கை)',
+    methodPayPal: 'PayPal',
     methodStripe: 'ஸ்ட்ரைப்',
     comingSoon: 'விரைவில்',
     comingSoonDesc: 'கட்டண முறை ஒருங்கிணைப்பு விரைவில் வருகிறது!',

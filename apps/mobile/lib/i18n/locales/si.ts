@@ -346,7 +346,7 @@ const si: Record<string, any> = {
     title: 'ගෙවීම',
     methodVisa: 'වීසා',
     methodMastercard: 'මාස්ටර්කාඩ්',
-    methodPayHere: 'PayHere (ශ්‍රී ලංකාව)',
+    methodPayPal: 'PayPal',
     methodStripe: 'ස්ට්‍රයිප්',
     comingSoon: 'ඉක්මනින්',
     comingSoonDesc: 'ගෙවීම් ක්‍රම ඒකාබද්ධ කිරීම ඉක්මනින්!',

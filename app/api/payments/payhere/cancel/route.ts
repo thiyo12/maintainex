@@ -6,7 +6,7 @@ function page(jobId: string, cancelled: boolean): string {
   const title = cancelled ? 'Payment cancelled' : 'Checking your payment'
   const message = cancelled
     ? 'No payment confirmation was received. You can return to MaintainEX and try again.'
-    : 'MaintainEX will confirm the final payment status from PayHere securely in the app.'
+    : 'This is a retired payment session. MaintainEX confirms payment status securely in the app.'
 
   return `<!doctype html>
 <html lang="en">

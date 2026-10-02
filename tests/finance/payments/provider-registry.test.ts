@@ -78,7 +78,9 @@ describe('payment provider registry', () => {
     ).toBeNull()
   })
 
-  it('selects the lowest-priority eligible provider deterministically', () => {
+  it('never selects PayHere for new checkout even when it has the lowest priority', () => {
+    // PayHere is legacy. Even when an ACTIVE, enabled PayHere row outranks
+    // PayPal on priority, it must never be resolved for a new payment.
     const selected = selectProviderFromConfigs(
       [
         config({ provider: 'PAYPAL', priority: 20 }),
@@ -91,8 +93,35 @@ describe('payment provider registry', () => {
       { countryCode: 'CA', currency: 'CAD' }
     )
 
-    expect(selected?.provider).toBe('PAYHERE')
+    expect(selected?.provider).toBe('PAYPAL')
     expect(selected?.environment).toBe('SANDBOX')
+  })
+
+  it('fails closed when only a legacy PayHere provider is configured', () => {
+    const selected = selectProviderFromConfigs(
+      [
+        config({
+          provider: 'PAYHERE',
+          priority: 1,
+          supportedCurrencies: JSON.stringify(['LKR']),
+          paymentMethods: JSON.stringify(['PAYHERE']),
+        }),
+      ],
+      { countryCode: 'LK', currency: 'LKR' }
+    )
+
+    expect(selected).toBeNull()
+  })
+
+  it('fails closed when an explicit PayHere provider is requested', () => {
+    const selected = selectProviderFromConfigs(
+      [
+        config({ provider: 'PAYHERE', supportedCurrencies: JSON.stringify(['CAD']) }),
+      ],
+      { countryCode: 'CA', currency: 'CAD', requestedProvider: 'PAYHERE' }
+    )
+
+    expect(selected).toBeNull()
   })
 
   it('honors an explicit requested provider without silently falling back', () => {

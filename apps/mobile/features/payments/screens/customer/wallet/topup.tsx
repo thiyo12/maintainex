@@ -13,10 +13,9 @@ import { useCountry } from '@/lib/country'
 const PRESETS = [500, 1000, 2500, 5000, 10000, 25000]
 
 const METHODS = [
-  { id: 'payhere', label: 'Card / Bank / eZ Cash', sub: 'Visa, Mastercard, Dialog, Sampath', icon: 'card-outline', badge: 'Instant', badgeColor: '#22C55E' },
-  { id: 'stripe', label: 'International Card', sub: 'Visa / Mastercard (USD, CAD, GBP)', icon: 'globe-outline', badge: 'Instant', badgeColor: '#22C55E' },
-  { id: 'bank_transfer', label: 'Direct Bank Transfer', sub: "People's Bank, BOC, Commercial Bank", icon: 'business-outline', badge: '1-2 hours', badgeColor: '#3B82F6' },
-]
+    { id: 'stripe', label: 'International Card', sub: 'Visa / Mastercard (USD, CAD, GBP)', icon: 'globe-outline', badge: 'Instant', badgeColor: '#22C55E' },
+    { id: 'bank_transfer', label: 'Direct Bank Transfer', sub: "People's Bank, BOC, Commercial Bank", icon: 'business-outline', badge: '1-2 hours', badgeColor: '#3B82F6' },
+  ]
 
 export default function TopUpScreen() {
   const colors = useColors()
@@ -24,7 +23,7 @@ export default function TopUpScreen() {
   const { selectedCountry } = useCountry()
   const currency: Currency = getCurrencyForCountry(selectedCountry?.code || 'LK')
   const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState('payhere')
+  const [method, setMethod] = useState('stripe')
   const [loading, setLoading] = useState(false)
   const [showBank, setShowBank] = useState(false)
   const styles = makeStyles(colors)
