@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
+import { assertCrmCountryAllowed, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 
 function dayKey(value: Date) {
@@ -16,7 +16,13 @@ export async function GET(request: NextRequest) {
     })
     if (!guard.ok) return guard.response
     const security = guard.context
-    const countryFilter = getCrmCountryFilter(security)
+    const requestedMarket = new URL(request.url).searchParams.get('market')?.trim().toUpperCase() || 'ALL'
+    if (requestedMarket !== 'ALL' && !assertCrmCountryAllowed(security, requestedMarket)) {
+      return NextResponse.json({ error: 'Market is outside the current staff scope' }, { status: 403 })
+    }
+    const countryFilter: any = requestedMarket === 'ALL'
+      ? getCrmCountryFilter(security)
+      : { countryCode: requestedMarket }
     const can = (permission: string) => {
       const entry = getPermissionCatalogEntry(permission)
       return evaluateEffectivePermission({
