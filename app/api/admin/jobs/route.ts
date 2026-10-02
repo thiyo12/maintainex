@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { guardCrmAction, guardCrmRequest, getCrmCountryFilter, assertCrmCountryAllowed } from '@/lib/crm/security'
+import { guardCrmAction, guardCrmRequest, getCrmCountryCodes, getCrmCountryFilter, assertCrmCountryAllowed } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { transitionMarketplaceJob, type JobStatus } from '@/lib/domain/job-lifecycle'
 import {
@@ -95,11 +95,12 @@ export async function GET(request: NextRequest) {
     const v1Filters: any[] = []
     if (status && status !== 'ALL') v1Filters.push({ status })
 
-    if (!security.isSuperAdmin) {
-      if (security.assignedCountries.length === 0) {
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    if (scopedCountryCodes !== null) {
+      if (scopedCountryCodes.length === 0) {
         v1Filters.push({ id: '__NONE__' })
       } else {
-        v1Filters.push({ customer: { countryCode: { in: security.assignedCountries } } })
+        v1Filters.push({ customer: { countryCode: { in: scopedCountryCodes } } })
       }
     }
 
@@ -418,10 +419,8 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 })
       }
 
-      if (!security.isSuperAdmin) {
-        if (!assertCrmCountryAllowed(security, job.countryCode || 'LK')) {
-          return NextResponse.json({ error: 'Forbidden: job belongs to a different country' }, { status: 403 })
-        }
+      if (!assertCrmCountryAllowed(security, job.countryCode || 'LK')) {
+        return NextResponse.json({ error: 'Forbidden: job belongs to a different market scope' }, { status: 403 })
       }
 
       try {
@@ -466,13 +465,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    if (!security.isSuperAdmin) {
-      if (security.assignedCountries.length === 0) {
-        return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
-      }
-      if (!assertCrmCountryAllowed(security, job.customer.countryCode || 'LK')) {
-        return NextResponse.json({ error: 'Forbidden: job belongs to a different country' }, { status: 403 })
-      }
+    if (!assertCrmCountryAllowed(security, job.customer.countryCode || 'LK')) {
+      return NextResponse.json({ error: 'Forbidden: job belongs to a different market scope' }, { status: 403 })
     }
 
     if (job.status === status) {
