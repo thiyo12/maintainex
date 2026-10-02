@@ -347,7 +347,7 @@ export default function KYCPage() {
             <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setLightboxDoc(null)}
-                className="absolute -top-10 right-0 text-slate-900 hover:text-amber-500 transition"
+                className="absolute -top-10 right-0 rounded-lg p-1 text-white/90 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
               >
                 <FiX size={24} />
               </button>
