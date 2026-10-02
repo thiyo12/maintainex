@@ -658,7 +658,7 @@ async function recordCapturedPaymentForRefund(
   await postLedgerTransaction({
     entries: [
       {
-        accountId: externalAccountId,
+        accountId: 'external:payhere',
         accountType: 'EXTERNAL_PAYOUT',
         entryType: 'DEBIT',
         amount: paymentIntent.amount,
