@@ -304,41 +304,42 @@ export default function Job360Page() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <div className="p-5 md:p-6">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+      <section className="overflow-hidden rounded-2xl border border-[var(--crm-border)] bg-white shadow-[var(--crm-shadow-card)]">
+        <div className="px-5 pt-4 md:px-6 md:pt-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0">
-              <Link href="/admin/jobs" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900">
-                <FiArrowLeft size={15} />
-                Back to jobs
+              <Link href="/admin/jobs" className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-900">
+                <FiArrowLeft size={14} />
+                Back to Jobs
               </Link>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-slate-950">{job.title}</h1>
-                <StatusBadge value={job.status} />
-                <CrmBadge tone={payload.source === 'V2' ? 'amber' : 'neutral'}>
-                  {payload.source === 'V2' ? 'Marketplace' : 'Classic'}
-                </CrmBadge>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={() => {
                     navigator.clipboard?.writeText(job.id)
                     toast.success('Job ID copied')
                   }}
-                  className="inline-flex items-center gap-1.5 font-mono hover:text-slate-700"
+                  className="inline-flex items-center gap-2 text-left"
                 >
-                  {job.id}
-                  <FiCopy size={12} />
+                  <h1 className="text-[24px] font-bold tracking-[-0.025em] text-slate-950 md:text-[28px]">{job.id}</h1>
+                  <FiCopy size={13} className="text-slate-300" />
                 </button>
+                <StatusBadge value={job.status} />
+              </div>
+
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                <span className="font-semibold text-slate-700">{job.title}</span>
+                <span>•</span>
+                <span>{payload.source === 'V2' ? 'Marketplace' : 'Classic'}</span>
+                <span>•</span>
                 <span>Created {formatDate(job.createdAt)}</span>
-                {job.urgency && <span>Urgency: {label(job.urgency)}</span>}
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <CrmButton variant="secondary" onClick={load}>
-                <FiRefreshCw size={15} />
+                <FiRefreshCw size={14} />
                 Refresh
               </CrmButton>
               {payload.permissions.cancel && !['COMPLETED', 'CANCELLED'].includes(job.status) && (
@@ -347,14 +348,14 @@ export default function Job360Page() {
                   disabled={actionLoading}
                   onClick={() => setCancelConfirmOpen(true)}
                 >
-                  <FiXCircle size={15} />
+                  <FiXCircle size={14} />
                   Cancel job
                 </CrmButton>
               )}
             </div>
           </div>
 
-          <div className="mt-6 grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="mt-5 grid gap-3 border-t border-[var(--crm-border)] py-4 sm:grid-cols-2 xl:grid-cols-4">
             <SummaryTile icon={FiUser} label="Customer" value={customer?.name || 'Unknown'} meta={customer?.mxId || customer?.email} href={customer?.id ? `/admin/users/${customer.id}` : undefined} />
             <SummaryTile icon={FiTool} label="Provider" value={provider?.companyName || provider?.name || 'Not assigned'} meta={acceptedQuote ? `${label(acceptedQuote.providerType)} provider` : 'Awaiting accepted quote'} href={providerLink || undefined} />
             <SummaryTile icon={FiMapPin} label="Location" value={location || 'Not specified'} meta={job.countryCode || customer?.countryCode || '—'} />
@@ -362,7 +363,7 @@ export default function Job360Page() {
           </div>
         </div>
 
-        <div className="border-t border-[var(--crm-border)] px-4 py-3">
+        <div className="px-3 md:px-4">
           <CrmTabs
             items={visibleTabs.map(tab => ({
               id: tab.key,
@@ -386,28 +387,32 @@ export default function Job360Page() {
           {activeTab === 'audit' && payload.permissions.audit && <AuditTab rows={auditRows} />}
         </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-[92px]">
-          <Card title="Operations rail" subtitle="Current job controls">
+        <aside className="space-y-4 xl:sticky xl:top-[84px]">
+          <Card title="Quick Actions" subtitle="Authorized controls for this job">
             <div className="space-y-2">
               {customer?.id && (
-                <RailLink href={`/admin/users/${customer.id}`} icon={FiUser} label="Open customer 360" />
+                <RailLink href={`/admin/users/${customer.id}`} icon={FiUser} label="Open customer 360" primary />
               )}
               {providerLink && <RailLink href={providerLink} icon={FiTool} label="Open provider 360" />}
               {payload.permissions.finance && (
                 <RailLink href="/admin/financial/wallets" icon={FiCreditCard} label="Finance operations" />
               )}
               {payload.permissions.trust && (
-                <>
-                  <RailLink href="/admin/jobs/disputes" icon={FiFlag} label="Dispute queue" />
-                  <RailLink href="/admin/trust-safety/risk-events" icon={FiShield} label="Trust & safety" />
-                </>
+                <RailLink href="/admin/jobs/disputes" icon={FiFlag} label="Create / review dispute" />
+              )}
+              {payload.permissions.trust && (
+                <RailLink href="/admin/trust-safety/risk-events" icon={FiShield} label="Trust & safety" />
               )}
             </div>
           </Card>
 
           {payload.permissions.finance && (
-            <Card title="Payment / escrow" subtitle="Canonical financial state">
-              <div className="space-y-3">
+            <Card title="Payment / Escrow" subtitle="Canonical financial state">
+              <div className="rounded-xl bg-amber-50 p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-700">Amount</div>
+                <div className="mt-1 text-xl font-bold text-slate-950">{formatMoney(amount, currency)}</div>
+              </div>
+              <div className="mt-4 space-y-3">
                 <KeyValue label="Escrow" value={finance.escrow?.status || 'Not funded'} />
                 <KeyValue label="Payment" value={finance.paymentIntents?.[0]?.status || 'No payment intent'} />
                 <KeyValue label="Commission" value={finance.settlements?.[0]?.status || 'Not created'} />
@@ -416,12 +421,12 @@ export default function Job360Page() {
             </Card>
           )}
 
-          <Card title="Verification" subtitle="Operator safety signals">
+          <Card title="Risk / Verification" subtitle="Safety and work-start signals">
             <div className="space-y-3">
               {payload.permissions.trust && <KeyValue label="Risk events" value={String(riskEvents.length)} />}
               <KeyValue label="PIN status" value={operations.verificationPin?.status || 'Not generated'} />
               <KeyValue label="Arrival verified" value={operations.verificationPin?.arrivalVerifiedAt ? 'Yes' : 'No'} />
-              <KeyValue label="Work start verified" value={operations.verificationPin?.workStartVerifiedAt ? 'Yes' : 'No'} />
+              <KeyValue label="Work started" value={operations.verificationPin?.workStartVerifiedAt ? 'Yes' : 'No'} />
               <KeyValue label="Completion verified" value={operations.verificationPin?.completionVerifiedAt ? 'Yes' : 'No'} />
             </div>
           </Card>
@@ -456,14 +461,21 @@ function SummaryTile({ icon: Icon, label: tileLabel, value, meta, href }: { icon
   return href ? <Link href={href} className="hover:opacity-80 transition">{body}</Link> : body
 }
 
-function RailLink({ href, icon: Icon, label: linkLabel }: { href: string; icon: any; label: string }) {
+function RailLink({ href, icon: Icon, label: linkLabel, primary = false }: { href: string; icon: any; label: string; primary?: boolean }) {
   return (
-    <Link href={href} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+    <Link
+      href={href}
+      className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
+        primary
+          ? 'border-[var(--crm-accent)] bg-[var(--crm-accent)] text-[#111315] hover:bg-[#ffc443]'
+          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+      }`}
+    >
       <span className="flex items-center gap-2.5">
-        <Icon size={15} className="text-slate-400" />
+        <Icon size={15} className={primary ? 'text-[#111315]' : 'text-slate-400'} />
         {linkLabel}
       </span>
-      <FiExternalLink size={13} className="text-slate-300" />
+      <FiExternalLink size={13} className={primary ? 'text-[#111315]/60' : 'text-slate-300'} />
     </Link>
   )
 }
@@ -482,73 +494,89 @@ function OverviewTab({ payload, location }: { payload: Job360Payload; location: 
   const customer = job.customer
   const isV2 = payload.source === 'V2'
   const operations = payload.operations
+  const acceptedQuote = payload.quotes?.find((quote: any) => quote.status === 'ACCEPTED')
+  const provider = job.acceptedProvider || operations?.assignments?.[0]?.company || operations?.assignments?.[0]?.worker
 
   return (
     <>
-      <Card title="Job overview" subtitle="Core request, customer and scheduling information">
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
-          <Field label="Service / category" value={isV2 ? job.category?.name || job.categoryId : job.category} />
-          <Field label="Location" value={location} />
-          <Field label="Country" value={job.countryCode || customer?.countryCode} />
-          <Field label="Preferred date" value={formatDate(job.preferredDate || job.scheduledDate)} />
-          <Field label="Time slot" value={label(job.preferredTimeSlot)} />
-          <Field label="Urgency" value={label(job.urgency)} />
-        </div>
-        <div className="mt-5 pt-5 border-t border-slate-100">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Description</div>
-          <p className="mt-2 text-sm leading-6 text-slate-700 whitespace-pre-wrap">{job.description || 'No description provided.'}</p>
-        </div>
-      </Card>
-
-      <div className="grid lg:grid-cols-2 gap-5">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Customer" subtitle="Customer attached to this job">
           <div className="grid grid-cols-2 gap-4">
             <Field label="Name" value={customer?.name} />
             <Field label="MX ID" value={customer?.mxId} mono />
             <Field label="Email" value={customer?.email} />
             <Field label="Phone" value={customer?.phone} />
-            <Field label="Account state" value={customer?.isBanned ? 'Banned' : customer?.isSuspended ? 'Suspended' : 'Active'} />
-            <Field label="Customer type" value={customer?.customerProfile?.customerType || '—'} />
+            <Field label="Account" value={customer?.isBanned ? 'Banned' : customer?.isSuspended ? 'Suspended' : 'Active'} />
+            <Field label="Type" value={customer?.customerProfile?.customerType || '—'} />
           </div>
         </Card>
 
-        <Card title="Work assignment" subtitle="Provider, company and worker state">
-          {payload.source === 'V2' ? (
-            operations?.assignments?.length ? (
-              <div className="space-y-3">
-                {operations.assignments.map((assignment: any) => (
-                  <div key={assignment.id} className="rounded-xl border border-slate-200 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">{assignment.company?.companyName || assignment.worker?.name}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">{assignment.worker?.name ? `Worker: ${assignment.worker.name}` : assignment.company?.mxId}</div>
-                      </div>
-                      <StatusBadge value={assignment.status} />
-                    </div>
-                    <div className="mt-3 text-xs text-slate-400">Assigned {formatDate(assignment.assignedAt)}</div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState icon={FiUsers} title="No workforce assignment" text="The accepted provider has not assigned a company worker." />
-            )
-          ) : payload.job.assignments?.length ? (
-            <div className="space-y-3">
-              {payload.job.assignments.map((assignment: any) => (
-                <div key={assignment.id} className="rounded-xl border border-slate-200 p-3 flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900">{assignment.tasker?.user?.name || 'Tasker'}</div>
-                    <div className="text-xs text-slate-400">{formatDate(assignment.createdAt)}</div>
-                  </div>
-                  <StatusBadge value={assignment.status} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState icon={FiUsers} title="No assignment" text="No provider has been assigned to this classic job." />
-          )}
+        <Card title="Provider / Company / Worker" subtitle="Accepted provider and assignment">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Provider" value={provider?.companyName || provider?.name || 'Not assigned'} />
+            <Field label="Provider type" value={acceptedQuote?.providerType ? label(acceptedQuote.providerType) : '—'} />
+            <Field label="Quote" value={acceptedQuote?.total ?? acceptedQuote?.price ? formatMoney(acceptedQuote?.total ?? acceptedQuote?.price, job.currency || 'LKR') : '—'} />
+            <Field label="Assignment state" value={operations?.assignments?.[0]?.status ? label(operations.assignments[0].status) : 'Not assigned'} />
+          </div>
         </Card>
       </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1.15fr_.85fr]">
+        <Card title="Location" subtitle="Service destination">
+          <div className="rounded-xl border border-[var(--crm-border)] bg-[#f8faf9] p-4">
+            <div className="flex items-start gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-slate-500 shadow-sm">
+                <FiMapPin size={15} />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-slate-900">{location || 'Not specified'}</div>
+                <div className="mt-1 text-xs text-slate-400">{job.countryCode || customer?.countryCode || 'Country unavailable'}</div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card title="Schedule" subtitle="Requested service timing">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Preferred date" value={formatDate(job.preferredDate || job.scheduledDate)} />
+            <Field label="Time slot" value={label(job.preferredTimeSlot)} />
+            <Field label="Urgency" value={label(job.urgency)} />
+            <Field label="Job type" value={label(job.jobType || job.serviceType)} />
+          </div>
+        </Card>
+      </div>
+
+      <Card title="Service Details" subtitle="Request scope and operational notes">
+        <div className="grid gap-5 md:grid-cols-3">
+          <Field label="Service / category" value={isV2 ? job.category?.name || job.categoryId : job.category} />
+          <Field label="Priority" value={label(job.urgency)} />
+          <Field label="Source" value={payload.source === 'V2' ? 'Marketplace' : 'Classic'} />
+        </div>
+        <div className="mt-5 border-t border-slate-100 pt-5">
+          <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Description</div>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{job.description || 'No description provided.'}</p>
+        </div>
+      </Card>
+
+      <Card title="Job Lifecycle" subtitle="Most recent canonical lifecycle events">
+        {payload.lifecycle?.length ? (
+          <div className="space-y-0">
+            {payload.lifecycle.slice(0, 7).map((event: any, index: number) => (
+              <div key={event.id || `${event.event || event.status}-${index}`} className="relative grid grid-cols-[24px_minmax(0,1fr)_auto] gap-3 pb-4 last:pb-0">
+                {index < Math.min(payload.lifecycle.length, 7) - 1 && <span className="absolute left-[7px] top-4 h-full w-px bg-slate-200" />}
+                <span className="relative mt-1.5 h-3 w-3 rounded-full bg-[var(--crm-success)] ring-4 ring-white" />
+                <div>
+                  <div className="text-xs font-semibold text-slate-800">{label(event.event || event.status || event.action)}</div>
+                  <div className="mt-0.5 text-[11px] text-slate-400">{event.description || event.note || 'Lifecycle update'}</div>
+                </div>
+                <div className="text-[10px] text-slate-400">{formatDate(event.createdAt || event.occurredAt)}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState icon={FiActivity} title="No lifecycle events" text="Canonical lifecycle events will appear here as the job progresses." />
+        )}
+      </Card>
     </>
   )
 }
