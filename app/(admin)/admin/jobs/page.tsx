@@ -27,6 +27,7 @@ import {
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface Job {
   id: string
@@ -119,7 +120,7 @@ export default function JobsCommandCentrePage() {
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}))
-        throw new Error(body?.error?.message || body?.error || 'Failed to load jobs')
+        throw crmApiError(body, 'Failed to load jobs')
       }
 
       const data: JobsPayload = await response.json()

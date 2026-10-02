@@ -37,6 +37,7 @@ import {
   CrmTabs,
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
+import { crmApiError } from '@/lib/crm/api-error'
 
 type TabKey = 'overview' | 'work' | 'finance' | 'trust' | 'activity'
 
@@ -157,7 +158,7 @@ export default function User360Page() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load user')
+      if (!response.ok) crmApiError(body, 'Unable to load user')
       setData(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load User 360')
@@ -234,7 +235,7 @@ export default function User360Page() {
         body: JSON.stringify({ userId: account.id, action, reason }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error?.message || body?.error || 'Action failed')
+      if (!response.ok) throw crmApiError(body, 'Action failed')
       toast.success('Account updated')
       await load()
     } catch (error) {

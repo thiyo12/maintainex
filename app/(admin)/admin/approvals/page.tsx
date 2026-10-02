@@ -25,6 +25,7 @@ import {
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface ApprovalRow {
   id: string
@@ -105,7 +106,7 @@ export default function ApprovalQueuePage() {
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(body?.error || 'Unable to load approvals')
+        crmApiError(body, 'Unable to load approvals')
       }
       setRows(Array.isArray(body?.approvals) ? body.approvals : [])
     } catch (error) {
@@ -180,7 +181,7 @@ export default function ApprovalQueuePage() {
       )
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(body?.error || 'Approval decision failed')
+        crmApiError(body, 'Approval decision failed')
       }
 
       const status = body?.approval?.status

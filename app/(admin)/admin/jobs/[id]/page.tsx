@@ -36,6 +36,7 @@ import {
   FiUsers,
   FiXCircle,
 } from 'react-icons/fi'
+import { crmApiError } from '@/lib/crm/api-error'
 
 type TabKey = 'overview' | 'lifecycle' | 'quotes' | 'workspace' | 'finance' | 'dispute' | 'audit'
 
@@ -182,7 +183,7 @@ export default function Job360Page() {
       })
       if (!response.ok) {
         const body = await response.json().catch(() => ({}))
-        throw new Error(body?.error || 'Unable to load job')
+        crmApiError(body, 'Unable to load job')
       }
       setPayload(await response.json())
     } catch (error) {
@@ -266,7 +267,7 @@ export default function Job360Page() {
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(body?.error?.message || body?.error || 'Unable to cancel job')
+        throw crmApiError(body, 'Unable to cancel job')
       }
 
       if (response.status === 202 || body?.approvalRequired) {

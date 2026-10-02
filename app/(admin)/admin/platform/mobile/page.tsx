@@ -26,6 +26,7 @@ import {
   crmThClass,
 } from '@/components/crm/v2/CrmPrimitives'
 import PlatformRuntimeControls from '@/components/crm/v2/PlatformRuntimeControls'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface MarketRow {
   id: string
@@ -92,7 +93,7 @@ export default function MobileManagementPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load mobile management')
+      if (!response.ok) crmApiError(body, 'Unable to load mobile management')
       setData(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load mobile management')

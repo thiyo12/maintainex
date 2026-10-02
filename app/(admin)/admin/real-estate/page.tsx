@@ -30,6 +30,7 @@ import {
   crmThClass,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { crmApiError } from '@/lib/crm/api-error'
 
 type Tone = 'success' | 'warning' | 'danger' | 'neutral' | 'info' | 'amber'
 
@@ -144,7 +145,7 @@ export default function RealEstateOperationsPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load real-estate operations')
+      if (!response.ok) crmApiError(body, 'Unable to load real-estate operations')
       setData({
         metrics: body.metrics || EMPTY.metrics,
         listings: body.listings || [],
@@ -178,7 +179,7 @@ export default function RealEstateOperationsPage() {
         body: JSON.stringify({ id: listing.id, action, reason }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Moderation action failed')
+      if (!response.ok) crmApiError(body, 'Moderation action failed')
       toast.success(
         action === 'approve'
           ? 'Listing approved'

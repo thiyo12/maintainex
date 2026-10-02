@@ -16,6 +16,7 @@ import {
   crmThClass,
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface AuditLog {
   id: string
@@ -53,7 +54,7 @@ export default function AuditLogPage() {
       if(target.trim()) params.set('targetId',target.trim())
       const response=await fetch(`/api/admin/audit?${params}`,{credentials:'include',cache:'no-store'})
       const body=await response.json().catch(()=>({}))
-      if(!response.ok) throw new Error(body?.error||'Unable to load audit')
+      if(!response.ok) crmApiError(body, 'Unable to load audit')
       setLogs(body.logs||[])
       setTotal(body.total||0)
       setTotalPages(body.totalPages||1)

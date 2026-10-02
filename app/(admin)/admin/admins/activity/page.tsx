@@ -29,6 +29,7 @@ import {
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmConfirmDialog } from '@/components/crm/v2/CrmOverlays'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface StaffMember {
   id: string
@@ -213,7 +214,7 @@ export default function StaffActivityPage() {
         body: JSON.stringify({ sessionId: revokeTarget.id }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Session revocation failed')
+      if (!response.ok) crmApiError(body, 'Session revocation failed')
 
       const revokedCurrent = Boolean(body.revokedCurrentSession)
       setRevokeTarget(null)

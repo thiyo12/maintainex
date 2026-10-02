@@ -31,6 +31,7 @@ import {
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
 import { CrmStepUpModal } from '@/components/crm/v2/CrmStepUpModal'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface WalletUser {
   id?: string
@@ -151,7 +152,7 @@ export default function WalletsPage() {
         return
       }
       if (!response.ok) {
-        throw new Error(body?.error || 'Failed to load wallet data')
+        crmApiError(body, 'Failed to load wallet data')
       }
 
       setPayload(body)
@@ -234,7 +235,7 @@ export default function WalletsPage() {
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(body?.error || 'Wallet update failed')
+        crmApiError(body, 'Wallet update failed')
       }
 
       toast.success(

@@ -30,6 +30,7 @@ import {
   crmThClass,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { crmApiError } from '@/lib/crm/api-error'
 
 type Tab = 'services' | 'categories' | 'templates'
 type CreateType = 'category' | 'service'
@@ -156,7 +157,7 @@ export default function CatalogManagementPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load catalog')
+      if (!response.ok) crmApiError(body, 'Unable to load catalog')
       setData({
         categories: body.categories || [],
         services: body.services || [],
@@ -222,7 +223,7 @@ export default function CatalogManagementPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Catalog publication update failed')
+      if (!response.ok) crmApiError(body, 'Catalog publication update failed')
       toast.success(`${item.name} ${item.isActive ? 'deactivated' : 'activated'}`)
       await load()
     } catch (error) {
@@ -283,7 +284,7 @@ export default function CatalogManagementPage() {
         body: JSON.stringify(payload),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Catalog item creation failed')
+      if (!response.ok) crmApiError(body, 'Catalog item creation failed')
 
       toast.success(
         canPublish && form.isActive

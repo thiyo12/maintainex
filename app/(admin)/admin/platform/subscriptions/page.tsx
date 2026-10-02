@@ -23,6 +23,7 @@ import {
   crmInputClass,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface Plan {
   id: string
@@ -123,7 +124,7 @@ export default function SubscriptionsPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load subscriptions')
+      if (!response.ok) crmApiError(body, 'Unable to load subscriptions')
       setData({
         plans: body.plans || [],
         subscriptions: body.subscriptions || [],
@@ -174,7 +175,7 @@ export default function SubscriptionsPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Plan creation failed')
+      if (!response.ok) crmApiError(body, 'Plan creation failed')
       toast.success('Subscription plan created')
       setShowCreate(false)
       setForm({
@@ -203,7 +204,7 @@ export default function SubscriptionsPage() {
         body: JSON.stringify({ id: plan.id, isActive: !plan.isActive }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Plan update failed')
+      if (!response.ok) crmApiError(body, 'Plan update failed')
       toast.success(`${plan.name} ${plan.isActive ? 'deactivated' : 'activated'}`)
       await load()
     } catch (error) {

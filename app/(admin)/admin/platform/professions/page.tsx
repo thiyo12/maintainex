@@ -26,6 +26,7 @@ import {
   crmInputClass,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface Skill {
   id: string
@@ -195,7 +196,7 @@ export default function ProfessionsManagementPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Profession creation failed')
+      if (!response.ok) crmApiError(body, 'Profession creation failed')
 
       toast.success(
         canPublish && professionForm.isActive
@@ -223,7 +224,7 @@ export default function ProfessionsManagementPage() {
         body: JSON.stringify({ isActive: !profession.isActive }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Profession publication update failed')
+      if (!response.ok) crmApiError(body, 'Profession publication update failed')
       toast.success(profession.isActive ? 'Profession deactivated' : 'Profession activated')
       await load()
     } catch (error) {
@@ -266,7 +267,7 @@ export default function ProfessionsManagementPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Skill creation failed')
+      if (!response.ok) crmApiError(body, 'Skill creation failed')
 
       toast.success(
         canPublish && skillForm.isActive
@@ -297,7 +298,7 @@ export default function ProfessionsManagementPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Skill publication update failed')
+      if (!response.ok) crmApiError(body, 'Skill publication update failed')
       toast.success(skill.isActive ? 'Skill deactivated' : 'Skill activated')
       await load()
     } catch (error) {
@@ -345,7 +346,7 @@ export default function ProfessionsManagementPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Submission review failed')
+      if (!response.ok) crmApiError(body, 'Submission review failed')
 
       toast.success('Profession submission reviewed')
       setReviewing(null)

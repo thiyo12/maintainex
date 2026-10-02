@@ -21,6 +21,7 @@ import {
   CrmPageHeader,
   CrmState,
 } from '@/components/crm/v2/CrmPrimitives'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface SettingsPayload {
   settings: Record<string, string | number | boolean>
@@ -107,7 +108,7 @@ export default function AdminSettingsPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load settings registry')
+      if (!response.ok) crmApiError(body, 'Unable to load settings registry')
       setData({
         settings: body.settings || {},
         definitions: body.definitions || {},

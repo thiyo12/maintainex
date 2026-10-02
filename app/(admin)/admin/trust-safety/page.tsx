@@ -20,6 +20,7 @@ import {
   CrmState,
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface Payload {
   permissions: {
@@ -86,7 +87,7 @@ export default function TrustSafetyControlCentrePage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load trust & safety')
+      if (!response.ok) crmApiError(body, 'Unable to load trust & safety')
       setData(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load trust & safety')

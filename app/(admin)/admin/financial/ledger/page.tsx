@@ -27,6 +27,7 @@ import {
   crmThClass,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface LedgerEntry {
   id: string
@@ -144,7 +145,7 @@ export default function FinancialLedgerPage() {
         window.location.href = '/admin/login'
         return
       }
-      if (!response.ok) throw new Error(body?.error || 'Unable to load financial ledger')
+      if (!response.ok) crmApiError(body, 'Unable to load financial ledger')
 
       setPayload(body)
     } catch (error) {

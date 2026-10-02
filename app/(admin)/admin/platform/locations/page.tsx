@@ -27,6 +27,7 @@ import {
   crmThClass,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { crmApiError } from '@/lib/crm/api-error'
 
 type Area = { id: string; name: string }
 type City = { id: string; name: string; areas: Area[] }
@@ -78,7 +79,7 @@ export default function LocationsManagementPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load locations')
+      if (!response.ok) crmApiError(body, 'Unable to load locations')
       setData(body)
       const countries: Country[] = body.countries || []
       setSelectedCountry(current =>
@@ -155,7 +156,7 @@ export default function LocationsManagementPage() {
         body: JSON.stringify(payload),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Location creation failed')
+      if (!response.ok) crmApiError(body, 'Location creation failed')
       toast.success(`${createType[0].toUpperCase() + createType.slice(1)} created`)
       setShowCreate(false)
       await load()
@@ -177,7 +178,7 @@ export default function LocationsManagementPage() {
         body: JSON.stringify({ type: 'seed', countryCode: country.code }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Location seed failed')
+      if (!response.ok) crmApiError(body, 'Location seed failed')
       toast.success(
         `Canonical hierarchy ready · ${body.summary?.statesCreated || 0} states · ${body.summary?.citiesCreated || 0} cities · ${body.summary?.areasCreated || 0} areas added`
       )
@@ -204,7 +205,7 @@ export default function LocationsManagementPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Location rename failed')
+      if (!response.ok) crmApiError(body, 'Location rename failed')
       toast.success('Location renamed')
       setRenameTarget(null)
       await load()

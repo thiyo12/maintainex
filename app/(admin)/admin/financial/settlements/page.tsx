@@ -25,6 +25,7 @@ import {
   crmThClass,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface Settlement {
   id: string
@@ -121,7 +122,7 @@ export default function SettlementsPage() {
         window.location.href = '/admin/login'
         return
       }
-      if (!response.ok) throw new Error(body?.error || 'Unable to load settlement history')
+      if (!response.ok) crmApiError(body, 'Unable to load settlement history')
 
       setPayload(body)
     } catch (error) {
