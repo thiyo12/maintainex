@@ -403,8 +403,6 @@ export default function AdminDashboard() {
   const openDisputes = analytics?.visibility?.disputes
     ? number(analytics?.summary?.openDisputes)
     : number(stats?.pendingCheatingReports)
-  const activeJobs = number(stats?.openJobs) + number(analytics?.jobsByStatus?.inProgress)
-
   const protectedEscrowRows = (financeOverview?.escrow || []).filter(row =>
     ['PROTECTED', 'ON_HOLD'].includes(String(row.status || '').toUpperCase())
   )
