@@ -121,6 +121,12 @@ interface FinancialOverviewPayload {
     count: number
     total: string
   }>
+  payouts?: Array<{
+    status: string
+    currency: string
+    count: number
+    amount: string
+  }>
 }
 
 interface HealthPayload {
@@ -420,6 +426,27 @@ export default function AdminDashboard() {
         ? formatCurrency(escrowEntries[0][1], escrowEntries[0][0])
         : `${escrowEntries.length} currencies`
 
+  const completedPayoutRows = (financeOverview?.payouts || []).filter(row =>
+    ['SUCCEEDED', 'CLEARED', 'SETTLED', 'PAID'].includes(String(row.status || '').toUpperCase())
+  )
+  const payoutsByCurrency = new Map<string, number>()
+  let processedPayoutCount = 0
+  for (const row of completedPayoutRows) {
+    processedPayoutCount += Number(row.count || 0)
+    payoutsByCurrency.set(
+      row.currency,
+      (payoutsByCurrency.get(row.currency) || 0) + Number(row.amount || 0) / 100
+    )
+  }
+  const payoutEntries = [...payoutsByCurrency.entries()]
+  const payoutsProcessedValue = !financeOverview
+    ? 'Restricted'
+    : payoutEntries.length === 0
+      ? formatCurrency(0)
+      : payoutEntries.length === 1
+        ? formatCurrency(payoutEntries[0][1], payoutEntries[0][0])
+        : `${payoutEntries.length} currencies`
+
   const totalForDonut = Math.max(1, jobStatus.total)
   const progressPct = (jobStatus.inProgress / totalForDonut) * 100
   const openPct = (jobStatus.open / totalForDonut) * 100
@@ -438,27 +465,27 @@ export default function AdminDashboard() {
         }
       />
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <CrmMetricCard
-          label="Active Jobs"
-          value={activeJobs.toLocaleString()}
-          helper={`${number(stats?.totalJobPostings).toLocaleString()} jobs recorded`}
+          label="Total Jobs"
+          value={jobStatus.total.toLocaleString()}
+          helper={`${jobStatus.open.toLocaleString()} currently open`}
           icon={<FiTool size={16} />}
-          tone="success"
+          tone="neutral"
         />
         <CrmMetricCard
-          label="Escrow Held"
-          value={escrowHeldValue}
-          helper={financeOverview ? `${escrowHeldCount} protected escrow items` : 'Finance permission required'}
-          icon={<FiDollarSign size={16} />}
-          tone="amber"
-        />
-        <CrmMetricCard
-          label="Revenue"
-          value={revenueValue === null ? 'Restricted' : formatCurrency(revenueValue)}
-          helper={revenueValue === null ? 'Finance permission required' : 'Commission revenue recorded'}
-          icon={<FiCreditCard size={16} />}
+          label="In Progress"
+          value={jobStatus.inProgress.toLocaleString()}
+          helper="Active marketplace work"
+          icon={<FiActivity size={16} />}
           tone="info"
+        />
+        <CrmMetricCard
+          label="Completed"
+          value={jobStatus.completed.toLocaleString()}
+          helper="Jobs completed in this scope"
+          icon={<FiCheckCircle size={16} />}
+          tone="success"
         />
         <CrmMetricCard
           label="Disputes"
@@ -467,7 +494,34 @@ export default function AdminDashboard() {
           icon={<FiShield size={16} />}
           tone={openDisputes > 0 ? 'danger' : 'success'}
         />
+        <CrmMetricCard
+          label="Total Revenue"
+          value={revenueValue === null ? 'Restricted' : formatCurrency(revenueValue)}
+          helper={revenueValue === null ? 'Finance permission required' : 'MaintainEX commission revenue'}
+          icon={<FiCreditCard size={16} />}
+          tone="amber"
+        />
+        <CrmMetricCard
+          label="Payouts Processed"
+          value={payoutsProcessedValue}
+          helper={financeOverview ? `${processedPayoutCount} cleared payouts` : 'Finance permission required'}
+          icon={<FiDollarSign size={16} />}
+          tone="neutral"
+        />
       </section>
+
+      {financeOverview && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--crm-border)] bg-white px-4 py-2.5 text-xs text-slate-500 shadow-sm">
+          <FiShield className="text-amber-600" />
+          <span className="font-semibold text-slate-700">Protected escrow</span>
+          <span>{escrowHeldValue}</span>
+          <span className="text-slate-300">·</span>
+          <span>{escrowHeldCount} held / protected records</span>
+          <Link href="/admin/financial/escrow" className="ml-auto font-semibold text-amber-700 hover:text-amber-800">
+            Escrow operations →
+          </Link>
+        </div>
+      )}
 
       <section className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
         <CrmCard
@@ -629,6 +683,7 @@ export default function AdminDashboard() {
                 ['Database', health.database?.status || 'unknown', health.database?.latencyMs !== undefined ? `${health.database.latencyMs}ms` : '—'],
                 ['Job queue', number(health.queues?.jobMatchPending) === 0 ? 'healthy' : 'pending', String(number(health.queues?.jobMatchPending))],
                 ['Payments', number(health.payments?.pending) === 0 ? 'healthy' : 'pending', String(number(health.payments?.pending))],
+                ['PayPal', health.payments?.paypalConfigured && health.payments?.paypalWebhookConfigured ? 'healthy' : 'check', health.payments?.paypalConfigured ? (health.payments?.paypalWebhookConfigured ? 'API + webhook' : 'Webhook missing') : 'Not configured'],
                 ['Notifications', health.notifications?.expoPushAvailable ? 'healthy' : 'check', `${number(health.notifications?.createdLastHour)} / hr`],
                 ['Cron', health.cron?.configured ? 'configured' : 'check', ''],
               ].map(([name, state, meta]) => (
