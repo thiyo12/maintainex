@@ -3561,6 +3561,110 @@ model CompanyJobAssignment {
   @@index([status])
 }
 
+model PaymentProviderConfig {
+  id                  String   @id @default(cuid())
+  countryCode         String
+  provider            String
+  enabled             Boolean  @default(false)
+  environment         String   @default("SANDBOX") // SANDBOX, LIVE
+  supportedCurrencies String   @default("[]") // JSON string; operational metadata only
+  paymentMethods      String   @default("[]") // JSON string
+  capabilities        String   @default("{}") // JSON string; checkout/capture/refund/partialRefund/webhooks/disputes/payouts
+  captureMode         String   @default("CAPTURE")
+  operationalStatus   String   @default("DISABLED") // DISABLED, ACTIVE, DEGRADED, MAINTENANCE
+  priority            Int      @default(100)
+  commissionRateBps   Int?
+  refundPolicy        String?  // JSON string; no credentials
+  settlementConfig    String?  // JSON string; no credentials
+  feeConfig           String?  // JSON string; no credentials
+  updatedBy           String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([countryCode, provider])
+  @@index([countryCode, enabled, priority])
+  @@index([provider, enabled])
+}
+
+model PaymentProviderTransaction {
+  id                      String    @id @default(cuid())
+  paymentIntentId         String
+  jobId                   String
+  countryCode             String
+  provider                String
+  providerOrderId         String?
+  providerAuthorizationId String?
+  providerCaptureId       String?
+  status                  String
+  grossAmount             BigInt
+  providerFee             BigInt?
+  netSettlement           BigInt?
+  currency                String
+  reconciliationStatus    String    @default("UNRECONCILED") // UNRECONCILED, MATCHED, MISMATCH, MANUAL_REVIEW
+  reconciliationReference String?
+  reconciledAt            DateTime?
+  metadata                String?   // sanitized provider metadata only
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@unique([provider, providerOrderId])
+  @@unique([provider, providerCaptureId])
+  @@index([paymentIntentId, createdAt])
+  @@index([jobId, createdAt])
+  @@index([countryCode, provider, status])
+  @@index([reconciliationStatus, createdAt])
+}
+
+model PaymentProviderRefund {
+  id                    String    @id @default(cuid())
+  paymentIntentId       String
+  providerTransactionId String?
+  countryCode           String
+  provider              String
+  providerRefundId      String?
+  amount                BigInt
+  currency              String
+  status                String    @default("REQUESTED")
+  reason                String?
+  initiatedByAdminId    String?
+  approvalRequestId     String?
+  completedAt           DateTime?
+  metadata              String?   // sanitized provider metadata only
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([provider, providerRefundId])
+  @@index([paymentIntentId, createdAt])
+  @@index([providerTransactionId, createdAt])
+  @@index([countryCode, provider, status])
+}
+
+model PaymentProviderEvent {
+  id                    String    @id @default(cuid())
+  provider              String
+  externalEventId       String
+  paymentIntentId       String?
+  providerTransactionId String?
+  countryCode           String?
+  eventType             String
+  eventStatus           String?
+  payloadHash           String
+  payload               String?   // sanitized payload; raw secrets/headers are never stored
+  signatureVerified     Boolean   @default(false)
+  processingStatus      String    @default("RECEIVED") // RECEIVED, PROCESSED, IGNORED, FAILED
+  errorCode             String?
+  errorMessage          String?
+  occurredAt            DateTime?
+  processedAt           DateTime?
+  createdAt             DateTime  @default(now())
+
+  @@unique([provider, externalEventId])
+  @@index([paymentIntentId, createdAt])
+  @@index([providerTransactionId, createdAt])
+  @@index([countryCode, provider, eventType])
+  @@index([processingStatus, createdAt])
+}
+
 model PaymentIntent {
   id              String    @id @default(cuid())
   jobId           String
