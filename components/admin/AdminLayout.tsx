@@ -60,6 +60,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAdminSession()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [market, setMarketState] = useState('ALL')
+  const [marketReady, setMarketReady] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
 
   const permissions = useMemo(
@@ -99,10 +100,12 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         : null
 
     const next = stored && allowed.has(stored) ? stored : fallback
+    setMarketReady(false)
     setMarketState(next)
     window.sessionStorage.setItem('maintainex.crm.market', next)
     const secure = window.location.protocol === 'https:' ? '; Secure' : ''
     document.cookie = `maintainex_crm_market=${encodeURIComponent(next)}; Path=/; Max-Age=2592000; SameSite=Lax${secure}`
+    setMarketReady(true)
   }, [marketOptions, user])
 
   const setMarket = useCallback((next: string) => {
@@ -136,7 +139,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     setSidebarOpen(false)
   }, [pathname])
 
-  if (loading) {
+  if (loading || (user && !marketReady)) {
     return (
       <div className="crm-v2 flex min-h-screen items-center justify-center bg-[var(--crm-rail)]">
         <div className="text-center">
