@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 const prismaMocks = vi.hoisted(() => ({
   adminFindUnique: vi.fn(),
   adminSessionFindUnique: vi.fn(),
+  countryFindUnique: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/authentication/admin-auth', () => ({
@@ -17,6 +18,9 @@ vi.mock('@/lib/prisma', () => ({
     },
     adminSession: {
       findUnique: prismaMocks.adminSessionFindUnique,
+    },
+    country: {
+      findUnique: prismaMocks.countryFindUnique,
     },
   },
 }))
@@ -38,6 +42,7 @@ import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
 import { checkRateLimit } from '@/lib/shared/rate-limit/middleware'
 import {
   assertCrmCountryAllowed,
+  getCrmCountryCodes,
   guardCrmRequest,
   isTrustedCrmMutationRequest,
   redactCrmSensitiveData,
@@ -209,6 +214,109 @@ describe('CRM three-layer security', () => {
       expect(result.context.assignedCountries).toEqual(['LK'])
       expect(assertCrmCountryAllowed(result.context, 'LK')).toBe(true)
       expect(assertCrmCountryAllowed(result.context, 'CA')).toBe(false)
+    }
+  })
+
+  it('narrows SUPER_ADMIN to the explicitly selected configured market', async () => {
+    mockedRateLimit.mockResolvedValueOnce({ allowed: true })
+    mockedSession.mockResolvedValueOnce({
+      sub: 'admin-global',
+      sid: 'session-admin-global',
+      email: 'owner@example.com',
+      role: 'SUPER_ADMIN',
+      assignedCountries: [],
+      type: 'access',
+      firstName: 'Owner',
+      lastName: 'Admin',
+    } as any)
+    prismaMocks.adminFindUnique.mockResolvedValueOnce(
+      liveAdmin({
+        id: 'admin-global',
+        email: 'owner@example.com',
+        role: 'SUPER_ADMIN',
+        assignedCountries: '[]',
+      })
+    )
+    prismaMocks.adminSessionFindUnique.mockResolvedValueOnce(
+      liveSession('admin-global', 'session-admin-global')
+    )
+    prismaMocks.countryFindUnique.mockResolvedValueOnce({ code: 'LK' })
+
+    const result = await guardCrmRequest(
+      request('GET', {}, 'https://maintainex.lk/api/admin/jobs?market=LK'),
+      { permission: 'jobs:view', requireCountryScope: true }
+    )
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.context.selectedMarket).toBe('LK')
+      expect(getCrmCountryCodes(result.context)).toEqual(['LK'])
+      expect(assertCrmCountryAllowed(result.context, 'LK')).toBe(true)
+      expect(assertCrmCountryAllowed(result.context, 'CA')).toBe(false)
+    }
+  })
+
+  it('rejects a selected market outside a non-super admins live assignments', async () => {
+    mockedRateLimit.mockResolvedValueOnce({ allowed: true })
+    mockedSession.mockResolvedValueOnce({
+      sub: 'admin-lk',
+      sid: 'session-admin-lk',
+      email: 'manager@example.com',
+      role: 'MANAGER',
+      assignedCountries: ['LK'],
+      type: 'access',
+      firstName: 'Sri Lanka',
+      lastName: 'Manager',
+    } as any)
+    prismaMocks.adminFindUnique.mockResolvedValueOnce(liveAdmin())
+    prismaMocks.adminSessionFindUnique.mockResolvedValueOnce(
+      liveSession('admin-lk', 'session-admin-lk')
+    )
+
+    const result = await guardCrmRequest(
+      request('GET', {}, 'https://maintainex.lk/api/admin/jobs?market=CA'),
+      { permission: 'jobs:view', requireCountryScope: true }
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.response.status).toBe(403)
+  })
+
+  it('keeps SUPER_ADMIN global only when the selected market is ALL', async () => {
+    mockedRateLimit.mockResolvedValueOnce({ allowed: true })
+    mockedSession.mockResolvedValueOnce({
+      sub: 'admin-all',
+      sid: 'session-admin-all',
+      email: 'owner@example.com',
+      role: 'SUPER_ADMIN',
+      assignedCountries: [],
+      type: 'access',
+      firstName: 'Owner',
+      lastName: 'Admin',
+    } as any)
+    prismaMocks.adminFindUnique.mockResolvedValueOnce(
+      liveAdmin({
+        id: 'admin-all',
+        email: 'owner@example.com',
+        role: 'SUPER_ADMIN',
+        assignedCountries: '[]',
+      })
+    )
+    prismaMocks.adminSessionFindUnique.mockResolvedValueOnce(
+      liveSession('admin-all', 'session-admin-all')
+    )
+
+    const result = await guardCrmRequest(request('GET'), {
+      permission: 'jobs:view',
+      requireCountryScope: true,
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.context.selectedMarket).toBe('ALL')
+      expect(getCrmCountryCodes(result.context)).toBeNull()
+      expect(assertCrmCountryAllowed(result.context, 'LK')).toBe(true)
+      expect(assertCrmCountryAllowed(result.context, 'CA')).toBe(true)
     }
   })
 
