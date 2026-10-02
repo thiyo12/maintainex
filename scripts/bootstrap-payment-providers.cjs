@@ -11,21 +11,6 @@ function boolEnv(name, fallback) {
 }
 
 async function main() {
-  const existing = await prisma.paymentProviderConfig.findUnique({
-    where: {
-      countryCode_provider: {
-        countryCode: 'LK',
-        provider: 'PAYHERE',
-      },
-    },
-  })
-
-  // Respect any explicit operator configuration already stored in CRM.
-  if (existing) {
-    console.log('[payment-provider-bootstrap] LK/PAYHERE already configured; leaving unchanged')
-    return
-  }
-
   const checkoutConfigured = Boolean(
     process.env.PAYHERE_MERCHANT_ID &&
     process.env.PAYHERE_MERCHANT_SECRET
@@ -37,8 +22,14 @@ async function main() {
   const sandbox = boolEnv('PAYHERE_SANDBOX', true)
   const environment = sandbox ? 'SANDBOX' : 'LIVE'
 
-  await prisma.paymentProviderConfig.create({
-    data: {
+  await prisma.paymentProviderConfig.upsert({
+    where: {
+      countryCode_provider: {
+        countryCode: 'LK',
+        provider: 'PAYHERE',
+      },
+    },
+    create: {
       countryCode: 'LK',
       provider: 'PAYHERE',
       enabled: checkoutConfigured,
@@ -61,10 +52,12 @@ async function main() {
       priority: 100,
       updatedBy: 'system:payment-provider-bootstrap',
     },
+    // Never overwrite an operator-managed provider configuration.
+    update: {},
   })
 
   console.log(
-    '[payment-provider-bootstrap] created LK/PAYHERE operational config',
+    '[payment-provider-bootstrap] ensured LK/PAYHERE operational config',
     JSON.stringify({
       enabled: checkoutConfigured,
       environment,
