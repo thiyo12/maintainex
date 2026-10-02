@@ -273,6 +273,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+      - name: Immutable deploy script safety
+        shell: bash
+        run: |
+          grep -q 'docker build' deploy-rsync.sh
+          grep -q 'pg_dump' deploy-rsync.sh
+          grep -q 'gzip -t' deploy-rsync.sh
+          grep -q 'PREVIOUS_IMAGE' deploy-rsync.sh
+          grep -q 'docker service update --force --image' deploy-rsync.sh
+          ! grep -q 'sed -i.*provider' deploy-rsync.sh
+          ! grep -q 'docker cp.*CONTAINER:/app' deploy-rsync.sh
+
       - name: Production build
         env:
           NODE_ENV: production

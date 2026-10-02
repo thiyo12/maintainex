@@ -65,7 +65,7 @@ cd code/
 npm install
 
 # 3. Restore database (on VPS)
-pg_dump < database/maintainex-live-dump.sql | psql -U postgres -d postgres
+psql -U postgres -d postgres < database/maintainex-live-dump.sql
 
 # 4. Rebuild and deploy
 npm run build
