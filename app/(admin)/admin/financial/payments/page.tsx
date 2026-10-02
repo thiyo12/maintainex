@@ -369,9 +369,12 @@ export default function PaymentOperationsPage() {
                 return (
                   <tr key={item.id} className="transition-colors hover:bg-[#fafbf9]">
                     <td className={crmTdClass}>
-                      <div className="font-mono text-xs font-semibold text-slate-800">
+                      <Link
+                        href={`/admin/financial/payments/${item.id}`}
+                        className="font-mono text-xs font-semibold text-slate-800 hover:text-amber-700"
+                      >
                         {item.merchantOrderId}
-                      </div>
+                      </Link>
                       <div className="mt-1 font-mono text-[10px] text-slate-400">
                         {item.paymentId || item.id}
                       </div>
