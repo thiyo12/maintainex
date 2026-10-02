@@ -56,6 +56,7 @@ export interface PaymentResult {
   paymentIntentId?: string
   checkoutUrl?: string
   merchantOrderId?: string
+  gateway?: string
   error?: string
   code?: string
 }
@@ -291,6 +292,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         config.merchantSecret
       ),
       merchantOrderId: decision.intent.merchantOrderId,
+      gateway: provider.provider,
     }
   }
 
@@ -314,6 +316,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         paymentIntentId: intent.id,
         checkoutUrl: approvalUrl,
         merchantOrderId: intent.merchantOrderId,
+        gateway: provider.provider,
       }
     }
 
@@ -399,6 +402,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         paymentIntentId: intent.id,
         checkoutUrl: created.approvalUrl,
         merchantOrderId: created.orderId,
+        gateway: provider.provider,
       }
     }
     return {
@@ -414,6 +418,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     paymentIntentId: intent.id,
     checkoutUrl: created.approvalUrl,
     merchantOrderId: created.orderId,
+    gateway: provider.provider,
   }
 }
 
