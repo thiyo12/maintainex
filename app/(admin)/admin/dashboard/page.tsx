@@ -10,12 +10,9 @@ import {
   FiBriefcase,
   FiCalendar,
   FiCheckCircle,
-  FiClock,
   FiCreditCard,
   FiDollarSign,
   FiShield,
-  FiTool,
-  FiUserCheck,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { useCrmShell } from '@/components/crm/v2/CrmShellContext'
