@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { guardCrmRequest } from '@/lib/crm/security'
+import { getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,9 +30,10 @@ export async function GET(request: NextRequest) {
     if (severity) where.severity = severity.toUpperCase().slice(0, 20)
     if (eventType) where.eventType = eventType.slice(0, 100)
 
-    if (!security.isSuperAdmin) {
+    const scopedCountryCodes = getCrmCountryCodes(security)
+    if (scopedCountryCodes !== null) {
       where.job = {
-        countryCode: { in: security.assignedCountries },
+        countryCode: { in: scopedCountryCodes },
       }
     }
 
