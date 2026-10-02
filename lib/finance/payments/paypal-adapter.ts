@@ -168,7 +168,12 @@ export function getPayPalCurrencyExponent(currency: string): number {
       style: 'currency',
       currency: normalized,
     }).resolvedOptions().maximumFractionDigits
-    if (Number.isInteger(exponent) && exponent >= 0 && exponent <= 3) return exponent
+    if (
+      typeof exponent === 'number' &&
+      Number.isInteger(exponent) &&
+      exponent >= 0 &&
+      exponent <= 3
+    ) return exponent
   } catch {
     // The provider/market capability gate remains authoritative. This fallback
     // is only for currencies whose ICU metadata is unavailable at runtime.
@@ -192,7 +197,7 @@ export function parsePayPalAmountToMinor(
 ): bigint | null {
   const raw = value.trim()
   const exponent = getPayPalCurrencyExponent(currency)
-  const match = raw.match(/^(\\d+)(?:\\.(\\d+))?$/)
+  const match = raw.match(/^(\d+)(?:\.(\d+))?$/)
   if (!match) return null
 
   const fraction = match[2] || ''
