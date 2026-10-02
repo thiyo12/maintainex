@@ -596,6 +596,7 @@ export async function getPaymentStatus(jobId: string, customerId: string) {
     currency: payment.currency,
     merchantOrderId: payment.merchantOrderId,
     paymentId: payment.paymentId,
+    gateway: payment.gateway,
     createdAt: payment.createdAt.toISOString(),
     paidAt: payment.paidAt?.toISOString() || null,
   }
