@@ -172,6 +172,12 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   const roleLabel = user.role.replaceAll('_', ' ')
+  const sessionExpiry = user.sessionExpiresAt
+    ? new Date(user.sessionExpiresAt).toLocaleTimeString('en-LK', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null
   const selectedMarketName =
     marketOptions.find(item => item.code === market)?.name ||
     (market === 'ALL' ? 'All markets' : market)
@@ -330,7 +336,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                   </div>
                   <div className="hidden max-w-[150px] leading-tight xl:block">
                     <div className="truncate text-xs font-semibold text-slate-800">{user.name || user.email}</div>
-                    <div className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400">
+                    <div
+                      className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400"
+                      title={sessionExpiry ? `${roleLabel} · Session until ${sessionExpiry}` : roleLabel}
+                    >
                       {roleLabel}
                     </div>
                   </div>
