@@ -40,4 +40,32 @@ describe('CRM V2 visual contract', () => {
     expect(shell).toContain('CrmNotificationBell')
     expect(shell).toContain('CrmShellProvider')
   })
+  it('keeps the approved reference dashboard wired to live market-scoped data', () => {
+    const page = readFileSync(resolve(process.cwd(), 'app/(admin)/admin/dashboard/page.tsx'), 'utf8')
+    const api = readFileSync(resolve(process.cwd(), 'app/api/dashboard/route.ts'), 'utf8')
+
+    expect(page).toContain('useCrmShell')
+    expect(page).toContain('/api/dashboard?market=')
+    expect(page).toContain('Jobs Trend')
+    expect(page).toContain('Recent Jobs')
+    expect(page).toContain('System Health')
+
+    expect(api).toContain('assertCrmCountryAllowed')
+    expect(api).toContain('requestedMarket')
+    expect(api).toContain('marketConfig.findMany')
+    expect(api).toContain('defaultCurrency')
+    expect(api).not.toContain("job.countryCode === 'CA' ? 'CAD' : 'LKR'")
+  })
+
+  it('keeps Job 360 aligned to the approved operations hierarchy', () => {
+    const page = readFileSync(resolve(process.cwd(), 'app/(admin)/admin/jobs/[id]/page.tsx'), 'utf8')
+
+    expect(page).toContain('variant="underline"')
+    expect(page).toContain('Quick Actions')
+    expect(page).toContain('Payment / Escrow')
+    expect(page).toContain('Financials')
+    expect(page).toContain('Job Lifecycle')
+    expect(page).toContain('Provider / Company / Worker')
+  })
+
 })
