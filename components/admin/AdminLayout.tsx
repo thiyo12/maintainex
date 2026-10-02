@@ -171,22 +171,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     )
   }
 
-  const activeItem = navigation.find(item =>
-    item.href &&
-    (pathname === item.href ||
-      (item.href !== '/admin/dashboard' && pathname.startsWith(item.href + '/')))
-  )
-  const activeTitle = activeItem?.name || 'MaintainEX CRM'
   const roleLabel = user.role.replaceAll('_', ' ')
   const selectedMarketName =
     marketOptions.find(item => item.code === market)?.name ||
     (market === 'ALL' ? 'All markets' : market)
-  const sessionExpiry = user.sessionExpiresAt
-    ? new Date(user.sessionExpiresAt).toLocaleTimeString('en-LK', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : null
 
   return (
     <CrmShellProvider value={{ market, setMarket, markets: marketOptions }}>
