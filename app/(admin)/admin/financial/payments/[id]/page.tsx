@@ -5,9 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
-  FiActivity,
   FiArrowLeft,
-  FiCheckCircle,
   FiCreditCard,
   FiDollarSign,
   FiRefreshCw,
