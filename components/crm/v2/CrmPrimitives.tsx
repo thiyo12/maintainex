@@ -66,10 +66,10 @@ export function CrmButton({
   className?: string
 }) {
   const variants = {
-    primary: 'bg-[var(--crm-accent)] text-[#151719] border-[var(--crm-accent)] hover:bg-[#ffc84a]',
+    primary: 'crm-accent-action text-[#111315] border-[var(--crm-accent)]',
     secondary: 'bg-white text-slate-800 border-[var(--crm-border)] hover:bg-slate-50',
     ghost: 'bg-transparent text-slate-600 border-transparent hover:bg-slate-100 hover:text-slate-900',
-    danger: 'bg-[var(--crm-danger)] text-white border-[var(--crm-danger)] hover:bg-red-700',
+    danger: 'crm-danger-action text-white border-[var(--crm-danger)]',
   }
   const sizes = {
     sm: 'h-8 px-3 text-xs rounded-[9px]',
@@ -283,7 +283,7 @@ export function CrmTabs({
             onClick={() => onChange(item.id)}
             className={`flex h-8 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-colors ${
               selected
-                ? 'bg-[#17191b] text-white'
+                ? 'bg-[#17191b] text-white shadow-sm'
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
