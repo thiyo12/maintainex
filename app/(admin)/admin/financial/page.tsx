@@ -158,6 +158,12 @@ export default function FinanceControlCentrePage() {
             Escrow operations
           </CrmButton>
         </Link>
+        <Link href="/admin/financial/providers">
+          <CrmButton variant="secondary">
+            <FiCreditCard size={14} />
+            Payment providers
+          </CrmButton>
+        </Link>
       </div>
 
       <section className="grid xl:grid-cols-2 gap-5">
@@ -183,9 +189,12 @@ export default function FinanceControlCentrePage() {
               Open payment operations <FiArrowUpRight size={14} />
             </Link>
             <Link href="/admin/financial/refunds" className="inline-flex items-center gap-1 text-sm font-medium text-amber-700">
-              Open PayHere refund queue <FiArrowUpRight size={14} />
+              Open refund queue <FiArrowUpRight size={14} />
             </Link>
-            <div className="text-xs text-slate-400">Gateway payloads and secrets are intentionally excluded from CRM responses.</div>
+            <Link href="/admin/financial/providers" className="inline-flex items-center gap-1 text-sm font-medium text-amber-700">
+              Configure market payment providers <FiArrowUpRight size={14} />
+            </Link>
+            <div className="text-xs text-slate-400">Provider credentials and raw gateway payloads are intentionally excluded from CRM responses.</div>
           </div>
         </Panel>
 
