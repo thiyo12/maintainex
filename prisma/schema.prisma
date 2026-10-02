@@ -3672,7 +3672,7 @@ model PaymentIntent {
   escrowId        String
   merchantOrderId String    @unique
   paymentId       String?
-  gateway         String    @default("PAYPAL") // PAYPAL for new payments; PAYHERE retained for legacy transactions
+  gateway         String    // Explicit provider code; no implicit gateway default
   refundId        String?
   amount          BigInt
   currency        String    @default("LKR")
