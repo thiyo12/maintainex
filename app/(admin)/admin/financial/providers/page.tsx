@@ -322,7 +322,11 @@ export default function PaymentProvidersPage() {
         }
         context={
           <>
-            <CrmBadge tone="info">{user?.selectedMarket || 'Scoped markets'}</CrmBadge>
+            <CrmBadge tone="info">
+              {user?.assignedCountries?.length
+                ? `${user.assignedCountries.length} assigned market${user.assignedCountries.length === 1 ? '' : 's'}`
+                : 'Market scoped'}
+            </CrmBadge>
             <CrmBadge tone={payload?.canManage ? 'amber' : 'neutral'}>
               {payload?.canManage ? 'Super-admin governed writes' : 'Read-only'}
             </CrmBadge>
