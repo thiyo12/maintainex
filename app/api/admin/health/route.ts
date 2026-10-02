@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
-import { getPayHereConfig } from '@/lib/payment/payhere-adapter'
+import {
+  getPayHereConfig,
+  getPayHereMerchantApiConfig,
+} from '@/lib/payment/payhere-adapter'
 import { getPayPalConfig } from '@/lib/finance/payments/paypal-adapter'
+import { parseProviderCapabilities } from '@/lib/finance/payments/provider-registry'
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,6 +33,7 @@ export async function GET(request: NextRequest) {
 
     const paypal = getPayPalConfig()
     const payhere = getPayHereConfig()
+    const payhereMerchantApi = getPayHereMerchantApiConfig()
     const paypalConfigured = Boolean(paypal)
     const paypalWebhookConfigured = Boolean(paypal?.webhookId)
     const providerConfigs = await prisma.paymentProviderConfig.findMany({
@@ -45,30 +50,32 @@ export async function GET(request: NextRequest) {
               configured: Boolean(paypal),
               environment: paypal ? (paypal.sandbox ? 'SANDBOX' : 'LIVE') : null,
               webhookConfigured: Boolean(paypal?.webhookId),
+              refundConfigured: Boolean(paypal),
             }
           : config.provider === 'PAYHERE'
             ? {
                 configured: Boolean(payhere),
                 environment: payhere ? (payhere.sandbox ? 'SANDBOX' : 'LIVE') : null,
                 webhookConfigured: Boolean(payhere),
+                refundConfigured: Boolean(payhereMerchantApi),
               }
             : {
                 configured: config.provider === 'MANUAL_BANK',
                 environment: config.provider === 'MANUAL_BANK' ? 'LIVE' : null,
                 webhookConfigured: false,
+                refundConfigured: false,
               }
 
+      const capabilities = parseProviderCapabilities(config.capabilities)
       const healthy =
         !config.enabled ||
         (
           config.operationalStatus === 'ACTIVE' &&
           runtime.configured &&
           runtime.environment === config.environment &&
-          (
-            config.provider !== 'PAYPAL' ||
-            !config.capabilities.includes('"webhooks":true') ||
-            runtime.webhookConfigured
-          )
+          (!capabilities.webhooks || runtime.webhookConfigured) &&
+          (!(capabilities.refund || capabilities.reconciliation) || runtime.refundConfigured) &&
+          !(config.provider === 'MANUAL_BANK' && capabilities.checkout)
         )
 
       return {
@@ -80,6 +87,7 @@ export async function GET(request: NextRequest) {
         runtimeEnvironment: runtime.environment,
         runtimeConfigured: runtime.configured,
         webhookConfigured: runtime.webhookConfigured,
+        refundConfigured: runtime.refundConfigured,
         status: healthy ? 'healthy' : 'degraded',
       }
     })
