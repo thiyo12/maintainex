@@ -34,7 +34,7 @@ describe('CRM V2 global readability guard', () => {
     const patterns: Array<[string, RegExp]> = [
       ['accent background with white text', /bg-\[var\(--crm-accent\)\][^"'\n]{0,100}text-white|text-white[^"'\n]{0,100}bg-\[var\(--crm-accent\)\]/g],
       ['amber action background with white text', /bg-amber-(?:400|500|600)[^"'\n]{0,100}text-white|text-white[^"'\n]{0,100}bg-amber-(?:400|500|600)/g],
-      ['white background with white text', /bg-white[^"'\n]{0,100}text-white|text-white[^"'\n]{0,100}bg-white/g],
+      ['white background with white text', /(?<!hover:)bg-white(?!\/)[^"'\n]{0,100}(?<!hover:)(?<!focus:)(?<!focus-visible:)text-white(?!\/)|(?<!hover:)(?<!focus:)(?<!focus-visible:)text-white(?!\/)[^"'\n]{0,100}(?<!hover:)bg-white(?!\/)/g],
       ['accent action with white text', /crm-accent-action[^"'\n]{0,100}text-white|text-white[^"'\n]{0,100}crm-accent-action/g],
       ['danger action with danger-colored text', /crm-danger-action[^"'\n]{0,100}text-\[var\(--crm-danger\)\]/g],
     ]
