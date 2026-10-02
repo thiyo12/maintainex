@@ -15,11 +15,11 @@ export type CrmTone = 'neutral' | 'amber' | 'success' | 'warning' | 'danger' | '
 
 const badgeTone: Record<CrmTone, string> = {
   neutral: 'bg-slate-100 text-slate-700 border-slate-200',
-  amber: 'bg-[var(--crm-accent-soft)] text-amber-800 border-amber-200',
-  success: 'bg-[var(--crm-success-soft)] text-[var(--crm-success)] border-emerald-200',
-  warning: 'bg-[var(--crm-warning-soft)] text-[var(--crm-warning)] border-amber-200',
-  danger: 'bg-[var(--crm-danger-soft)] text-[var(--crm-danger)] border-red-200',
-  info: 'bg-[var(--crm-info-soft)] text-[var(--crm-info)] border-blue-200',
+  amber: 'bg-[#fff4c2] text-[#7a5200] border-[#f1d66b]',
+  success: 'bg-[#e9f8ef] text-[#137a4f] border-[#bfe7cf]',
+  warning: 'bg-[#fff3df] text-[#9b5d00] border-[#efd09d]',
+  danger: 'bg-[#fff0f0] text-[#b62f3f] border-[#f3c3c8]',
+  info: 'bg-[#eef4ff] text-[#2f67b4] border-[#cbdaf4]',
 }
 
 export function CrmBadge({
@@ -66,14 +66,14 @@ export function CrmButton({
   className?: string
 }) {
   const variants = {
-    primary: 'bg-[var(--crm-accent)] text-[#151719] border-[var(--crm-accent)] hover:bg-[#ffc84a]',
-    secondary: 'bg-white text-slate-800 border-[var(--crm-border)] hover:bg-slate-50',
-    ghost: 'bg-transparent text-slate-600 border-transparent hover:bg-slate-100 hover:text-slate-900',
-    danger: 'bg-[var(--crm-danger)] text-white border-[var(--crm-danger)] hover:bg-red-700',
+    primary: 'bg-[#ffca18] text-[#111827] border-[#e8b800] hover:bg-[#ffd642] hover:text-[#111827] shadow-sm',
+    secondary: 'bg-white text-[#1f2937] border-[#d8dee5] hover:bg-[#f7f9fb] hover:text-[#111827]',
+    ghost: 'bg-transparent text-[#475569] border-transparent hover:bg-[#eef2f5] hover:text-[#111827]',
+    danger: 'bg-[#d9364f] text-white border-[#c42e45] hover:bg-[#bb293f] hover:text-white',
   }
   const sizes = {
-    sm: 'h-8 px-3 text-xs rounded-[9px]',
-    md: 'h-10 px-4 text-sm rounded-[11px]',
+    sm: 'h-8 px-3 text-[11px] rounded-lg',
+    md: 'h-9 px-3.5 text-xs rounded-lg',
   }
 
   return (
@@ -81,7 +81,7 @@ export function CrmButton({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex items-center justify-center gap-2 border font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 border font-bold leading-none transition-colors focus-visible:ring-2 focus-visible:ring-[#ffca18]/35 disabled:cursor-not-allowed disabled:opacity-45 ${variants[variant]} ${sizes[size]} ${className}`}
     >
       {children}
     </button>
@@ -139,11 +139,11 @@ export function CrmCard({
   className?: string
   padding?: 'none' | 'sm' | 'md'
 }) {
-  const paddingClass = padding === 'none' ? '' : padding === 'sm' ? 'p-4' : 'p-5'
+  const paddingClass = padding === 'none' ? '' : padding === 'sm' ? 'p-3.5' : 'p-4'
   return (
     <section className={`crm-card overflow-hidden ${className}`}>
       {(title || description || action) && (
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--crm-border)] px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--crm-border)] px-4 py-3.5">
           <div>
             {title && <h2 className="text-sm font-semibold text-slate-900">{title}</h2>}
             {description && <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>}
@@ -181,12 +181,12 @@ export function CrmMetricCard({
   }
 
   return (
-    <div className="crm-card min-h-[132px] p-[18px]">
+    <div className="crm-card min-h-[108px] p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="text-xs font-medium text-slate-500">{label}</div>
         {icon && <div className={`grid h-9 w-9 place-items-center rounded-xl ${iconTone[tone]}`}>{icon}</div>}
       </div>
-      <div className="mt-3 text-[28px] font-semibold tracking-[-0.035em] text-slate-950">{value}</div>
+      <div className="mt-2.5 text-[23px] font-bold tracking-[-0.035em] text-slate-950">{value}</div>
       <div className="mt-2 flex min-h-5 items-center justify-between gap-3 text-xs">
         <span className="text-slate-400">{helper}</span>
         {trend && <span className="font-medium text-slate-600">{trend}</span>}
@@ -267,13 +267,43 @@ export function CrmTabs({
   items,
   active,
   onChange,
+  variant = 'pill',
 }: {
   items: Array<{ id: string; label: string; count?: number }>
   active: string
   onChange: (id: string) => void
+  variant?: 'pill' | 'underline'
 }) {
+  if (variant === 'underline') {
+    return (
+      <div className="crm-scrollbar flex max-w-full gap-6 overflow-x-auto border-b border-[var(--crm-border)]">
+        {items.map(item => {
+          const selected = item.id === active
+          return (
+            <button
+              type="button"
+              key={item.id}
+              onClick={() => onChange(item.id)}
+              className={`relative flex h-10 items-center gap-1.5 whitespace-nowrap px-0.5 text-[11px] font-semibold transition-colors ${
+                selected ? 'text-slate-950' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {item.label}
+              {typeof item.count === 'number' && (
+                <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${selected ? 'bg-[#fff2b2] text-[#7a5200]' : 'bg-slate-100 text-slate-500'}`}>
+                  {item.count}
+                </span>
+              )}
+              {selected && <span className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-[#ffca18]" />}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
-    <div className="inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-[var(--crm-border)] bg-white p-1">
+    <div className="inline-flex max-w-full gap-1 overflow-x-auto rounded-lg border border-[var(--crm-border)] bg-white p-1">
       {items.map(item => {
         const selected = item.id === active
         return (
@@ -281,9 +311,9 @@ export function CrmTabs({
             type="button"
             key={item.id}
             onClick={() => onChange(item.id)}
-            className={`flex h-8 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-colors ${
+            className={`flex h-8 items-center gap-2 whitespace-nowrap rounded-md px-3 text-[11px] font-semibold transition-colors ${
               selected
-                ? 'bg-[#17191b] text-white'
+                ? 'bg-[#17212a] text-white'
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >

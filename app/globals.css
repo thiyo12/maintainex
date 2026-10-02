@@ -736,34 +736,35 @@ input, select, textarea { font-size: 16px; }
 
 /* ===== MAINTAINEX CRM V2 TOKENS ===== */
 .crm-v2 {
-  --crm-rail: #121416;
-  --crm-rail-soft: #1a1d20;
-  --crm-canvas: #f4f5f3;
+  --crm-rail: #101820;
+  --crm-rail-soft: #17212a;
+  --crm-canvas: #eef2f5;
   --crm-surface: #ffffff;
-  --crm-surface-soft: #f8f9f7;
-  --crm-text: #17191b;
-  --crm-text-muted: #687078;
-  --crm-border: #e2e5e1;
-  --crm-border-strong: #cfd4ce;
-  --crm-accent: #f4b223;
-  --crm-accent-strong: #dc9610;
-  --crm-accent-soft: #fff7df;
-  --crm-success: #17845b;
-  --crm-success-soft: #eaf7f0;
-  --crm-warning: #b86f0d;
-  --crm-warning-soft: #fff5e5;
-  --crm-danger: #c03a3a;
-  --crm-danger-soft: #fff0f0;
-  --crm-info: #2f68b1;
-  --crm-info-soft: #edf4fd;
-  --crm-radius-sm: 10px;
-  --crm-radius-md: 14px;
-  --crm-radius-lg: 18px;
-  --crm-shadow-card: 0 1px 2px rgba(18, 20, 22, 0.04), 0 8px 24px rgba(18, 20, 22, 0.04);
-  --crm-shadow-float: 0 24px 70px -28px rgba(18, 20, 22, 0.35);
+  --crm-surface-soft: #f8fafb;
+  --crm-text: #17202a;
+  --crm-text-muted: #667085;
+  --crm-border: #dfe4e8;
+  --crm-border-strong: #cbd3da;
+  --crm-accent: #ffca18;
+  --crm-accent-strong: #e8b800;
+  --crm-accent-soft: #fff7d6;
+  --crm-success: #179c62;
+  --crm-success-soft: #eaf8f0;
+  --crm-warning: #b87500;
+  --crm-warning-soft: #fff4df;
+  --crm-danger: #d9364f;
+  --crm-danger-soft: #fff0f2;
+  --crm-info: #3478d4;
+  --crm-info-soft: #edf4ff;
+  --crm-radius-sm: 7px;
+  --crm-radius-md: 9px;
+  --crm-radius-lg: 12px;
+  --crm-shadow-card: 0 1px 2px rgba(16, 24, 32, 0.03), 0 4px 14px rgba(16, 24, 32, 0.035);
+  --crm-shadow-float: 0 18px 45px -22px rgba(16, 24, 32, 0.32);
   min-height: 100vh;
   background: var(--crm-canvas);
   color: var(--crm-text);
+  font-family: Inter, 'Outfit', ui-sans-serif, system-ui, sans-serif;
 }
 
 .crm-v2 :focus-visible {
@@ -772,8 +773,8 @@ input, select, textarea { font-size: 16px; }
 }
 
 .crm-v2 ::selection {
-  background: color-mix(in srgb, var(--crm-accent) 30%, white);
-  color: var(--crm-text);
+  background: color-mix(in srgb, var(--crm-accent) 34%, white);
+  color: #111827;
 }
 
 .crm-v2 .crm-card {
@@ -791,12 +792,12 @@ input, select, textarea { font-size: 16px; }
 
 .crm-v2 .crm-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #c6cbc5 transparent;
+  scrollbar-color: #c5ccd3 transparent;
 }
 
 .crm-v2 .crm-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 .crm-v2 .crm-scrollbar::-webkit-scrollbar-track {
@@ -804,75 +805,15 @@ input, select, textarea { font-size: 16px; }
 }
 
 .crm-v2 .crm-scrollbar::-webkit-scrollbar-thumb {
-  background: #c6cbc5;
+  background: #c5ccd3;
   border-radius: 999px;
 }
 
-
-/* ===== CRM V2 TEMPORARY LEGACY VISUAL BRIDGE =====
-   Transitional only. Keeps unmigrated admin pages visually consistent with
-   the approved CRM V2 reference while each module is rewritten on native
-   CrmPrimitives. Remove selectors module-by-module; delete this bridge in the
-   final legacy-demolition phase. */
-.crm-v2 main [class*="bg-[#15161E]"],
-.crm-v2 main [class*="bg-[#0B0C12]"] {
-  background: var(--crm-surface) !important;
-  border-color: var(--crm-border) !important;
-  color: var(--crm-text) !important;
-  box-shadow: var(--crm-shadow-card);
-}
-
-.crm-v2 main [class*="border-white/"] {
-  border-color: var(--crm-border) !important;
-}
-
-.crm-v2 main [class*="bg-white/"] {
-  background: var(--crm-surface-soft) !important;
-}
-
-.crm-v2 main .text-white {
-  color: var(--crm-text) !important;
-}
-
-.crm-v2 main .text-gray-300 {
-  color: #475569 !important;
-}
-
-.crm-v2 main .text-gray-400 {
-  color: var(--crm-text-muted) !important;
-}
-
-.crm-v2 main .text-gray-500,
-.crm-v2 main .text-gray-600 {
-  color: #94a3b8 !important;
-}
-
-.crm-v2 main .text-red-300,
-.crm-v2 main .text-red-400 {
-  color: var(--crm-danger) !important;
-}
-
-.crm-v2 main .text-green-300,
-.crm-v2 main .text-green-400 {
-  color: var(--crm-success) !important;
-}
-
-.crm-v2 main .text-amber-300,
-.crm-v2 main .text-amber-400 {
-  color: var(--crm-warning) !important;
-}
-
-.crm-v2 main .text-blue-300,
-.crm-v2 main .text-blue-400 {
-  color: var(--crm-info) !important;
-}
-
-.crm-v2 main [class*="hover:bg-white/"]:hover {
-  background: #f8fafc !important;
-}
-
+/* CRM V2 is fully migrated. Do not globally rewrite utility text/background
+   colors here; doing so breaks contrast on intentional dark/colored controls. */
 .crm-v2 main input,
 .crm-v2 main select,
 .crm-v2 main textarea {
   color-scheme: light;
 }
+
