@@ -63,6 +63,7 @@ interface ProviderConfig {
     configured: boolean
     environment?: string | null
     webhookConfigured: boolean
+    refundConfigured: boolean
   }
 }
 
@@ -456,8 +457,12 @@ export default function PaymentProvidersPage() {
                     >
                       {config.runtime.configured ? 'Configured' : 'Missing runtime'}
                     </CrmBadge>
-                    <div className="text-[10px] text-slate-400">
+                    <div className="text-[10px] leading-4 text-slate-400">
                       Runtime {config.runtime.environment || '—'}
+                      {' · '}
+                      Webhook {config.runtime.webhookConfigured ? 'ready' : 'not configured'}
+                      {' · '}
+                      Refund API {config.runtime.refundConfigured ? 'ready' : 'not configured'}
                     </div>
                   </div>
                 </td>
