@@ -52,9 +52,11 @@ export async function GET(request: NextRequest) {
     const documentWhere: any = { ...countryFilter }
     const settlementWhere: any = { ...countryFilter }
     const marketplaceWhere: any = { ...countryFilter }
-    const classicJobWhere: any = security.isSuperAdmin
-      ? {}
-      : { customer: { countryCode: { in: security.assignedCountries } } }
+    const classicJobWhere: any = requestedMarket !== 'ALL'
+      ? { customer: { countryCode: requestedMarket } }
+      : security.isSuperAdmin
+        ? {}
+        : { customer: { countryCode: { in: security.assignedCountries } } }
     const walletWhere: any = scopedUserIds ? { userId: { in: scopedUserIds } } : {}
 
     const [
@@ -212,7 +214,8 @@ export async function GET(request: NextRequest) {
 
       const marketplaceIds = recentMarketplace.map(job => job.id)
       const customerIds = [...new Set(recentMarketplace.map(job => job.customerId))]
-      const [marketplaceCustomers, marketplaceAssignments] = await Promise.all([
+      const marketplaceCountries = [...new Set(recentMarketplace.map(job => job.countryCode))]
+      const [marketplaceCustomers, marketplaceAssignments, marketConfigs] = await Promise.all([
         customerIds.length
           ? prisma.user.findMany({ where: { id: { in: customerIds } }, select: { id: true, name: true } })
           : Promise.resolve([]),
@@ -227,9 +230,16 @@ export async function GET(request: NextRequest) {
               },
             })
           : Promise.resolve([]),
+        marketplaceCountries.length
+          ? prisma.marketConfig.findMany({
+              where: { countryCode: { in: marketplaceCountries } },
+              select: { countryCode: true, defaultCurrency: true },
+            })
+          : Promise.resolve([]),
       ])
 
       const customerMap = new Map(marketplaceCustomers.map(row => [row.id, row.name]))
+      const currencyMap = new Map(marketConfigs.map(row => [row.countryCode, row.defaultCurrency]))
       const assignmentMap = new Map<string, string>()
       for (const row of marketplaceAssignments) {
         if (!assignmentMap.has(row.jobId)) assignmentMap.set(row.jobId, row.worker?.name || row.company?.companyName || 'Assigned provider')
@@ -254,7 +264,7 @@ export async function GET(request: NextRequest) {
           customer: customerMap.get(job.customerId) || 'Customer',
           provider: assignmentMap.get(job.id) || 'Marketplace provider',
           amount: Number(job.budgetAmount || 0),
-          currency: job.countryCode === 'CA' ? 'CAD' : 'LKR',
+          currency: currencyMap.get(job.countryCode) || 'LKR',
           status: job.status,
           createdAt: job.createdAt.toISOString(),
         })),
