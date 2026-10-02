@@ -1533,7 +1533,7 @@ async function finalizeExternalProviderRefund(
           paymentId: intent.paymentId,
           merchantOrderId: intent.merchantOrderId,
           refundReference: details.refundReference,
-          refundSource: details.source || details.provider
+          refundSource: details.source || details.provider,
           fundingSource: 'ESCROW',
         }),
       }, tx)
@@ -1583,7 +1583,7 @@ async function finalizeExternalProviderRefund(
         paymentId: intent.paymentId,
         escrowId: intent.escrowId,
         refundReference: details.refundReference,
-        refundSource: details.source || details.provider
+        refundSource: details.source || details.provider,
         fundingSource: suspenseFunding ? 'REFUND_SUSPENSE' : 'ESCROW',
         refundMinor: suspenseFunding ? intent.amount : escrow!.totalAmount,
         currency: suspenseFunding ? intent.currency : escrow!.currency,
