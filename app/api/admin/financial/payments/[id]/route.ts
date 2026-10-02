@@ -6,7 +6,7 @@ import {
   redactCrmSensitiveData,
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
-import { evaluateActionInitiation } from '@/lib/crm/governance'
+import { evaluateEffectivePermission } from '@/lib/crm/governance'
 
 const RECONCILIATION_STATUSES = new Set(['MATCHED', 'MISMATCH', 'MANUAL_REVIEW'])
 
@@ -22,7 +22,8 @@ function safeJson(value: unknown) {
 
 async function scopedPayment(id: string, request: NextRequest, mode: 'read' | 'sensitive') {
   const guard = await guardCrmRequest(request, {
-    permission: mode === 'read' ? 'finance:payments:view' : 'finance:commission:reconcile',
+    permission: mode === 'read' ? 'finance:payments:view' : 'finance:payments:reconcile',
+    permissionClass: mode === 'read' ? 'READ' : 'SENSITIVE',
     level: mode,
     requireCountryScope: true,
   })
@@ -173,9 +174,10 @@ export async function GET(
         approvals,
         audit,
         actions: {
-          reconcile: evaluateActionInitiation({
+          reconcile: evaluateEffectivePermission({
             role: security.role,
-            actionId: 'finance.commission.reconcile',
+            permission: 'finance:payments:reconcile',
+            permissionClass: 'SENSITIVE',
             overrides: security.permissionOverrides,
           }).allowed,
         },
