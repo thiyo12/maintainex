@@ -36,7 +36,7 @@ if [ -z "$APP_CONTAINER" ]; then
   exit 1
 fi
 
-DB_META=$(ssh $SSH_OPTS "$SERVER" "docker exec $APP_CONTAINER node -e 'const u=new URL(process.env.DATABASE_URL); const user=decodeURIComponent(u.username||\"\"); const name=decodeURIComponent(u.pathname.replace(/^\\\\/+/,\"\")); const host=u.hostname||\"\"; if(!user||!name) process.exit(3); process.stdout.write([user,name,host].join(\"|\"));'")
+DB_META=$(ssh $SSH_OPTS "$SERVER" "docker exec $APP_CONTAINER node -e 'const u=new URL(process.env.DATABASE_URL); const user=decodeURIComponent(u.username||\"\"); const path=u.pathname||\"\"; const name=decodeURIComponent(path.startsWith(\"/\")?path.slice(1):path); const host=u.hostname||\"\"; if(!user||!name) process.exit(3); process.stdout.write([user,name,host].join(\"|\"));'")
 DB_USER=$(printf '%s' "$DB_META" | cut -d'|' -f1)
 DB_NAME=$(printf '%s' "$DB_META" | cut -d'|' -f2)
 DB_HOST=$(printf '%s' "$DB_META" | cut -d'|' -f3)
