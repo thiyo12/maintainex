@@ -79,6 +79,7 @@ interface RecentJob {
   status: string
   source: 'V1' | 'V2'
   customer: { name: string }
+  provider?: { id: string; name: string; type: 'INDIVIDUAL' | 'COMPANY' } | null
   createdAt: string
 }
 
@@ -108,6 +109,20 @@ interface AnalyticsPayload {
     entityType?: string
     description?: string
     createdAt: string
+  }>
+  trend?: Array<{
+    date: string
+    jobs: number
+    revenue: number | null
+  }>
+}
+
+interface FinancialOverviewPayload {
+  escrow?: Array<{
+    status: string
+    currency: string
+    count: number
+    total: string
   }>
 }
 
@@ -157,12 +172,134 @@ function statusTone(status?: string): CrmTone {
   return 'neutral'
 }
 
+function TrendChart({
+  points,
+  showRevenue,
+}: {
+  points: Array<{ date: string; jobs: number; revenue: number | null }>
+  showRevenue: boolean
+}) {
+  const safePoints = points.length ? points : Array.from({ length: 30 }, (_, index) => {
+    const date = new Date()
+    date.setDate(date.getDate() - (29 - index))
+    return { date: date.toISOString().slice(0, 10), jobs: 0, revenue: showRevenue ? 0 : null }
+  })
+  const width = 720
+  const height = 220
+  const left = 34
+  const right = 14
+  const top = 18
+  const bottom = 32
+  const plotWidth = width - left - right
+  const plotHeight = height - top - bottom
+  const step = safePoints.length > 1 ? plotWidth / (safePoints.length - 1) : plotWidth
+  const maxJobs = Math.max(1, ...safePoints.map(point => point.jobs))
+  const maxRevenue = Math.max(1, ...safePoints.map(point => Number(point.revenue || 0)))
+  const barWidth = Math.max(5, Math.min(12, plotWidth / Math.max(1, safePoints.length) - 5))
+  const linePoints = safePoints
+    .map((point, index) => {
+      const x = left + index * step
+      const y = top + plotHeight - (Number(point.revenue || 0) / maxRevenue) * plotHeight
+      return `${x},${y}`
+    })
+    .join(' ')
+  const labelIndexes = new Set([0, 7, 14, 21, safePoints.length - 1])
+
+  return (
+    <div className="w-full">
+      <div className="mb-3 flex flex-wrap items-center gap-5 text-[11px] font-medium text-slate-500">
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-[var(--crm-accent)]" />
+          Jobs created
+        </span>
+        {showRevenue && (
+          <span className="inline-flex items-center gap-2">
+            <span className="h-0.5 w-5 rounded-full bg-slate-800" />
+            Revenue
+          </span>
+        )}
+      </div>
+      <div className="crm-scrollbar overflow-x-auto">
+        <svg
+          role="img"
+          aria-label="30 day jobs and revenue trend"
+          viewBox={`0 0 ${width} ${height}`}
+          className="min-w-[620px] w-full"
+        >
+          {[0, 0.25, 0.5, 0.75, 1].map(level => {
+            const y = top + plotHeight * level
+            return (
+              <line
+                key={level}
+                x1={left}
+                x2={width - right}
+                y1={y}
+                y2={y}
+                stroke="#e8ebe7"
+                strokeWidth="1"
+              />
+            )
+          })}
+          {safePoints.map((point, index) => {
+            const x = left + index * step
+            const barHeight = Math.max(point.jobs > 0 ? 3 : 0, (point.jobs / maxJobs) * plotHeight)
+            const y = top + plotHeight - barHeight
+            return (
+              <g key={point.date}>
+                <rect
+                  x={x - barWidth / 2}
+                  y={y}
+                  width={barWidth}
+                  height={barHeight}
+                  rx="3"
+                  fill="var(--crm-accent)"
+                  opacity="0.92"
+                />
+                {labelIndexes.has(index) && (
+                  <text
+                    x={x}
+                    y={height - 9}
+                    textAnchor="middle"
+                    fontSize="10"
+                    fill="#94a3b8"
+                  >
+                    {new Date(`${point.date}T00:00:00Z`).toLocaleDateString('en', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                  </text>
+                )}
+              </g>
+            )
+          })}
+          {showRevenue && (
+            <>
+              <polyline
+                points={linePoints}
+                fill="none"
+                stroke="#1f2937"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {safePoints.map((point, index) => {
+                if (index % 4 !== 0 && index !== safePoints.length - 1) return null
+                const x = left + index * step
+                const y = top + plotHeight - (Number(point.revenue || 0) / maxRevenue) * plotHeight
+                return <circle key={point.date} cx={x} cy={y} r="3" fill="#1f2937" />
+              })}
+            </>
+          )}
+        </svg>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminDashboard() {
   const { user } = useAdminSession()
   const [data, setData] = useState<DashboardStats | null>(null)
   const [recentJobs, setRecentJobs] = useState<RecentJob[]>([])
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null)
   const [health, setHealth] = useState<HealthPayload | null>(null)
+  const [financeOverview, setFinanceOverview] = useState<FinancialOverviewPayload | null>(null)
   const [approvalCount, setApprovalCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
@@ -171,13 +308,14 @@ export default function AdminDashboard() {
 
     async function loadDashboard() {
       try {
-        const [dashboardResult, approvalsResult, jobsResult, analyticsResult, healthResult] =
+        const [dashboardResult, approvalsResult, jobsResult, analyticsResult, healthResult, financeResult] =
           await Promise.allSettled([
             fetch('/api/dashboard', { credentials: 'include', cache: 'no-store' }),
             fetch('/api/admin/approvals', { credentials: 'include', cache: 'no-store' }),
             fetch('/api/admin/jobs?limit=5&page=1', { credentials: 'include', cache: 'no-store' }),
             fetch('/api/admin/analytics', { credentials: 'include', cache: 'no-store' }),
             fetch('/api/admin/health', { credentials: 'include', cache: 'no-store' }),
+            fetch('/api/admin/financial/overview', { credentials: 'include', cache: 'no-store' }),
           ])
 
         if (dashboardResult.status !== 'fulfilled') throw new Error('Dashboard request failed')
@@ -208,6 +346,10 @@ export default function AdminDashboard() {
 
         if (healthResult.status === 'fulfilled' && healthResult.value.ok) {
           setHealth(await healthResult.value.json().catch(() => null))
+        }
+
+        if (financeResult.status === 'fulfilled' && financeResult.value.ok) {
+          setFinanceOverview(await financeResult.value.json().catch(() => null))
         }
       } catch (error) {
         console.error('CRM dashboard error:', error)
