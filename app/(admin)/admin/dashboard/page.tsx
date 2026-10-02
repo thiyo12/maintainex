@@ -404,16 +404,33 @@ export default function AdminDashboard() {
     ? number(analytics?.summary?.openDisputes)
     : number(stats?.pendingCheatingReports)
   const activeJobs = number(stats?.openJobs) + number(analytics?.jobsByStatus?.inProgress)
-  const pendingCommission = primaryFinance
-    ? formatCurrency(primaryFinance.pendingCommission, primaryFinance.currency)
-    : financeRows.length > 1
-      ? `${financeRows.length} currencies`
-      : formatCurrency(number(data.weeklySummary?.pendingCommission))
+
+  const protectedEscrowRows = (financeOverview?.escrow || []).filter(row =>
+    ['PROTECTED', 'ON_HOLD'].includes(String(row.status || '').toUpperCase())
+  )
+  const escrowByCurrency = new Map<string, number>()
+  let escrowHeldCount = 0
+  for (const row of protectedEscrowRows) {
+    escrowHeldCount += Number(row.count || 0)
+    escrowByCurrency.set(
+      row.currency,
+      (escrowByCurrency.get(row.currency) || 0) + Number(row.total || 0) / 100
+    )
+  }
+  const escrowEntries = [...escrowByCurrency.entries()]
+  const escrowHeldValue = !financeOverview
+    ? 'Restricted'
+    : escrowEntries.length === 0
+      ? formatCurrency(0)
+      : escrowEntries.length === 1
+        ? formatCurrency(escrowEntries[0][1], escrowEntries[0][0])
+        : `${escrowEntries.length} currencies`
 
   const totalForDonut = Math.max(1, jobStatus.total)
-  const completedPct = (jobStatus.completed / totalForDonut) * 100
-  const openPct = (jobStatus.open / totalForDonut) * 100
   const progressPct = (jobStatus.inProgress / totalForDonut) * 100
+  const openPct = (jobStatus.open / totalForDonut) * 100
+  const completedPct = (jobStatus.completed / totalForDonut) * 100
+  const cancelledPct = ((jobStatus.cancelled + jobStatus.other) / totalForDonut) * 100
 
   return (
     <div className="space-y-4">
@@ -436,9 +453,9 @@ export default function AdminDashboard() {
           tone="success"
         />
         <CrmMetricCard
-          label="Commission Pending"
-          value={pendingCommission}
-          helper={`${number(data.weeklySummary?.pendingCount)} settlement items`}
+          label="Escrow Held"
+          value={escrowHeldValue}
+          helper={financeOverview ? `${escrowHeldCount} protected escrow items` : 'Finance permission required'}
           icon={<FiDollarSign size={16} />}
           tone="amber"
         />
@@ -460,106 +477,61 @@ export default function AdminDashboard() {
 
       <section className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
         <CrmCard
-          title="Jobs & Revenue Overview"
-          description="Live operational position for the selected market"
+          title="Jobs & Revenue Trend"
+          description="Last 30 days in the selected market"
           action={<CrmBadge tone="success" dot>Live data</CrmBadge>}
         >
-          <div className="grid min-h-[240px] gap-6 md:grid-cols-[1.35fr_1fr]">
-            <div className="flex flex-col justify-between">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-4">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Jobs created</div>
-                  <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{jobStatus.total.toLocaleString()}</div>
-                </div>
-                <div className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-4">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Commission</div>
-                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                    {revenueValue === null ? '—' : formatCurrency(revenueValue)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-4">
-                {[
-                  ['Open', jobStatus.open, 'bg-[var(--crm-accent)]'],
-                  ['In progress', jobStatus.inProgress, 'bg-[var(--crm-info)]'],
-                  ['Completed', jobStatus.completed, 'bg-[var(--crm-success)]'],
-                  ['Cancelled / other', jobStatus.cancelled + jobStatus.other, 'bg-[var(--crm-danger)]'],
-                ].map(([name, value, bar]) => {
-                  const amount = Number(value)
-                  const pct = Math.max(3, Math.round((amount / totalForDonut) * 100))
-                  return (
-                    <div key={String(name)}>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium text-slate-600">{String(name)}</span>
-                        <span className="font-semibold text-slate-900">{amount.toLocaleString()}</span>
-                      </div>
-                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--crm-border)] bg-white p-4">
-              <div
-                className="relative grid h-36 w-36 place-items-center rounded-full"
-                style={{
-                  background: `conic-gradient(
-                    var(--crm-success) 0 ${completedPct}%,
-                    var(--crm-accent) ${completedPct}% ${completedPct + openPct}%,
-                    var(--crm-info) ${completedPct + openPct}% ${completedPct + openPct + progressPct}%,
-                    #ef4444 ${completedPct + openPct + progressPct}% 100%
-                  )`,
-                }}
-              >
-                <div className="grid h-24 w-24 place-items-center rounded-full bg-white text-center shadow-inner">
-                  <div>
-                    <div className="text-2xl font-bold text-slate-950">{jobStatus.total.toLocaleString()}</div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Total jobs</div>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 grid w-full grid-cols-2 gap-x-4 gap-y-2 text-[11px] text-slate-600">
-                <span>● Completed {jobStatus.completed}</span>
-                <span>● Open {jobStatus.open}</span>
-                <span>● In progress {jobStatus.inProgress}</span>
-                <span>● Other {jobStatus.cancelled + jobStatus.other}</span>
-              </div>
-            </div>
-          </div>
+          <TrendChart
+            points={analytics?.trend || []}
+            showRevenue={analytics?.visibility?.finance === true}
+          />
         </CrmCard>
 
-        <CrmCard title="System Health" description="Live production services" action={<FiServer className="text-slate-400" />}>
-          {health ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-3">
-                <span className="flex items-center gap-2 text-xs font-semibold text-emerald-800">
-                  <FiCheckCircle /> {health.status === 'healthy' ? 'All systems operational' : 'System degraded'}
-                </span>
-                <CrmBadge tone={health.status === 'healthy' ? 'success' : 'warning'}>{health.status || 'unknown'}</CrmBadge>
-              </div>
-              {[
-                ['Database', health.database?.status || 'unknown', health.database?.latencyMs !== undefined ? `${health.database.latencyMs}ms` : '—'],
-                ['Job queue', number(health.queues?.jobMatchPending) === 0 ? 'healthy' : 'pending', String(number(health.queues?.jobMatchPending))],
-                ['Payments', number(health.payments?.pending) === 0 ? 'healthy' : 'pending', String(number(health.payments?.pending))],
-                ['Notifications', health.notifications?.expoPushAvailable ? 'healthy' : 'check', `${number(health.notifications?.createdLastHour)} / hr`],
-                ['Cron', health.cron?.configured ? 'configured' : 'check', ''],
-              ].map(([name, state, meta]) => (
-                <div key={name} className="flex items-center justify-between border-b border-slate-100 py-2.5 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`h-2 w-2 rounded-full ${state === 'healthy' || state === 'configured' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                    <span className="text-xs font-medium text-slate-600">{name}</span>
-                  </div>
-                  <span className="text-[11px] font-semibold text-slate-500">{meta}</span>
+        <CrmCard title="Job Status" description="Current marketplace workload">
+          <div className="flex flex-col items-center">
+            <div
+              className="relative grid h-40 w-40 place-items-center rounded-full"
+              style={{
+                background: `conic-gradient(
+                  var(--crm-success) 0 ${progressPct}%,
+                  var(--crm-accent) ${progressPct}% ${progressPct + openPct}%,
+                  var(--crm-info) ${progressPct + openPct}% ${progressPct + openPct + completedPct}%,
+                  var(--crm-danger) ${progressPct + openPct + completedPct}% ${progressPct + openPct + completedPct + cancelledPct}%,
+                  #cbd5e1 ${progressPct + openPct + completedPct + cancelledPct}% 100%
+                )`,
+              }}
+            >
+              <div className="grid h-[108px] w-[108px] place-items-center rounded-full bg-white text-center shadow-inner">
+                <div>
+                  <div className="text-2xl font-bold text-slate-950">{jobStatus.total.toLocaleString()}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Total jobs</div>
                 </div>
-              ))}
+              </div>
             </div>
-          ) : (
-            <div className="text-xs leading-6 text-slate-500">Health details are restricted for this staff role.</div>
-          )}
+
+            <div className="mt-5 w-full space-y-2.5">
+              {[
+                ['In progress', jobStatus.inProgress, 'bg-[var(--crm-success)]'],
+                ['Pending / open', jobStatus.open, 'bg-[var(--crm-accent)]'],
+                ['Completed', jobStatus.completed, 'bg-[var(--crm-info)]'],
+                ['Cancelled / other', jobStatus.cancelled + jobStatus.other, 'bg-[var(--crm-danger)]'],
+              ].map(([label, value, dot]) => {
+                const amount = Number(value)
+                const pct = jobStatus.total > 0 ? Math.round((amount / jobStatus.total) * 100) : 0
+                return (
+                  <div key={String(label)} className="flex items-center justify-between gap-4 text-xs">
+                    <span className="flex items-center gap-2 text-slate-600">
+                      <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
+                      {String(label)}
+                    </span>
+                    <span className="font-semibold text-slate-900">
+                      {amount.toLocaleString()} <span className="font-normal text-slate-400">({pct}%)</span>
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </CrmCard>
       </section>
 
@@ -570,10 +542,10 @@ export default function AdminDashboard() {
         action={<Link href="/admin/jobs" className="text-xs font-semibold text-amber-700">View all →</Link>}
       >
         <div className="crm-scrollbar overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left">
+          <table className="w-full min-w-[900px] text-left">
             <thead>
               <tr className="border-b border-[var(--crm-border)] bg-[#fafbf9]">
-                {['ID', 'Service', 'Customer', 'Amount', 'Status', 'Created'].map(head => (
+                {['ID', 'Service', 'Customer', 'Provider', 'Amount', 'Status', 'Created'].map(head => (
                   <th key={head} className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{head}</th>
                 ))}
               </tr>
@@ -586,12 +558,13 @@ export default function AdminDashboard() {
                   </td>
                   <td className="px-4 py-3 text-xs font-semibold text-slate-800">{job.category || job.title}</td>
                   <td className="px-4 py-3 text-xs text-slate-600">{job.customer?.name || 'Unknown'}</td>
+                  <td className="px-4 py-3 text-xs font-medium text-slate-700">{job.provider?.name || 'Unassigned'}</td>
                   <td className="px-4 py-3 text-xs font-semibold text-slate-800">{formatCurrency(job.budget)}</td>
                   <td className="px-4 py-3"><CrmBadge tone={statusTone(job.status)} dot>{job.status.replaceAll('_', ' ')}</CrmBadge></td>
                   <td className="px-4 py-3 text-xs text-slate-400">{relativeTime(job.createdAt)}</td>
                 </tr>
               )) : (
-                <tr><td colSpan={6} className="px-5 py-8 text-center text-xs text-slate-400">No recent jobs available for this scope.</td></tr>
+                <tr><td colSpan={7} className="px-5 py-8 text-center text-xs text-slate-400">No recent jobs available for this scope.</td></tr>
               )}
             </tbody>
           </table>
@@ -645,41 +618,38 @@ export default function AdminDashboard() {
           </div>
         </CrmCard>
 
-        <CrmCard className="crm-dark-surface" padding="md">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-semibold text-white">International Control</h2>
-              <p className="crm-dark-muted mt-1 text-xs">Current CRM control-plane coverage</p>
-            </div>
-            <FiBriefcase className="text-[var(--crm-accent)]" size={18} />
-          </div>
-          <div className="mt-5 space-y-3">
-            {[
-              ['Market-scoped data', true],
-              ['Server-issued permissions', true],
-              ['Finance & escrow controls', caps.finance],
-              ['Trust & dispute controls', caps.trust],
-              ['App & web runtime controls', caps.platform],
-            ].map(([label, ready]) => (
-              <div key={String(label)} className="flex items-center justify-between gap-3">
-                <span className="crm-dark-muted text-xs">{String(label)}</span>
-                <span className={`inline-flex items-center gap-1.5 text-[11px] ${ready ? 'text-emerald-300' : 'text-slate-500'}`}>
-                  {ready ? <FiCheckCircle size={12} /> : <FiClock size={12} />}
-                  {ready ? 'Ready' : 'Restricted'}
+        <CrmCard
+          title="System Health"
+          description="Live production services"
+          action={<FiServer className="text-slate-400" />}
+        >
+          {health ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-3">
+                <span className="flex items-center gap-2 text-xs font-semibold text-emerald-800">
+                  <FiCheckCircle /> {health.status === 'healthy' ? 'All systems operational' : 'System degraded'}
                 </span>
+                <CrmBadge tone={health.status === 'healthy' ? 'success' : 'warning'}>{health.status || 'unknown'}</CrmBadge>
               </div>
-            ))}
-          </div>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {caps.platform && (
-              <Link href="/admin/platform" className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--crm-accent)] hover:text-amber-200">
-                App & Web controls <FiArrowUpRight size={12} />
-              </Link>
-            )}
-            <Link href="/admin/analytics" className="inline-flex items-center gap-1 text-xs font-semibold text-white hover:text-amber-200">
-              Analytics <FiArrowUpRight size={12} />
-            </Link>
-          </div>
+              {[
+                ['Database', health.database?.status || 'unknown', health.database?.latencyMs !== undefined ? `${health.database.latencyMs}ms` : '—'],
+                ['Job queue', number(health.queues?.jobMatchPending) === 0 ? 'healthy' : 'pending', String(number(health.queues?.jobMatchPending))],
+                ['Payments', number(health.payments?.pending) === 0 ? 'healthy' : 'pending', String(number(health.payments?.pending))],
+                ['Notifications', health.notifications?.expoPushAvailable ? 'healthy' : 'check', `${number(health.notifications?.createdLastHour)} / hr`],
+                ['Cron', health.cron?.configured ? 'configured' : 'check', ''],
+              ].map(([name, state, meta]) => (
+                <div key={name} className="flex items-center justify-between border-b border-slate-100 py-2 last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full ${state === 'healthy' || state === 'configured' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <span className="text-xs font-medium text-slate-600">{name}</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500">{meta}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs leading-6 text-slate-500">Health details are restricted for this staff role.</div>
+          )}
         </CrmCard>
       </section>
     </div>
