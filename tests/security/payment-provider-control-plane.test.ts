@@ -39,10 +39,9 @@ describe('payment provider control plane', () => {
     const bootstrap = source('scripts/bootstrap-payment-providers.cjs')
     const docker = source('Dockerfile')
 
-    const paymentIntentBlock = schema.slice(
-      schema.indexOf('model PaymentIntent {'),
-      schema.indexOf('model JobEscrow {')
-    )
+    const paymentIntentStart = schema.indexOf('model PaymentIntent {')
+    const paymentIntentEnd = schema.indexOf('\n}', paymentIntentStart)
+    const paymentIntentBlock = schema.slice(paymentIntentStart, paymentIntentEnd + 2)
 
     expect(paymentIntentBlock).toContain('gateway         String')
     expect(paymentIntentBlock).not.toContain('@default("PAYPAL")')
