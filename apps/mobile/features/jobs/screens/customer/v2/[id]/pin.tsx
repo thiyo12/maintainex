@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native'
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ShieldCheck, ShieldSlash, ArrowsClockwise, Copy, CheckCircle, WarningCircle } from 'phosphor-react-native'
@@ -29,6 +29,25 @@ export default function JobPinScreen() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [copied, setCopied] = useState(false)
+  const [workerIdentity, setWorkerIdentity] = useState<{
+    required: boolean
+    worker: null | {
+      providerIdentityId: string
+      providerType: 'INDIVIDUAL' | 'COMPANY'
+      userId: string
+      displayName: string
+      verifiedPhotoUrl: string | null
+      identityVerified: boolean
+      companyId: string | null
+      companyName: string | null
+    }
+    confirmation: null | {
+      id: string
+      status: string
+      confirmedAt: string | null
+      mismatchReportedAt: string | null
+    }
+  } | null>(null)
 
   const loadPinState = async () => {
     try {
@@ -42,8 +61,18 @@ export default function JobPinScreen() {
     }
   }
 
+  const loadWorkerIdentity = async () => {
+    try {
+      const state = await v2JobActions.getWorkerIdentity(id)
+      setWorkerIdentity(state)
+    } catch {
+      setWorkerIdentity(null)
+    }
+  }
+
   useEffect(() => {
     loadPinState()
+    loadWorkerIdentity()
     const timer = setInterval(loadPinState, 3000)
     return () => clearInterval(timer)
   }, [id])
