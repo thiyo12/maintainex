@@ -2198,6 +2198,7 @@ model MarketplaceJob {
   approvedQuoteId    String?
   approvedQuoteVersion Int?
   finalAuthorizedAmountCents BigInt?
+  workerIdentityCheckRequired Boolean @default(false)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -3821,6 +3822,7 @@ model JobWorkerIdentityCheck {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
+  @@unique([jobId, providerIdentityId])
   @@index([jobId, status])
   @@index([providerIdentityId, status])
   @@index([customerId, createdAt])
