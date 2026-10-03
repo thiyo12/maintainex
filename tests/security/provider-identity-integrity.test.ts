@@ -92,6 +92,32 @@ describe('provider identity integrity lifecycle', () => {
     expect(identityRoute).toContain('CUSTOMER_WORKER_IDENTITY_MISMATCH')
   })
 
+  it('gates Start Work PIN generation and rotation on the customer worker match', () => {
+    const pin = source('lib/domain/job-pin.ts')
+    const pinRoute = source('app/api/mobile/v2/jobs/[id]/pin/route.ts')
+    const rotateRoute = source('app/api/mobile/v2/jobs/[id]/pin/rotate/route.ts')
+
+    expect(pin).toContain('assertWorkerIdentityConfirmedBeforeWorkStartPin')
+    expect(pin).toContain('Customer must confirm the verified worker identity before Start Work PIN')
+    expect(pin).toContain('Worker identity mismatch requires Trust & Safety review before Start Work PIN')
+    expect((pin.match(/assertWorkerIdentityConfirmedBeforeWorkStartPin\(prisma, jobId\)/g) || []).length)
+      .toBeGreaterThanOrEqual(2)
+    expect(pinRoute).toContain("error.message.includes('Start Work PIN')")
+    expect(rotateRoute).toContain("error.message.includes('Start Work PIN')")
+  })
+
+  it('makes a customer-reported worker mismatch sticky until governed Trust & Safety dismissal', () => {
+    const identityRoute = source('app/api/mobile/v2/jobs/[id]/worker-identity/route.ts')
+    const integrityRoute = source('app/api/admin/trust-safety/integrity/route.ts')
+
+    expect(identityRoute).toContain("existingCheck?.status === 'MISMATCH_REPORTED'")
+    expect(identityRoute).toContain('WORKER_IDENTITY_MISMATCH_REVIEW_REQUIRED')
+    expect(integrityRoute).toContain("signal.signalType === 'CUSTOMER_WORKER_IDENTITY_MISMATCH'")
+    expect(integrityRoute).toContain("if (status === 'DISMISSED')")
+    expect(integrityRoute).toContain('jobWorkerIdentityCheck.updateMany')
+    expect(integrityRoute).toContain("status: 'MISMATCH_REPORTED'")
+  })
+
   it('keeps verified public-photo changes behind governed CRM review', () => {
     const taskerProfile = source('app/api/mobile/taskers/profile/route.ts')
     const crmReview = source('app/api/admin/kyc/photo-changes/route.ts')
