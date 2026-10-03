@@ -515,6 +515,236 @@ export async function recordCashPlatformReceivable(
   }
 }
 
+export async function recordProviderBalanceAdjustment(
+  tx: Prisma.TransactionClient,
+  input: {
+    providerId: string
+    providerType: FinancialProviderType
+    countryCode: string
+    currency: string
+    jobId: string
+    escrowId: string
+    paymentIntentId?: string | null
+    adjustmentType: string
+    sourceProvider: string
+    sourceReference: string
+    amountMinor: bigint
+    reason: string
+    createdBy: string
+    metadata?: Record<string, unknown> | null
+  },
+) {
+  if (input.amountMinor <= 0n) {
+    return { recorded: false, replayed: false, adjustmentId: null as string | null, amountMinor: 0n }
+  }
+
+  const currency = input.currency.trim().toUpperCase()
+  const sourceProvider = input.sourceProvider.trim().toUpperCase()
+  const adjustmentType = input.adjustmentType.trim().toUpperCase()
+  const sourceReference = input.sourceReference.trim()
+  const identity = await ensureProviderIdentity(tx, input)
+  const idempotencyKey =
+    `provider-balance-adjustment:${sourceProvider}:${adjustmentType}:${sourceReference}`
+
+  const existing = await tx.providerBalanceAdjustment.findUnique({ where: { idempotencyKey } })
+  if (existing) {
+    return {
+      recorded: false,
+      replayed: true,
+      adjustmentId: existing.id,
+      amountMinor: existing.amountOriginal,
+    }
+  }
+
+  const account = await ensureFinancialAccount(tx, identity.id, currency)
+  const dueAt = new Date()
+
+  await postLedgerTransaction({
+    entries: [
+      {
+        accountId: `provider-adjustment-receivable:${identity.id}`,
+        accountType: 'PROVIDER_BALANCE_ADJUSTMENT_RECEIVABLE',
+        entryType: 'DEBIT',
+        amount: input.amountMinor,
+      },
+      {
+        accountId: `chargeback-clearing:${sourceProvider}`,
+        accountType: 'CHARGEBACK_CLEARING',
+        entryType: 'CREDIT',
+        amount: input.amountMinor,
+      },
+    ],
+    currency: currency as Currency,
+    referenceType: 'PROVIDER_BALANCE_ADJUSTMENT',
+    referenceId: input.paymentIntentId || input.escrowId,
+    idempotencyKey: `ledger:${idempotencyKey}`,
+    description: input.reason,
+    createdBy: input.createdBy,
+    metadata: JSON.stringify({
+      providerIdentityId: identity.id,
+      providerId: input.providerId,
+      providerType: input.providerType,
+      jobId: input.jobId,
+      escrowId: input.escrowId,
+      paymentIntentId: input.paymentIntentId || null,
+      adjustmentType,
+      sourceProvider,
+      sourceReference,
+      ...(input.metadata || {}),
+    }),
+  }, tx)
+
+  const adjustment = await tx.providerBalanceAdjustment.create({
+    data: {
+      providerIdentityId: identity.id,
+      jobId: input.jobId,
+      escrowId: input.escrowId,
+      paymentIntentId: input.paymentIntentId || null,
+      adjustmentType,
+      sourceProvider,
+      sourceReference,
+      amountOriginal: input.amountMinor,
+      amountRemaining: input.amountMinor,
+      currency,
+      status: 'OPEN',
+      dueAt,
+      reason: input.reason,
+      metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+      idempotencyKey,
+    },
+  })
+
+  const updatedAccount = await tx.providerFinancialAccount.update({
+    where: { id: account.id },
+    data: {
+      adjustmentDue: { increment: input.amountMinor },
+      oldestAdjustmentDueAt: account.oldestAdjustmentDueAt || dueAt,
+      version: { increment: 1 },
+    },
+  })
+  const policy = await resolveProviderFinancialPolicy(tx, {
+    countryCode: input.countryCode,
+    providerType: input.providerType,
+    currency,
+  })
+  const standing = evaluateAccountFinancialStanding(updatedAccount, policy)
+  const finalAccount = await tx.providerFinancialAccount.update({
+    where: { id: account.id },
+    data: {
+      status: standing.standing,
+      cashJobsAllowed: standing.cashJobsAllowed,
+      onlineJobsAllowed: standing.onlineJobsAllowed,
+      manualReviewRequired: standing.manualReviewRequired,
+      lastEvaluatedAt: dueAt,
+      version: { increment: 1 },
+    },
+  })
+  await tx.providerIdentity.update({
+    where: { id: identity.id },
+    data: { standingStatus: identityStanding(standing) },
+  })
+  await tx.providerIntegritySignal.create({
+    data: {
+      providerIdentityId: identity.id,
+      userId: identity.currentUserId,
+      jobId: input.jobId,
+      signalType: 'POST_PAYOUT_PROVIDER_BALANCE_ADJUSTMENT',
+      severity: 'CRITICAL',
+      source: sourceProvider,
+      status: 'OPEN',
+      metadata: JSON.stringify({
+        adjustmentId: adjustment.id,
+        adjustmentType,
+        amountMinor: input.amountMinor.toString(),
+        currency,
+        sourceReference,
+        reason: input.reason,
+      }),
+    },
+  })
+
+  return {
+    recorded: true,
+    replayed: false,
+    adjustmentId: adjustment.id,
+    amountMinor: input.amountMinor,
+    totalAdjustmentDueMinor: finalAccount.adjustmentDue,
+  }
+}
+
+export async function recordPostPayoutProviderAdjustmentForEscrow(
+  tx: Prisma.TransactionClient,
+  input: {
+    escrowId: string
+    paymentIntentId: string
+    sourceProvider: string
+    sourceReference: string
+    adjustmentType: string
+    reason: string
+    createdBy: string
+    metadata?: Record<string, unknown> | null
+  },
+) {
+  const escrow = await tx.jobEscrow.findUnique({
+    where: { id: input.escrowId },
+    select: { id: true, jobId: true, quoteId: true, providerId: true, currency: true, status: true },
+  })
+  if (!escrow || escrow.status !== 'RELEASED') {
+    return { recorded: false, replayed: false, adjustmentId: null as string | null, amountMinor: 0n }
+  }
+
+  const [quote, job, providerCredit] = await Promise.all([
+    tx.jobQuote.findUnique({
+      where: { id: escrow.quoteId },
+      select: { providerId: true, providerType: true },
+    }),
+    tx.marketplaceJob.findUnique({
+      where: { id: escrow.jobId },
+      select: { countryCode: true },
+    }),
+    tx.financialLedger.aggregate({
+      where: {
+        referenceType: 'ESCROW_RELEASE',
+        referenceId: escrow.id,
+        accountType: 'PROVIDER_WALLET',
+        entryType: 'CREDIT',
+        currency: escrow.currency,
+      },
+      _sum: { amount: true },
+    }),
+  ])
+
+  if (
+    !quote ||
+    quote.providerId !== escrow.providerId ||
+    (quote.providerType !== 'INDIVIDUAL' && quote.providerType !== 'COMPANY')
+  ) {
+    throw new Error('POST_PAYOUT_ADJUSTMENT_PROVIDER_MISMATCH')
+  }
+
+  const amountMinor = providerCredit._sum.amount ?? 0n
+  if (amountMinor <= 0n) {
+    return { recorded: false, replayed: false, adjustmentId: null as string | null, amountMinor: 0n }
+  }
+
+  return recordProviderBalanceAdjustment(tx, {
+    providerId: quote.providerId,
+    providerType: quote.providerType,
+    countryCode: job?.countryCode || 'LK',
+    currency: escrow.currency,
+    jobId: escrow.jobId,
+    escrowId: escrow.id,
+    paymentIntentId: input.paymentIntentId,
+    adjustmentType: input.adjustmentType,
+    sourceProvider: input.sourceProvider,
+    sourceReference: input.sourceReference,
+    amountMinor,
+    reason: input.reason,
+    createdBy: input.createdBy,
+    metadata: input.metadata,
+  })
+}
+
 export async function recoverProviderCommissionFromOnlineEarnings(
   tx: Prisma.TransactionClient,
   input: {
@@ -535,11 +765,15 @@ export async function recoverProviderCommissionFromOnlineEarnings(
   const lockedRows = await tx.$queryRaw<Array<{
     id: string
     commissionDue: string
+    adjustmentDue: string
     oldestCommissionDueAt: Date | null
+    oldestAdjustmentDueAt: Date | null
   }>>`
     SELECT id,
            "commissionDue"::text AS "commissionDue",
-           "oldestCommissionDueAt"
+           "adjustmentDue"::text AS "adjustmentDue",
+           "oldestCommissionDueAt",
+           "oldestAdjustmentDueAt"
     FROM "ProviderFinancialAccount"
     WHERE id = ${account.id}
     FOR UPDATE
@@ -549,18 +783,9 @@ export async function recoverProviderCommissionFromOnlineEarnings(
   if (!locked) throw new Error('PROVIDER_FINANCIAL_ACCOUNT_NOT_FOUND')
 
   const currentCommissionDue = BigInt(locked.commissionDue)
-  if (currentCommissionDue <= 0n || input.availableOnlineEarningsMinor <= 0n) {
-    return {
-      providerIdentityId: identity.id,
-      recoveryMinor: 0n,
-      providerPayoutMinor: input.availableOnlineEarningsMinor > 0n
-        ? input.availableOnlineEarningsMinor
-        : 0n,
-      remainingCommissionDueMinor: currentCommissionDue > 0n ? currentCommissionDue : 0n,
-      allocations: [] as Array<{ receivableId: string; amount: bigint }>,
-    }
-  }
-
+  const currentAdjustmentDue = BigInt(locked.adjustmentDue)
+  const earnings = input.availableOnlineEarningsMinor > 0n ? input.availableOnlineEarningsMinor : 0n
+  const currentTotalDue = currentCommissionDue + currentAdjustmentDue
   const policy = await resolveProviderFinancialPolicy(tx, {
     countryCode: input.countryCode,
     providerType: input.providerType,
@@ -568,96 +793,111 @@ export async function recoverProviderCommissionFromOnlineEarnings(
   })
 
   const decision = calculateOnlineDebtOffset({
-    availableOnlineEarningsMinor: input.availableOnlineEarningsMinor,
-    commissionDueMinor: currentCommissionDue,
+    availableOnlineEarningsMinor: earnings,
+    commissionDueMinor: currentTotalDue,
     autoOffsetEnabled: policy.autoOffsetOnlineEarnings,
   })
 
-  if (decision.recoveryMinor <= 0n) {
-    return {
-      providerIdentityId: identity.id,
-      recoveryMinor: 0n,
-      providerPayoutMinor: input.availableOnlineEarningsMinor > 0n
-        ? input.availableOnlineEarningsMinor
-        : 0n,
-      remainingCommissionDueMinor: BigInt(locked.commissionDue),
-      allocations: [] as Array<{ receivableId: string; amount: bigint }>,
-    }
-  }
-
-  const receivables = await tx.providerCommissionReceivable.findMany({
-    where: {
-      providerIdentityId: identity.id,
-      currency,
-      status: { in: ['OPEN', 'PARTIAL'] },
-      amountRemaining: { gt: 0 },
-      OR: [
-        { weeklySettlementId: null },
-        {
-          weeklySettlement: {
-            commissionPayments: { none: { status: 'PENDING' } },
-          },
-        },
-      ],
-    },
-    orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
-  })
-
   let remainingToRecover = decision.recoveryMinor
-  let actualRecovery = 0n
+  let commissionRecoveryMinor = 0n
+  let adjustmentRecoveryMinor = 0n
   const allocations: Array<{ receivableId: string; amount: bigint }> = []
+  const adjustmentAllocations: Array<{ adjustmentId: string; amount: bigint }> = []
   const touchedSettlements = new Set<string>()
 
-  for (const receivable of receivables) {
-    if (remainingToRecover <= 0n) break
-    const allocation =
-      receivable.amountRemaining < remainingToRecover
+  if (remainingToRecover > 0n) {
+    const receivables = await tx.providerCommissionReceivable.findMany({
+      where: {
+        providerIdentityId: identity.id,
+        currency,
+        status: { in: ['OPEN', 'PARTIAL'] },
+        amountRemaining: { gt: 0 },
+        OR: [
+          { weeklySettlementId: null },
+          { weeklySettlement: { commissionPayments: { none: { status: 'PENDING' } } } },
+        ],
+      },
+      orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    })
+
+    for (const receivable of receivables) {
+      if (remainingToRecover <= 0n) break
+      const allocation = receivable.amountRemaining < remainingToRecover
         ? receivable.amountRemaining
         : remainingToRecover
-    if (allocation <= 0n) continue
+      if (allocation <= 0n) continue
+      const newRemaining = receivable.amountRemaining - allocation
 
-    const newRemaining = receivable.amountRemaining - allocation
-    await tx.providerCommissionReceivable.update({
-      where: { id: receivable.id },
-      data: {
-        amountRemaining: newRemaining,
-        status: newRemaining === 0n ? 'SETTLED' : 'PARTIAL',
-        settledAt: newRemaining === 0n ? new Date() : null,
-      },
-    })
-
-    await tx.providerCommissionRecovery.create({
-      data: {
-        receivableId: receivable.id,
-        providerIdentityId: identity.id,
-        sourceJobId: input.sourceJobId,
-        sourceEscrowId: input.sourceEscrowId,
-        amount: allocation,
-        currency,
-        method: 'ONLINE_EARNINGS',
-        idempotencyKey: `online-recovery:${input.sourceEscrowId}:${receivable.id}`,
-        createdBy: input.createdBy,
-      },
-    })
-
-    if (receivable.weeklySettlementId) {
-      touchedSettlements.add(receivable.weeklySettlementId)
+      await tx.providerCommissionReceivable.update({
+        where: { id: receivable.id },
+        data: {
+          amountRemaining: newRemaining,
+          status: newRemaining === 0n ? 'SETTLED' : 'PARTIAL',
+          settledAt: newRemaining === 0n ? new Date() : null,
+        },
+      })
+      await tx.providerCommissionRecovery.create({
+        data: {
+          receivableId: receivable.id,
+          providerIdentityId: identity.id,
+          sourceJobId: input.sourceJobId,
+          sourceEscrowId: input.sourceEscrowId,
+          amount: allocation,
+          currency,
+          method: 'ONLINE_EARNINGS',
+          idempotencyKey: `online-recovery:${input.sourceEscrowId}:${receivable.id}`,
+          createdBy: input.createdBy,
+        },
+      })
+      if (receivable.weeklySettlementId) touchedSettlements.add(receivable.weeklySettlementId)
+      allocations.push({ receivableId: receivable.id, amount: allocation })
+      commissionRecoveryMinor += allocation
+      remainingToRecover -= allocation
     }
-
-    allocations.push({ receivableId: receivable.id, amount: allocation })
-    actualRecovery += allocation
-    remainingToRecover -= allocation
   }
 
-  if (actualRecovery <= 0n) {
-    return {
-      providerIdentityId: identity.id,
-      recoveryMinor: 0n,
-      providerPayoutMinor: input.availableOnlineEarningsMinor > 0n
-        ? input.availableOnlineEarningsMinor
-        : 0n,
-      remainingCommissionDueMinor: BigInt(locked.commissionDue),
-      allocations,
+  if (remainingToRecover > 0n) {
+    const adjustments = await tx.providerBalanceAdjustment.findMany({
+      where: {
+        providerIdentityId: identity.id,
+        currency,
+        status: { in: ['OPEN', 'PARTIAL'] },
+        amountRemaining: { gt: 0 },
+      },
+      orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    })
+    for (const adjustment of adjustments) {
+      if (remainingToRecover <= 0n) break
+      const allocation = adjustment.amountRemaining < remainingToRecover
+        ? adjustment.amountRemaining
+        : remainingToRecover
+      if (allocation <= 0n) continue
+      const newRemaining = adjustment.amountRemaining - allocation
+
+      await tx.providerBalanceAdjustment.update({
+        where: { id: adjustment.id },
+        data: {
+          amountRemaining: newRemaining,
+          status: newRemaining === 0n ? 'SETTLED' : 'PARTIAL',
+          settledAt: newRemaining === 0n ? new Date() : null,
+        },
+      })
+      await tx.providerBalanceAdjustmentRecovery.create({
+        data: {
+          adjustmentId: adjustment.id,
+          providerIdentityId: identity.id,
+          sourceJobId: input.sourceJobId,
+          sourceEscrowId: input.sourceEscrowId,
+          amount: allocation,
+          currency,
+          method: 'ONLINE_EARNINGS',
+          idempotencyKey: `online-adjustment-recovery:${input.sourceEscrowId}:${adjustment.id}`,
+          createdBy: input.createdBy,
+        },
+      })
+      adjustmentAllocations.push({ adjustmentId: adjustment.id, amount: allocation })
+      adjustmentRecoveryMinor += allocation
+      remainingToRecover -= allocation
     }
   }
 
@@ -683,36 +923,51 @@ export async function recoverProviderCommissionFromOnlineEarnings(
     }
   }
 
-  const previousDue = BigInt(locked.commissionDue)
-  const remainingDue = previousDue > actualRecovery
-    ? previousDue - actualRecovery
+  const remainingCommissionDue = currentCommissionDue > commissionRecoveryMinor
+    ? currentCommissionDue - commissionRecoveryMinor
     : 0n
-  const oldestRemaining = await tx.providerCommissionReceivable.findFirst({
-    where: {
-      providerIdentityId: identity.id,
-      currency,
-      status: { in: ['OPEN', 'PARTIAL'] },
-      amountRemaining: { gt: 0 },
-    },
-    orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }],
-    select: { dueAt: true },
-  })
+  const remainingAdjustmentDue = currentAdjustmentDue > adjustmentRecoveryMinor
+    ? currentAdjustmentDue - adjustmentRecoveryMinor
+    : 0n
+  const [oldestCommission, oldestAdjustment] = await Promise.all([
+    tx.providerCommissionReceivable.findFirst({
+      where: {
+        providerIdentityId: identity.id,
+        currency,
+        status: { in: ['OPEN', 'PARTIAL'] },
+        amountRemaining: { gt: 0 },
+      },
+      orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }],
+      select: { dueAt: true },
+    }),
+    tx.providerBalanceAdjustment.findFirst({
+      where: {
+        providerIdentityId: identity.id,
+        currency,
+        status: { in: ['OPEN', 'PARTIAL'] },
+        amountRemaining: { gt: 0 },
+      },
+      orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }],
+      select: { dueAt: true },
+    }),
+  ])
 
   const standing = evaluateAccountFinancialStanding(
     {
-      commissionDue: remainingDue,
-      adjustmentDue: account.adjustmentDue,
-      oldestCommissionDueAt: oldestRemaining?.dueAt || null,
-      oldestAdjustmentDueAt: account.oldestAdjustmentDueAt,
+      commissionDue: remainingCommissionDue,
+      adjustmentDue: remainingAdjustmentDue,
+      oldestCommissionDueAt: oldestCommission?.dueAt || null,
+      oldestAdjustmentDueAt: oldestAdjustment?.dueAt || null,
     },
     policy,
   )
-
   await tx.providerFinancialAccount.update({
     where: { id: account.id },
     data: {
-      commissionDue: remainingDue,
-      oldestCommissionDueAt: oldestRemaining?.dueAt || null,
+      commissionDue: remainingCommissionDue,
+      adjustmentDue: remainingAdjustmentDue,
+      oldestCommissionDueAt: oldestCommission?.dueAt || null,
+      oldestAdjustmentDueAt: oldestAdjustment?.dueAt || null,
       status: standing.standing,
       cashJobsAllowed: standing.cashJobsAllowed,
       onlineJobsAllowed: standing.onlineJobsAllowed,
@@ -721,21 +976,22 @@ export async function recoverProviderCommissionFromOnlineEarnings(
       version: { increment: 1 },
     },
   })
-
   await tx.providerIdentity.update({
     where: { id: identity.id },
     data: { standingStatus: identityStanding(standing) },
   })
 
+  const actualRecovery = commissionRecoveryMinor + adjustmentRecoveryMinor
   return {
     providerIdentityId: identity.id,
     recoveryMinor: actualRecovery,
-    providerPayoutMinor:
-      input.availableOnlineEarningsMinor > actualRecovery
-        ? input.availableOnlineEarningsMinor - actualRecovery
-        : 0n,
-    remainingCommissionDueMinor: remainingDue,
+    commissionRecoveryMinor,
+    adjustmentRecoveryMinor,
+    providerPayoutMinor: earnings > actualRecovery ? earnings - actualRecovery : 0n,
+    remainingCommissionDueMinor: remainingCommissionDue,
+    remainingAdjustmentDueMinor: remainingAdjustmentDue,
     allocations,
+    adjustmentAllocations,
   }
 }
 
@@ -885,10 +1141,12 @@ export async function settleProviderReceivablesFromDirectPayment(
     providerType,
     currency,
   })
-  const standing = evaluateProviderFinancialStanding(
+  const standing = evaluateAccountFinancialStanding(
     {
-      commissionDueMinor: remainingDue,
+      commissionDue: remainingDue,
+      adjustmentDue: account.adjustmentDue,
       oldestCommissionDueAt: oldestRemaining?.dueAt || null,
+      oldestAdjustmentDueAt: account.oldestAdjustmentDueAt,
     },
     policy,
   )
