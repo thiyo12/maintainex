@@ -130,7 +130,7 @@ export async function ensureProviderIdentity(
           : 'PENDING',
       standingStatus: 'ACTIVE',
       verifiedDisplayName: tasker.user.name,
-      verifiedPhotoUrl: tasker.profileImage,
+      verifiedPhotoUrl: null,
       photoLocked: true,
       verifiedAt: tasker.verifiedAt,
     },
@@ -144,7 +144,6 @@ export async function ensureProviderIdentity(
           ? 'VERIFIED'
           : 'PENDING',
       verifiedDisplayName: tasker.user.name,
-      ...(tasker.profileImage ? { verifiedPhotoUrl: tasker.profileImage } : {}),
       photoLocked: true,
       verifiedAt: tasker.verifiedAt,
     },
