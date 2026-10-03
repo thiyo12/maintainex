@@ -69,6 +69,16 @@ interface ProviderReceivable {
   manualReviewRequired: boolean
   oldestCommissionDueAt?: string | null
   updatedAt: string
+  recentRecoveries: Array<{
+    id: string
+    amount: number
+    amountMinor: string
+    currency: string
+    method: string
+    sourceJobId?: string | null
+    originalCashJobId: string
+    createdAt: string
+  }>
   user?: WalletUser | null
 }
 
@@ -467,7 +477,7 @@ export default function WalletsPage() {
           title="Provider receivables"
           description="Cash-job commission and platform amounts owed to MaintainEX. These balances are ledger-backed and read only here."
         >
-          <table className={`${crmTableClass} min-w-[1180px]`}>
+          <table className={`${crmTableClass} min-w-[1340px]`}>
             <thead>
               <tr>
                 <th className={crmThClass}>Provider</th>
@@ -478,6 +488,7 @@ export default function WalletsPage() {
                 <th className={crmThClass}>Cash jobs</th>
                 <th className={crmThClass}>Online jobs</th>
                 <th className={crmThClass}>Oldest due</th>
+                <th className={crmThClass}>Latest recovery</th>
               </tr>
             </thead>
             <tbody>
@@ -545,6 +556,27 @@ export default function WalletsPage() {
                       <div className="mt-1 text-xs font-semibold text-red-700">
                         Manual review required
                       </div>
+                    )}
+                  </td>
+                  <td className={crmTdClass}>
+                    {receivable.recentRecoveries?.[0] ? (
+                      <>
+                        <div className="font-semibold text-emerald-700">
+                          {formatCurrency(
+                            receivable.recentRecoveries[0].amount,
+                            receivable.recentRecoveries[0].currency
+                          )}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {formatDate(receivable.recentRecoveries[0].createdAt)}
+                        </div>
+                        <div className="mt-1 font-mono text-[10px] text-slate-400">
+                          online {receivable.recentRecoveries[0].sourceJobId?.slice(0, 8) || '—'}
+                          {' → '}cash {receivable.recentRecoveries[0].originalCashJobId.slice(0, 8)}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-xs text-slate-400">No recovery yet</span>
                     )}
                   </td>
                 </tr>
