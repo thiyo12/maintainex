@@ -19,16 +19,16 @@ export default function HealthPage(){
  useEffect(()=>{load()},[load])
  if(loading&&!data)return <CrmState type="loading" title="Checking system health" description="Checking safe application, database, queue and integration readiness."/>
  if(!data)return <CrmState type="error" title="System health unavailable" description="Health diagnostics could not be loaded." action={<CrmButton variant="secondary" onClick={load}>Retry</CrmButton>}/>
- return <div className="space-y-5">
+ return <div className="space-y-4">
   <CrmPageHeader eyebrow="Intelligence · Health" title="System health" description="Safe operational diagnostics only. Secret values, credentials and infrastructure access are never exposed." actions={<CrmButton variant="secondary" onClick={load}><FiRefreshCw size={14}/>Refresh</CrmButton>} context={<><CrmBadge tone={data.status==='healthy'?'success':'warning'} dot>{data.status.toUpperCase()}</CrmBadge><CrmBadge tone="neutral">Release · {data.release.slice(0,12)}</CrmBadge></>}/>
-  <section className="grid grid-cols-2 gap-4 xl:grid-cols-5">
+  <section className="grid grid-cols-2 gap-3 xl:grid-cols-5">
     <CrmMetricCard label="DB latency" value={`${data.database.latencyMs} ms`} icon={<FiDatabase/>} tone={data.database.latencyMs<500?'success':'warning'}/>
     <CrmMetricCard label="Job queue" value={data.queues.jobMatchPending.toLocaleString()} helper="Pending matches" icon={<FiActivity/>} tone="info"/>
     <CrmMetricCard label="Offer queue" value={data.queues.offerMatchPending.toLocaleString()} helper="Pending offers" icon={<FiClock/>} tone="amber"/>
     <CrmMetricCard label="Payment work" value={data.payments.pending.toLocaleString()} helper="Created/pending/refund processing" icon={<FiCreditCard/>} tone="warning"/>
     <CrmMetricCard label="Notifications / hour" value={data.notifications.createdLastHour.toLocaleString()} icon={<FiBell/>} tone="neutral"/>
   </section>
-  <section className="grid gap-5 xl:grid-cols-3">
+  <section className="grid gap-4 xl:grid-cols-3">
     <HealthCard title="Payment integration" rows={[['PayPal credentials',data.payments.paypalConfigured],['PayPal webhook',data.payments.paypalWebhookConfigured],[data.payments.sandbox?'Sandbox mode':'Live mode',true]]}/>
     <HealthCard title="Notification & media" rows={[['Expo push transport',data.notifications.expoPushAvailable],['Cloudinary media storage',data.notifications.mediaStorageConfigured]]}/>
     <HealthCard title="Scheduler readiness" rows={[['Cron authentication configured',data.cron.configured],['Database reachable',data.database.status==='healthy']]}/>
@@ -38,4 +38,4 @@ export default function HealthPage(){
   </CrmCard>
  </div>
 }
-function HealthCard({title,rows}:{title:string;rows:Array<[string,boolean]>}){return <CrmCard title={title}><div className="space-y-2">{rows.map(([label,ok])=><div key={label} className="flex items-center justify-between rounded-xl border border-[var(--crm-border)] p-3"><span className="text-xs font-medium text-slate-700">{label}</span><CrmBadge tone={ok?'success':'warning'} dot>{ok?'READY':'NOT READY'}</CrmBadge></div>)}</div></CrmCard>}
+function HealthCard({title,rows}:{title:string;rows:Array<[string,boolean]>}){return <CrmCard title={title}><div className="space-y-2">{rows.map(([label,ok])=><div key={label} className="flex items-center justify-between rounded-[10px] border border-[var(--crm-border)] bg-[#fbfcfd] p-3"><span className="text-xs font-medium text-slate-700">{label}</span><CrmBadge tone={ok?'success':'warning'} dot>{ok?'READY':'NOT READY'}</CrmBadge></div>)}</div></CrmCard>}
