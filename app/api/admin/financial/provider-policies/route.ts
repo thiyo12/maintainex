@@ -82,7 +82,11 @@ export async function GET(request: NextRequest) {
 
     const serialized = policies.map(policy => ({ ...serializePolicy(policy), inheritedDefault: false }))
 
-    if ((countries === null || countries.includes('LK')) && !requested || requested === 'LK' || requested === 'ALL') {
+    const canSeeSriLanka = countries === null || countries.includes('LK')
+    const requestIncludesSriLanka =
+      !requested || requested === 'LK' || requested === 'ALL'
+
+    if (canSeeSriLanka && requestIncludesSriLanka) {
       for (const providerType of ['TASKER', 'COMPANY'] as const) {
         const exists = serialized.some(
           policy =>
