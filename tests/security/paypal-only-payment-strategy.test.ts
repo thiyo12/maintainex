@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -79,6 +79,93 @@ describe('PayPal-only launch strategy', () => {
     expect(bootstrap).toContain("where: { provider: 'PAYHERE' }")
     expect(bootstrap).not.toContain('paymentProviderConfig.upsert')
     expect(hostedRoute).toContain('status: 410')
+  })
+
+  describe('PayPal webhook signature verification', () => {
+    const originalEnv = { ...process.env }
+
+    beforeEach(() => {
+      vi.resetModules()
+      process.env.PAYPAL_CLIENT_ID = 'client-id'
+      process.env.PAYPAL_CLIENT_SECRET = 'client-secret'
+      process.env.PAYPAL_WEBHOOK_ID = 'webhook-id'
+      process.env.PAYPAL_SANDBOX = 'true'
+    })
+
+    afterEach(() => {
+      process.env = { ...originalEnv }
+      vi.unstubAllGlobals()
+    })
+
+    it('fails closed when PayPal explicitly rejects the signature', async () => {
+      const {
+        verifyPayPalWebhook,
+        resetPayPalAccessTokenCacheForTests,
+      } = await import('@/lib/finance/payments/paypal-adapter')
+      resetPayPalAccessTokenCacheForTests()
+
+      vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+        if (String(url).includes('/v1/oauth2/token')) {
+          return new Response(
+            JSON.stringify({ access_token: 'token', expires_in: 300 }),
+            { status: 200 }
+          )
+        }
+        return new Response(
+          JSON.stringify({ verification_status: 'FAILURE' }),
+          { status: 200 }
+        )
+      }))
+
+      const headers = new Headers({
+        'paypal-transmission-id': 'tid',
+        'paypal-transmission-time': 'ttime',
+        'paypal-cert-url': 'https://api.paypal.com/cert.pem',
+        'paypal-auth-algo': 'SHA256withRSA',
+        'paypal-transmission-sig': 'bad-signature',
+      })
+
+      await expect(
+        verifyPayPalWebhook(headers, { id: 'WH-1' })
+      ).resolves.toBe(false)
+    })
+
+    it('fails closed when required PayPal signature headers are missing', async () => {
+      const { verifyPayPalWebhook } = await import(
+        '@/lib/finance/payments/paypal-adapter'
+      )
+
+      vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+        if (String(url).includes('/v1/oauth2/token')) {
+          return new Response(
+            JSON.stringify({ access_token: 'token', expires_in: 300 }),
+            { status: 200 }
+          )
+        }
+        return new Response(
+          JSON.stringify({ verification_status: 'SUCCESS' }),
+          { status: 200 }
+        )
+      }))
+
+      await expect(
+        verifyPayPalWebhook(new Headers(), { id: 'WH-1' })
+      ).resolves.toBe(false)
+    })
+
+    it('fails closed when no webhook ID is configured', async () => {
+      process.env.PAYPAL_WEBHOOK_ID = ''
+      const { verifyPayPalWebhook } = await import(
+        '@/lib/finance/payments/paypal-adapter'
+      )
+
+      await expect(
+        verifyPayPalWebhook(
+          new Headers({ 'paypal-transmission-id': 'tid' }),
+          { id: 'WH-1' }
+        )
+      ).resolves.toBe(false)
+    })
   })
 
   it('requires server verification before a PayPal redirect can protect payment', () => {
