@@ -4,64 +4,45 @@ const { PrismaClient } = require('@prisma/client')
 
 const prisma = new PrismaClient()
 
-function boolEnv(name, fallback) {
-  const value = process.env[name]
-  if (value == null || value === '') return fallback
-  return value !== 'false'
-}
-
+/**
+ * PayHere is historical/read-only for MaintainEX.
+ *
+ * Preserve existing provider rows and all historical payment data, but force
+ * PayHere provider configuration out of new-checkout service on every boot.
+ * PayPal remains operator-governed per market and is never auto-created here.
+ */
 async function main() {
-  const checkoutConfigured = Boolean(
-    process.env.PAYHERE_MERCHANT_ID &&
-    process.env.PAYHERE_MERCHANT_SECRET
-  )
-  const merchantApiConfigured = Boolean(
-    process.env.PAYHERE_APP_ID &&
-    process.env.PAYHERE_APP_SECRET
-  )
-  const sandbox = boolEnv('PAYHERE_SANDBOX', true)
-  const environment = sandbox ? 'SANDBOX' : 'LIVE'
-
-  await prisma.paymentProviderConfig.upsert({
-    where: {
-      countryCode_provider: {
-        countryCode: 'LK',
-        provider: 'PAYHERE',
-      },
+  const legacyConfigs = await prisma.paymentProviderConfig.findMany({
+    where: { provider: 'PAYHERE' },
+    select: {
+      id: true,
+      countryCode: true,
+      enabled: true,
+      operationalStatus: true,
     },
-    create: {
-      countryCode: 'LK',
-      provider: 'PAYHERE',
-      enabled: checkoutConfigured,
-      environment,
-      supportedCurrencies: JSON.stringify(['LKR']),
-      paymentMethods: JSON.stringify(['PAYHERE']),
-      capabilities: JSON.stringify({
-        checkout: checkoutConfigured,
-        authorize: false,
-        capture: true,
-        refund: merchantApiConfigured,
-        partialRefund: false,
-        webhooks: true,
-        disputes: false,
-        payouts: false,
-        reconciliation: merchantApiConfigured,
-      }),
-      captureMode: 'CAPTURE',
-      operationalStatus: checkoutConfigured ? 'ACTIVE' : 'DISABLED',
-      priority: 100,
-      updatedBy: 'system:payment-provider-bootstrap',
-    },
-    // Never overwrite an operator-managed provider configuration.
-    update: {},
   })
 
+  const toDisable = legacyConfigs.filter(
+    config => config.enabled || config.operationalStatus !== 'DISABLED'
+  )
+
+  if (toDisable.length > 0) {
+    await prisma.paymentProviderConfig.updateMany({
+      where: { id: { in: toDisable.map(config => config.id) } },
+      data: {
+        enabled: false,
+        operationalStatus: 'DISABLED',
+        updatedBy: 'system:payment-provider-bootstrap',
+      },
+    })
+  }
+
   console.log(
-    '[payment-provider-bootstrap] ensured LK/PAYHERE operational config',
+    '[payment-provider-bootstrap] PayHere kept legacy/read-only',
     JSON.stringify({
-      enabled: checkoutConfigured,
-      environment,
-      refundConfigured: merchantApiConfigured,
+      disabledRows: toDisable.length,
+      preservedRows: legacyConfigs.length,
+      markets: legacyConfigs.map(config => config.countryCode),
     })
   )
 }
