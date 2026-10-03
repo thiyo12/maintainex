@@ -23,6 +23,7 @@ import {
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmActivityFeed } from '@/components/crm/v2/CrmOperational'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface AnalyticsData {
   visibility: {
@@ -102,7 +103,7 @@ export default function AnalyticsOverview() {
         return
       }
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Failed to load analytics')
+      if (!response.ok) crmApiError(body, 'Failed to load analytics')
       setData(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load analytics')

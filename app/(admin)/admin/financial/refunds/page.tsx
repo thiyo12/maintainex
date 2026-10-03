@@ -31,6 +31,7 @@ import {
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface RefundItem {
   id: string
@@ -137,7 +138,7 @@ export default function RefundQueuePage() {
         window.location.href = '/admin/login'
         return
       }
-      if (!response.ok) throw new Error(body?.error || 'Unable to load refund queue')
+      if (!response.ok) crmApiError(body, 'Unable to load refund queue')
 
       setPayload(body)
     } catch (error) {
@@ -221,7 +222,7 @@ export default function RefundQueuePage() {
       const result = await response.json().catch(() => ({}))
 
       if (!response.ok && response.status !== 202) {
-        throw new Error(result?.error || result?.result?.error || 'Refund action failed')
+        crmApiError(result?.result ? { error: { message: result?.error, code: undefined }, ...result.result } : result, 'Refund action failed')
       }
 
       if (result?.mode === 'APPROVAL_REQUIRED') {

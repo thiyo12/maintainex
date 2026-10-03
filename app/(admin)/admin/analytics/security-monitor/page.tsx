@@ -9,6 +9,7 @@ import {
   crmInputClass,crmTableClass,crmTdClass,crmThClass,type CrmTone
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface SecurityData{
   summary:{totalEventsToday:number;blockedIPs:number;failedLogins:number;highRiskEvents:number;activeSessions:number;apiRequestsLastHour:number}
@@ -36,7 +37,7 @@ export default function SecurityMonitorPage(){
     try{
       const response=await fetch('/api/admin/security/monitor',{credentials:'include',cache:'no-store'})
       const body=await response.json().catch(()=>({}))
-      if(!response.ok) throw new Error(body?.error||'Unable to load security monitor')
+      if(!response.ok) crmApiError(body, 'Unable to load security monitor')
       setData(body)
     }catch(error){toast.error(error instanceof Error?error.message:'Failed to load security monitor')}
     finally{setLoading(false)}
@@ -49,7 +50,7 @@ export default function SecurityMonitorPage(){
     try{
       const response=await fetch('/api/admin/security/blocked-ips',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip:ip.trim(),reason:reason.trim(),durationMinutes:duration?Number(duration):null})})
       const body=await response.json().catch(()=>({}))
-      if(!response.ok) throw new Error(body?.error||'Unable to block IP')
+      if(!response.ok) crmApiError(body, 'Unable to block IP')
       toast.success('IP block applied');setModal(false);setIp('');setReason('');await load()
     }catch(error){toast.error(error instanceof Error?error.message:'Unable to block IP')}finally{setBusy(false)}
   }

@@ -31,6 +31,7 @@ import {
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
 import { CrmStepUpModal } from '@/components/crm/v2/CrmStepUpModal'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface PayoutItem {
   id: string
@@ -165,7 +166,7 @@ export default function PayoutQueuePage() {
         window.location.href = '/admin/login'
         return
       }
-      if (!response.ok) throw new Error(body?.error || 'Unable to load payout queue')
+      if (!response.ok) crmApiError(body, 'Unable to load payout queue')
 
       setPayload(body)
     } catch (error) {
@@ -252,7 +253,7 @@ export default function PayoutQueuePage() {
       const body = await response.json().catch(() => ({}))
 
       if (!response.ok && response.status !== 202) {
-        throw new Error(body?.error || 'Unable to submit payout approval')
+        crmApiError(body, 'Unable to submit payout approval')
       }
 
       toast.success(
@@ -307,7 +308,7 @@ export default function PayoutQueuePage() {
         }
       )
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Payout action failed')
+      if (!response.ok) crmApiError(body, 'Payout action failed')
 
       toast.success(
         stepUpTarget.action === 'FAILED'

@@ -31,6 +31,7 @@ import {
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
 import { CrmStepUpModal } from '@/components/crm/v2/CrmStepUpModal'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface Settlement {
   id: string
@@ -183,7 +184,7 @@ export default function CommissionPage() {
           window.location.href = '/admin/login'
           return
         }
-        if (!response.ok) throw new Error(body?.error || 'Unable to load commission obligations')
+        if (!response.ok) crmApiError(body, 'Unable to load commission obligations')
         setSettlements(body)
       } else {
         const params = new URLSearchParams({
@@ -200,7 +201,7 @@ export default function CommissionPage() {
           window.location.href = '/admin/login'
           return
         }
-        if (!response.ok) throw new Error(body?.error || 'Unable to load commission payments')
+        if (!response.ok) crmApiError(body, 'Unable to load commission payments')
         setPayments(body)
       }
     } catch (error) {
@@ -267,7 +268,7 @@ export default function CommissionPage() {
         body: JSON.stringify({ settlementId, action }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Commission action failed')
+      if (!response.ok) crmApiError(body, 'Commission action failed')
 
       toast.success(
         action === 'SEND_REMINDER'
@@ -299,7 +300,7 @@ export default function CommissionPage() {
         body: JSON.stringify({ paymentId }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Payment confirmation failed')
+      if (!response.ok) crmApiError(body, 'Payment confirmation failed')
 
       toast.success('Commission payment confirmed and settlement reconciled')
       setStepUpTarget(null)

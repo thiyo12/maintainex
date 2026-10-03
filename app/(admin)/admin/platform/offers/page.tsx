@@ -24,6 +24,7 @@ import {
   crmInputClass,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface SeasonalOffer {
   id: string
@@ -117,7 +118,7 @@ export default function OffersManagementPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load offers')
+      if (!response.ok) crmApiError(body, 'Unable to load offers')
       setData({
         seasonal: body.seasonal || [],
         flash: body.flash || [],
@@ -162,7 +163,7 @@ export default function OffersManagementPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Promotion update failed')
+      if (!response.ok) crmApiError(body, 'Promotion update failed')
       toast.success(`${item.title} ${item.isActive ? 'deactivated' : 'activated'}`)
       await load()
     } catch (error) {
@@ -235,7 +236,7 @@ export default function OffersManagementPage() {
         body: JSON.stringify(payload),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Promotion creation failed')
+      if (!response.ok) crmApiError(body, 'Promotion creation failed')
 
       toast.success('Promotion created and audited')
       setShowCreate(false)

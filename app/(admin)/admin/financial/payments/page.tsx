@@ -28,6 +28,7 @@ import {
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface PaymentItem {
   id: string
@@ -142,7 +143,7 @@ export default function PaymentOperationsPage() {
         window.location.href = '/admin/login'
         return
       }
-      if (!response.ok) throw new Error(body?.error || 'Unable to load payment operations')
+      if (!response.ok) crmApiError(body, 'Unable to load payment operations')
 
       setPayload(body)
     } catch (error) {

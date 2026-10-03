@@ -23,6 +23,7 @@ import {
   CrmState,
   crmInputClass,
 } from '@/components/crm/v2/CrmPrimitives'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface MarketConfig {
   id: string
@@ -146,7 +147,7 @@ export default function MarketConfigPage() {
         { credentials: 'include', cache: 'no-store' }
       )
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Failed to load market configuration')
+      if (!response.ok) crmApiError(body, 'Failed to load market configuration')
       setConfig(body.config || null)
       setChanges({})
       setReason('')
@@ -195,7 +196,7 @@ export default function MarketConfigPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Failed to save market configuration')
+      if (!response.ok) crmApiError(body, 'Failed to save market configuration')
       toast.success('Market configuration updated and audited')
       await fetchConfig()
     } catch (error) {

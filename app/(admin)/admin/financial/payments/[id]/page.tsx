@@ -24,6 +24,7 @@ import {
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface Payload {
   payment: any
@@ -103,7 +104,7 @@ export default function PaymentDetailPage() {
         window.location.href = '/admin/login'
         return
       }
-      if (!response.ok) throw new Error(body?.error || 'Unable to load payment')
+      if (!response.ok) crmApiError(body, 'Unable to load payment')
       setData(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to load payment')
@@ -151,7 +152,7 @@ export default function PaymentDetailPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Reconciliation failed')
+      if (!response.ok) crmApiError(body, 'Reconciliation failed')
       toast.success('Reconciliation recorded and audited')
       setModal(null)
       await load()

@@ -36,6 +36,7 @@ import {
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface CompanyUser {
   id: string
@@ -155,7 +156,7 @@ export default function CompanyManagementPage() {
         return
       }
       if (!response.ok) {
-        throw new Error(body?.error || 'Failed to load companies')
+        crmApiError(body, 'Failed to load companies')
       }
 
       const payload = body as ApiResponse
@@ -252,7 +253,7 @@ export default function CompanyManagementPage() {
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(body?.error || 'Company action failed')
+        crmApiError(body, 'Company action failed')
       }
 
       toast.success('Company account updated')

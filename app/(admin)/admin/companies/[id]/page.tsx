@@ -26,6 +26,7 @@ import {
   FiUsers,
   FiUserX,
 } from 'react-icons/fi'
+import { crmApiError } from '@/lib/crm/api-error'
 
 type TabKey = 'overview' | 'workforce' | 'jobs' | 'finance' | 'trust' | 'audit'
 
@@ -153,7 +154,7 @@ export default function Company360Page() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load company')
+      if (!response.ok) crmApiError(body, 'Unable to load company')
       setData(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load Company 360')
@@ -217,7 +218,7 @@ export default function Company360Page() {
       }
 
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Company action failed')
+      if (!response.ok) crmApiError(body, 'Company action failed')
 
       toast.success(
         action === 'suspend'

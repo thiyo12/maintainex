@@ -31,6 +31,7 @@ import {
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
+import { crmApiError } from '@/lib/crm/api-error'
 
 type ProviderCode = 'PAYPAL' | 'PAYHERE' | 'MANUAL_BANK'
 type CapabilityKey =
@@ -184,7 +185,7 @@ export default function PaymentProvidersPage() {
         window.location.href = '/admin/login'
         return
       }
-      if (!response.ok) throw new Error(body?.error || 'Unable to load providers')
+      if (!response.ok) throw crmApiError(body, 'Unable to load providers')
       setPayload(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to load providers')
@@ -280,7 +281,7 @@ export default function PaymentProvidersPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Provider update failed')
+      if (!response.ok) throw crmApiError(body, 'Provider update failed')
       toast.success('Payment provider configuration updated and audited')
       setOpen(false)
       await load()

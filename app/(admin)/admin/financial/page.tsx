@@ -13,6 +13,7 @@ import {
   FiRefreshCw,
   FiShield,
 } from 'react-icons/fi'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface Group {
   status: string
@@ -60,7 +61,7 @@ export default function FinanceControlCentrePage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load finance overview')
+      if (!response.ok) crmApiError(body, 'Unable to load finance overview')
       setData(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load finance overview')

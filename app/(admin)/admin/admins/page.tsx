@@ -38,6 +38,7 @@ import {
   CrmModal,
 } from '@/components/crm/v2/CrmOverlays'
 import { CrmStepUpModal } from '@/components/crm/v2/CrmStepUpModal'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface StaffUser {
   id: string
@@ -179,7 +180,7 @@ export default function StaffManagementPage() {
         return
       }
       if (!response.ok) {
-        throw new Error(body?.error || 'Failed to load staff')
+        crmApiError(body, 'Failed to load staff')
       }
 
       setStaff(body?.admins || [])
@@ -341,7 +342,7 @@ export default function StaffManagementPage() {
           }),
         })
         const body = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(body?.error || 'Staff status update failed')
+        if (!response.ok) crmApiError(body, 'Staff status update failed')
         toast.success(item.isActive ? 'Staff account deactivated' : 'Staff account activated')
         await fetchStaff()
       }
@@ -355,7 +356,7 @@ export default function StaffManagementPage() {
       headers: { 'X-CRM-Step-Up': proof },
     })
     const body = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(body?.error || 'Failed to remove staff account')
+    if (!response.ok) crmApiError(body, 'Failed to remove staff account')
 
     toast.success('Staff account removed')
     setDeleteTarget(null)
@@ -375,7 +376,7 @@ export default function StaffManagementPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Failed to load staff permissions')
+      if (!response.ok) crmApiError(body, 'Failed to load staff permissions')
 
       const rows: PermissionRow[] = body?.permissions || []
       const overrides: PermissionOverrideRow[] = body?.overrides || []
@@ -423,7 +424,7 @@ export default function StaffManagementPage() {
       }
     )
     const body = await response.json().catch(() => ({}))
-    if (!response.ok) throw new Error(body?.error || 'Failed to update permissions')
+    if (!response.ok) crmApiError(body, 'Failed to update permissions')
 
     toast.success('Staff permissions updated and active sessions revoked')
     setPermissionTarget(null)

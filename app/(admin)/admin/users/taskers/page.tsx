@@ -36,6 +36,7 @@ import {
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface TaskerUser {
   id: string
@@ -153,7 +154,7 @@ export default function TaskerManagementPage() {
         return
       }
       if (!response.ok) {
-        throw new Error(body?.error || 'Failed to load taskers')
+        crmApiError(body, 'Failed to load taskers')
       }
 
       const payload = body as ApiResponse
@@ -250,7 +251,7 @@ export default function TaskerManagementPage() {
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(body?.error || 'Tasker action failed')
+        crmApiError(body, 'Tasker action failed')
       }
 
       toast.success('Tasker account updated')

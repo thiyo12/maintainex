@@ -22,6 +22,7 @@ import {
   CrmState,
 } from '@/components/crm/v2/CrmPrimitives'
 import PlatformRuntimeControls from '@/components/crm/v2/PlatformRuntimeControls'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface Overview {
   catalog: {
@@ -60,7 +61,7 @@ export default function WebsiteManagementPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load website operations')
+      if (!response.ok) crmApiError(body, 'Unable to load website operations')
       setOverview(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load website operations')

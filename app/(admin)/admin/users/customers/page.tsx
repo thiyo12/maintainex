@@ -31,6 +31,7 @@ import {
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface CustomerUser {
   id: string
@@ -133,7 +134,7 @@ export default function CustomerManagementPage() {
         return
       }
       if (!response.ok) {
-        throw new Error(body?.error || 'Failed to load customers')
+        crmApiError(body, 'Failed to load customers')
       }
 
       const payload = body as ApiResponse
@@ -223,7 +224,7 @@ export default function CustomerManagementPage() {
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(body?.error || 'Account action failed')
+        crmApiError(body, 'Account action failed')
       }
 
       toast.success('Customer account updated')

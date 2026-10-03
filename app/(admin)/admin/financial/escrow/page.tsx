@@ -31,6 +31,7 @@ import {
 } from '@/components/crm/v2/CrmPrimitives'
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface EscrowItem {
   id: string
@@ -155,7 +156,7 @@ export default function EscrowOperationsPage() {
         window.location.href = '/admin/login'
         return
       }
-      if (!response.ok) throw new Error(body?.error || 'Unable to load escrow queue')
+      if (!response.ok) crmApiError(body, 'Unable to load escrow queue')
       setPayload(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load escrow queue')
@@ -238,7 +239,7 @@ export default function EscrowOperationsPage() {
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok && response.status !== 202) {
-        throw new Error(body?.error || 'Unable to submit escrow release')
+        crmApiError(body, 'Unable to submit escrow release')
       }
 
       toast.success(

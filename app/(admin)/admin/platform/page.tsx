@@ -26,6 +26,7 @@ import {
   CrmPageHeader,
   CrmState,
 } from '@/components/crm/v2/CrmPrimitives'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface PlatformPayload {
   scope: { superAdmin: boolean; countries: string[] }
@@ -59,7 +60,7 @@ export default function PlatformManagementPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load platform management')
+      if (!response.ok) crmApiError(body, 'Unable to load platform management')
       setData(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load platform management')

@@ -18,6 +18,7 @@ import {
   CrmPageHeader,
   CrmState,
 } from '@/components/crm/v2/CrmPrimitives'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface Notification {
   id: string
@@ -42,7 +43,7 @@ export default function AdminNotificationCentrePage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Unable to load notifications')
+      if (!response.ok) crmApiError(body, 'Unable to load notifications')
       setItems(body.notifications || [])
       setUnread(body.unreadCount || 0)
     } catch (error) {
