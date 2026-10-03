@@ -282,6 +282,35 @@ export async function assertProviderCashEligible(
   }
 }
 
+export async function assertProviderOnlineEligible(
+  tx: Prisma.TransactionClient,
+  input: {
+    providerId: string
+    providerType: FinancialProviderType
+    countryCode: string
+    currency: string
+  },
+) {
+  const identity = await ensureProviderIdentity(tx, input)
+  const standing = await evaluateStoredProviderFinancialStanding(tx, {
+    providerIdentityId: identity.id,
+    providerType: input.providerType,
+    countryCode: input.countryCode,
+    currency: input.currency,
+  })
+
+  if (!standing.decision.onlineJobsAllowed) {
+    const error = new Error('PROVIDER_ONLINE_RESTRICTED')
+    ;(error as Error & { code?: string }).code = 'PROVIDER_ONLINE_RESTRICTED'
+    throw error
+  }
+
+  return {
+    providerIdentity: identity,
+    ...standing,
+  }
+}
+
 export async function recordCashPlatformReceivable(
   tx: Prisma.TransactionClient,
   input: {
