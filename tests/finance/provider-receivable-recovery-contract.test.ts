@@ -56,7 +56,9 @@ describe('provider cash receivable recovery contract', () => {
 
     expect(escrow).toContain("accountType: 'PROVIDER_COMMISSION_RECEIVABLE'")
     expect(escrow).toContain("entryType: 'CREDIT'")
-    expect(escrow).toContain('amount: commissionRecovery.recoveryMinor')
+    expect(escrow).toContain('amount: commissionRecovery.commissionRecoveryMinor')
+    expect(escrow).toContain("accountType: 'PROVIDER_BALANCE_ADJUSTMENT_RECEIVABLE'")
+    expect(escrow).toContain('amount: commissionRecovery.adjustmentRecoveryMinor')
     expect(escrow).toContain('amount: providerPayoutCents')
     expect(escrow).toContain('amount: platformDueCents')
     expect(escrow).not.toContain('platformDueCents + commissionRecovery.recoveryMinor')
@@ -120,6 +122,12 @@ describe('provider cash receivable recovery contract', () => {
     expect(company).toContain('readCanonicalProviderBalance(company.userId, currency)')
     expect(company).toContain('(canonicalBalance?.availableBalance ?? 0n).toString()')
     expect(company).toContain('(canonicalBalance?.pendingBalance ?? 0n).toString()')
+  })
+
+  it('keeps Canada/CAD online eligibility configured for PayPal markets', () => {
+    const balance = source('lib/finance/commissions/provider-balance-service.ts')
+    expect(balance).toContain('DEFAULT_CA_CAD_POLICY')
+    expect(balance).toContain("countryCode === 'CA' && currency === 'CAD'")
   })
 
   it('keeps per-job recovery history idempotent', () => {
