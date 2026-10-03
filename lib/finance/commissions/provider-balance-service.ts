@@ -734,7 +734,7 @@ export async function recordPostPayoutProviderAdjustmentForEscrow(
     return { recorded: false, replayed: false, adjustmentId: null as string | null, amountMinor: 0n }
   }
 
-  const [quote, job, providerCredit] = await Promise.all([
+  const [quote, job, providerBenefitCredits] = await Promise.all([
     tx.jobQuote.findUnique({
       where: { id: escrow.quoteId },
       select: { providerId: true, providerType: true },
@@ -743,13 +743,20 @@ export async function recordPostPayoutProviderAdjustmentForEscrow(
       where: { id: escrow.jobId },
       select: { countryCode: true },
     }),
-    tx.financialLedger.aggregate({
+    tx.financialLedger.groupBy({
+      by: ['accountType'],
       where: {
         referenceType: 'ESCROW_RELEASE',
         referenceId: escrow.id,
-        accountType: 'PROVIDER_WALLET',
         entryType: 'CREDIT',
         currency: escrow.currency,
+        accountType: {
+          in: [
+            'PROVIDER_WALLET',
+            'PROVIDER_COMMISSION_RECEIVABLE',
+            'PROVIDER_BALANCE_ADJUSTMENT_RECEIVABLE',
+          ],
+        },
       },
       _sum: { amount: true },
     }),
@@ -763,7 +770,14 @@ export async function recordPostPayoutProviderAdjustmentForEscrow(
     throw new Error('POST_PAYOUT_ADJUSTMENT_PROVIDER_MISMATCH')
   }
 
-  const amountMinor = providerCredit._sum.amount ?? 0n
+  // Chargeback liability equals the provider's economic benefit from the
+  // released payment: wallet credit plus any older provider liabilities that
+  // this same payment cleared. Current-job platform commission/service fees
+  // remain MaintainEX loss and are intentionally excluded.
+  const amountMinor = providerBenefitCredits.reduce(
+    (sum, row) => sum + (row._sum.amount ?? 0n),
+    0n,
+  )
   if (amountMinor <= 0n) {
     return { recorded: false, replayed: false, adjustmentId: null as string | null, amountMinor: 0n }
   }
