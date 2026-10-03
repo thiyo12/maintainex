@@ -45,6 +45,7 @@ interface MaintainEXBalance {
 }
 
 interface EarningsData {
+  currency: string
   balance: number
   totalEarned: number
   totalJobs: number
@@ -80,6 +81,8 @@ export default function TaskerEarnings() {
     loadEarnings()
   }, [loadEarnings])
 
+  const displayCurrency = data?.currency || data?.maintainexBalance?.currency || 'LKR'
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
@@ -94,7 +97,7 @@ export default function TaskerEarnings() {
         <>
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>{t('wallet.available')}</Text>
-            <Text style={styles.balanceValue}>LKR {(data?.balance || 0).toLocaleString()}</Text>
+            <Text style={styles.balanceValue}>{displayCurrency} {(data?.balance || 0).toLocaleString()}</Text>
             <TouchableOpacity style={styles.withdrawBtn}>
               <Text style={styles.withdrawBtnText}>{t('wallet.withdraw')}</Text>
             </TouchableOpacity>
@@ -199,7 +202,7 @@ export default function TaskerEarnings() {
                     <Ionicons name="cash-outline" size={20} color={colors.amber} />
                     <Text style={styles.commissionRef}>{cp.referenceNumber}</Text>
                   </View>
-                  <Text style={styles.commissionAmount}>LKR {cp.amountDue.toLocaleString()}</Text>
+                  <Text style={styles.commissionAmount}>{displayCurrency} {cp.amountDue.toLocaleString()}</Text>
                   <Text style={styles.commissionInstruction}>
                     Pay this amount to any MΛINTΛINEX agent using reference: {cp.referenceNumber}
                   </Text>
@@ -214,15 +217,15 @@ export default function TaskerEarnings() {
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>{t('tasker.totalEarned')}</Text>
-              <Text style={styles.statValue}>LKR {(data?.totalEarned || 0).toLocaleString()}</Text>
+              <Text style={styles.statValue}>{displayCurrency} {(data?.totalEarned || 0).toLocaleString()}</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>{t('tasker.pending')}</Text>
-              <Text style={styles.statValue}>LKR {(data?.pendingAmount || 0).toLocaleString()}</Text>
+              <Text style={styles.statValue}>{displayCurrency} {(data?.pendingAmount || 0).toLocaleString()}</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>{t('tasker.totalEarned')}</Text>
-              <Text style={styles.statValue}>LKR {(data?.totalEarned || 0).toLocaleString()}</Text>
+              <Text style={styles.statValue}>{displayCurrency} {(data?.totalEarned || 0).toLocaleString()}</Text>
             </View>
           </View>
 
@@ -261,7 +264,7 @@ export default function TaskerEarnings() {
                   </View>
                   <View style={styles.txRight}>
                     <Text style={[styles.txAmount, { color: tx.status === t('wallet.statusCleared') ? colors.success : colors.amber }]}>
-                      +LKR {tx.amount.toLocaleString()}
+                      +{displayCurrency} {tx.amount.toLocaleString()}
                     </Text>
                   </View>
                 </View>
