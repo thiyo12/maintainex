@@ -28,6 +28,51 @@ function identityStanding(decision: ProviderFinancialDecision): string {
   return decision.standing
 }
 
+function earliestLiabilityDate(
+  commissionDueAt?: Date | null,
+  adjustmentDueAt?: Date | null,
+): Date | null {
+  if (!commissionDueAt) return adjustmentDueAt || null
+  if (!adjustmentDueAt) return commissionDueAt
+  return commissionDueAt <= adjustmentDueAt ? commissionDueAt : adjustmentDueAt
+}
+
+function evaluateAccountFinancialStanding(
+  account: {
+    commissionDue: bigint
+    adjustmentDue: bigint
+    oldestCommissionDueAt?: Date | null
+    oldestAdjustmentDueAt?: Date | null
+  },
+  policy: ProviderFinancialPolicy,
+): ProviderFinancialDecision {
+  const decision = evaluateProviderFinancialStanding(
+    {
+      commissionDueMinor: account.commissionDue + account.adjustmentDue,
+      oldestCommissionDueAt: earliestLiabilityDate(
+        account.oldestCommissionDueAt,
+        account.oldestAdjustmentDueAt,
+      ),
+    },
+    policy,
+  )
+
+  // A post-payout chargeback/dispute loss is not ordinary commission debt.
+  // Keep it under governed financial review until fully recovered or resolved.
+  if (account.adjustmentDue > 0n) {
+    return {
+      ...decision,
+      standing: 'REVIEW_REQUIRED',
+      cashJobsAllowed: false,
+      onlineJobsAllowed: policy.allowOnlineWhenCashRestricted,
+      manualReviewRequired: true,
+      reason: 'Outstanding post-payout provider balance adjustment requires review',
+    }
+  }
+
+  return decision
+}
+
 export async function ensureProviderIdentity(
   tx: Prisma.TransactionClient,
   input: {
@@ -225,13 +270,7 @@ export async function evaluateStoredProviderFinancialStanding(
   const currency = input.currency.trim().toUpperCase()
   const account = await ensureFinancialAccount(tx, input.providerIdentityId, currency)
   const policy = await resolveProviderFinancialPolicy(tx, input)
-  const decision = evaluateProviderFinancialStanding(
-    {
-      commissionDueMinor: account.commissionDue,
-      oldestCommissionDueAt: account.oldestCommissionDueAt,
-    },
-    policy,
-  )
+  const decision = evaluateAccountFinancialStanding(account, policy)
 
   const updated = await tx.providerFinancialAccount.update({
     where: { id: account.id },
@@ -428,10 +467,7 @@ export async function recordCashPlatformReceivable(
     providerType: input.providerType,
     currency,
   })
-  const decision = evaluateProviderFinancialStanding({
-    commissionDueMinor: updatedAccount.commissionDue,
-    oldestCommissionDueAt: updatedAccount.oldestCommissionDueAt,
-  }, policy)
+  const decision = evaluateAccountFinancialStanding(updatedAccount, policy)
 
   const finalAccount = await tx.providerFinancialAccount.update({
     where: { id: account.id },
@@ -662,10 +698,12 @@ export async function recoverProviderCommissionFromOnlineEarnings(
     select: { dueAt: true },
   })
 
-  const standing = evaluateProviderFinancialStanding(
+  const standing = evaluateAccountFinancialStanding(
     {
-      commissionDueMinor: remainingDue,
+      commissionDue: remainingDue,
+      adjustmentDue: account.adjustmentDue,
       oldestCommissionDueAt: oldestRemaining?.dueAt || null,
+      oldestAdjustmentDueAt: account.oldestAdjustmentDueAt,
     },
     policy,
   )
