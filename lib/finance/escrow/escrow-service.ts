@@ -265,8 +265,13 @@ export async function releaseEscrow(
   })
   if (!quote) throw new Error('Accepted quote not found')
   if (quote.providerId !== escrow.providerId) throw new Error('Escrow provider identity mismatch')
+  if (quote.providerType !== 'INDIVIDUAL' && quote.providerType !== 'COMPANY') {
+    throw new Error('Accepted quote provider type is invalid')
+  }
+  const providerType = quote.providerType
+  const escrowCurrency = escrow.currency as Currency
 
-  const identity = await resolvePayoutIdentity(quote.providerId, quote.providerType)
+  const identity = await resolvePayoutIdentity(quote.providerId, providerType)
   const defaultRate = await getCommissionRate()
   const rawRate = identity.commissionRate ?? defaultRate
   const rate = Math.max(0, Math.min(100, rawRate))
@@ -276,6 +281,8 @@ export async function releaseEscrow(
   const platformCents = commissionCents + escrow.serviceFee
   const commissionMajor = bigIntToSafeNumber(commissionCents) / 100
   const netMajor = bigIntToSafeNumber(netCents) / 100
+  let providerPayoutCents = netCents
+  let providerPayoutMajor = netMajor
 
   await prisma.$transaction(async (tx) => {
     const claimed = await tx.jobEscrow.updateMany({
@@ -294,8 +301,8 @@ export async function releaseEscrow(
       sourceEscrowId: escrow.id,
       createdBy: ctx.actorId,
     })
-    const providerPayoutCents = commissionRecovery.providerPayoutMinor
-    const providerPayoutMajor = bigIntToSafeNumber(providerPayoutCents) / 100
+    providerPayoutCents = commissionRecovery.providerPayoutMinor
+    providerPayoutMajor = bigIntToSafeNumber(providerPayoutCents) / 100
 
     const providerWalletSeed = await tx.providerWallet.upsert({
       where: { userId: identity.payoutUserId },
@@ -311,8 +318,23 @@ export async function releaseEscrow(
       amount: bigint
     }> = [
       { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: escrow.totalAmount },
-      { accountId: providerWalletSeed.id, accountType: 'PROVIDER_WALLET', entryType: 'CREDIT', amount: netCents },
     ]
+    if (providerPayoutCents > 0n) {
+      ledgerEntries.push({
+        accountId: providerWalletSeed.id,
+        accountType: 'PROVIDER_WALLET',
+        entryType: 'CREDIT',
+        amount: providerPayoutCents,
+      })
+    }
+    if (commissionRecovery.recoveryMinor > 0n) {
+      ledgerEntries.push({
+        accountId: `provider-receivable:${commissionRecovery.providerIdentityId}`,
+        accountType: 'PROVIDER_COMMISSION_RECEIVABLE',
+        entryType: 'CREDIT',
+        amount: commissionRecovery.recoveryMinor,
+      })
+    }
     if (platformCents > 0n) {
       ledgerEntries.push({ accountId: 'platform', accountType: 'PLATFORM', entryType: 'CREDIT', amount: platformCents })
     }
@@ -331,14 +353,20 @@ export async function releaseEscrow(
         providerType: quote.providerType,
         serviceFeeCents: escrow.serviceFee.toString(),
         commissionCents: commissionCents.toString(),
+        cashCommissionRecoveryCents: commissionRecovery.recoveryMinor.toString(),
+        remainingCashCommissionDueCents: commissionRecovery.remainingCommissionDueMinor.toString(),
+        providerPayoutCents: providerPayoutCents.toString(),
+        recoveryAllocations: commissionRecovery.allocations.map(allocation => ({
+          receivableId: allocation.receivableId,
+          amount: allocation.amount.toString(),
+        })),
       }),
     }, tx)
 
-    const escrowCurrency = escrow.currency as Currency
-    if (escrowCurrency === 'LKR') {
+    if (escrowCurrency === 'LKR' && providerPayoutCents > 0n) {
       const providerWallet = await tx.providerWallet.update({
         where: { userId: identity.payoutUserId },
-        data: { availableBalance: { increment: netMajor } },
+        data: { availableBalance: { increment: providerPayoutMajor } },
         select: { availableBalance: true },
       })
 
@@ -347,14 +375,17 @@ export async function releaseEscrow(
           userId: identity.payoutUserId,
           walletType: 'PROVIDER',
           type: 'CREDIT',
-          amount: netMajor,
-          balanceBefore: providerWallet.availableBalance - netMajor,
+          amount: providerPayoutMajor,
+          balanceBefore: providerWallet.availableBalance - providerPayoutMajor,
           balanceAfter: providerWallet.availableBalance,
-          reference: commissionCents > 0n
-            ? `Escrow release for job ${jobId} (${rate}% commission: LKR ${commissionMajor})`
-            : `Escrow release for job ${jobId}`,
+          reference: commissionRecovery.recoveryMinor > 0n
+            ? `Escrow release for job ${jobId}; prior cash commission automatically recovered`
+            : commissionCents > 0n
+              ? `Escrow release for job ${jobId} (${rate}% commission: LKR ${commissionMajor})`
+              : `Escrow release for job ${jobId}`,
           referenceType: 'ESCROW_RELEASE',
           referenceId: escrow.id,
+          currency: escrowCurrency,
         },
       })
     }
@@ -396,9 +427,9 @@ export async function releaseEscrow(
 
   return {
     commission: commissionMajor,
-    netAmount: netMajor,
+    netAmount: providerPayoutMajor,
     commissionCents,
-    netCents,
+    netCents: providerPayoutCents,
     providerId: identity.payoutUserId,
     providerEntityId: identity.providerEntityId,
     providerType: quote.providerType,
@@ -998,6 +1029,19 @@ export async function completeAndReleaseEscrow(
       data: { status: 'RELEASED', releasedAt: new Date() },
     })
     if (claimed.count !== 1) throw new Error('Escrow already released or state changed')
+
+    const commissionRecovery = await recoverProviderCommissionFromOnlineEarnings(tx, {
+      providerId: quote.providerId,
+      providerType,
+      countryCode: job.countryCode || 'LK',
+      currency: escrowCurrency,
+      availableOnlineEarningsMinor: netCents,
+      sourceJobId: jobId,
+      sourceEscrowId: escrow.id,
+      createdBy: ctx.actorId,
+    })
+    const providerPayoutCents = commissionRecovery.providerPayoutMinor
+    const providerPayoutMajor = bigIntToSafeNumber(providerPayoutCents) / 100
 
     const providerWalletSeed = await tx.providerWallet.upsert({
       where: { userId: identity.payoutUserId },
