@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { readCanonicalProviderBalance } from '@/lib/financial-read'
 import { bigIntToSafeNumber, getCurrencyForCountry } from '@/lib/shared/money/money'
+import { readProviderFinancialAccountForUser } from '@/lib/finance/commissions/provider-balance-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,12 +15,19 @@ export async function GET(request: NextRequest) {
     const countryCode = user.countryCode || 'LK'
     const currency = getCurrencyForCountry(countryCode)
 
-    const [payouts, canonicalBalance] = await Promise.all([
+    const [payouts, canonicalBalance, financialAccount] = await Promise.all([
       prisma.payout.findMany({
         where: { userId: user.id, countryCode, currency },
         orderBy: { createdAt: 'desc' },
       }),
       readCanonicalProviderBalance(user.id, currency),
+      prisma.$transaction(tx =>
+        readProviderFinancialAccountForUser(tx, {
+          userId: user.id,
+          providerType: 'TASKER',
+          currency,
+        })
+      ),
     ])
 
     const walletId = canonicalBalance?.walletId ?? null
@@ -92,8 +100,21 @@ export async function GET(request: NextRequest) {
       currency,
       totalEarned,
       pendingAmount,
+      balance: availableBalance,
       availableBalance,
       pendingBalance,
+      maintainexBalance: {
+        commissionDueMinor: (financialAccount?.commissionDue ?? 0n).toString(),
+        commissionDue: bigIntToSafeNumber(financialAccount?.commissionDue ?? 0n) / 100,
+        availableEarningsMinor: (financialAccount?.availableEarnings ?? 0n).toString(),
+        pendingEarningsMinor: (financialAccount?.pendingEarnings ?? 0n).toString(),
+        status: financialAccount?.status ?? 'CLEAR',
+        cashJobsAllowed: financialAccount?.cashJobsAllowed ?? true,
+        onlineJobsAllowed: financialAccount?.onlineJobsAllowed ?? true,
+        manualReviewRequired: financialAccount?.manualReviewRequired ?? false,
+        oldestCommissionDueAt: financialAccount?.oldestCommissionDueAt?.toISOString() ?? null,
+        currency,
+      },
       completedJobs,
       recentPayouts: payouts.slice(0, 20).map(p => ({
         id: p.id,
