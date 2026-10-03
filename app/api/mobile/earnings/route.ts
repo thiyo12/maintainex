@@ -139,8 +139,8 @@ export async function GET(request: NextRequest) {
       maintainexBalance: {
         commissionDueMinor: (financialAccount?.commissionDue ?? 0n).toString(),
         commissionDue: bigIntToSafeNumber(financialAccount?.commissionDue ?? 0n) / 100,
-        availableEarningsMinor: (financialAccount?.availableEarnings ?? 0n).toString(),
-        pendingEarningsMinor: (financialAccount?.pendingEarnings ?? 0n).toString(),
+        availableEarningsMinor: (canonicalBalance?.availableBalance ?? 0n).toString(),
+        pendingEarningsMinor: (canonicalBalance?.pendingBalance ?? 0n).toString(),
         status: financialAccount?.status ?? 'CLEAR',
         cashJobsAllowed: financialAccount?.cashJobsAllowed ?? true,
         onlineJobsAllowed: financialAccount?.onlineJobsAllowed ?? true,
