@@ -96,7 +96,7 @@ export default function AdminNotificationCentrePage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="App & Web · Staff operations"
         title="Notification centre"
@@ -131,7 +131,7 @@ export default function AdminNotificationCentrePage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 max-w-2xl">
+      <section className="grid max-w-2xl grid-cols-2 gap-3">
         <CrmMetricCard
           label="Notifications"
           value={items.length.toLocaleString()}
