@@ -19,6 +19,17 @@ interface CommissionPayment {
   dueAt: string
 }
 
+interface MaintainEXBalance {
+  commissionDue: number
+  commissionDueMinor: string
+  status: string
+  cashJobsAllowed: boolean
+  onlineJobsAllowed: boolean
+  manualReviewRequired: boolean
+  oldestCommissionDueAt?: string | null
+  currency: string
+}
+
 interface EarningsData {
   balance: number
   totalEarned: number
@@ -26,6 +37,7 @@ interface EarningsData {
   pendingAmount?: number
   transactions: { job: string; amount: number; date: string; status: string }[]
   pendingCommissionPayments?: CommissionPayment[]
+  maintainexBalance?: MaintainEXBalance
 }
 
 export default function TaskerEarnings() {
@@ -72,6 +84,59 @@ export default function TaskerEarnings() {
               <Text style={styles.withdrawBtnText}>{t('wallet.withdraw')}</Text>
             </TouchableOpacity>
           </View>
+
+          {data?.maintainexBalance && (
+            <View style={styles.maintainexCard}>
+              <View style={styles.maintainexHeader}>
+                <View>
+                  <Text style={styles.maintainexTitle}>MaintainEX Balance</Text>
+                  <Text style={styles.maintainexStatus}>
+                    {data.maintainexBalance.status.replaceAll('_', ' ')}
+                  </Text>
+                </View>
+                <Ionicons
+                  name={data.maintainexBalance.commissionDue > 0 ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+                  size={26}
+                  color={data.maintainexBalance.commissionDue > 0 ? colors.amber : colors.success}
+                />
+              </View>
+
+              <Text style={styles.maintainexDueLabel}>Commission due</Text>
+              <Text style={styles.maintainexDueValue}>
+                {data.maintainexBalance.currency} {data.maintainexBalance.commissionDue.toLocaleString()}
+              </Text>
+
+              <View style={styles.maintainexRuleRow}>
+                <Text style={styles.maintainexRuleLabel}>Cash jobs</Text>
+                <Text style={[
+                  styles.maintainexRuleValue,
+                  { color: data.maintainexBalance.cashJobsAllowed ? colors.success : colors.error },
+                ]}>
+                  {data.maintainexBalance.cashJobsAllowed ? 'Allowed' : 'Temporarily blocked'}
+                </Text>
+              </View>
+              <View style={styles.maintainexRuleRow}>
+                <Text style={styles.maintainexRuleLabel}>Online jobs</Text>
+                <Text style={[
+                  styles.maintainexRuleValue,
+                  { color: data.maintainexBalance.onlineJobsAllowed ? colors.success : colors.error },
+                ]}>
+                  {data.maintainexBalance.onlineJobsAllowed ? 'Allowed' : 'Restricted'}
+                </Text>
+              </View>
+
+              {!data.maintainexBalance.cashJobsAllowed && data.maintainexBalance.onlineJobsAllowed && (
+                <Text style={styles.maintainexHelp}>
+                  Online-paid jobs remain available so outstanding commission can be recovered safely from future earnings.
+                </Text>
+              )}
+              {data.maintainexBalance.manualReviewRequired && (
+                <Text style={styles.maintainexWarning}>
+                  Your financial standing requires MaintainEX review.
+                </Text>
+              )}
+            </View>
+          )}
 
           {(data?.pendingCommissionPayments || []).length > 0 && (
             <View style={styles.commissionSection}>
@@ -241,6 +306,35 @@ const makeStyles = (colors: any) => StyleSheet.create({
   txAmount: { fontSize: 15, fontFamily: fonts.bodyMedium },
   empty: { alignItems: 'center', paddingTop: 40 },
   emptyTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.muted },
+  maintainexCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: 24,
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  maintainexHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  maintainexTitle: { fontSize: 17, fontFamily: fonts.heading, color: colors.ink },
+  maintainexStatus: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.muted, marginTop: 2 },
+  maintainexDueLabel: { fontSize: 12, fontFamily: fonts.body, color: colors.muted },
+  maintainexDueValue: { fontSize: 26, fontFamily: fonts.heading, color: colors.ink, marginTop: 2, marginBottom: 14 },
+  maintainexRuleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 7,
+  },
+  maintainexRuleLabel: { fontSize: 13, fontFamily: fonts.body, color: colors.muted },
+  maintainexRuleValue: { fontSize: 13, fontFamily: fonts.bodyMedium },
+  maintainexHelp: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, lineHeight: 18, marginTop: 10 },
+  maintainexWarning: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.error, lineHeight: 18, marginTop: 8 },
   commissionSection: {
     marginHorizontal: 24,
     marginBottom: 16,
