@@ -134,7 +134,7 @@ export default function FinanceControlCentrePage() {
             <Metric icon={FiAlertTriangle} label={`Payment exceptions · ${row.currency}`} value={String(row.paymentFailures)} detail="Failed / chargeback / refund queue" danger={row.paymentFailures > 0} />
           </div>
         )) : (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-400">
+          <div className="rounded-[12px] border border-[var(--crm-border)] bg-white p-4 text-sm text-slate-400 shadow-[var(--crm-shadow-card)]">
             No financial records are available for the assigned markets.
           </div>
         )}
