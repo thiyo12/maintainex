@@ -1,10 +1,21 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
+  isPayPalMarketVerified,
   parseProviderCapabilities,
   parseProviderList,
   selectProviderFromConfigs,
   type PaymentProviderConfigLike,
 } from '@/lib/finance/payments/provider-registry'
+
+const originalVerifiedMarkets = process.env.PAYPAL_MARKET_CHECKOUT_VERIFIED
+
+afterEach(() => {
+  if (originalVerifiedMarkets === undefined) {
+    delete process.env.PAYPAL_MARKET_CHECKOUT_VERIFIED
+  } else {
+    process.env.PAYPAL_MARKET_CHECKOUT_VERIFIED = originalVerifiedMarkets
+  }
+})
 
 function config(
   overrides: Partial<PaymentProviderConfigLike> = {}
@@ -78,49 +89,49 @@ describe('payment provider registry', () => {
     ).toBeNull()
   })
 
-  it('selects the lowest-priority eligible provider deterministically', () => {
+  it('never selects PayHere for a new checkout even if it has higher priority', () => {
     const selected = selectProviderFromConfigs(
       [
         config({ provider: 'PAYPAL', priority: 20 }),
         config({
           provider: 'PAYHERE',
-          priority: 5,
+          priority: 1,
           supportedCurrencies: JSON.stringify(['CAD']),
         }),
       ],
       { countryCode: 'CA', currency: 'CAD' }
     )
 
-    expect(selected?.provider).toBe('PAYHERE')
-    expect(selected?.environment).toBe('SANDBOX')
+    expect(selected?.provider).toBe('PAYPAL')
   })
 
-  it('honors an explicit requested provider without silently falling back', () => {
-    const selected = selectProviderFromConfigs(
-      [
-        config({ provider: 'PAYPAL', priority: 20 }),
-        config({
-          provider: 'PAYHERE',
-          priority: 5,
-          supportedCurrencies: JSON.stringify(['CAD']),
-        }),
-      ],
-      {
-        countryCode: 'CA',
-        currency: 'CAD',
-        requestedProvider: 'PAYPAL',
-      }
-    )
+  it('restricts sandbox PayPal checkout to the controlled CA fixture', () => {
+    expect(isPayPalMarketVerified('CA', 'SANDBOX')).toBe(true)
+    expect(isPayPalMarketVerified('LK', 'SANDBOX')).toBe(false)
+    expect(isPayPalMarketVerified('US', 'SANDBOX')).toBe(false)
+  })
 
-    expect(selected?.provider).toBe('PAYPAL')
+  it('requires an explicit allowlist for live markets and hard-blocks Sri Lanka', () => {
+    delete process.env.PAYPAL_MARKET_CHECKOUT_VERIFIED
+    expect(isPayPalMarketVerified('CA', 'LIVE')).toBe(false)
+
+    process.env.PAYPAL_MARKET_CHECKOUT_VERIFIED = 'CA,LK'
+    expect(isPayPalMarketVerified('CA', 'LIVE')).toBe(true)
+    expect(isPayPalMarketVerified('LK', 'LIVE')).toBe(false)
+  })
+
+  it('honors an explicit PayPal request and refuses legacy PayHere requests', () => {
     expect(
       selectProviderFromConfigs(
-        [config({ provider: 'PAYPAL' })],
-        {
-          countryCode: 'CA',
-          currency: 'CAD',
-          requestedProvider: 'UNKNOWN',
-        }
+        [config()],
+        { countryCode: 'CA', currency: 'CAD', requestedProvider: 'PAYPAL' }
+      )?.provider
+    ).toBe('PAYPAL')
+
+    expect(
+      selectProviderFromConfigs(
+        [config({ provider: 'PAYHERE' })],
+        { countryCode: 'CA', currency: 'CAD', requestedProvider: 'PAYHERE' }
       )
     ).toBeNull()
   })
