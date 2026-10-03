@@ -362,6 +362,16 @@ export default function CompanyProfile() {
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.myProfile')}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.muted} />
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
+              onPress={() => router.push('/settings/account-close' as any)}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: '#FEE2E2' }]}>
+                <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
+              </View>
+              <Text style={[styles.menuTitle, { color: '#DC2626' }]}>Close account</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </TouchableOpacity>
           </View>
         </Animated.View>
       </ScrollView>
