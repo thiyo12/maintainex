@@ -101,6 +101,27 @@ describe('provider cash receivable recovery contract', () => {
     expect(balance).toContain('PROVIDER_CASH_RESTRICTED')
   })
 
+  it('enforces online-job financial eligibility at hosted payment creation', () => {
+    const balance = source('lib/finance/commissions/provider-balance-service.ts')
+    const payment = source('lib/finance/payments/payment-service.ts')
+
+    expect(balance).toContain('assertProviderOnlineEligible')
+    expect(balance).toContain('PROVIDER_ONLINE_RESTRICTED')
+    expect(payment).toContain('await assertProviderOnlineEligible(tx')
+    expect(payment).toContain("code: 'PROVIDER_ONLINE_RESTRICTED'")
+  })
+
+  it('derives MaintainEX available and pending earnings from the canonical provider wallet', () => {
+    const tasker = source('app/api/mobile/earnings/route.ts')
+    const company = source('app/api/mobile/company/earnings/route.ts')
+
+    expect(tasker).toContain('(canonicalBalance?.availableBalance ?? 0n).toString()')
+    expect(tasker).toContain('(canonicalBalance?.pendingBalance ?? 0n).toString()')
+    expect(company).toContain('readCanonicalProviderBalance(company.userId, currency)')
+    expect(company).toContain('(canonicalBalance?.availableBalance ?? 0n).toString()')
+    expect(company).toContain('(canonicalBalance?.pendingBalance ?? 0n).toString()')
+  })
+
   it('keeps per-job recovery history idempotent', () => {
     const schema = source('prisma/schema.prisma')
     expect(schema).toContain('model ProviderCommissionReceivable')
