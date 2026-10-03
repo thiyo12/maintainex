@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
@@ -29,6 +30,16 @@ interface CommissionRecovery {
   createdAt: string
 }
 
+interface BalanceAdjustmentRecovery {
+  id: string
+  amount: number
+  currency: string
+  method: string
+  adjustmentType: string
+  originalJobId: string
+  createdAt: string
+}
+
 interface MaintainEXBalance {
   commissionDue: number
   commissionDueMinor: string
@@ -50,14 +61,26 @@ interface EarningsData {
   totalEarned: number
   totalJobs: number
   pendingAmount?: number
-  transactions: { job: string; amount: number; date: string; status: string }[]
+  transactions: {
+    id?: string
+    job: string
+    amount: number
+    currency?: string
+    direction?: 'CREDIT' | 'DEBIT' | string
+    referenceType?: string
+    referenceId?: string
+    date: string
+    status: string
+  }[]
   pendingCommissionPayments?: CommissionPayment[]
   recentCommissionRecoveries?: CommissionRecovery[]
+  recentBalanceAdjustmentRecoveries?: BalanceAdjustmentRecovery[]
   maintainexBalance?: MaintainEXBalance
 }
 
 export default function TaskerEarnings() {
   const { t } = useTranslation()
+  const router = useRouter()
   const colors = useColors()
   const styles = makeStyles(colors)
   const [period, setPeriod] = useState<Period>('weekly')
@@ -98,7 +121,10 @@ export default function TaskerEarnings() {
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>{t('wallet.available')}</Text>
             <Text style={styles.balanceValue}>{displayCurrency} {(data?.balance || 0).toLocaleString()}</Text>
-            <TouchableOpacity style={styles.withdrawBtn}>
+            <TouchableOpacity
+              style={styles.withdrawBtn}
+              onPress={() => router.push('/(tasker)/wallet/withdraw' as any)}
+            >
               <Text style={styles.withdrawBtnText}>{t('wallet.withdraw')}</Text>
             </TouchableOpacity>
           </View>
@@ -193,6 +219,33 @@ export default function TaskerEarnings() {
             </View>
           )}
 
+          {(data?.recentBalanceAdjustmentRecoveries || []).length > 0 && (
+            <View style={styles.recoverySection}>
+              <Text style={styles.recoveryTitle}>Recent balance adjustments</Text>
+              <Text style={styles.recoveryHelp}>
+                These are recoveries of post-payment losses such as chargebacks, kept separate from commission.
+              </Text>
+              {data?.recentBalanceAdjustmentRecoveries?.slice(0, 5).map((recovery) => (
+                <View key={recovery.id} style={styles.recoveryCard}>
+                  <View style={styles.recoveryIcon}>
+                    <Ionicons name="shield-checkmark-outline" size={18} color={colors.success} />
+                  </View>
+                  <View style={styles.recoveryBody}>
+                    <Text style={styles.recoveryAmount}>
+                      {recovery.currency} {recovery.amount.toLocaleString()} recovered
+                    </Text>
+                    <Text style={styles.recoveryMeta}>
+                      {recovery.adjustmentType.replaceAll('_', ' ')} · job {recovery.originalJobId.slice(0, 8)}
+                    </Text>
+                    <Text style={styles.recoveryMeta}>
+                      {new Date(recovery.createdAt).toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
           {(data?.pendingCommissionPayments || []).length > 0 && (
             <View style={styles.commissionSection}>
               <Text style={styles.commissionTitle}>Pending Commission Payments</Text>
@@ -259,12 +312,12 @@ export default function TaskerEarnings() {
                     <View style={[styles.txDot, { backgroundColor: tx.status === t('wallet.statusCleared') ? colors.success : colors.amber }]} />
                     <View>
                       <Text style={styles.txJob}>{tx.job}</Text>
-                      <Text style={styles.txDate}>{tx.date} • {tx.status === 'Cleared' ? t('wallet.statusCleared') : tx.status}</Text>
+                      <Text style={styles.txDate}>{new Date(tx.date).toLocaleString()} • {tx.status === 'Cleared' ? t('wallet.statusCleared') : tx.status}</Text>
                     </View>
                   </View>
                   <View style={styles.txRight}>
                     <Text style={[styles.txAmount, { color: tx.status === t('wallet.statusCleared') ? colors.success : colors.amber }]}>
-                      +{displayCurrency} {tx.amount.toLocaleString()}
+                      {tx.direction === 'DEBIT' ? '-' : '+'}{tx.currency || displayCurrency} {tx.amount.toLocaleString()}
                     </Text>
                   </View>
                 </View>
