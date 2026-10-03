@@ -209,7 +209,7 @@ function TrendChart({
 
   return (
     <div className="w-full">
-      <div className="mb-3 flex flex-wrap items-center gap-5 text-[11px] font-medium text-slate-500">
+      <div className="mb-3 flex flex-wrap items-center gap-4 text-[11px] font-medium text-slate-500">
         <span className="inline-flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-[var(--crm-accent)]" />
           Jobs created
