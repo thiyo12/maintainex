@@ -31,6 +31,8 @@ export type AccountClosurePreflight = {
     identityType: string
     currency: string
     amountMinor: string
+    commissionDueMinor: string
+    adjustmentDueMinor: string
   }>
   closesWithBalance: boolean
 }
@@ -172,10 +174,16 @@ export async function getAccountClosurePreflight(
         id: true,
         identityType: true,
         financialAccounts: {
-          where: { commissionDue: { gt: 0 } },
+          where: {
+            OR: [
+              { commissionDue: { gt: 0 } },
+              { adjustmentDue: { gt: 0 } },
+            ],
+          },
           select: {
             currency: true,
             commissionDue: true,
+            adjustmentDue: true,
           },
         },
       },
@@ -202,7 +210,9 @@ export async function getAccountClosurePreflight(
       providerIdentityId: identity.id,
       identityType: identity.identityType,
       currency: account.currency,
-      amountMinor: account.commissionDue.toString(),
+      amountMinor: (account.commissionDue + account.adjustmentDue).toString(),
+      commissionDueMinor: account.commissionDue.toString(),
+      adjustmentDueMinor: account.adjustmentDue.toString(),
     }))
   )
 
@@ -307,6 +317,7 @@ async function closeAccountWithTx(
       financialAccounts: {
         select: {
           commissionDue: true,
+          adjustmentDue: true,
           currency: true,
         },
       },
@@ -314,7 +325,9 @@ async function closeAccountWithTx(
   })
 
   for (const identity of identities) {
-    const hasDebt = identity.financialAccounts.some(account => account.commissionDue > 0n)
+    const hasDebt = identity.financialAccounts.some(
+      account => account.commissionDue > 0n || account.adjustmentDue > 0n,
+    )
     await tx.providerIdentity.update({
       where: { id: identity.id },
       data: {
@@ -334,11 +347,13 @@ async function closeAccountWithTx(
         metadata: JSON.stringify({
           identityType: identity.identityType,
           closedAt: now.toISOString(),
-          commissionBalances: identity.financialAccounts
-            .filter(account => account.commissionDue > 0n)
+          financialBalances: identity.financialAccounts
+            .filter(account => account.commissionDue > 0n || account.adjustmentDue > 0n)
             .map(account => ({
               currency: account.currency,
-              amountMinor: account.commissionDue.toString(),
+              commissionDueMinor: account.commissionDue.toString(),
+              adjustmentDueMinor: account.adjustmentDue.toString(),
+              totalDueMinor: (account.commissionDue + account.adjustmentDue).toString(),
             })),
         }),
       },
