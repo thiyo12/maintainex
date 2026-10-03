@@ -10,6 +10,7 @@ import { validateQuotePrice } from '@/lib/pricing/engine'
 import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
 import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/shared/money/money'
 import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
+import { assertProviderAnyJobEligible } from '@/lib/finance/commissions/provider-balance-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -146,6 +147,12 @@ export async function POST(request: NextRequest) {
         resolvedProviderId,
         'Provider is no longer available to submit this quote',
       )
+      await assertProviderAnyJobEligible(tx, {
+        providerId: resolvedProviderId,
+        providerType: resolvedProviderType,
+        countryCode: jobCountry,
+        currency,
+      })
 
       const lockedJobs = await tx.$queryRaw<Array<{ id: string; status: string; targetTaskerId: string | null }>>`
         SELECT id, status, "targetTaskerId"
@@ -219,6 +226,15 @@ export async function POST(request: NextRequest) {
     }
     if (error instanceof Error && error.message.includes('Provider is no longer available')) {
       return NextResponse.json({ error: error.message }, { status: 409 })
+    }
+    if (error instanceof Error && error.message === 'PROVIDER_FINANCIALLY_RESTRICTED') {
+      return NextResponse.json(
+        {
+          error: 'MaintainEX Balance must be resolved before accepting new jobs',
+          code: 'PROVIDER_FINANCIALLY_RESTRICTED',
+        },
+        { status: 403 },
+      )
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ error: 'You already have an active quote for this job' }, { status: 409 })
