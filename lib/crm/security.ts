@@ -116,6 +116,56 @@ function normalizedCountries(session: any): string[] {
   return normalizeCountryValues(session?.assignedCountries)
 }
 
+function forwardedValues(value: string | null): string[] {
+  if (!value) return []
+  return value
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function trustedRequestHosts(request: NextRequest): Set<string> {
+  const hosts = new Set<string>()
+
+  if (request.nextUrl.host) hosts.add(request.nextUrl.host.toLowerCase())
+
+  for (const value of forwardedValues(request.headers.get('x-forwarded-host'))) {
+    hosts.add(value.toLowerCase())
+  }
+
+  for (const value of forwardedValues(request.headers.get('host'))) {
+    hosts.add(value.toLowerCase())
+  }
+
+  return hosts
+}
+
+function trustedRequestOrigins(request: NextRequest): Set<string> {
+  const origins = new Set<string>([request.nextUrl.origin])
+  const hosts = trustedRequestHosts(request)
+  const protocols = new Set<string>()
+
+  for (const value of forwardedValues(request.headers.get('x-forwarded-proto'))) {
+    const protocol = value.toLowerCase().replace(/:$/, '')
+    if (protocol === 'http' || protocol === 'https') protocols.add(protocol)
+  }
+
+  const nextProtocol = request.nextUrl.protocol.replace(/:$/, '').toLowerCase()
+  if (nextProtocol === 'http' || nextProtocol === 'https') protocols.add(nextProtocol)
+
+  for (const host of hosts) {
+    for (const protocol of protocols) {
+      try {
+        origins.add(new URL(`${protocol}://${host}`).origin)
+      } catch {
+        // Ignore malformed proxy/host values. They must never make a request trusted.
+      }
+    }
+  }
+
+  return origins
+}
+
 export function isTrustedCrmMutationRequest(request: NextRequest): boolean {
   const method = request.method.toUpperCase()
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return true
@@ -127,17 +177,31 @@ export function isTrustedCrmMutationRequest(request: NextRequest): boolean {
   const origin = request.headers.get('origin')
   if (!origin) return false
 
-  try {
-    const parsedOrigin = new URL(origin)
-    if (parsedOrigin.origin !== request.nextUrl.origin) return false
-  } catch {
-    return false
-  }
-
   const fetchSite = request.headers.get('sec-fetch-site')
   if (fetchSite && fetchSite !== 'same-origin') return false
 
-  return true
+  try {
+    const parsedOrigin = new URL(origin)
+
+    // Normal case: the browser origin matches the URL Next.js sees or the
+    // public origin reconstructed from trusted reverse-proxy host/proto headers.
+    if (trustedRequestOrigins(request).has(parsedOrigin.origin)) return true
+
+    // Reverse proxies can terminate TLS and hand Next.js an internal HTTP URL.
+    // A real browser's Sec-Fetch-Site: same-origin is computed before the proxy,
+    // so when that signal is present we may safely tolerate a scheme mismatch
+    // while still requiring the public host (and port, when present) to match.
+    if (
+      fetchSite === 'same-origin' &&
+      trustedRequestHosts(request).has(parsedOrigin.host.toLowerCase())
+    ) {
+      return true
+    }
+
+    return false
+  } catch {
+    return false
+  }
 }
 
 export function redactCrmSensitiveData<T>(value: T): T {
