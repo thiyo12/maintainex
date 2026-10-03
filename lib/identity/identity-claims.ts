@@ -117,33 +117,62 @@ export async function recordStrongIdentityClaim(
   const highRisk = debtMatches.length > 0 || closedWithBalance.length > 0
 
   if (matches.length > 0) {
-    await tx.providerIntegritySignal.create({
-      data: {
-        providerIdentityId: input.providerIdentityId,
-        userId: input.userId,
-        signalType: highRisk
-          ? 'STRONG_IDENTITY_MATCH_WITH_FINANCIAL_LIABILITY'
-          : 'STRONG_IDENTITY_REUSE',
-        severity: highRisk ? 'CRITICAL' : 'HIGH',
-        signalHash: claimHash,
-        source: input.source,
-        status: 'OPEN',
-        metadata: JSON.stringify({
-          claimType: input.claimType,
-          matchedProviderIdentityIds: matches.map(match => match.providerIdentityId),
-          financialLiabilityMatches: debtMatches.map(match => ({
-            providerIdentityId: match.providerIdentityId,
-            balances: match.providerIdentity.financialAccounts
-              .filter(account => account.commissionDue > 0n)
-              .map(account => ({
-                currency: account.currency,
-                commissionDueMinor: account.commissionDue.toString(),
-                status: account.status,
-              })),
+    const signalType = highRisk
+      ? 'STRONG_IDENTITY_MATCH_WITH_FINANCIAL_LIABILITY'
+      : 'STRONG_IDENTITY_REUSE'
+    const severity = highRisk ? 'CRITICAL' : 'HIGH'
+    const metadata = {
+      claimType: input.claimType,
+      matchedProviderIdentityIds: matches.map(match => match.providerIdentityId),
+      financialLiabilityMatches: debtMatches.map(match => ({
+        providerIdentityId: match.providerIdentityId,
+        balances: match.providerIdentity.financialAccounts
+          .filter(account => account.commissionDue > 0n)
+          .map(account => ({
+            currency: account.currency,
+            commissionDueMinor: account.commissionDue.toString(),
+            status: account.status,
           })),
-        }),
+      })),
+    }
+
+    let integritySignal = await tx.providerIntegritySignal.findFirst({
+      where: {
+        providerIdentityId: input.providerIdentityId,
+        signalType,
+        signalHash: claimHash,
+        status: { in: ['OPEN', 'REVIEWED', 'CONFIRMED'] },
       },
+      orderBy: { createdAt: 'desc' },
     })
+
+    if (!integritySignal) {
+      integritySignal = await tx.providerIntegritySignal.create({
+        data: {
+          providerIdentityId: input.providerIdentityId,
+          userId: input.userId,
+          signalType,
+          severity,
+          signalHash: claimHash,
+          source: input.source,
+          status: 'OPEN',
+          metadata: JSON.stringify(metadata),
+        },
+      })
+
+      await tx.marketplaceRiskEvent.create({
+        data: {
+          actorUserId: input.userId,
+          eventType: signalType,
+          severity,
+          metadata: JSON.stringify({
+            providerIntegritySignalId: integritySignal.id,
+            providerIdentityId: input.providerIdentityId,
+            ...metadata,
+          }),
+        },
+      })
+    }
 
     await tx.providerIdentity.update({
       where: { id: input.providerIdentityId },
