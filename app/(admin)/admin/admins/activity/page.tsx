@@ -253,7 +253,7 @@ export default function StaffActivityPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Governance · Staff"
         title="Activity & sessions"
@@ -282,7 +282,7 @@ export default function StaffActivityPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Staff accounts"
           value={activity.summary.totalStaff.toLocaleString()}
