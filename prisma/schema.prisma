@@ -3688,3 +3688,164 @@ model PaymentIntent {
   @@index([gateway, status])
   @@index([merchantOrderId])
 }
+
+// ============================================
+// PROVIDER IDENTITY + FINANCIAL STANDING
+// Durable identity and cash-commission receivable projections.
+// FinancialLedger remains the accounting source of truth.
+// ============================================
+
+model ProviderIdentity {
+  id                       String    @id @default(cuid())
+  identityType             String    // TASKER, COMPANY, COMPANY_WORKER
+  subjectId                String    // TaskerProfile.id, CompanyProfile.id, or TeamMember.id
+  currentUserId            String?   // scalar only: identity/finance history survives login closure
+  parentProviderIdentityId String?   // COMPANY_WORKER -> COMPANY identity
+  countryCode              String    @default("LK")
+  kycStatus                String    @default("PENDING") // PENDING, VERIFIED, REJECTED, REVIEW_REQUIRED
+  standingStatus           String    @default("ACTIVE") // ACTIVE, WARNING, CASH_RESTRICTED, REVIEW_REQUIRED, CLOSED_WITH_BALANCE, CLOSED
+  verifiedDisplayName      String?
+  verifiedPhotoUrl         String?
+  photoLocked              Boolean   @default(true)
+  verifiedAt               DateTime?
+  closedAt                 DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  claims              ProviderIdentityClaim[]
+  financialAccounts   ProviderFinancialAccount[]
+  photoChangeRequests ProviderPhotoChangeRequest[]
+
+  @@unique([identityType, subjectId])
+  @@index([currentUserId])
+  @@index([parentProviderIdentityId])
+  @@index([countryCode, standingStatus])
+  @@index([kycStatus])
+}
+
+model ProviderIdentityClaim {
+  id                 String           @id @default(cuid())
+  providerIdentityId String
+  providerIdentity   ProviderIdentity @relation(fields: [providerIdentityId], references: [id], onDelete: Restrict)
+  claimType          String           // NATIONAL_ID_HASH, PASSPORT_HASH, COMPANY_REG_HASH, BANK_ACCOUNT_HASH, VERIFIED_PHONE_HASH
+  claimHash          String           // deterministic server-side protected hash; never raw identifier
+  isStrongIdentifier Boolean          @default(false)
+  verified           Boolean          @default(false)
+  status             String           @default("ACTIVE") // ACTIVE, REVOKED
+  source             String?          // KYC, PAYOUT, COMPANY_VERIFICATION, RE_REGISTRATION
+  verifiedAt         DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([providerIdentityId, claimType, claimHash])
+  @@index([claimType, claimHash])
+  @@index([providerIdentityId, status])
+}
+
+model ProviderFinancialAccount {
+  id                       String           @id @default(cuid())
+  providerIdentityId       String
+  providerIdentity         ProviderIdentity @relation(fields: [providerIdentityId], references: [id], onDelete: Restrict)
+  currency                 String
+  commissionDue            BigInt           @default(0)
+  availableEarnings        BigInt           @default(0)
+  pendingEarnings          BigInt           @default(0)
+  status                   String           @default("CLEAR") // CLEAR, WARNING, CASH_RESTRICTED, REVIEW_REQUIRED, FROZEN
+  cashJobsAllowed          Boolean          @default(true)
+  onlineJobsAllowed        Boolean          @default(true)
+  manualReviewRequired     Boolean          @default(false)
+  oldestCommissionDueAt    DateTime?
+  version                  Int              @default(1)
+  lastEvaluatedAt          DateTime?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  @@unique([providerIdentityId, currency])
+  @@index([status, currency])
+  @@index([cashJobsAllowed, currency])
+  @@index([commissionDue])
+}
+
+model ProviderFinancialPolicyConfig {
+  id                            String   @id @default(cuid())
+  countryCode                   String
+  providerType                  String   // TASKER, COMPANY
+  currency                      String
+  warningThresholdMinor         BigInt
+  cashRestrictionThresholdMinor BigInt
+  reviewThresholdMinor          BigInt
+  maxDebtAgeDays                Int      @default(14)
+  allowOnlineWhenCashRestricted Boolean  @default(true)
+  autoOffsetOnlineEarnings      Boolean  @default(true)
+  settlementCadence             String   @default("REALTIME") // REALTIME, WEEKLY
+  enabled                       Boolean  @default(true)
+  updatedBy                     String?
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  @@unique([countryCode, providerType, currency])
+  @@index([countryCode, enabled])
+}
+
+model ProviderPhotoChangeRequest {
+  id                 String           @id @default(cuid())
+  providerIdentityId String
+  providerIdentity   ProviderIdentity @relation(fields: [providerIdentityId], references: [id], onDelete: Restrict)
+  requestedPhotoUrl  String
+  requestReason      String?
+  livenessStatus     String           @default("PENDING") // PENDING, PASSED, FAILED, REVIEW_REQUIRED
+  faceMatchStatus    String           @default("PENDING") // PENDING, MATCHED, MISMATCH, REVIEW_REQUIRED
+  status             String           @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
+  reviewedBy         String?
+  reviewedAt         DateTime?
+  reviewNote         String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([providerIdentityId, status])
+  @@index([status, createdAt])
+}
+
+model JobWorkerIdentityCheck {
+  id                   String    @id @default(cuid())
+  jobId                String
+  customerId           String
+  providerIdentityId   String
+  assignedWorkerUserId String?
+  displayNameSnapshot  String
+  photoSnapshotUrl     String?
+  status               String    @default("PENDING") // PENDING, MATCHED, MISMATCH_REPORTED, REVIEW_REQUIRED
+  confirmedAt          DateTime?
+  mismatchReportedAt   DateTime?
+  mismatchReason       String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([jobId, status])
+  @@index([providerIdentityId, status])
+  @@index([customerId, createdAt])
+}
+
+model ProviderIntegritySignal {
+  id                 String    @id @default(cuid())
+  providerIdentityId String?
+  userId             String?
+  jobId              String?
+  signalType         String    // STRONG_IDENTITY_MATCH, BANK_MATCH, DEVICE_MATCH, CUSTOMER_WORKER_MISMATCH, etc.
+  severity           String    @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+  signalHash         String?
+  source             String?
+  status             String    @default("OPEN") // OPEN, REVIEWED, CONFIRMED, DISMISSED
+  metadata           String?   // sanitized JSON only
+  reviewedAt         DateTime?
+  reviewedBy         String?
+  resolution         String?
+  createdAt          DateTime  @default(now())
+
+  @@index([providerIdentityId, status])
+  @@index([userId, status])
+  @@index([jobId])
+  @@index([signalType, severity])
+  @@index([createdAt])
+}
+
