@@ -308,6 +308,31 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
       if (testCategoryId) await prisma.jobCategory.delete({ where: { id: testCategoryId } }).catch(() => {})
     })
 
+    it('uses the persisted job market and category over caller-supplied matching fields', async () => {
+      const result = await findCandidates(prisma, {
+        jobId,
+        jobMode: 'QUOTE',
+        urgency: 'NORMAL',
+        categoryId: 'caller-supplied-wrong-category',
+        countryCode: 'CH',
+      })
+
+      expect(
+        result.candidates.some(
+          candidate =>
+            candidate.providerId === individualUserId &&
+            candidate.providerType === 'INDIVIDUAL',
+        ),
+      ).toBe(true)
+      expect(
+        result.candidates.some(
+          candidate =>
+            candidate.providerId === companyAId &&
+            candidate.providerType === 'COMPANY',
+        ),
+      ).toBe(true)
+    })
+
     it('individual providers never matched as company providers', async () => {
       const input: MatchingInput = {
         jobId,
