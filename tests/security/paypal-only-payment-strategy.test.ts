@@ -22,6 +22,21 @@ describe('PayPal-only launch strategy', () => {
     expect(paymentSettings).not.toContain('methodStripe')
   })
 
+  it('keeps both active payment creation routes on the same fail-closed policy', () => {
+    const paymentRoute = source(
+      'app/api/mobile/v2/jobs/[id]/payment/route.ts'
+    )
+    const payRoute = source(
+      'app/api/mobile/v2/jobs/[id]/pay/route.ts'
+    )
+
+    for (const route of [paymentRoute, payRoute]) {
+      expect(route).toContain('createPaymentIntent')
+      expect(route).toContain('PAYMENT_PROVIDER_NOT_AVAILABLE')
+      expect(route).not.toContain("result.code === 'PAYHERE_NOT_CONFIGURED'")
+    }
+  })
+
   it('keeps historical receipts provider-neutral', () => {
     const receipt = source(
       'apps/mobile/features/jobs/screens/customer/receipt/[id].tsx'
