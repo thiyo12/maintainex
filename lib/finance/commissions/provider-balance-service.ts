@@ -19,6 +19,15 @@ export const DEFAULT_LK_LKR_POLICY: ProviderFinancialPolicy = {
   autoOffsetOnlineEarnings: true,
 }
 
+export const DEFAULT_CA_CAD_POLICY: ProviderFinancialPolicy = {
+  warningThresholdMinor: 5_000n,
+  cashRestrictionThresholdMinor: 10_000n,
+  reviewThresholdMinor: 25_000n,
+  maxDebtAgeDays: 14,
+  allowOnlineWhenCashRestricted: true,
+  autoOffsetOnlineEarnings: true,
+}
+
 function policyProviderType(providerType: FinancialProviderType): 'TASKER' | 'COMPANY' {
   return providerType === 'COMPANY' ? 'COMPANY' : 'TASKER'
 }
@@ -233,6 +242,9 @@ export async function resolveProviderFinancialPolicy(
   // can override these values without code changes.
   if (countryCode === 'LK' && currency === 'LKR') {
     return DEFAULT_LK_LKR_POLICY
+  }
+  if (countryCode === 'CA' && currency === 'CAD') {
+    return DEFAULT_CA_CAD_POLICY
   }
 
   throw new Error('PROVIDER_FINANCIAL_POLICY_NOT_CONFIGURED')
