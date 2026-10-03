@@ -12,10 +12,12 @@ import {
 } from '@/lib/payment/payhere-adapter'
 import { getPayPalConfig } from '@/lib/finance/payments/paypal-adapter'
 import {
-  normalizePaymentProvider,
-  parseProviderCapabilities,
-  parseProviderList,
-} from '@/lib/finance/payments/provider-registry'
+    isLegacyReadOnlyProvider,
+    isPayPalMarketVerified,
+    normalizePaymentProvider,
+    parseProviderCapabilities,
+    parseProviderList,
+  } from '@/lib/finance/payments/provider-registry'
 
 const ENVIRONMENTS = new Set(['SANDBOX', 'LIVE'])
 const OPERATIONAL_STATUSES = new Set(['DISABLED', 'ACTIVE', 'DEGRADED', 'MAINTENANCE'])
@@ -201,6 +203,31 @@ export async function PATCH(request: NextRequest) {
     }
     if (commissionRateBps !== null && (!Number.isInteger(commissionRateBps) || commissionRateBps < 0 || commissionRateBps > 10000)) {
       return NextResponse.json({ error: 'Commission BPS must be 0 to 10000' }, { status: 400 })
+    }
+
+    if (enabled && isLegacyReadOnlyProvider(provider)) {
+      return NextResponse.json(
+        {
+          error:
+            provider +
+            ' is LEGACY and cannot be enabled for new checkout. Historical ' +
+            provider +
+            ' payments remain readable, but only PayPal may process new payments.',
+        },
+        { status: 409 }
+      )
+    }
+    if (enabled && provider === 'PAYPAL' && !isPayPalMarketVerified(countryCode)) {
+      return NextResponse.json(
+        {
+          error:
+            'PayPal Checkout capability is not verified for market ' +
+            countryCode +
+            '. PayPal accounts existing in a market does not prove Checkout is ' +
+            'available to the MaintainEX merchant account for this flow.',
+        },
+        { status: 409 }
+      )
     }
 
     const runtime = runtimeState(provider)

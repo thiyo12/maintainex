@@ -46,11 +46,10 @@ describe('trusted payment public origin', () => {
     expect(resolvePaymentPublicOrigin('https://maintainex.lk/api/pay')).toBeNull()
   })
 
-  it('keeps every PayHere entry route on the shared trusted-origin resolver', () => {
+  it('keeps every payment entry route on the shared trusted-origin resolver', () => {
     const routes = [
       'app/api/mobile/v2/jobs/[id]/payment/route.ts',
       'app/api/mobile/v2/jobs/[id]/pay/route.ts',
-      'app/api/payments/payhere/[intentId]/route.ts',
     ]
 
     for (const route of routes) {
@@ -58,5 +57,30 @@ describe('trusted payment public origin', () => {
       expect(source).toContain('resolvePaymentPublicOrigin(request.url)')
       expect(source).not.toContain('mutableEnv.NEXTAUTH_URL || new URL(request.url).origin')
     }
+  })
+
+  it('never derives an HTTP checkout origin from a PayPal browser return route', () => {
+    // The PayPal return/cancel pages only emit a maintainex:// deep link, so
+    // they must never resolve an HTTP origin from the incoming request.
+    for (const route of [
+      'app/api/payments/paypal/return/route.ts',
+      'app/api/payments/paypal/cancel/route.ts',
+    ]) {
+      const source = readFileSync(resolve(process.cwd(), route), 'utf-8')
+      expect(source).not.toContain('resolvePaymentPublicOrigin')
+      expect(source).not.toContain('new URL(request.url).origin')
+    }
+  })
+
+  it('never derives a checkout origin from the legacy PayHere route', () => {
+    // The PayHere route is now a fail-closed 410 that renders no payment form,
+    // so it must not resolve or build any checkout origin at all.
+    const source = readFileSync(
+      resolve(process.cwd(), 'app/api/payments/payhere/[intentId]/route.ts'),
+      'utf-8'
+    )
+    expect(source).not.toContain('resolvePaymentPublicOrigin')
+    expect(source).not.toContain('request.url')
+    expect(source).toContain('status: 410')
   })
 })

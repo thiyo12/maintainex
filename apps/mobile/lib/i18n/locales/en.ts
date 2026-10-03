@@ -346,7 +346,7 @@ const en = {
     title: 'Payment',
     methodVisa: 'Visa',
     methodMastercard: 'Mastercard',
-    methodPayHere: 'PayHere (Sri Lanka)',
+    methodPayPal: 'PayPal',
     methodStripe: 'Stripe',
     comingSoon: 'Coming Soon',
     comingSoonDesc: 'Payment method integration is on its way!',

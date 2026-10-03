@@ -80,9 +80,9 @@ export default function ReceiptScreen() {
   const paymentMethod =
     job?.escrow?.paymentMethod === 'CASH'
       ? 'Cash'
-      : job?.escrow?.paymentMethod === 'CARD'
-        ? 'PayHere / Card'
-        : job?.escrow?.paymentMethod || 'Protected payment'
+: job?.escrow?.paymentMethod === 'CARD'
+          ? 'PayPal / Card'
+          : job?.escrow?.paymentMethod || 'Protected payment'
 
   const handleShare = async () => {
     await Share.share({

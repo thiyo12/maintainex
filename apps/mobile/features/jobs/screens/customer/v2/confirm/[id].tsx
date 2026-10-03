@@ -205,13 +205,11 @@ export default function V2ConfirmBookingScreen() {
                 <ActivityIndicator color={colors.ink} />
               ) : (
                 <Text style={styles.depositBtnText}>
-                  {paymentStatus === 'PENDING'
-                    ? 'Continue Secure Payment'
-                    : paymentProvider === 'PAYPAL'
-                      ? 'Pay Securely with PayPal'
-                      : paymentProvider === 'PAYHERE'
-                        ? 'Pay Securely with PayHere'
-                        : 'Pay Securely'}
+{paymentStatus === 'PENDING'
+                      ? 'Continue Secure Payment'
+                      : paymentProvider === 'PAYPAL'
+                        ? 'Pay Securely with PayPal'
+                        : 'Pay Securely with PayPal'}
                 </Text>
               )}
             </TouchableOpacity>

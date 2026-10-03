@@ -413,10 +413,19 @@ export default function PaymentProvidersPage() {
                     <FiCreditCard className="text-amber-600" />
                     {config.provider.replaceAll('_', ' ')}
                   </div>
+                  {config.provider === 'PAYHERE' && (
+                    <div className="mt-1 text-xs font-medium text-slate-500">
+                      Legacy / read only / disabled for new checkout
+                    </div>
+                  )}
                 </td>
                 <td className={crmTdClass}>
                   <CrmBadge tone={tone(config)} dot>
-                    {config.enabled ? config.operationalStatus : 'DISABLED'}
+                    {config.provider === 'PAYHERE'
+                      ? 'LEGACY · DISABLED'
+                      : config.enabled
+                        ? config.operationalStatus
+                        : 'DISABLED'}
                   </CrmBadge>
                 </td>
                 <td className={crmTdClass}>
@@ -591,7 +600,6 @@ export default function PaymentProvidersPage() {
               className={crmInputClass}
             >
               <option value="PAYPAL">PayPal</option>
-              <option value="PAYHERE">PayHere</option>
               <option value="MANUAL_BANK">Manual bank</option>
             </select>
           </CrmField>
