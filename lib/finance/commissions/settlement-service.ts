@@ -56,7 +56,7 @@ export async function recordWeeklySettlement(
   const commissionOwed = bigIntToSafeNumber(input.commissionCents) / 100
   const providerType = input.providerType === 'COMPANY' ? 'COMPANY' : 'TASKER'
 
-  await tx.weeklySettlement.upsert({
+  return tx.weeklySettlement.upsert({
     where: { providerId_weekStart: { providerId: input.providerId, weekStart } },
     create: {
       providerId: input.providerId,
