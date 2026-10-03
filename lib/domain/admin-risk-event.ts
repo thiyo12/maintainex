@@ -30,7 +30,7 @@ export async function reviewRiskEvent(
     where: { id: eventId },
     select: {
       id: true, eventType: true, severity: true,
-      resolution: true, reviewedAt: true, actorUserId: true,
+      resolution: true, reviewedAt: true, actorUserId: true, metadata: true,
     },
   })
 
@@ -61,6 +61,65 @@ export async function reviewRiskEvent(
     DISMISSED: 'RISK_EVENT_DISMISS',
     ESCALATED: 'RISK_EVENT_ESCALATE',
     NO_ACTION: 'RISK_EVENT_RESOLVE',
+  }
+
+  if (event.metadata) {
+    try {
+      const metadata = JSON.parse(event.metadata)
+      const providerIntegritySignalId =
+        typeof metadata?.providerIntegritySignalId === 'string'
+          ? metadata.providerIntegritySignalId
+          : null
+
+      if (providerIntegritySignalId) {
+        const mappedStatus =
+          resolution === 'DISMISSED' || resolution === 'NO_ACTION'
+            ? 'DISMISSED'
+            : resolution === 'CONFIRMED'
+              ? 'CONFIRMED'
+              : 'REVIEWED'
+
+        const signal = await tx.providerIntegritySignal.findUnique({
+          where: { id: providerIntegritySignalId },
+          select: { providerIdentityId: true },
+        })
+
+        if (signal) {
+          await tx.providerIntegritySignal.update({
+            where: { id: providerIntegritySignalId },
+            data: {
+              status: mappedStatus,
+              resolution,
+              reviewedAt: new Date(),
+              reviewedBy: session.id,
+            },
+          })
+
+          if (mappedStatus === 'DISMISSED' && signal.providerIdentityId) {
+            const remainingBlocking = await tx.providerIntegritySignal.count({
+              where: {
+                providerIdentityId: signal.providerIdentityId,
+                id: { not: providerIntegritySignalId },
+                status: { in: ['OPEN', 'REVIEWED', 'CONFIRMED'] },
+                severity: { in: ['HIGH', 'CRITICAL'] },
+              },
+            })
+            if (remainingBlocking === 0) {
+              await tx.providerIdentity.updateMany({
+                where: {
+                  id: signal.providerIdentityId,
+                  standingStatus: 'REVIEW_REQUIRED',
+                },
+                data: { standingStatus: 'ACTIVE' },
+              })
+            }
+          }
+        }
+      }
+    } catch {
+      // Risk-event metadata is best-effort; malformed legacy metadata must not
+      // prevent the primary CRM review from completing.
+    }
   }
 
   await tx.auditLog.create({
