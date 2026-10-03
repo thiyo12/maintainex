@@ -44,6 +44,28 @@ export async function GET(request: NextRequest) {
         })
       : null
 
+    const walletLedgerEntries = walletId
+      ? await prisma.financialLedger.findMany({
+          where: {
+            accountId: walletId,
+            accountType: 'PROVIDER_WALLET',
+            currency,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+          select: {
+            id: true,
+            entryType: true,
+            amount: true,
+            currency: true,
+            referenceType: true,
+            referenceId: true,
+            description: true,
+            createdAt: true,
+          },
+        })
+      : []
+
     const totalEarnedMinor = earnedAggregate?._sum.amount ?? 0n
     const pendingPayoutMinor = payouts
       .filter(p => ['REQUESTED', 'RESERVED', 'PROCESSING', 'PENDING'].includes(p.status))
@@ -184,6 +206,20 @@ export async function GET(request: NextRequest) {
         currency,
       },
       completedJobs,
+      totalJobs: completedJobs,
+      transactions: walletLedgerEntries.map(entry => ({
+        id: entry.id,
+        title: entry.description || entry.referenceType.replaceAll('_', ' '),
+        job: entry.description || entry.referenceType.replaceAll('_', ' '),
+        amount: bigIntToSafeNumber(entry.amount) / 100,
+        amountMinor: entry.amount.toString(),
+        currency: entry.currency,
+        direction: entry.entryType,
+        referenceType: entry.referenceType,
+        referenceId: entry.referenceId,
+        date: entry.createdAt.toISOString(),
+        status: 'Cleared',
+      })),
       recentCommissionRecoveries: recentCommissionRecoveries.map(recovery => ({
         id: recovery.id,
         amountMinor: recovery.amount.toString(),
