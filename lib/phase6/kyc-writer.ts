@@ -119,6 +119,38 @@ export async function transitionUserKyc(
           })
         }
       }
+
+      const providerKycStatus =
+        action === 'APPROVE'
+          ? 'VERIFIED'
+          : action === 'REJECT'
+            ? 'REJECTED'
+            : action === 'SUBMIT'
+              ? 'PENDING'
+              : 'REVIEW_REQUIRED'
+
+      await tx.providerIdentity.updateMany({
+        where: { currentUserId: userId },
+        data: { kycStatus: providerKycStatus },
+      })
+
+      const providerIdentities = await tx.providerIdentity.findMany({
+        where: { currentUserId: userId },
+        select: { id: true },
+      })
+      if (providerIdentities.length > 0) {
+        await tx.providerIdentityClaim.updateMany({
+          where: {
+            providerIdentityId: { in: providerIdentities.map(identity => identity.id) },
+            status: 'ACTIVE',
+          },
+          data: action === 'APPROVE'
+            ? { verified: true, verifiedAt: new Date() }
+            : action === 'REJECT'
+              ? { verified: false, verifiedAt: null }
+              : {},
+        })
+      }
     })
   } catch (err: any) {
     if (err?.message === 'KYC_STATUS_CHANGED_BY_ANOTHER_REQUEST') {
