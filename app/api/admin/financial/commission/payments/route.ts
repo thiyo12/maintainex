@@ -9,6 +9,8 @@ import {
 import { consumeCrmStepUpFromHeader } from '@/lib/crm/governance/step-up'
 import { evaluateActionInitiation } from '@/lib/crm/governance'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
+import { settleProviderReceivablesFromDirectPayment } from '@/lib/finance/commissions/provider-balance-service'
+import { minorUnitsToMajorUnits, parseMajorUnitsInput, type Currency } from '@/lib/shared/money/money'
 
 function amountMatches(paymentAmount: number, commissionOwed: number): boolean {
   return Math.abs(paymentAmount - commissionOwed) < 0.005
@@ -119,6 +121,7 @@ export async function PATCH(request: NextRequest) {
             commissionOwed: true,
             commissionPaid: true,
             status: true,
+            providerType: true,
             currency: true,
             countryCode: true,
           },
@@ -147,8 +150,38 @@ export async function PATCH(request: NextRequest) {
     ) {
       return NextResponse.json({ error: 'Payment market/currency does not match settlement' }, { status: 409 })
     }
-    if (!amountMatches(payment.amountDue, payment.weeklySettlement.commissionOwed)) {
-      return NextResponse.json({ error: 'Payment amount does not match commission owed' }, { status: 409 })
+    const currency = payment.currency as Currency
+    const openReceivables = await prisma.providerCommissionReceivable.findMany({
+      where: {
+        weeklySettlementId: payment.weeklySettlementId,
+        currency: payment.currency,
+        status: { in: ['OPEN', 'PARTIAL'] },
+        amountRemaining: { gt: 0 },
+      },
+      select: { amountRemaining: true },
+    })
+    const remainingReceivableMinor = openReceivables.reduce(
+      (sum, item) => sum + item.amountRemaining,
+      0n,
+    )
+    const expectedPaymentAmount = openReceivables.length > 0
+      ? minorUnitsToMajorUnits(remainingReceivableMinor, currency)
+      : payment.weeklySettlement.commissionOwed
+
+    if (!amountMatches(payment.amountDue, expectedPaymentAmount)) {
+      return NextResponse.json(
+        {
+          error: 'Payment amount does not match the remaining commission due',
+          expectedAmount: expectedPaymentAmount,
+          currency: payment.currency,
+        },
+        { status: 409 },
+      )
+    }
+
+    const paymentAmountMinor = parseMajorUnitsInput(payment.amountDue, currency)
+    if (paymentAmountMinor === null) {
+      return NextResponse.json({ error: 'Invalid commission payment amount' }, { status: 409 })
     }
 
     const stepUp = await consumeCrmStepUpFromHeader({
@@ -190,6 +223,14 @@ export async function PATCH(request: NextRequest) {
         },
       })
       if (!settlement) throw new Error('SETTLEMENT_NOT_FOUND')
+
+      const receivableReconciliation = await settleProviderReceivablesFromDirectPayment(tx, {
+        weeklySettlementId: payment.weeklySettlementId,
+        commissionPaymentId: payment.id,
+        amountPaidMinor: paymentAmountMinor,
+        currency: payment.currency,
+        createdBy: security.adminId,
+      })
 
       if (!settlement.commissionPaid) {
         await tx.weeklySettlement.update({
@@ -264,6 +305,9 @@ export async function PATCH(request: NextRequest) {
             amountDue: payment.amountDue,
             currency: payment.currency,
             countryCode: payment.countryCode,
+            providerReceivableReconciled: receivableReconciliation.featureBacked,
+            receivableRecoveredMinor: receivableReconciliation.recoveredMinor.toString(),
+            remainingCommissionDueMinor: receivableReconciliation.remainingCommissionDueMinor.toString(),
           }),
           ipAddress: security.ipAddress,
           userAgent: security.userAgent || undefined,
@@ -273,7 +317,16 @@ export async function PATCH(request: NextRequest) {
         },
       })
 
-      return { payment: confirmedPayment, settlement: updatedSettlement }
+      return {
+        payment: confirmedPayment,
+        settlement: updatedSettlement,
+        receivableReconciliation: {
+          featureBacked: receivableReconciliation.featureBacked,
+          recoveredMinor: receivableReconciliation.recoveredMinor.toString(),
+          remainingCommissionDueMinor: receivableReconciliation.remainingCommissionDueMinor.toString(),
+          providerIdentityId: receivableReconciliation.providerIdentityId,
+        },
+      }
     })
 
     return NextResponse.json({
