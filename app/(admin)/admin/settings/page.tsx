@@ -171,7 +171,7 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Platform governance"
         title="Settings registry"
@@ -190,7 +190,7 @@ export default function AdminSettingsPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <CrmMetricCard
           label="Stored keys"
           value={counts.total.toLocaleString()}
@@ -231,7 +231,7 @@ export default function AdminSettingsPage() {
             return (
               <div
                 key={key}
-                className="grid gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1.4fr)_auto] lg:items-center"
+                className="grid gap-3.5 px-4 py-3.5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1.4fr)_auto] lg:items-center"
               >
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-slate-900">
@@ -280,7 +280,7 @@ export default function AdminSettingsPage() {
         </div>
       </CrmCard>
 
-      <section className="grid gap-5 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-3">
         <ControlCard
           icon={<FiDollarSign size={17} />}
           title="Finance & pricing"
