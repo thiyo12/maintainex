@@ -288,6 +288,7 @@ jobs:
           tests/finance/payouts/payout-engine.test.ts
           tests/finance/provider-financial-policy.test.ts
           tests/finance/provider-receivable-recovery-contract.test.ts
+          tests/finance/provider-balance-adjustment-contract.test.ts
           tests/finance/commission-currency-isolation.test.ts tests/finance/commission-governance.test.ts tests/finance/commission-settlement-actions.test.ts tests/finance/settlement-history-v2.test.ts
           tests/quotes/change-order.test.ts
           --reporter=verbose 2>&1 | tee /tmp/financial-flow-tests.txt
