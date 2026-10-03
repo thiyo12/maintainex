@@ -273,9 +273,9 @@ export default function Company360Page() {
             <FiArrowLeft size={15} /> Back to companies
           </Link>
 
-          <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex items-start gap-4 min-w-0">
-              <div className="w-14 h-14 rounded-2xl bg-slate-950 text-amber-300 flex items-center justify-center text-xl font-semibold shrink-0">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-slate-950 text-xl font-semibold text-amber-300">
                 {(company.companyName?.[0] || 'C').toUpperCase()}
               </div>
               <div className="min-w-0">
@@ -744,7 +744,7 @@ function Summary({ icon: Icon, label, value }: { icon: any; label: string; value
 
 function Metric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-[12px] border border-[var(--crm-border)] bg-white p-4 shadow-[var(--crm-shadow-card)]">
       <div className="text-xs text-slate-400">{label}</div>
       <div className="mt-2 text-lg font-semibold text-slate-900">{value}</div>
     </div>
