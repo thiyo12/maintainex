@@ -236,6 +236,35 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+      - name: Core app lifecycle gates
+        run: >-
+          npx vitest run
+          tests/customer/customer-lifecycle.test.ts
+          tests/security/tasker-capability-boundary.test.ts
+          tests/security/tasker-state-input-boundary.test.ts
+          tests/company/company-membership.test.ts
+          tests/company/worker-assignment-workspace.test.ts
+          tests/quotes/quote-acceptance.test.ts
+          tests/security/company-assignment-lifecycle-boundary.test.ts
+          tests/security/job-booking-mutation-boundary.test.ts
+          tests/auth/work-start-auth.test.ts
+          tests/jobs/job-pin.test.ts
+          tests/security/chat-delivery-contract.test.ts
+          tests/security/chat-isolation.test.ts
+          tests/notifications/booking-notifications.test.ts
+          tests/notifications/company-job-recipient-routing.test.ts
+          --reporter=verbose 2>&1 | tee /tmp/core-app-lifecycle-tests.txt
+        if: always()
+
+      - name: Upload core app lifecycle diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-app-lifecycle-diagnostics
+          path: /tmp/core-app-lifecycle-tests.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Current financial lifecycle gates
         run: >-
           npx vitest run
