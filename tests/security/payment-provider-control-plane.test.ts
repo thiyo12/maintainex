@@ -30,28 +30,48 @@ describe('payment provider control plane', () => {
     expect(events).toContain('signatureVerified: true')
   })
 
-
-  it('requires explicit payment providers and bootstraps only the legacy Sri Lanka PayHere path from runtime configuration', () => {
+  it('preserves PayHere history but disables it for new checkout at boot', () => {
     const schema = source('prisma/schema.prisma')
-    const explicitMigration = source(
-      'prisma/migrations/20261002173500_payment_intent_explicit_provider/migration.sql'
-    )
     const bootstrap = source('scripts/bootstrap-payment-providers.cjs')
     const docker = source('Dockerfile')
 
-    const paymentIntentStart = schema.indexOf('model PaymentIntent {')
-    const paymentIntentEnd = schema.indexOf('\n}', paymentIntentStart)
-    const paymentIntentBlock = schema.slice(paymentIntentStart, paymentIntentEnd + 2)
-
-    expect(paymentIntentBlock).toContain('gateway         String')
-    expect(paymentIntentBlock).not.toContain('@default("PAYPAL")')
-    expect(explicitMigration).toContain('ALTER COLUMN "gateway" DROP DEFAULT')
-    expect(bootstrap).toContain("countryCode: 'LK'")
-    expect(bootstrap).toContain("provider: 'PAYHERE'")
-    expect(bootstrap).toContain("const value = process.env[name]")
-    expect(bootstrap).toContain("boolEnv('PAYHERE_SANDBOX', true)")
-    expect(bootstrap).not.toContain('PAYHERE_MERCHANT_SECRET=')
+    expect(schema).toContain('model PaymentProviderTransaction')
+    expect(schema).toContain('model PaymentProviderRefund')
+    expect(schema).toContain('model PaymentProviderEvent')
+    expect(bootstrap).toContain("where: { provider: 'PAYHERE' }")
+    expect(bootstrap).toContain('enabled: false')
+    expect(bootstrap).toContain("operationalStatus: 'DISABLED'")
+    expect(bootstrap).toContain('updateMany')
+    expect(bootstrap).not.toContain('paymentProviderConfig.upsert')
+    expect(bootstrap).not.toContain('paymentProviderConfig.create')
+    expect(bootstrap).not.toContain('deleteMany')
     expect(docker).toContain('node scripts/bootstrap-payment-providers.cjs')
+  })
+
+  it('restricts new online checkout to PayPal with market verification', () => {
+    const registry = source('lib/finance/payments/provider-registry.ts')
+    const service = source('lib/finance/payments/payment-service.ts')
+    const providersApi = source('app/api/admin/financial/providers/route.ts')
+
+    expect(registry).toContain("NEW_ONLINE_CHECKOUT_PROVIDER_CODES = ['PAYPAL']")
+    expect(registry).toContain("LEGACY_READ_ONLY_PROVIDER_CODES = ['PAYHERE']")
+    expect(registry).toContain('PAYPAL_MARKET_CHECKOUT_VERIFIED')
+    expect(registry).toContain("PAYPAL_SANDBOX_FIXTURE_COUNTRY = 'CA'")
+    expect(registry).toContain("PAYPAL_LIVE_HARD_BLOCKED_MARKETS = new Set(['LK'])")
+
+    expect(service).toContain('PAYMENT_PROVIDER_NOT_AVAILABLE')
+    expect(service).toContain("if (provider.provider !== 'PAYPAL')")
+    expect(providersApi).toContain('isLegacyReadOnlyProvider(provider)')
+    expect(providersApi).toContain('isPayPalMarketVerified(countryCode')
+  })
+
+  it('blocks the legacy PayHere hosted checkout route', () => {
+    const route = source('app/api/payments/payhere/[intentId]/route.ts')
+
+    expect(route).toContain('PAYHERE_DISABLED_FOR_NEW_CHECKOUT')
+    expect(route).toContain('status: 410')
+    expect(route).not.toContain('getPaymentCheckoutForm')
+    expect(route).not.toContain('checkout.actionUrl')
   })
 
   it('keeps payment reconciliation on a dedicated sensitive permission', () => {
@@ -70,6 +90,7 @@ describe('payment provider control plane', () => {
     expect(env).toContain('PAYPAL_CLIENT_ID=')
     expect(env).toContain('PAYPAL_CLIENT_SECRET=')
     expect(env).toContain('PAYPAL_WEBHOOK_ID=')
+    expect(env).toContain('PAYPAL_MARKET_CHECKOUT_VERIFIED=')
     expect(env).not.toContain('NEXT_PUBLIC_PAYPAL_CLIENT_SECRET')
     expect(env).not.toContain('NEXT_PUBLIC_PAYPAL_WEBHOOK_ID')
   })
