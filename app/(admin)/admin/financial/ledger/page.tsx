@@ -204,7 +204,7 @@ export default function FinancialLedgerPage() {
   }, [payload, currencies])
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Finance · Accounting truth"
         title="Financial Ledger"
@@ -228,7 +228,7 @@ export default function FinancialLedgerPage() {
       </div>
 
       {metrics.map(row => (
-        <section key={row.currency} className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <section key={row.currency} className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <CrmMetricCard
             label={`Debits · ${row.currency}`}
             value={money(row.debit, row.currency)}
@@ -428,7 +428,7 @@ export default function FinancialLedgerPage() {
         </CrmTableFrame>
       )}
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <div className="rounded-[12px] border border-amber-200 bg-amber-50 p-3.5">
         <div className="flex items-start gap-3">
           <FiShield className="mt-0.5 shrink-0 text-amber-700" size={16} />
           <div>
