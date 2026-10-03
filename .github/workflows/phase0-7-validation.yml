@@ -242,6 +242,10 @@ jobs:
           tests/customer/customer-lifecycle.test.ts
           tests/security/tasker-capability-boundary.test.ts
           tests/security/tasker-state-input-boundary.test.ts
+          tests/security/otp-demo-rate-limit.test.ts
+          tests/security/customer-idor.test.ts
+          tests/security/matching-persona-isolation.test.ts
+          tests/security/dual-persona-isolation.test.ts
           tests/company/company-membership.test.ts
           tests/company/worker-assignment-workspace.test.ts
           tests/quotes/quote-acceptance.test.ts
