@@ -177,7 +177,7 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
 
     await assertProviderCashEligible(tx, {
       providerId: quote.providerId,
-      providerType: quote.providerType,
+      providerType: quote.providerType as 'INDIVIDUAL' | 'COMPANY',
       countryCode: job.countryCode || 'LK',
       currency: escrow.currency,
     })
@@ -858,8 +858,12 @@ export async function completeAndReleaseEscrow(
     })
     if (!quote) throw new Error('Accepted quote not found')
     if (quote.providerId !== escrow.providerId) throw new Error('Escrow provider identity mismatch')
+    if (quote.providerType !== 'INDIVIDUAL' && quote.providerType !== 'COMPANY') {
+      throw new Error('Accepted quote provider type is invalid')
+    }
+    const providerType = quote.providerType
 
-    const identity = await resolvePayoutIdentity(quote.providerId, quote.providerType)
+    const identity = await resolvePayoutIdentity(quote.providerId, providerType)
     const defaultRate = await getCommissionRate()
     const rawRate = identity.commissionRate ?? defaultRate
     const rate = Math.max(0, Math.min(100, rawRate))
@@ -922,7 +926,7 @@ export async function completeAndReleaseEscrow(
           jobId,
           escrowId: escrow.id,
           providerId: quote.providerId,
-          providerType: quote.providerType,
+          providerType,
           countryCode: job.countryCode || 'LK',
           currency: escrowCurrency,
           platformDueMinor: platformDueCents,
