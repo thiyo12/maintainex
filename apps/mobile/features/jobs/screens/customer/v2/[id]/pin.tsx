@@ -261,6 +261,11 @@ export default function JobPinScreen() {
       ? 'Arrival is confirmed. Generate a fresh one-time PIN only when you are ready for work to start.'
       : 'Work has already started. No additional start PIN is required.'
 
+  const needsWorkerIdentity =
+    Boolean(pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && workerIdentity?.required)
+  const workerMatched = workerIdentity?.confirmation?.status === 'MATCHED'
+  const workerMismatch = workerIdentity?.confirmation?.status === 'MISMATCH_REPORTED'
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
