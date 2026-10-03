@@ -26,6 +26,7 @@ import {
   PAYMENT_PROVIDER_NOT_AVAILABLE,
   type ResolvedPaymentProvider,
 } from '@/lib/finance/payments/provider-registry'
+import { assertProviderOnlineEligible } from '@/lib/finance/commissions/provider-balance-service'
 
 export type PaymentStatus =
   | 'CREATED'
@@ -206,6 +207,50 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
           code: 'PAYMENT_CURRENCY_CHANGED',
         },
       }
+    }
+
+    const acceptedQuote = await tx.jobQuote.findFirst({
+      where: { jobId, status: 'ACCEPTED' },
+      select: { providerId: true, providerType: true },
+    })
+    if (
+      !acceptedQuote ||
+      (acceptedQuote.providerType !== 'INDIVIDUAL' && acceptedQuote.providerType !== 'COMPANY')
+    ) {
+      return {
+        intent: null,
+        jobTitle: job.title,
+        failure: {
+          success: false,
+          error: 'Accepted provider is unavailable for payment',
+          code: 'JOB_PROVIDER_NOT_FOUND',
+        },
+      }
+    }
+
+    try {
+      await assertProviderOnlineEligible(tx, {
+        providerId: acceptedQuote.providerId,
+        providerType: acceptedQuote.providerType,
+        countryCode: job.countryCode,
+        currency: escrow.currency,
+      })
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error as Error & { code?: string }).code === 'PROVIDER_ONLINE_RESTRICTED'
+      ) {
+        return {
+          intent: null,
+          jobTitle: job.title,
+          failure: {
+            success: false,
+            error: 'Provider is temporarily restricted from new online-paid jobs',
+            code: 'PROVIDER_ONLINE_RESTRICTED',
+          },
+        }
+      }
+      throw error
     }
 
     const expiryCutoff = new Date(Date.now() - 30 * 60 * 1000)
