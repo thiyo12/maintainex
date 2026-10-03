@@ -51,6 +51,27 @@ interface ProviderWallet {
   user?: WalletUser | null
 }
 
+interface ProviderReceivable {
+  id: string
+  providerIdentityId: string
+  identityType: string
+  subjectId: string
+  currentUserId?: string | null
+  countryCode: string
+  kycStatus: string
+  standingStatus: string
+  currency: string
+  commissionDue: number
+  commissionDueMinor: string
+  status: string
+  cashJobsAllowed: boolean
+  onlineJobsAllowed: boolean
+  manualReviewRequired: boolean
+  oldestCommissionDueAt?: string | null
+  updatedAt: string
+  user?: WalletUser | null
+}
+
 interface CustomerWallet {
   id: string
   userId: string
@@ -88,6 +109,7 @@ interface CurrencySummary {
 
 interface WalletPayload {
   providerWallets: ProviderWallet[]
+  providerReceivables: ProviderReceivable[]
   customerWallets: CustomerWallet[]
   transactions: Transaction[]
   summaryByCurrency: CurrencySummary[]
@@ -102,7 +124,7 @@ interface WalletPayload {
   }
 }
 
-type WalletTab = 'providers' | 'customers' | 'transactions'
+type WalletTab = 'providers' | 'receivables' | 'customers' | 'transactions'
 
 function formatCurrency(amount: number, currency = 'LKR') {
   return new Intl.NumberFormat(currency === 'CAD' ? 'en-CA' : 'en-LK', {
@@ -184,6 +206,19 @@ export default function WalletsPage() {
     ),
     [payload, query]
   )
+  const receivables = useMemo(
+    () => (payload?.providerReceivables || []).filter(receivable =>
+      !query ||
+      receivable.user?.name?.toLowerCase().includes(query) ||
+      receivable.user?.email?.toLowerCase().includes(query) ||
+      receivable.user?.mxId?.toLowerCase().includes(query) ||
+      receivable.providerIdentityId.toLowerCase().includes(query) ||
+      receivable.identityType.toLowerCase().includes(query) ||
+      receivable.status.toLowerCase().includes(query)
+    ),
+    [payload, query]
+  )
+
   const customers = useMemo(
     () => (payload?.customerWallets || []).filter(wallet =>
       !query ||
@@ -256,9 +291,11 @@ export default function WalletsPage() {
   const currentRows =
     activeTab === 'providers'
       ? providers
-      : activeTab === 'customers'
-        ? customers
-        : transactions
+      : activeTab === 'receivables'
+        ? receivables
+        : activeTab === 'customers'
+          ? customers
+          : transactions
 
   return (
     <div className="space-y-4">
@@ -321,6 +358,7 @@ export default function WalletsPage() {
           onChange={changeTab}
           items={[
             { id: 'providers', label: 'Provider wallets' },
+            { id: 'receivables', label: 'Provider receivables' },
             { id: 'customers', label: 'Customer wallets' },
             { id: 'transactions', label: 'Transactions' },
           ]}
@@ -416,6 +454,97 @@ export default function WalletsPage() {
                       </CrmButton>
                     ) : (
                       <CrmBadge>Read only</CrmBadge>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <WalletPagination payload={payload} page={page} setPage={setPage} />
+        </CrmTableFrame>
+      ) : activeTab === 'receivables' ? (
+        <CrmTableFrame
+          title="Provider receivables"
+          description="Cash-job commission and platform amounts owed to MaintainEX. These balances are ledger-backed and read only here."
+        >
+          <table className={`${crmTableClass} min-w-[1180px]`}>
+            <thead>
+              <tr>
+                <th className={crmThClass}>Provider</th>
+                <th className={crmThClass}>Type</th>
+                <th className={crmThClass}>Market</th>
+                <th className={crmThClass}>Commission due</th>
+                <th className={crmThClass}>Standing</th>
+                <th className={crmThClass}>Cash jobs</th>
+                <th className={crmThClass}>Online jobs</th>
+                <th className={crmThClass}>Oldest due</th>
+              </tr>
+            </thead>
+            <tbody>
+              {receivables.map(receivable => (
+                <tr key={receivable.id} className="transition-colors hover:bg-[#fafbf9]">
+                  <td className={crmTdClass}>
+                    {receivable.currentUserId ? (
+                      <Link
+                        href={`/admin/users/${receivable.currentUserId}`}
+                        className="font-semibold text-slate-900 hover:text-amber-700"
+                      >
+                        {receivable.user?.name || 'Provider'}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold text-slate-900">
+                        {receivable.user?.name || 'Closed / detached identity'}
+                      </span>
+                    )}
+                    <div className="mt-1 text-xs text-slate-400">
+                      {receivable.user?.mxId || receivable.user?.email || receivable.providerIdentityId}
+                    </div>
+                  </td>
+                  <td className={crmTdClass}>
+                    <CrmBadge>{receivable.identityType}</CrmBadge>
+                  </td>
+                  <td className={crmTdClass}>
+                    <CrmBadge>{receivable.countryCode}</CrmBadge>
+                  </td>
+                  <td className={crmTdClass}>
+                    <span className={receivable.commissionDue > 0 ? 'font-semibold text-red-700' : 'font-semibold text-slate-900'}>
+                      {formatCurrency(receivable.commissionDue, receivable.currency)}
+                    </span>
+                  </td>
+                  <td className={crmTdClass}>
+                    <CrmBadge
+                      tone={
+                        receivable.status === 'REVIEW_REQUIRED'
+                          ? 'danger'
+                          : receivable.status === 'CASH_RESTRICTED'
+                            ? 'warning'
+                            : receivable.status === 'WARNING'
+                              ? 'warning'
+                              : 'success'
+                      }
+                      dot
+                    >
+                      {receivable.status.replaceAll('_', ' ')}
+                    </CrmBadge>
+                  </td>
+                  <td className={crmTdClass}>
+                    <CrmBadge tone={receivable.cashJobsAllowed ? 'success' : 'danger'} dot>
+                      {receivable.cashJobsAllowed ? 'Allowed' : 'Blocked'}
+                    </CrmBadge>
+                  </td>
+                  <td className={crmTdClass}>
+                    <CrmBadge tone={receivable.onlineJobsAllowed ? 'success' : 'danger'} dot>
+                      {receivable.onlineJobsAllowed ? 'Allowed' : 'Blocked'}
+                    </CrmBadge>
+                  </td>
+                  <td className={crmTdClass}>
+                    {receivable.oldestCommissionDueAt
+                      ? formatDate(receivable.oldestCommissionDueAt)
+                      : '—'}
+                    {receivable.manualReviewRequired && (
+                      <div className="mt-1 text-xs font-semibold text-red-700">
+                        Manual review required
+                      </div>
                     )}
                   </td>
                 </tr>
