@@ -89,6 +89,15 @@ describe('payment provider registry', () => {
     ).toBeNull()
   })
 
+  it('rejects non-CAD PayPal sandbox checkout even if the CA config advertises it', () => {
+    expect(
+      selectProviderFromConfigs(
+        [config({ supportedCurrencies: JSON.stringify(['CAD', 'USD']) })],
+        { countryCode: 'CA', currency: 'USD' }
+      )
+    ).toBeNull()
+  })
+
   it('never selects PayHere for a new checkout even if it has higher priority', () => {
     const selected = selectProviderFromConfigs(
       [
