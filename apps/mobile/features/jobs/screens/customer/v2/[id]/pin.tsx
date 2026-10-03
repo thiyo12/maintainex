@@ -78,6 +78,19 @@ export default function JobPinScreen() {
   }, [id])
 
   const handleGenerate = async () => {
+    const startingWork = Boolean(pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt)
+    if (
+      startingWork &&
+      workerIdentity?.required &&
+      workerIdentity.confirmation?.status !== 'MATCHED'
+    ) {
+      Alert.alert(
+        'Confirm your tasker first',
+        'For your safety, confirm that the person who arrived matches the verified MaintainEX profile before generating the Start Work PIN.'
+      )
+      return
+    }
+
     setActionLoading('generate')
     try {
       const res = await v2JobActions.generatePin(id)
@@ -169,6 +182,55 @@ export default function JobPinScreen() {
           },
         },
       ]
+    )
+  }
+
+  const handleWorkerMatch = async () => {
+    setActionLoading('identity-match')
+    try {
+      const result = await v2JobActions.confirmWorkerIdentity(id, 'MATCH')
+      setWorkerIdentity(prev => prev ? { ...prev, confirmation: result.confirmation } : prev)
+      Alert.alert(
+        'Identity confirmed',
+        'The arriving person matches the verified MaintainEX profile. You can now generate the Start Work PIN when you are ready.'
+      )
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err?.message || 'Could not confirm worker identity.')
+    } finally {
+      setActionLoading('')
+    }
+  }
+
+  const handleWorkerMismatch = () => {
+    Alert.alert(
+      'Different person arrived?',
+      'Do not share the Start Work PIN. MaintainEX will flag this booking for Trust & Safety review.',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: 'Report mismatch',
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoading('identity-mismatch')
+            try {
+              const result = await v2JobActions.confirmWorkerIdentity(
+                id,
+                'MISMATCH',
+                'Customer reported that the arriving person did not match the verified profile.'
+              )
+              setWorkerIdentity(prev => prev ? { ...prev, confirmation: result.confirmation } : prev)
+              Alert.alert(
+                'Mismatch reported',
+                'Work start is blocked. Do not share any PIN until MaintainEX resolves the identity issue.'
+              )
+            } catch (err: any) {
+              Alert.alert(t('common.error'), err?.message || 'Could not report the identity mismatch.')
+            } finally {
+              setActionLoading('')
+            }
+          },
+        },
+      ],
     )
   }
 
