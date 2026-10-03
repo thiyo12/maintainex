@@ -37,6 +37,46 @@ function generatePin(): string {
   return String(crypto.randomInt(min, max + 1))
 }
 
+async function assertWorkerIdentityConfirmedBeforeWorkStartPin(
+  tx: PrismaClientOrTx,
+  jobId: string,
+): Promise<void> {
+  const job = await tx.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { workerIdentityCheckRequired: true },
+  })
+  if (!job?.workerIdentityCheckRequired) return
+
+  const worker = await resolveJobWorkerIdentity(tx, jobId)
+  if (!worker || !worker.identityVerified) {
+    throw new Error('Worker identity is not ready for Start Work PIN')
+  }
+
+  const identityCheck = await tx.jobWorkerIdentityCheck.findUnique({
+    where: {
+      jobId_providerIdentityId: {
+        jobId,
+        providerIdentityId: worker.providerIdentityId,
+      },
+    },
+    select: {
+      assignedWorkerUserId: true,
+      status: true,
+    },
+  })
+
+  if (identityCheck?.status === 'MISMATCH_REPORTED') {
+    throw new Error('Worker identity mismatch requires Trust & Safety review before Start Work PIN')
+  }
+  if (
+    !identityCheck ||
+    identityCheck.assignedWorkerUserId !== worker.assignedWorkerUserId ||
+    identityCheck.status !== 'MATCHED'
+  ) {
+    throw new Error('Customer must confirm the verified worker identity before Start Work PIN')
+  }
+}
+
 export async function generateJobPin(
   jobId: string,
   customerId: string
@@ -72,6 +112,13 @@ export async function generateJobPin(
     },
   })
   const nextVersion = (lastPin?.version ?? 0) + 1
+
+  // The first PIN verifies arrival. Once arrival is consumed, the next PIN is
+  // the Start Work PIN and must not even be generated until the customer has
+  // confirmed the currently assigned verified worker.
+  if (lastPin?.arrivalVerifiedAt && !lastPin.workStartVerifiedAt) {
+    await assertWorkerIdentityConfirmedBeforeWorkStartPin(prisma, jobId)
+  }
 
   const record = await prisma.jobVerificationPin.create({
     data: {
@@ -122,6 +169,10 @@ export async function rotateJobPin(
   })
 
   const nextVersion = (latestPin?.version ?? 0) + 1
+
+  if (latestPin?.arrivalVerifiedAt && !latestPin.workStartVerifiedAt) {
+    await assertWorkerIdentityConfirmedBeforeWorkStartPin(prisma, jobId)
+  }
 
   const pin = generatePin()
   const pinHash = await hashPassword(pin)
