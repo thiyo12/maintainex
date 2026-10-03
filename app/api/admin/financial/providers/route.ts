@@ -14,6 +14,7 @@ import { getPayPalConfig } from '@/lib/finance/payments/paypal-adapter'
 import {
   isLegacyReadOnlyProvider,
   isPayPalMarketVerified,
+  PAYPAL_SANDBOX_FIXTURE_CURRENCY,
   normalizePaymentProvider,
   parseProviderCapabilities,
   parseProviderList,
@@ -228,6 +229,24 @@ export async function PATCH(request: NextRequest) {
             ' in ' +
             environment +
             '. Sandbox launch testing is restricted to CA/CAD and live markets require explicit verification.',
+        },
+        { status: 409 }
+      )
+    }
+    if (
+      enabled &&
+      provider === 'PAYPAL' &&
+      environment === 'SANDBOX' &&
+      (
+        supportedCurrencies.length !== 1 ||
+        supportedCurrencies[0] !== PAYPAL_SANDBOX_FIXTURE_CURRENCY
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'PayPal sandbox launch testing is restricted to CA/CAD. ' +
+            'Configure CAD as the only sandbox currency.',
         },
         { status: 409 }
       )
