@@ -223,3 +223,82 @@ ALTER TABLE "ProviderPhotoChangeRequest"
 ADD CONSTRAINT "ProviderPhotoChangeRequest_providerIdentityId_fkey"
 FOREIGN KEY ("providerIdentityId") REFERENCES "ProviderIdentity"("id")
 ON DELETE RESTRICT ON UPDATE CASCADE;
+
+CREATE TABLE "ProviderCommissionReceivable" (
+    "id" TEXT NOT NULL,
+    "providerIdentityId" TEXT NOT NULL,
+    "weeklySettlementId" TEXT,
+    "jobId" TEXT NOT NULL,
+    "escrowId" TEXT NOT NULL,
+    "currency" TEXT NOT NULL,
+    "amountOriginal" BIGINT NOT NULL,
+    "amountRemaining" BIGINT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'OPEN',
+    "dueAt" TIMESTAMP(3) NOT NULL,
+    "settledAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ProviderCommissionReceivable_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "ProviderCommissionRecovery" (
+    "id" TEXT NOT NULL,
+    "receivableId" TEXT NOT NULL,
+    "providerIdentityId" TEXT NOT NULL,
+    "sourceJobId" TEXT,
+    "sourceEscrowId" TEXT,
+    "amount" BIGINT NOT NULL,
+    "currency" TEXT NOT NULL,
+    "method" TEXT NOT NULL,
+    "idempotencyKey" TEXT NOT NULL,
+    "createdBy" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ProviderCommissionRecovery_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX "ProviderCommissionReceivable_escrowId_key"
+ON "ProviderCommissionReceivable"("escrowId");
+
+CREATE INDEX "ProviderCommissionReceivable_providerIdentityId_currency_status_dueAt_idx"
+ON "ProviderCommissionReceivable"("providerIdentityId", "currency", "status", "dueAt");
+
+CREATE INDEX "ProviderCommissionReceivable_jobId_idx"
+ON "ProviderCommissionReceivable"("jobId");
+
+CREATE INDEX "ProviderCommissionReceivable_weeklySettlementId_idx"
+ON "ProviderCommissionReceivable"("weeklySettlementId");
+
+CREATE UNIQUE INDEX "ProviderCommissionRecovery_idempotencyKey_key"
+ON "ProviderCommissionRecovery"("idempotencyKey");
+
+CREATE INDEX "ProviderCommissionRecovery_providerIdentityId_createdAt_idx"
+ON "ProviderCommissionRecovery"("providerIdentityId", "createdAt");
+
+CREATE INDEX "ProviderCommissionRecovery_receivableId_idx"
+ON "ProviderCommissionRecovery"("receivableId");
+
+CREATE INDEX "ProviderCommissionRecovery_sourceEscrowId_idx"
+ON "ProviderCommissionRecovery"("sourceEscrowId");
+
+ALTER TABLE "ProviderCommissionReceivable"
+ADD CONSTRAINT "ProviderCommissionReceivable_providerIdentityId_fkey"
+FOREIGN KEY ("providerIdentityId") REFERENCES "ProviderIdentity"("id")
+ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "ProviderCommissionReceivable"
+ADD CONSTRAINT "ProviderCommissionReceivable_weeklySettlementId_fkey"
+FOREIGN KEY ("weeklySettlementId") REFERENCES "WeeklySettlement"("id")
+ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE "ProviderCommissionRecovery"
+ADD CONSTRAINT "ProviderCommissionRecovery_receivableId_fkey"
+FOREIGN KEY ("receivableId") REFERENCES "ProviderCommissionReceivable"("id")
+ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "ProviderCommissionRecovery"
+ADD CONSTRAINT "ProviderCommissionRecovery_providerIdentityId_fkey"
+FOREIGN KEY ("providerIdentityId") REFERENCES "ProviderIdentity"("id")
+ON DELETE RESTRICT ON UPDATE CASCADE;
+
