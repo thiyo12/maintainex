@@ -10,6 +10,7 @@ import {
 import { evaluateActionInitiation } from '@/lib/crm/governance'
 import { consumeCrmStepUpFromHeader } from '@/lib/crm/governance/step-up'
 import { auditWalletFreeze, auditWalletUnfreeze } from '@/lib/financial-audit'
+import { readCanonicalProviderBalance } from '@/lib/financial-read'
 
 async function scopedUserIds(countryFilter: ReturnType<typeof getCrmCountryFilter>) {
   if (countryFilter.id === '__NONE__') return ['__NONE__']
@@ -189,8 +190,20 @@ export async function GET(request: NextRequest) {
           })
         : []
       const userMap = new Map(users.map(user => [user.id, user]))
+      const canonicalByAccountId = new Map(
+        await Promise.all(
+          accounts.map(async account => {
+            const userId = account.providerIdentity.currentUserId
+            if (!userId) return [account.id, null] as const
+            const canonical = await readCanonicalProviderBalance(userId, account.currency as any)
+            return [account.id, canonical] as const
+          }),
+        ),
+      )
 
-      providerReceivables = accounts.map(account => ({
+      providerReceivables = accounts.map(account => {
+        const canonical = canonicalByAccountId.get(account.id)
+        return ({
         id: account.id,
         providerIdentityId: account.providerIdentityId,
         identityType: account.providerIdentity.identityType,
@@ -202,13 +215,17 @@ export async function GET(request: NextRequest) {
         currency: account.currency,
         commissionDueMinor: account.commissionDue.toString(),
         commissionDue: Number(account.commissionDue) / 100,
-        availableEarningsMinor: account.availableEarnings.toString(),
-        pendingEarningsMinor: account.pendingEarnings.toString(),
+        adjustmentDueMinor: account.adjustmentDue.toString(),
+        adjustmentDue: Number(account.adjustmentDue) / 100,
+        totalLiabilityMinor: (account.commissionDue + account.adjustmentDue).toString(),
+        availableEarningsMinor: (canonical?.availableBalance ?? 0n).toString(),
+        pendingEarningsMinor: (canonical?.pendingBalance ?? 0n).toString(),
         status: account.status,
         cashJobsAllowed: account.cashJobsAllowed,
         onlineJobsAllowed: account.onlineJobsAllowed,
         manualReviewRequired: account.manualReviewRequired,
         oldestCommissionDueAt: account.oldestCommissionDueAt?.toISOString() ?? null,
+        oldestAdjustmentDueAt: account.oldestAdjustmentDueAt?.toISOString() ?? null,
         updatedAt: account.updatedAt.toISOString(),
         recentRecoveries: account.providerIdentity.commissionRecoveries
           .filter(recovery => recovery.currency === account.currency)
@@ -225,7 +242,8 @@ export async function GET(request: NextRequest) {
         user: account.providerIdentity.currentUserId
           ? userMap.get(account.providerIdentity.currentUserId) || null
           : null,
-      }))
+        })
+      })
     } else if (type === 'customers') {
       const [wallets, count] = await Promise.all([
         prisma.customerWallet.findMany({
