@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { bigIntToSafeNumber, getCurrencyForCountry } from '@/lib/shared/money/money'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,11 +20,32 @@ export async function GET(request: NextRequest) {
 
     const company = await prisma.companyProfile.findUnique({
       where: { id: context!.companyId },
-      select: { userId: true },
+      select: { userId: true, countryCode: true },
     })
     if (!company) {
       return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
     }
+
+    const currency = getCurrencyForCountry(company.countryCode || 'LK')
+    const financialIdentity = await prisma.providerIdentity.findUnique({
+      where: {
+        identityType_subjectId: {
+          identityType: 'COMPANY',
+          subjectId: context!.companyId,
+        },
+      },
+      select: { id: true },
+    })
+    const financialAccount = financialIdentity
+      ? await prisma.providerFinancialAccount.findUnique({
+          where: {
+            providerIdentityId_currency: {
+              providerIdentityId: financialIdentity.id,
+              currency,
+            },
+          },
+        })
+      : null
 
     const contracts = await prisma.contract.findMany({
       where: { companyId: context!.companyId },
@@ -61,6 +83,16 @@ export async function GET(request: NextRequest) {
       contractCount: contracts.length,
       completedCount: completedContracts.length,
       pendingCount: contracts.filter(c => c.status === 'IN_PROGRESS').length,
+      maintainexBalance: {
+        commissionDueMinor: (financialAccount?.commissionDue ?? 0n).toString(),
+        commissionDue: bigIntToSafeNumber(financialAccount?.commissionDue ?? 0n) / 100,
+        status: financialAccount?.status ?? 'CLEAR',
+        cashJobsAllowed: financialAccount?.cashJobsAllowed ?? true,
+        onlineJobsAllowed: financialAccount?.onlineJobsAllowed ?? true,
+        manualReviewRequired: financialAccount?.manualReviewRequired ?? false,
+        oldestCommissionDueAt: financialAccount?.oldestCommissionDueAt?.toISOString() ?? null,
+        currency,
+      },
       milestones: contracts.flatMap(c =>
         c.milestones.map(m => ({
           contractTitle: c.title,
