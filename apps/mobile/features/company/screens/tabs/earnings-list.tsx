@@ -39,6 +39,7 @@ export default function CompanyEarnings() {
   const paidOut = earnings?.paidOut || 0
   const avgPerJob = earnings?.avgPerJob || 0
   const revenueChange = earnings?.revenueChange || 0
+  const displayCurrency = earnings?.currency || earnings?.maintainexBalance?.currency || 'LKR'
 
   if (loading) {
     return (
@@ -58,7 +59,7 @@ export default function CompanyEarnings() {
 
       <View style={styles.revenueCard}>
         <Text style={styles.revenueLabel}>{t('tasker.totalEarned')}</Text>
-        <Text style={styles.revenueValue}>LKR {Number(totalRevenue).toLocaleString()}</Text>
+        <Text style={styles.revenueValue}>{displayCurrency} {Number(totalRevenue).toLocaleString()}</Text>
         <Text style={styles.revenuePeriod}>{t('company.thisPeriod', { period })}</Text>
         <View style={styles.revenueChange}>
           <Text style={styles.changeText}>↑ {revenueChange}% {t('company.fromLast', { period })}</Text>
@@ -164,7 +165,7 @@ export default function CompanyEarnings() {
                 <Ionicons name="cash-outline" size={20} color={colors.amber} />
                 <Text style={styles.commissionRef}>{cp.referenceNumber}</Text>
               </View>
-              <Text style={styles.commissionAmount}>LKR {cp.amountDue.toLocaleString()}</Text>
+              <Text style={styles.commissionAmount}>{displayCurrency} {cp.amountDue.toLocaleString()}</Text>
               <Text style={styles.commissionInstruction}>
                 Pay this amount to any MΛINTΛINEX agent using reference: {cp.referenceNumber}
               </Text>
@@ -179,15 +180,15 @@ export default function CompanyEarnings() {
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>{t('wallet.pending')}</Text>
-          <Text style={styles.statValue}>LKR {Number(pendingAmount).toLocaleString()}</Text>
+          <Text style={styles.statValue}>{displayCurrency} {Number(pendingAmount).toLocaleString()}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>{t('wallet.withdraw')}</Text>
-          <Text style={styles.statValue}>LKR {Number(paidOut).toLocaleString()}</Text>
+          <Text style={styles.statValue}>{displayCurrency} {Number(paidOut).toLocaleString()}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>{t('tasker.earnings')}</Text>
-          <Text style={styles.statValue}>LKR {Number(avgPerJob).toLocaleString()}</Text>
+          <Text style={styles.statValue}>{displayCurrency} {Number(avgPerJob).toLocaleString()}</Text>
         </View>
       </View>
 
@@ -225,7 +226,7 @@ export default function CompanyEarnings() {
                 </View>
                 <View style={styles.payoutRight}>
                   <Text style={[styles.payoutAmount, { color: isPaid ? colors.success : colors.amber }]}>
-                    LKR {Number(p.amount).toLocaleString()}
+                    {p.currency || displayCurrency} {Number(p.amount).toLocaleString()}
                   </Text>
                   <Text style={styles.payoutStatus}>{statusLabel}</Text>
                 </View>
