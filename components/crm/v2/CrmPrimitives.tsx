@@ -41,7 +41,7 @@ export function CrmBadge({
   }[tone]
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none ${badgeTone[tone]}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-[5px] text-[10px] font-semibold leading-none ${badgeTone[tone]}`}>
       {dot && <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />}
       {children}
     </span>
@@ -72,8 +72,8 @@ export function CrmButton({
     danger: 'crm-danger-action text-white border-[var(--crm-danger)]',
   }
   const sizes = {
-    sm: 'h-8 px-3 text-xs rounded-[9px]',
-    md: 'h-10 px-4 text-sm rounded-[11px]',
+    sm: 'h-8 px-3 text-[11px] rounded-[8px]',
+    md: 'h-9 px-3.5 text-xs rounded-[9px]',
   }
 
   return (
@@ -109,11 +109,11 @@ export function CrmPageHeader({
             {eyebrow}
           </div>
         )}
-        <h1 className="text-[26px] font-semibold tracking-[-0.025em] text-[var(--crm-text)] md:text-[30px]">
+        <h1 className="text-[22px] font-semibold tracking-[-0.025em] text-[var(--crm-text)] md:text-[24px]">
           {title}
         </h1>
         {description && (
-          <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[var(--crm-text-muted)]">
+          <p className="mt-1 max-w-3xl text-[13px] leading-5 text-[var(--crm-text-muted)]">
             {description}
           </p>
         )}
@@ -139,14 +139,14 @@ export function CrmCard({
   className?: string
   padding?: 'none' | 'sm' | 'md'
 }) {
-  const paddingClass = padding === 'none' ? '' : padding === 'sm' ? 'p-4' : 'p-5'
+  const paddingClass = padding === 'none' ? '' : padding === 'sm' ? 'p-3.5' : 'p-4'
   return (
     <section className={`crm-card overflow-hidden ${className}`}>
       {(title || description || action) && (
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--crm-border)] px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--crm-border)] px-4 py-3.5">
           <div>
-            {title && <h2 className="text-sm font-semibold text-slate-900">{title}</h2>}
-            {description && <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>}
+            {title && <h2 className="text-[13px] font-semibold text-slate-900">{title}</h2>}
+            {description && <p className="mt-1 text-[11px] leading-4 text-slate-500">{description}</p>}
           </div>
           {action}
         </div>
@@ -181,13 +181,13 @@ export function CrmMetricCard({
   }
 
   return (
-    <div className="crm-card min-h-[132px] p-[18px]">
+    <div className="crm-card min-h-[112px] p-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-xs font-medium text-slate-500">{label}</div>
-        {icon && <div className={`grid h-9 w-9 place-items-center rounded-xl ${iconTone[tone]}`}>{icon}</div>}
+        <div className="text-[11px] font-medium text-slate-500">{label}</div>
+        {icon && <div className={`grid h-8 w-8 place-items-center rounded-[9px] ${iconTone[tone]}`}>{icon}</div>}
       </div>
-      <div className="mt-3 text-[28px] font-semibold tracking-[-0.035em] text-slate-950">{value}</div>
-      <div className="mt-2 flex min-h-5 items-center justify-between gap-3 text-xs">
+      <div className="mt-2.5 text-[24px] font-semibold tracking-[-0.035em] text-slate-950">{value}</div>
+      <div className="mt-1.5 flex min-h-4 items-center justify-between gap-3 text-[11px]">
         <span className="text-slate-400">{helper}</span>
         {trend && <span className="font-medium text-slate-600">{trend}</span>}
       </div>
@@ -220,11 +220,11 @@ export function CrmField({
 }
 
 export const crmInputClass =
-  'h-10 w-full rounded-[11px] border border-[var(--crm-border)] bg-white px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-amber-300 focus:ring-2 focus:ring-amber-100 disabled:bg-slate-50 disabled:text-slate-400'
+  'h-9 w-full rounded-[9px] border border-[var(--crm-border)] bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-amber-300 focus:ring-2 focus:ring-amber-100 disabled:bg-slate-50 disabled:text-slate-400'
 
 export function CrmFilterBar({ children }: { children: ReactNode }) {
   return (
-    <div className="crm-card flex flex-col gap-3 p-3 md:flex-row md:items-center">
+    <div className="crm-card flex flex-col gap-2.5 p-2.5 md:flex-row md:items-center">
       {children}
     </div>
   )
@@ -244,7 +244,7 @@ export function CrmTableFrame({
   return (
     <div className="crm-card overflow-hidden">
       {(title || description || action) && (
-        <div className="flex items-center justify-between gap-4 border-b border-[var(--crm-border)] px-5 py-4">
+        <div className="flex items-center justify-between gap-4 border-b border-[var(--crm-border)] px-4 py-3.5">
           <div>
             {title && <div className="text-sm font-semibold text-slate-900">{title}</div>}
             {description && <div className="mt-1 text-xs text-slate-500">{description}</div>}
@@ -259,9 +259,9 @@ export function CrmTableFrame({
 
 export const crmTableClass = 'w-full border-collapse text-left'
 export const crmThClass =
-  'whitespace-nowrap border-b border-[var(--crm-border)] bg-[#fafbf9] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400'
+  'whitespace-nowrap border-b border-[var(--crm-border)] bg-[#fafbfc] px-3.5 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400'
 export const crmTdClass =
-  'border-b border-[var(--crm-border)] px-4 py-3.5 text-sm text-slate-700'
+  'border-b border-[var(--crm-border)] px-3.5 py-3 text-[13px] text-slate-700'
 
 export function CrmTabs({
   items,
@@ -281,7 +281,7 @@ export function CrmTabs({
             type="button"
             key={item.id}
             onClick={() => onChange(item.id)}
-            className={`relative flex h-10 items-center gap-2 whitespace-nowrap px-3 text-xs font-semibold transition-colors ${
+            className={`relative flex h-9 items-center gap-2 whitespace-nowrap px-3 text-[11px] font-semibold transition-colors ${
               selected
                 ? 'text-slate-950'
                 : 'text-slate-500 hover:text-slate-900'
