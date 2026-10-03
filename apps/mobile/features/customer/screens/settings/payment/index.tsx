@@ -18,10 +18,8 @@ export default function PaymentScreen() {
   }, [])
 
   const methods = [
-    { name: t('payment.methodVisa'), icon: 'card-outline' as const },
-    { name: t('payment.methodMastercard'), icon: 'card-outline' as const },
-    { name: t('payment.methodPayHere'), icon: 'wallet-outline' as const },
-    { name: t('payment.methodStripe'), icon: 'link-outline' as const },
+    { name: 'PayPal online checkout', icon: 'wallet-outline' as const },
+    { name: 'Cash payment', icon: 'cash-outline' as const },
   ]
 
   return (
