@@ -118,7 +118,7 @@ export default function WebsiteManagementPage() {
     overview.offers.activeFlash
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="App & Web · Public surface"
         title="Website management"
@@ -148,7 +148,7 @@ export default function WebsiteManagementPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Active categories"
           value={overview.catalog.categories.active.toLocaleString()}
@@ -179,7 +179,7 @@ export default function WebsiteManagementPage() {
         />
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-2">
+      <section className="grid gap-4 lg:grid-cols-2">
         <CrmCard
           title="Services & categories"
           description="Create drafts and publish market-scoped catalog entries through the governed catalog workspace."
