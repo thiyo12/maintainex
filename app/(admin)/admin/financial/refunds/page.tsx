@@ -268,7 +268,7 @@ export default function RefundQueuePage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Finance · Payment recovery"
         title="Refund Queue"
@@ -299,7 +299,7 @@ export default function RefundQueuePage() {
         </Link>
       </div>
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Refund required"
           value={metrics.required}
@@ -520,7 +520,7 @@ export default function RefundQueuePage() {
         </CrmTableFrame>
       )}
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <div className="rounded-[12px] border border-amber-200 bg-amber-50 p-3.5">
         <div className="flex items-start gap-3">
           <FiShield className="mt-0.5 shrink-0 text-amber-700" size={16} />
           <div>
