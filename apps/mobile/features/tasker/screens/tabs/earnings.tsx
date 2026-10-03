@@ -151,9 +151,9 @@ export default function TaskerEarnings() {
 
           {(data?.recentCommissionRecoveries || []).length > 0 && (
             <View style={styles.recoverySection}>
-              <Text style={styles.recoveryTitle}>Recent automatic recoveries</Text>
+              <Text style={styles.recoveryTitle}>Recent commission settlements</Text>
               <Text style={styles.recoveryHelp}>
-                These amounts were applied from online-job earnings to older cash-job commission due.
+                Online offsets and confirmed direct payments reduce older cash-job commission due.
               </Text>
               {data?.recentCommissionRecoveries?.slice(0, 5).map((recovery) => (
                 <View key={recovery.id} style={styles.recoveryCard}>
@@ -162,10 +162,12 @@ export default function TaskerEarnings() {
                   </View>
                   <View style={styles.recoveryBody}>
                     <Text style={styles.recoveryAmount}>
-                      {recovery.currency} {recovery.amount.toLocaleString()} recovered
+                      {recovery.currency} {recovery.amount.toLocaleString()} {recovery.method === 'ONLINE_EARNINGS' ? 'recovered from online earnings' : 'direct payment confirmed'}
                     </Text>
                     <Text style={styles.recoveryMeta}>
-                      Online job {recovery.sourceJobId?.slice(0, 8) || '—'} → cash job {recovery.originalCashJobId.slice(0, 8)}
+                      {recovery.method === 'ONLINE_EARNINGS'
+                        ? `Online job ${recovery.sourceJobId?.slice(0, 8) || '—'} → cash job ${recovery.originalCashJobId.slice(0, 8)}`
+                        : `Cash job ${recovery.originalCashJobId.slice(0, 8)}`}
                     </Text>
                     <Text style={styles.recoveryMeta}>
                       {new Date(recovery.createdAt).toLocaleString()}
