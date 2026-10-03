@@ -3,6 +3,7 @@ import { prisma, type PrismaClientOrTx } from '../prisma'
 import { hashPassword, verifyPassword } from '../security/password'
 import { emitSecurityEvent } from '../security/events'
 import { recordJobLifecycleEvent } from './job-lifecycle-audit'
+import { resolveJobWorkerIdentity } from '@/lib/identity/job-worker-identity'
 
 const PIN_LENGTH = 6
 const MAX_FAILED_ATTEMPTS = 5
@@ -236,11 +237,49 @@ export async function verifyJobPin(
       return { valid: false, error: 'PIN is temporarily locked', locked: true }
     }
 
-    // 5. Validate lifecycle state for this purpose
+    // 5. Enforce worker identity confirmation before work starts.
+    if (purpose === 'WORK_START' && job.workerIdentityCheckRequired) {
+      const worker = await resolveJobWorkerIdentity(tx, jobId)
+      if (!worker) {
+        return { valid: false, error: 'Worker identity is not ready for work start' }
+      }
+      if (worker.assignedWorkerUserId !== actorId) {
+        return { valid: false, error: 'Worker identity does not match the assigned worker' }
+      }
+      if (!worker.identityVerified) {
+        return { valid: false, error: 'Worker identity photo is not verified by MaintainEX' }
+      }
+
+      const identityCheck = await tx.jobWorkerIdentityCheck.findUnique({
+        where: {
+          jobId_providerIdentityId: {
+            jobId,
+            providerIdentityId: worker.providerIdentityId,
+          },
+        },
+        select: {
+          assignedWorkerUserId: true,
+          status: true,
+        },
+      })
+
+      if (
+        !identityCheck ||
+        identityCheck.assignedWorkerUserId !== actorId ||
+        identityCheck.status !== 'MATCHED'
+      ) {
+        if (identityCheck?.status === 'MISMATCH_REPORTED') {
+          return { valid: false, error: 'Customer reported a worker identity mismatch; work start is blocked' }
+        }
+        return { valid: false, error: 'Customer must confirm the verified worker identity before work start' }
+      }
+    }
+
+    // 6. Validate lifecycle state for this purpose
     const purposeValid = await validatePurposeTx(tx, jobId, purpose)
     if (!purposeValid) return { valid: false, error: `Cannot verify PIN for ${purpose} in current job state` }
 
-    // 6. Check if purpose already consumed (atomic per-purpose guard)
+    // 7. Check if purpose already consumed (atomic per-purpose guard)
     const purposeField =
       purpose === 'ARRIVAL' ? 'arrivalVerifiedAt'
       : purpose === 'WORK_START' ? 'workStartVerifiedAt'
@@ -256,7 +295,7 @@ export async function verifyJobPin(
       return { valid: false, error: `PIN already verified for ${purpose}` }
     }
 
-    // 7. Verify PIN hash
+    // 8. Verify PIN hash
     const pinValid = await verifyPassword(pin, pinRecord.pinHash)
     if (!pinValid) {
       // Atomic increment: read from locked row, increment, write back
@@ -298,7 +337,7 @@ export async function verifyJobPin(
       return { valid: false, error: 'Incorrect PIN', locked: lockUntil !== null }
     }
 
-    // 8. Valid PIN: mark purpose consumed + canonical lifecycle transition (atomic)
+    // 9. Valid PIN: mark purpose consumed + canonical lifecycle transition (atomic)
     const now = new Date()
     const updateData: Record<string, unknown> = {
       failedAttempts: 0,
@@ -315,7 +354,7 @@ export async function verifyJobPin(
       },
     })
 
-    // 9. Execute the single canonical WORK_START transition atomically.
+    // 10. Execute the single canonical WORK_START transition atomically.
     // Payment only protects escrow; work does not begin until this PIN succeeds.
     if (purpose === 'WORK_START') {
       const jobClaimed = await tx.marketplaceJob.updateMany({
@@ -364,7 +403,7 @@ export async function verifyJobPin(
       metadata: { purpose, pinVersion: pinRecord.version },
     })
 
-    // 10. Emit security events
+    // 11. Emit security events
     const eventType = purpose === 'ARRIVAL' ? 'job_pin_arrival_verified'
       : purpose === 'WORK_START' ? 'job_pin_work_start_verified'
       : 'job_pin_completion_verified'
