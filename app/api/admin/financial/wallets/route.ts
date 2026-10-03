@@ -149,6 +149,23 @@ export async function GET(request: NextRequest) {
                 countryCode: true,
                 kycStatus: true,
                 standingStatus: true,
+                commissionRecoveries: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 5,
+                  select: {
+                    id: true,
+                    sourceJobId: true,
+                    amount: true,
+                    currency: true,
+                    method: true,
+                    createdAt: true,
+                    receivable: {
+                      select: {
+                        jobId: true,
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -193,6 +210,18 @@ export async function GET(request: NextRequest) {
         manualReviewRequired: account.manualReviewRequired,
         oldestCommissionDueAt: account.oldestCommissionDueAt?.toISOString() ?? null,
         updatedAt: account.updatedAt.toISOString(),
+        recentRecoveries: account.providerIdentity.commissionRecoveries
+          .filter(recovery => recovery.currency === account.currency)
+          .map(recovery => ({
+            id: recovery.id,
+            amountMinor: recovery.amount.toString(),
+            amount: Number(recovery.amount) / 100,
+            currency: recovery.currency,
+            method: recovery.method,
+            sourceJobId: recovery.sourceJobId,
+            originalCashJobId: recovery.receivable.jobId,
+            createdAt: recovery.createdAt.toISOString(),
+          })),
         user: account.providerIdentity.currentUserId
           ? userMap.get(account.providerIdentity.currentUserId) || null
           : null,
