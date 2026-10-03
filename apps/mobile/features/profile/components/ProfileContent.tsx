@@ -174,6 +174,8 @@ export default function ProfileContent() {
             onPress={() => router.push('/settings/terms')} />
           <MenuRow icon={Info} label={t('profile.about')} color="#EC4899"
             onPress={() => router.push('/settings/about')} />
+          <MenuRow icon={SignOut} label="Close account" color={colors.error}
+            onPress={() => router.push('/settings/account-close' as any)} />
         </View>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
