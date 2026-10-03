@@ -74,25 +74,22 @@ async function assertProviderFinancialPayoutEligible(
   userId: string,
   currency: Currency,
 ): Promise<{ ok: true } | { ok: false; error: string; code: string }> {
-  const identity = await prisma.providerIdentity.findFirst({
+  const identityWithAdjustment = await prisma.providerIdentity.findFirst({
     where: {
       currentUserId: userId,
       identityType: { in: ['TASKER', 'COMPANY'] },
       closedAt: null,
-    },
-    select: {
       financialAccounts: {
-        where: { currency },
-        select: {
-          adjustmentDue: true,
-          status: true,
+        some: {
+          currency,
+          adjustmentDue: { gt: 0 },
         },
       },
     },
+    select: { id: true },
   })
 
-  const account = identity?.financialAccounts[0]
-  if (account?.adjustmentDue && account.adjustmentDue > 0n) {
+  if (identityWithAdjustment) {
     return {
       ok: false,
       error: 'Payout is blocked while a post-payment financial adjustment is unresolved',
