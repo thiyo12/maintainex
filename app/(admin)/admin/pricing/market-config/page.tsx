@@ -245,7 +245,7 @@ export default function MarketConfigPage() {
   const waveTotal = config.wave1Size + config.wave2Size + config.wave3Size
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="App & Web · Market policy"
         title="Market configuration"
@@ -282,7 +282,7 @@ export default function MarketConfigPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CrmMetricCard
           label="Currency"
           value={config.defaultCurrency}
@@ -313,7 +313,7 @@ export default function MarketConfigPage() {
         />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-2">
+      <section className="grid gap-4 xl:grid-cols-2">
         <ConfigGroup
           title="Matching weights"
           description="Scoring weights used by the provider-matching engine."
@@ -369,7 +369,7 @@ export default function MarketConfigPage() {
           </CrmBadge>
         }
       >
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <CrmField
             label="Change reason"
             hint="Required for configuration updates. This becomes part of the audit record."
@@ -431,7 +431,7 @@ function ConfigGroup({
       description={description}
       action={<span className="text-slate-400">{icon}</span>}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3.5 sm:grid-cols-2">
         {fields.map(field => {
           const pricingLocked = Boolean(field.pricing && !canManagePricing)
           const disabled = !canManage || pricingLocked
