@@ -22,6 +22,17 @@ describe('PayPal-only launch strategy', () => {
     expect(paymentSettings).not.toContain('methodStripe')
   })
 
+  it('keeps the CRM provider control aligned with PayHere legacy/read-only policy', () => {
+    const page = source(
+      'app/(admin)/admin/financial/providers/page.tsx'
+    )
+
+    expect(page).toContain('Legacy / read only / disabled for new checkout')
+    expect(page).toContain("form.provider === 'PAYHERE'")
+    expect(page).toContain('Legacy read only')
+    expect(page).not.toContain('<option value="PAYHERE">PayHere</option>')
+  })
+
   it('keeps both active payment creation routes on the same fail-closed policy', () => {
     const paymentRoute = source(
       'app/api/mobile/v2/jobs/[id]/payment/route.ts'
