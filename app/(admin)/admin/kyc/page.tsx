@@ -175,7 +175,7 @@ export default function KYCPage() {
 
   return (
     <>
-      <div className="space-y-5">
+      <div className="space-y-4">
         <CrmPageHeader
           eyebrow="Trust & Safety"
           title="KYC verification"
@@ -190,7 +190,7 @@ export default function KYCPage() {
           }
         />
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <CrmMetricCard
             label="Pending"
             value={summary.pending.toLocaleString()}
