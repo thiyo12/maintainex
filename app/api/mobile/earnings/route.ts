@@ -95,6 +95,39 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
+    const taskerIdentity = await prisma.providerIdentity.findFirst({
+      where: {
+        currentUserId: user.id,
+        identityType: 'TASKER',
+      },
+      select: { id: true },
+    })
+    const recentCommissionRecoveries = taskerIdentity
+      ? await prisma.providerCommissionRecovery.findMany({
+          where: {
+            providerIdentityId: taskerIdentity.id,
+            currency,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            sourceJobId: true,
+            sourceEscrowId: true,
+            amount: true,
+            currency: true,
+            method: true,
+            createdAt: true,
+            receivable: {
+              select: {
+                jobId: true,
+                escrowId: true,
+              },
+            },
+          },
+        })
+      : []
+
     return NextResponse.json({
       countryCode,
       currency,
@@ -116,6 +149,17 @@ export async function GET(request: NextRequest) {
         currency,
       },
       completedJobs,
+      recentCommissionRecoveries: recentCommissionRecoveries.map(recovery => ({
+        id: recovery.id,
+        amountMinor: recovery.amount.toString(),
+        amount: bigIntToSafeNumber(recovery.amount) / 100,
+        currency: recovery.currency,
+        method: recovery.method,
+        sourceJobId: recovery.sourceJobId,
+        sourceEscrowId: recovery.sourceEscrowId,
+        originalCashJobId: recovery.receivable.jobId,
+        createdAt: recovery.createdAt.toISOString(),
+      })),
       recentPayouts: payouts.slice(0, 20).map(p => ({
         id: p.id,
         amount: bigIntToSafeNumber(p.amount) / 100,
