@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '30', 10) || 30))
     const skip = (page - 1) * limit
 
-    if (!['providers', 'customers', 'transactions'].includes(type)) {
+    if (!['providers', 'receivables', 'customers', 'transactions'].includes(type)) {
       return NextResponse.json({ error: 'Invalid wallet view' }, { status: 400 })
     }
 
@@ -102,6 +102,7 @@ export async function GET(request: NextRequest) {
     })
 
     let providerWallets: any[] = []
+    let providerReceivables: any[] = []
     let customerWallets: any[] = []
     let transactions: any[] = []
     let total = 0
@@ -129,6 +130,72 @@ export async function GET(request: NextRequest) {
       providerWallets = wallets.map(wallet => ({
         ...wallet,
         user: userMap.get(wallet.userId) || null,
+      }))
+    } else if (type === 'receivables') {
+      const identityWhere = userIds
+        ? { providerIdentity: { currentUserId: { in: userIds } } }
+        : {}
+
+      const [accounts, count] = await Promise.all([
+        prisma.providerFinancialAccount.findMany({
+          where: identityWhere,
+          include: {
+            providerIdentity: {
+              select: {
+                id: true,
+                identityType: true,
+                subjectId: true,
+                currentUserId: true,
+                countryCode: true,
+                kycStatus: true,
+                standingStatus: true,
+              },
+            },
+          },
+          orderBy: [{ commissionDue: 'desc' }, { updatedAt: 'desc' }],
+          skip,
+          take: limit,
+        }),
+        prisma.providerFinancialAccount.count({ where: identityWhere }),
+      ])
+      total = count
+
+      const ids = [...new Set(
+        accounts
+          .map(account => account.providerIdentity.currentUserId)
+          .filter((value): value is string => Boolean(value))
+      )]
+      const users = ids.length
+        ? await prisma.user.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, name: true, email: true, mxId: true, countryCode: true },
+          })
+        : []
+      const userMap = new Map(users.map(user => [user.id, user]))
+
+      providerReceivables = accounts.map(account => ({
+        id: account.id,
+        providerIdentityId: account.providerIdentityId,
+        identityType: account.providerIdentity.identityType,
+        subjectId: account.providerIdentity.subjectId,
+        currentUserId: account.providerIdentity.currentUserId,
+        countryCode: account.providerIdentity.countryCode,
+        kycStatus: account.providerIdentity.kycStatus,
+        standingStatus: account.providerIdentity.standingStatus,
+        currency: account.currency,
+        commissionDueMinor: account.commissionDue.toString(),
+        commissionDue: Number(account.commissionDue) / 100,
+        availableEarningsMinor: account.availableEarnings.toString(),
+        pendingEarningsMinor: account.pendingEarnings.toString(),
+        status: account.status,
+        cashJobsAllowed: account.cashJobsAllowed,
+        onlineJobsAllowed: account.onlineJobsAllowed,
+        manualReviewRequired: account.manualReviewRequired,
+        oldestCommissionDueAt: account.oldestCommissionDueAt?.toISOString() ?? null,
+        updatedAt: account.updatedAt.toISOString(),
+        user: account.providerIdentity.currentUserId
+          ? userMap.get(account.providerIdentity.currentUserId) || null
+          : null,
       }))
     } else if (type === 'customers') {
       const [wallets, count] = await Promise.all([
@@ -183,6 +250,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         providerWallets,
+        providerReceivables,
         customerWallets,
         transactions,
         summaryByCurrency,
