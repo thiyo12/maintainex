@@ -63,11 +63,17 @@ interface ProviderReceivable {
   currency: string
   commissionDue: number
   commissionDueMinor: string
+  adjustmentDue: number
+  adjustmentDueMinor: string
+  totalLiabilityMinor: string
+  availableEarningsMinor: string
+  pendingEarningsMinor: string
   status: string
   cashJobsAllowed: boolean
   onlineJobsAllowed: boolean
   manualReviewRequired: boolean
   oldestCommissionDueAt?: string | null
+  oldestAdjustmentDueAt?: string | null
   updatedAt: string
   recentRecoveries: Array<{
     id: string
@@ -77,6 +83,19 @@ interface ProviderReceivable {
     method: string
     sourceJobId?: string | null
     originalCashJobId: string
+    createdAt: string
+  }>
+  recentAdjustmentRecoveries: Array<{
+    id: string
+    amount: number
+    amountMinor: string
+    currency: string
+    method: string
+    sourceJobId?: string | null
+    adjustmentId: string
+    adjustmentType: string
+    originalJobId: string
+    sourceProvider: string
     createdAt: string
   }>
   user?: WalletUser | null
@@ -475,7 +494,7 @@ export default function WalletsPage() {
       ) : activeTab === 'receivables' ? (
         <CrmTableFrame
           title="Provider receivables"
-          description="Cash-job commission and platform amounts owed to MaintainEX. These balances are ledger-backed and read only here."
+          description="Commission receivables and post-payment provider adjustments owed to MaintainEX. Balances are ledger-backed and read only here."
         >
           <table className={`${crmTableClass} min-w-[1340px]`}>
             <thead>
@@ -484,6 +503,7 @@ export default function WalletsPage() {
                 <th className={crmThClass}>Type</th>
                 <th className={crmThClass}>Market</th>
                 <th className={crmThClass}>Commission due</th>
+                <th className={crmThClass}>Adjustment due</th>
                 <th className={crmThClass}>Standing</th>
                 <th className={crmThClass}>Cash jobs</th>
                 <th className={crmThClass}>Online jobs</th>
@@ -523,6 +543,16 @@ export default function WalletsPage() {
                     </span>
                   </td>
                   <td className={crmTdClass}>
+                    <span className={receivable.adjustmentDue > 0 ? 'font-semibold text-red-700' : 'font-semibold text-slate-900'}>
+                      {formatCurrency(receivable.adjustmentDue, receivable.currency)}
+                    </span>
+                    {receivable.adjustmentDue > 0 && (
+                      <div className="mt-1 text-[11px] font-semibold text-red-600">
+                        Post-payment liability
+                      </div>
+                    )}
+                  </td>
+                  <td className={crmTdClass}>
                     <CrmBadge
                       tone={
                         receivable.status === 'REVIEW_REQUIRED'
@@ -551,7 +581,9 @@ export default function WalletsPage() {
                   <td className={crmTdClass}>
                     {receivable.oldestCommissionDueAt
                       ? formatDate(receivable.oldestCommissionDueAt)
-                      : '—'}
+                      : receivable.oldestAdjustmentDueAt
+                        ? formatDate(receivable.oldestAdjustmentDueAt)
+                        : '—'}
                     {receivable.manualReviewRequired && (
                       <div className="mt-1 text-xs font-semibold text-red-700">
                         Manual review required
@@ -559,7 +591,22 @@ export default function WalletsPage() {
                     )}
                   </td>
                   <td className={crmTdClass}>
-                    {receivable.recentRecoveries?.[0] ? (
+                    {receivable.recentAdjustmentRecoveries?.[0] ? (
+                      <>
+                        <div className="font-semibold text-emerald-700">
+                          {formatCurrency(
+                            receivable.recentAdjustmentRecoveries[0].amount,
+                            receivable.recentAdjustmentRecoveries[0].currency
+                          )}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          Adjustment · {receivable.recentAdjustmentRecoveries[0].adjustmentType.replaceAll('_', ' ')}
+                        </div>
+                        <div className="mt-1 text-[10px] text-slate-400">
+                          {formatDate(receivable.recentAdjustmentRecoveries[0].createdAt)}
+                        </div>
+                      </>
+                    ) : receivable.recentRecoveries?.[0] ? (
                       <>
                         <div className="font-semibold text-emerald-700">
                           {formatCurrency(
