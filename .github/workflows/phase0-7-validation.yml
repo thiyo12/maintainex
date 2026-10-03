@@ -328,7 +328,9 @@ jobs:
           grep -q 'BACKUP_TABLES' scripts/crm-v2-production-preflight.sh
           grep -q 'gzip -t' scripts/crm-v2-production-preflight.sh
           grep -q 'required environment names' scripts/crm-v2-production-preflight.sh
+          grep -q 'IDENTITY_CLAIM_PEPPER' scripts/crm-v2-production-preflight.sh
           grep -q 'process.env.DATABASE_URL' deploy-rsync.sh
+          grep -q 'IDENTITY_CLAIM_PEPPER' deploy-rsync.sh
           grep -q 'BACKUP_TABLES' deploy-rsync.sh
           grep -q 'process.env.DATABASE_URL' backup.sh
           ! grep -q 'pg_dump -U postgres -d postgres' scripts/crm-v2-production-preflight.sh
