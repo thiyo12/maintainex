@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client'
 import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
 import type { Currency } from '@/lib/shared/money/money'
 import {
+  calculateOnlineDebtOffset,
   evaluateProviderFinancialStanding,
   type ProviderFinancialDecision,
   type ProviderFinancialPolicy,
@@ -291,6 +292,7 @@ export async function recordCashPlatformReceivable(
     countryCode: string
     currency: string
     platformDueMinor: bigint
+    weeklySettlementId?: string | null
     createdBy: string
   },
 ) {
@@ -369,6 +371,20 @@ export async function recordCashPlatformReceivable(
     }),
   }, tx)
 
+  await tx.providerCommissionReceivable.create({
+    data: {
+      providerIdentityId: identity.id,
+      weeklySettlementId: input.weeklySettlementId || null,
+      jobId: input.jobId,
+      escrowId: input.escrowId,
+      currency,
+      amountOriginal: input.platformDueMinor,
+      amountRemaining: input.platformDueMinor,
+      status: 'OPEN',
+      dueAt,
+    },
+  })
+
   const updatedAccount = await tx.providerFinancialAccount.update({
     where: { id: account.id },
     data: {
@@ -431,6 +447,207 @@ export async function recordCashPlatformReceivable(
     standing: decision.standing,
     cashJobsAllowed: decision.cashJobsAllowed,
     onlineJobsAllowed: decision.onlineJobsAllowed,
+  }
+}
+
+export async function recoverProviderCommissionFromOnlineEarnings(
+  tx: Prisma.TransactionClient,
+  input: {
+    providerId: string
+    providerType: FinancialProviderType
+    countryCode: string
+    currency: string
+    availableOnlineEarningsMinor: bigint
+    sourceJobId: string
+    sourceEscrowId: string
+    createdBy: string
+  },
+) {
+  const currency = input.currency.trim().toUpperCase()
+  const identity = await ensureProviderIdentity(tx, input)
+  const account = await ensureFinancialAccount(tx, identity.id, currency)
+
+  const lockedRows = await tx.$queryRaw<Array<{
+    id: string
+    commissionDue: string
+    oldestCommissionDueAt: Date | null
+  }>>`
+    SELECT id,
+           "commissionDue"::text AS "commissionDue",
+           "oldestCommissionDueAt"
+    FROM "ProviderFinancialAccount"
+    WHERE id = ${account.id}
+    FOR UPDATE
+  `
+
+  const locked = lockedRows[0]
+  if (!locked) throw new Error('PROVIDER_FINANCIAL_ACCOUNT_NOT_FOUND')
+
+  const policy = await resolveProviderFinancialPolicy(tx, {
+    countryCode: input.countryCode,
+    providerType: input.providerType,
+    currency,
+  })
+
+  const decision = calculateOnlineDebtOffset({
+    availableOnlineEarningsMinor: input.availableOnlineEarningsMinor,
+    commissionDueMinor: BigInt(locked.commissionDue),
+    autoOffsetEnabled: policy.autoOffsetOnlineEarnings,
+  })
+
+  if (decision.recoveryMinor <= 0n) {
+    return {
+      providerIdentityId: identity.id,
+      recoveryMinor: 0n,
+      providerPayoutMinor: input.availableOnlineEarningsMinor > 0n
+        ? input.availableOnlineEarningsMinor
+        : 0n,
+      remainingCommissionDueMinor: BigInt(locked.commissionDue),
+      allocations: [] as Array<{ receivableId: string; amount: bigint }>,
+    }
+  }
+
+  const receivables = await tx.providerCommissionReceivable.findMany({
+    where: {
+      providerIdentityId: identity.id,
+      currency,
+      status: { in: ['OPEN', 'PARTIAL'] },
+      amountRemaining: { gt: 0 },
+    },
+    orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+  })
+
+  let remainingToRecover = decision.recoveryMinor
+  let actualRecovery = 0n
+  const allocations: Array<{ receivableId: string; amount: bigint }> = []
+  const touchedSettlements = new Set<string>()
+
+  for (const receivable of receivables) {
+    if (remainingToRecover <= 0n) break
+    const allocation =
+      receivable.amountRemaining < remainingToRecover
+        ? receivable.amountRemaining
+        : remainingToRecover
+    if (allocation <= 0n) continue
+
+    const newRemaining = receivable.amountRemaining - allocation
+    await tx.providerCommissionReceivable.update({
+      where: { id: receivable.id },
+      data: {
+        amountRemaining: newRemaining,
+        status: newRemaining === 0n ? 'SETTLED' : 'PARTIAL',
+        settledAt: newRemaining === 0n ? new Date() : null,
+      },
+    })
+
+    await tx.providerCommissionRecovery.create({
+      data: {
+        receivableId: receivable.id,
+        providerIdentityId: identity.id,
+        sourceJobId: input.sourceJobId,
+        sourceEscrowId: input.sourceEscrowId,
+        amount: allocation,
+        currency,
+        method: 'ONLINE_EARNINGS',
+        idempotencyKey: `online-recovery:${input.sourceEscrowId}:${receivable.id}`,
+        createdBy: input.createdBy,
+      },
+    })
+
+    if (receivable.weeklySettlementId) {
+      touchedSettlements.add(receivable.weeklySettlementId)
+    }
+
+    allocations.push({ receivableId: receivable.id, amount: allocation })
+    actualRecovery += allocation
+    remainingToRecover -= allocation
+  }
+
+  if (actualRecovery <= 0n) {
+    return {
+      providerIdentityId: identity.id,
+      recoveryMinor: 0n,
+      providerPayoutMinor: input.availableOnlineEarningsMinor > 0n
+        ? input.availableOnlineEarningsMinor
+        : 0n,
+      remainingCommissionDueMinor: BigInt(locked.commissionDue),
+      allocations,
+    }
+  }
+
+  for (const weeklySettlementId of touchedSettlements) {
+    const unresolved = await tx.providerCommissionReceivable.count({
+      where: {
+        weeklySettlementId,
+        status: { in: ['OPEN', 'PARTIAL'] },
+        amountRemaining: { gt: 0 },
+      },
+    })
+    if (unresolved === 0) {
+      await tx.weeklySettlement.updateMany({
+        where: { id: weeklySettlementId, commissionPaid: false },
+        data: {
+          commissionPaid: true,
+          paidAt: new Date(),
+          status: 'PAID',
+          suspendedAt: null,
+          notes: 'Automatically recovered from future online earnings',
+        },
+      })
+    }
+  }
+
+  const previousDue = BigInt(locked.commissionDue)
+  const remainingDue = previousDue > actualRecovery
+    ? previousDue - actualRecovery
+    : 0n
+  const oldestRemaining = await tx.providerCommissionReceivable.findFirst({
+    where: {
+      providerIdentityId: identity.id,
+      currency,
+      status: { in: ['OPEN', 'PARTIAL'] },
+      amountRemaining: { gt: 0 },
+    },
+    orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }],
+    select: { dueAt: true },
+  })
+
+  const standing = evaluateProviderFinancialStanding(
+    {
+      commissionDueMinor: remainingDue,
+      oldestCommissionDueAt: oldestRemaining?.dueAt || null,
+    },
+    policy,
+  )
+
+  await tx.providerFinancialAccount.update({
+    where: { id: account.id },
+    data: {
+      commissionDue: remainingDue,
+      oldestCommissionDueAt: oldestRemaining?.dueAt || null,
+      status: standing.standing,
+      cashJobsAllowed: standing.cashJobsAllowed,
+      onlineJobsAllowed: standing.onlineJobsAllowed,
+      manualReviewRequired: standing.manualReviewRequired,
+      lastEvaluatedAt: new Date(),
+      version: { increment: 1 },
+    },
+  })
+
+  await tx.providerIdentity.update({
+    where: { id: identity.id },
+    data: { standingStatus: identityStanding(standing) },
+  })
+
+  return {
+    providerIdentityId: identity.id,
+    recoveryMinor: actualRecovery,
+    providerPayoutMinor:
+      input.availableOnlineEarningsMinor > actualRecovery
+        ? input.availableOnlineEarningsMinor - actualRecovery
+        : 0n,
+    remainingCommissionDueMinor: remainingDue,
+    allocations,
   }
 }
 
