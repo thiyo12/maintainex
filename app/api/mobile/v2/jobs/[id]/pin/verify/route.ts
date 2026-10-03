@@ -40,7 +40,11 @@ export async function POST(
         ? 403
         : error.includes('No active PIN') ||
             error.includes('Cannot verify PIN') ||
-            error.includes('already verified')
+            error.includes('already verified') ||
+            error.includes('Worker identity') ||
+            error.includes('worker identity') ||
+            error.includes('Customer must confirm') ||
+            error.includes('identity mismatch')
           ? 409
           : 401
     return NextResponse.json({ error, locked: result.locked }, { status })
