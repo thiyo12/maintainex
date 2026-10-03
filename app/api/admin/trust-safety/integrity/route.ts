@@ -232,14 +232,53 @@ export async function PATCH(request: NextRequest) {
     }
 
     const reviewedAt = new Date()
-    const updated = await prisma.providerIntegritySignal.update({
-      where: { id: signal.id },
-      data: {
-        status,
-        reviewedAt,
-        reviewedBy: security.adminId,
-        resolution,
-      },
+    const updated = await prisma.$transaction(async tx => {
+      const reviewed = await tx.providerIntegritySignal.update({
+        where: { id: signal.id },
+        data: {
+          status,
+          reviewedAt,
+          reviewedBy: security.adminId,
+          resolution,
+        },
+      })
+
+      if (
+        signal.signalType === 'CUSTOMER_WORKER_IDENTITY_MISMATCH' &&
+        signal.jobId &&
+        signal.providerIdentityId
+      ) {
+        await tx.marketplaceRiskEvent.updateMany({
+          where: {
+            jobId: signal.jobId,
+            eventType: 'WORKER_IDENTITY_MISMATCH',
+            reviewedAt: null,
+          },
+          data: {
+            reviewedAt,
+            reviewedBy: security.adminId,
+            resolution: status,
+          },
+        })
+
+        // A customer cannot undo a mismatch. Only a governed T&S dismissal can
+        // clear the start-work block; confirming/escalating the signal leaves it blocked.
+        if (status === 'DISMISSED') {
+          await tx.jobWorkerIdentityCheck.updateMany({
+            where: {
+              jobId: signal.jobId,
+              providerIdentityId: signal.providerIdentityId,
+              status: 'MISMATCH_REPORTED',
+            },
+            data: {
+              status: 'MATCHED',
+              confirmedAt: reviewedAt,
+            },
+          })
+        }
+      }
+
+      return reviewed
     })
 
     await createAuditLog({
