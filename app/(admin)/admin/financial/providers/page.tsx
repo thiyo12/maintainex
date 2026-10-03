@@ -413,10 +413,19 @@ export default function PaymentProvidersPage() {
                     <FiCreditCard className="text-amber-600" />
                     {config.provider.replaceAll('_', ' ')}
                   </div>
+                  {config.provider === 'PAYHERE' && (
+                    <div className="mt-1 text-xs font-medium text-slate-500">
+                      Legacy / read only / disabled for new checkout
+                    </div>
+                  )}
                 </td>
                 <td className={crmTdClass}>
                   <CrmBadge tone={tone(config)} dot>
-                    {config.enabled ? config.operationalStatus : 'DISABLED'}
+                    {config.provider === 'PAYHERE'
+                      ? 'LEGACY · DISABLED'
+                      : config.enabled
+                        ? config.operationalStatus
+                        : 'DISABLED'}
                   </CrmBadge>
                 </td>
                 <td className={crmTdClass}>
@@ -591,7 +600,6 @@ export default function PaymentProvidersPage() {
               className={crmInputClass}
             >
               <option value="PAYPAL">PayPal</option>
-              <option value="PAYHERE">PayHere</option>
               <option value="MANUAL_BANK">Manual bank</option>
             </select>
           </CrmField>
@@ -664,15 +672,24 @@ export default function PaymentProvidersPage() {
           <CrmField label="Enable checkout">
             <button
               type="button"
+              disabled={form.provider === 'PAYHERE'}
               onClick={() => setForm(current => ({ ...current, enabled: !current.enabled }))}
               className={`flex h-10 w-full items-center justify-between rounded-[11px] border px-3 text-sm font-semibold ${
-                form.enabled
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                  : 'border-slate-200 bg-slate-50 text-slate-600'
+                form.provider === 'PAYHERE'
+                  ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500'
+                  : form.enabled
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-slate-200 bg-slate-50 text-slate-600'
               }`}
             >
-              <span>{form.enabled ? 'Enabled' : 'Disabled'}</span>
-              <span>{form.enabled ? 'ON' : 'OFF'}</span>
+              <span>
+                {form.provider === 'PAYHERE'
+                  ? 'Legacy read only'
+                  : form.enabled
+                    ? 'Enabled'
+                    : 'Disabled'}
+              </span>
+              <span>{form.provider === 'PAYHERE' ? 'LOCKED' : form.enabled ? 'ON' : 'OFF'}</span>
             </button>
           </CrmField>
         </div>
