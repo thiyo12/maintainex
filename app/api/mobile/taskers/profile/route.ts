@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
         },
       },
       select: {
+        id: true,
         verifiedPhotoUrl: true,
         photoLocked: true,
         kycStatus: true,
