@@ -191,7 +191,7 @@ export default function DisputesPage() {
 
   return (
     <>
-      <div className="space-y-5">
+      <div className="space-y-4">
         <CrmPageHeader
           eyebrow="Trust & Safety"
           title="Disputes"
@@ -300,8 +300,8 @@ export default function DisputesPage() {
                   </button>
                 </div>
               </div>
-              <div className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3.5 p-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="text-xs text-slate-400 mb-1">Job</div>
                     <div className="text-slate-900 text-sm font-medium">{detailModal.job.title}</div>
