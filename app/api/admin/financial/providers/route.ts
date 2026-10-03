@@ -12,6 +12,8 @@ import {
 } from '@/lib/payment/payhere-adapter'
 import { getPayPalConfig } from '@/lib/finance/payments/paypal-adapter'
 import {
+  isLegacyReadOnlyProvider,
+  isPayPalMarketVerified,
   normalizePaymentProvider,
   parseProviderCapabilities,
   parseProviderList,
@@ -201,6 +203,34 @@ export async function PATCH(request: NextRequest) {
     }
     if (commissionRateBps !== null && (!Number.isInteger(commissionRateBps) || commissionRateBps < 0 || commissionRateBps > 10000)) {
       return NextResponse.json({ error: 'Commission BPS must be 0 to 10000' }, { status: 400 })
+    }
+
+    if (enabled && isLegacyReadOnlyProvider(provider)) {
+      return NextResponse.json(
+        {
+          error:
+            provider +
+            ' is legacy/read-only and cannot be enabled for new checkout. Historical records remain available for audit and reconciliation.',
+        },
+        { status: 409 }
+      )
+    }
+    if (
+      enabled &&
+      provider === 'PAYPAL' &&
+      !isPayPalMarketVerified(countryCode, environment as 'SANDBOX' | 'LIVE')
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'PayPal Checkout is not verified for ' +
+            countryCode +
+            ' in ' +
+            environment +
+            '. Sandbox launch testing is restricted to CA/CAD and live markets require explicit verification.',
+        },
+        { status: 409 }
+      )
     }
 
     const runtime = runtimeState(provider)
