@@ -130,6 +130,28 @@ describe('provider cash receivable recovery contract', () => {
     expect(balance).toContain("countryCode === 'CA' && currency === 'CAD'")
   })
 
+  it('blocks fully restricted providers before matching and quote creation', () => {
+    const balance = source('lib/finance/commissions/provider-balance-service.ts')
+    const matching = source('lib/matching/eligibility.ts')
+    const quote = source('app/api/mobile/v2/quotes/route.ts')
+
+    expect(balance).toContain('assertProviderAnyJobEligible')
+    expect(balance).toContain('PROVIDER_FINANCIALLY_RESTRICTED')
+    expect(matching).toContain("gate: 'FINANCIAL_STANDING'")
+    expect(matching).toContain("'PROVIDER_FINANCIALLY_RESTRICTED'")
+    expect(quote).toContain('await assertProviderAnyJobEligible(tx')
+  })
+
+  it('does not keep stale earnings projections in ProviderFinancialAccount', () => {
+    const schema = source('prisma/schema.prisma')
+    const migration = source('prisma/migrations/20261004024500_provider_balance_identity_integrity/migration.sql')
+
+    expect(schema).not.toContain('availableEarnings        BigInt')
+    expect(schema).not.toContain('pendingEarnings          BigInt')
+    expect(migration).not.toContain('"availableEarnings" BIGINT')
+    expect(migration).not.toContain('"pendingEarnings" BIGINT')
+  })
+
   it('keeps per-job recovery history idempotent', () => {
     const schema = source('prisma/schema.prisma')
     expect(schema).toContain('model ProviderCommissionReceivable')
