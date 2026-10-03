@@ -30,6 +30,7 @@ import {
 } from '@/lib/payment/payhere-adapter'
 import {
   resolvePaymentProviderForMarket,
+  PAYMENT_PROVIDER_NOT_AVAILABLE,
   type ResolvedPaymentProvider,
 } from '@/lib/finance/payments/provider-registry'
 
@@ -100,8 +101,18 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
   if (!provider) {
     return {
       success: false,
-      error: 'No payment provider is enabled for this market and currency',
-      code: 'PAYMENT_PROVIDER_NOT_ENABLED',
+      error: 'No verified online payment provider is available for this market and currency',
+      code: PAYMENT_PROVIDER_NOT_AVAILABLE,
+    }
+  }
+
+  // Defense in depth: registry policy already excludes legacy providers, but
+  // payment creation itself also fails closed if that policy ever regresses.
+  if (provider.provider !== 'PAYPAL') {
+    return {
+      success: false,
+      error: `${provider.provider} is not enabled for new online checkout`,
+      code: PAYMENT_PROVIDER_NOT_AVAILABLE,
     }
   }
 
@@ -244,10 +255,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     }
 
     const totalAmount = escrow.totalAmount ?? escrow.amount
-    const merchantOrderId =
-      provider.provider === 'PAYPAL'
-        ? `PP-PENDING-${crypto.randomUUID()}`
-        : generateMerchantOrderId(jobId)
+    const merchantOrderId = `PP-PENDING-${crypto.randomUUID()}`
 
     const paymentIntent = await tx.paymentIntent.create({
       data: {
@@ -278,21 +286,6 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       success: false,
       error: 'Could not create payment session',
       code: 'PAYMENT_INTENT_FAILED',
-    }
-  }
-
-  if (provider.provider === 'PAYHERE') {
-    const config = getPayHereConfig()!
-    return {
-      success: true,
-      paymentIntentId: decision.intent.id,
-      checkoutUrl: buildHostedCheckoutUrl(
-        baseUrl,
-        decision.intent.id,
-        config.merchantSecret
-      ),
-      merchantOrderId: decision.intent.merchantOrderId,
-      gateway: provider.provider,
     }
   }
 
