@@ -57,6 +57,7 @@ describe('payment provider control plane', () => {
     expect(registry).toContain("LEGACY_READ_ONLY_PROVIDER_CODES = ['PAYHERE']")
     expect(registry).toContain('PAYPAL_MARKET_CHECKOUT_VERIFIED')
     expect(registry).toContain("PAYPAL_SANDBOX_FIXTURE_COUNTRY = 'CA'")
+    expect(registry).toContain("PAYPAL_SANDBOX_FIXTURE_CURRENCY = 'CAD'")
     expect(registry).toContain("PAYPAL_LIVE_HARD_BLOCKED_MARKETS = new Set(['LK'])")
 
     expect(service).toContain('PAYMENT_PROVIDER_NOT_AVAILABLE')
