@@ -83,34 +83,81 @@ beforeAll(async () => {
   })
   jobBId = jobB.id
 
-  await prisma.jobQuote.create({
+  const quoteA = await prisma.jobQuote.create({
     data: {
       jobId: jobAId,
       providerId,
       providerType: 'INDIVIDUAL',
       price: 5000n,
       estimatedCompletionTime: '2 hours',
-        attachments: '[]',
+      attachments: '[]',
       status: 'ACCEPTED',
     },
   })
 
-  await prisma.jobQuote.create({
+  const quoteB = await prisma.jobQuote.create({
     data: {
       jobId: jobBId,
       providerId,
       providerType: 'INDIVIDUAL',
       price: 3000n,
       estimatedCompletionTime: '1 hour',
-        attachments: '[]',
+      attachments: '[]',
       status: 'ACCEPTED',
     },
+  })
+
+  await prisma.marketplaceJob.update({
+    where: { id: jobAId },
+    data: { approvedQuoteId: quoteA.id },
+  })
+  await prisma.marketplaceJob.update({
+    where: { id: jobBId },
+    data: { approvedQuoteId: quoteB.id },
+  })
+
+  await prisma.jobEscrow.createMany({
+    data: [
+      {
+        jobId: jobAId,
+        quoteId: quoteA.id,
+        customerId: customerAId,
+        providerId,
+        amount: 5000n,
+        serviceFee: 0n,
+        totalAmount: 5000n,
+        paymentMethod: 'CARD',
+        currency: 'LKR',
+        status: 'PROTECTED',
+        heldAt: new Date(),
+      },
+      {
+        jobId: jobBId,
+        quoteId: quoteB.id,
+        customerId: customerBId,
+        providerId,
+        amount: 3000n,
+        serviceFee: 0n,
+        totalAmount: 3000n,
+        paymentMethod: 'CARD',
+        currency: 'LKR',
+        status: 'PROTECTED',
+        heldAt: new Date(),
+      },
+    ],
   })
 })
 
 afterAll(async () => {
   await prisma.jobVerificationPin.deleteMany({
     where: { jobId: { in: [jobAId, jobBId] } },
+  })
+  await prisma.jobEscrow.deleteMany({
+    where: { jobId: { in: [jobAId, jobBId] } },
+  })
+  await prisma.marketplaceJob.updateMany({
+    where: { id: { in: [jobAId, jobBId] } },
+    data: { approvedQuoteId: null },
   })
   await prisma.jobQuote.deleteMany({
     where: { jobId: { in: [jobAId, jobBId] } },
@@ -135,7 +182,7 @@ describe('Phase 10.5 — IDOR Protection', () => {
       const { generateJobPin, getPinState } = await import('@/lib/domain/job-pin')
       await generateJobPin(jobAId, customerAId)
 
-      await expect(getPinState(jobAId, customerBId)).rejects.toThrow('Only the job owner')
+      await expect(getPinState(jobAId, customerBId)).rejects.toThrow('Not authorized to view PIN state')
     })
 
     it('Customer B cannot generate PIN for Customer A job', async () => {
@@ -196,7 +243,7 @@ describe('Phase 10.5 — IDOR Protection', () => {
       const { generateJobPin, getPinState } = await import('@/lib/domain/job-pin')
       await generateJobPin(jobBId, customerBId)
 
-      await expect(getPinState(jobBId, customerAId)).rejects.toThrow('Only the job owner')
+      await expect(getPinState(jobBId, customerAId)).rejects.toThrow('Not authorized to view PIN state')
     })
 
     it('Customer A cannot rotate Customer B PIN', async () => {
@@ -238,7 +285,7 @@ describe('Phase 10.5 — IDOR Protection', () => {
       const { approveChangeOrder } = await import('@/lib/domain/change-order')
       await expect(
         approveChangeOrder(prisma, co.id, customerAId, 'idempotency-key-idor')
-      ).rejects.toThrow()
+      ).resolves.toEqual(expect.objectContaining({ success: false, error: 'NOT_CUSTOMER' }))
 
       await prisma.jobChangeOrder.delete({ where: { id: co.id } })
     })

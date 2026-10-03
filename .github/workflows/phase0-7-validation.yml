@@ -215,7 +215,7 @@ jobs:
         if: always()
 
       - name: Phase 9 security tests
-        run: npx vitest run tests/security/phase11-offer-redemption.test.ts tests/security/crm-subscriptions-v2.test.ts tests/security/real-estate-public-privacy.test.ts tests/security/crm-real-estate-v2.test.ts tests/security/crm-three-layer-security.test.ts tests/security/crm-selected-market-control-plane.test.ts tests/security/crm-market-config-v2.test.ts tests/security/crm-catalog-v2.test.ts tests/security/crm-promotions-v2.test.ts tests/security/crm-settings-registry-v2.test.ts tests/security/crm-profession-taxonomy-v2.test.ts tests/security/crm-locations-v2.test.ts tests/security/mobile-taxonomy-source-v2.test.ts tests/security/crm-governance-policy.test.ts tests/security/crm-refund-approval-boundary.test.ts tests/security/crm-payment-escrow-control-boundary.test.ts tests/security/payment-provider-control-plane.test.ts tests/security/crm-financial-ledger-boundary.test.ts tests/security/crm-commission-control-boundary.test.ts tests/security/crm-approval-engine.test.ts tests/security/crm-approval-service.test.ts tests/security/crm-step-up-proof.test.ts tests/security/crm-permission-overrides.test.ts tests/security/crm-permission-catalog.test.ts tests/security/crm-staff-session-invalidation.test.ts tests/security/crm-staff-sessions-v2.test.ts tests/security/crm-staff-role-session-hardening.test.ts tests/security/crm-staff-step-up-enforcement.test.ts tests/security/crm-global-search-scope.test.ts tests/security/crm-platform-runtime-v2.test.ts tests/security/admin-staff-password-hashing.test.ts tests/security/admin-login-identity-boundary.test.ts tests/security/admin-session-token-lifecycle.test.ts tests/security/admin-totp-verification.test.ts tests/security/crm-kyc-privacy-boundary.test.ts tests/security/marketplace-lifecycle-bypass-regression.test.ts tests/security/legacy-marketplace-route-security.test.ts tests/security/payment-public-origin.test.ts --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
+        run: npx vitest run tests/security/phase11-offer-redemption.test.ts tests/security/crm-subscriptions-v2.test.ts tests/security/real-estate-public-privacy.test.ts tests/security/crm-real-estate-v2.test.ts tests/security/crm-three-layer-security.test.ts tests/security/crm-selected-market-control-plane.test.ts tests/security/crm-market-config-v2.test.ts tests/security/crm-catalog-v2.test.ts tests/security/crm-promotions-v2.test.ts tests/security/crm-settings-registry-v2.test.ts tests/security/crm-profession-taxonomy-v2.test.ts tests/security/crm-locations-v2.test.ts tests/security/mobile-taxonomy-source-v2.test.ts tests/security/crm-governance-policy.test.ts tests/security/crm-refund-approval-boundary.test.ts tests/security/crm-payment-escrow-control-boundary.test.ts tests/security/payment-provider-control-plane.test.ts tests/security/crm-financial-ledger-boundary.test.ts tests/security/crm-commission-control-boundary.test.ts tests/security/crm-approval-engine.test.ts tests/security/crm-approval-service.test.ts tests/security/crm-step-up-proof.test.ts tests/security/crm-permission-overrides.test.ts tests/security/crm-permission-catalog.test.ts tests/security/crm-staff-session-invalidation.test.ts tests/security/crm-staff-sessions-v2.test.ts tests/security/crm-staff-role-session-hardening.test.ts tests/security/crm-staff-step-up-enforcement.test.ts tests/security/crm-global-search-scope.test.ts tests/security/crm-platform-runtime-v2.test.ts tests/security/admin-staff-password-hashing.test.ts tests/security/admin-login-identity-boundary.test.ts tests/security/admin-session-token-lifecycle.test.ts tests/security/admin-totp-verification.test.ts tests/security/crm-kyc-privacy-boundary.test.ts tests/security/marketplace-lifecycle-bypass-regression.test.ts tests/security/legacy-marketplace-route-security.test.ts tests/security/payment-public-origin.test.ts tests/security/paypal-only-payment-strategy.test.ts --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
         if: always()
 
       - name: Upload Phase 9 security test diagnostics
@@ -233,6 +233,39 @@ jobs:
         with:
           name: security-test-diagnostics
           path: /tmp/security-tests.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Core app lifecycle gates
+        run: >-
+          npx vitest run
+          tests/customer/customer-lifecycle.test.ts
+          tests/security/tasker-capability-boundary.test.ts
+          tests/security/tasker-state-input-boundary.test.ts
+          tests/security/otp-demo-rate-limit.test.ts
+          tests/security/customer-idor.test.ts
+          tests/security/matching-persona-isolation.test.ts
+          tests/security/dual-persona-isolation.test.ts
+          tests/company/company-membership.test.ts
+          tests/company/worker-assignment-workspace.test.ts
+          tests/quotes/quote-acceptance.test.ts
+          tests/security/company-assignment-lifecycle-boundary.test.ts
+          tests/security/job-booking-mutation-boundary.test.ts
+          tests/auth/work-start-auth.test.ts
+          tests/jobs/job-pin.test.ts
+          tests/security/chat-delivery-contract.test.ts
+          tests/security/chat-isolation.test.ts
+          tests/notifications/booking-notifications.test.ts
+          tests/notifications/company-job-recipient-routing.test.ts
+          --reporter=verbose 2>&1 | tee /tmp/core-app-lifecycle-tests.txt
+        if: always()
+
+      - name: Upload core app lifecycle diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-app-lifecycle-diagnostics
+          path: /tmp/core-app-lifecycle-tests.txt
           if-no-files-found: ignore
           retention-days: 3
 

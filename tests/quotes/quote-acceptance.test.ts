@@ -42,8 +42,8 @@ describe('4C.2 — Quote Acceptance Transaction', () => {
       expect(isValidJobTransition('IN_PROGRESS', 'COMPLETED')).toBe(true)
     })
 
-    it('IN_PROGRESS can transition to CANCELLED', () => {
-      expect(isValidJobTransition('IN_PROGRESS', 'CANCELLED')).toBe(true)
+    it('IN_PROGRESS cannot transition to CANCELLED directly', () => {
+      expect(isValidJobTransition('IN_PROGRESS', 'CANCELLED')).toBe(false)
     })
 
     it('COMPLETED is terminal', () => {
@@ -124,8 +124,8 @@ describe('4C.2 — Quote Acceptance Transaction', () => {
       expect(canActorPerformWorkspaceTransition('CUSTOMER', 'COMPLETION_REQUESTED')).toBe(false)
     })
 
-    it('STAFF can perform neutral transitions', () => {
-      expect(canActorPerformWorkspaceTransition('STAFF', 'WAITING_CUSTOMER')).toBe(true)
+    it('STAFF cannot impersonate a provider-only workspace transition', () => {
+      expect(canActorPerformWorkspaceTransition('STAFF', 'WAITING_CUSTOMER')).toBe(false)
     })
   })
 

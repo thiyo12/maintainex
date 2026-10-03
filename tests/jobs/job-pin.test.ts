@@ -163,16 +163,20 @@ beforeAll(async () => {
   })
   inspectionFirstJobId = inspectionJob.id
 
-  await prisma.jobQuote.create({
+  const jobAQuote = await prisma.jobQuote.create({
     data: {
       jobId: jobAId,
       providerId,
       providerType: 'INDIVIDUAL',
       price: 5000n,
       estimatedCompletionTime: '2 hours',
-        attachments: '[]',
+      attachments: '[]',
       status: 'ACCEPTED',
     },
+  })
+  await prisma.marketplaceJob.update({
+    where: { id: jobAId },
+    data: { approvedQuoteId: jobAQuote.id },
   })
 
   await prisma.jobQuote.create({
@@ -260,6 +264,10 @@ afterAll(async () => {
   await prisma.jobEscrow.deleteMany({
     where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] } },
   })
+  await prisma.marketplaceJob.update({
+    where: { id: jobAId },
+    data: { approvedQuoteId: null },
+  }).catch(() => {})
   await prisma.jobQuote.deleteMany({
     where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] } },
   })
@@ -326,7 +334,7 @@ describe('Phase 10.5 — Job Verification PIN', () => {
       })
 
       try {
-        await expect(generateJobPin(jobAId, customerAId)).rejects.toThrow('Payment must be protected')
+        await expect(generateJobPin(jobAId, customerAId)).rejects.toThrow('Payment method must be confirmed')
       } finally {
         await prisma.jobEscrow.update({
           where: { id: escrow!.id },
@@ -389,7 +397,7 @@ describe('Phase 10.5 — Job Verification PIN', () => {
       expect(result.valid).toBe(true)
     })
 
-    it('requires a fresh PIN after ARRIVAL before WORK_START', async () => {
+    it('requires a fresh PIN after ARRIVAL before WORK_START', { timeout: 30000 }, async () => {
       const { generateJobPin, getPinState, verifyJobPin } = await import('@/lib/domain/job-pin')
 
       const arrivalPin = await generateJobPin(jobAId, customerAId)

@@ -3,6 +3,89 @@ import { prisma } from '@/lib/prisma'
 export const PAYMENT_PROVIDER_CODES = ['PAYPAL', 'PAYHERE', 'MANUAL_BANK'] as const
 export type PaymentProviderCode = (typeof PAYMENT_PROVIDER_CODES)[number]
 
+/**
+ * Only PayPal may create a new online checkout. PayHere is retained strictly
+ * for historical transactions, refunds, reconciliation and audit visibility.
+ */
+export const NEW_ONLINE_CHECKOUT_PROVIDER_CODES = ['PAYPAL'] as const
+export const LEGACY_READ_ONLY_PROVIDER_CODES = ['PAYHERE'] as const
+export const PAYMENT_PROVIDER_NOT_AVAILABLE = 'PAYMENT_PROVIDER_NOT_AVAILABLE' as const
+
+/**
+ * LIVE PayPal Checkout is opt-in per market. The env value is a comma-separated
+ * ISO-3166 alpha-2 allowlist confirmed against the MaintainEX merchant account.
+ *
+ * Sandbox launch verification is deliberately constrained to the controlled
+ * Canada + CAD fixture. Sri Lanka LIVE Checkout stays hard-blocked while
+ * PayPal's official Sri Lanka documentation says Checkout is not yet live.
+ */
+export const PAYPAL_MARKET_VERIFICATION_ENV = 'PAYPAL_MARKET_CHECKOUT_VERIFIED'
+export const PAYPAL_SANDBOX_FIXTURE_COUNTRY = 'CA'
+export const PAYPAL_SANDBOX_FIXTURE_CURRENCY = 'CAD'
+const PAYPAL_LIVE_HARD_BLOCKED_MARKETS = new Set(['LK'])
+
+export function isProviderSelectableForNewCheckout(provider: string): boolean {
+  const normalized = provider.trim().toUpperCase()
+  return (NEW_ONLINE_CHECKOUT_PROVIDER_CODES as readonly string[]).includes(normalized)
+}
+
+export function isLegacyReadOnlyProvider(provider: string): boolean {
+  const normalized = provider.trim().toUpperCase()
+  return (LEGACY_READ_ONLY_PROVIDER_CODES as readonly string[]).includes(normalized)
+}
+
+export function verifiedPayPalMarkets(): string[] {
+  const raw = process.env[PAYPAL_MARKET_VERIFICATION_ENV]
+  if (!raw) return []
+  return [...new Set(
+    raw
+      .split(',')
+      .map(value => value.trim().toUpperCase())
+      .filter(value => /^[A-Z]{2}$/.test(value))
+  )]
+}
+
+export function isPayPalMarketVerified(
+  countryCode: string,
+  environment: 'SANDBOX' | 'LIVE'
+): boolean {
+  const country = countryCode.trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(country)) return false
+
+  if (environment === 'SANDBOX') {
+    return country === PAYPAL_SANDBOX_FIXTURE_COUNTRY
+  }
+
+  if (PAYPAL_LIVE_HARD_BLOCKED_MARKETS.has(country)) return false
+  return verifiedPayPalMarkets().includes(country)
+}
+
+export function blockedNewCheckoutReason(
+  provider: string,
+  countryCode: string,
+  environment: 'SANDBOX' | 'LIVE',
+  currency: string
+): string | null {
+  const normalizedProvider = provider.trim().toUpperCase()
+  if (!isProviderSelectableForNewCheckout(normalizedProvider)) {
+    return `${normalizedProvider} is not enabled for new online checkout`
+  }
+  if (
+    normalizedProvider === 'PAYPAL' &&
+    !isPayPalMarketVerified(countryCode, environment)
+  ) {
+    return `PayPal Checkout is not verified for ${countryCode.trim().toUpperCase()} in ${environment}`
+  }
+  if (
+    normalizedProvider === 'PAYPAL' &&
+    environment === 'SANDBOX' &&
+    currency.trim().toUpperCase() !== PAYPAL_SANDBOX_FIXTURE_CURRENCY
+  ) {
+    return `PayPal sandbox checkout is restricted to ${PAYPAL_SANDBOX_FIXTURE_COUNTRY}/${PAYPAL_SANDBOX_FIXTURE_CURRENCY}`
+  }
+  return null
+}
+
 export type PaymentProviderCapabilities = {
   checkout?: boolean
   authorize?: boolean
@@ -119,6 +202,14 @@ export function selectProviderFromConfigs(
       if (!provider) return null
       if (requested && provider !== requested) return null
       if (environment !== 'SANDBOX' && environment !== 'LIVE') return null
+      if (
+        blockedNewCheckoutReason(
+          provider,
+          countryCode,
+          environment as 'SANDBOX' | 'LIVE',
+          currency
+        )
+      ) return null
       if (!currencies.includes(currency)) return null
       if (capabilities.checkout !== true) return null
 

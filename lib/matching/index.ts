@@ -119,7 +119,6 @@ export async function findCandidates(
   client: PrismaClient,
   input: MatchingInput,
 ): Promise<MatchResult> {
-  const config = await resolveMatchingConfig(client, input.countryCode || 'GLOBAL')
   const excluded: ExcludedProvider[] = []
   const candidates: MatchCandidate[] = []
 
@@ -130,7 +129,21 @@ export async function findCandidates(
       latitude: true, longitude: true, urgency: true, countryCode: true,
     },
   })
-  if (!job) return emptyResult(input.jobId, config.matchingVersion)
+  if (!job) {
+    const fallbackConfig = await resolveMatchingConfig(client, input.countryCode || 'GLOBAL')
+    return emptyResult(input.jobId, fallbackConfig.matchingVersion)
+  }
+
+  const canonicalInput: MatchingInput = {
+    ...input,
+    categoryId: job.categoryId,
+    serviceTemplateId: job.serviceTemplateId || undefined,
+    latitude: job.latitude ?? input.latitude,
+    longitude: job.longitude ?? input.longitude,
+    urgency: ((job.urgency || input.urgency || 'NORMAL').toUpperCase()) as MatchingInput['urgency'],
+    countryCode: job.countryCode || input.countryCode,
+  }
+  const config = await resolveMatchingConfig(client, canonicalInput.countryCode || 'GLOBAL')
 
   const jobReqs = await resolveJobRequirements(client, job.categoryId, job.serviceTemplateId, job.templateJobId)
   if (!jobReqs) return emptyResult(input.jobId, config.matchingVersion)
@@ -155,7 +168,7 @@ export async function findCandidates(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: input.countryCode ? { countryCode: input.countryCode } : undefined,
+      user: canonicalInput.countryCode ? { countryCode: canonicalInput.countryCode } : undefined,
     },
     include: {
       user: { select: { id: true, email: true, isSuspended: true, isBanned: true, identityStatus: true, createdAt: true, countryCode: true } },
@@ -182,7 +195,7 @@ export async function findCandidates(
     const eligibility = await evaluateEligibility({
       providerType: 'INDIVIDUAL',
       providerId: profile.userId,
-      job: input,
+      job: canonicalInput,
       client,
     })
 
@@ -205,7 +218,7 @@ export async function findCandidates(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: input.countryCode ? { countryCode: input.countryCode } : undefined,
+      user: canonicalInput.countryCode ? { countryCode: canonicalInput.countryCode } : undefined,
     },
     include: {
       user: { select: { id: true, email: true, isSuspended: true, isBanned: true, countryCode: true, createdAt: true } },
@@ -227,7 +240,7 @@ export async function findCandidates(
     const eligibility = await evaluateEligibility({
       providerType: 'COMPANY',
       providerId: company.id,
-      job: input,
+      job: canonicalInput,
       client,
     })
 

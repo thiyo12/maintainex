@@ -214,17 +214,19 @@ async function evaluateTaskerProfession(
   job: MatchingInput,
 ): Promise<ProfessionEvaluation> {
   // Get service requirements for this job
-  const requirements = await client.serviceProfessionRequirement.findMany({
-    where: { serviceTemplateId: job.serviceTemplateId || undefined },
-    include: {
-      profession: { select: { id: true, isActive: true } },
-      skillRequirements: {
+  const requirements = job.serviceTemplateId
+    ? await client.serviceProfessionRequirement.findMany({
+        where: { serviceTemplateId: job.serviceTemplateId },
         include: {
-          professionSkill: { select: { id: true, slug: true } },
+          profession: { select: { id: true, isActive: true } },
+          skillRequirements: {
+            include: {
+              professionSkill: { select: { id: true, slug: true } },
+            },
+          },
         },
-      },
-    },
-  })
+      })
+    : []
 
   if (requirements.length === 0) {
     // No profession requirements configured — fall back to legacy capability check
@@ -238,7 +240,12 @@ async function evaluateTaskerProfession(
     // Legacy fallback: check if any taskerSkill matches the job category
     const hasLegacy = profile.taskerSkills.some(s => s.job.categoryId === job.categoryId)
     if (hasLegacy) {
-      return { gate: { gate: 'PROFESSION_MATCH', passed: true, detail: 'Legacy capability match' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
+      return {
+        gate: { gate: 'PROFESSION_MATCH', passed: true, detail: 'Legacy capability match' },
+        matchedProfessionId: null,
+        matchedSkills: [job.categoryId],
+        preferredSkillsMatched: [],
+      }
     }
     return { gate: { gate: 'PROFESSION_MATCH', passed: false, reason: 'No matching capability' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
   }
@@ -323,17 +330,19 @@ async function evaluateCompanyProfession(
   companyId: string,
   job: MatchingInput,
 ): Promise<ProfessionEvaluation> {
-  const requirements = await client.serviceProfessionRequirement.findMany({
-    where: { serviceTemplateId: job.serviceTemplateId || undefined },
-    include: {
-      profession: { select: { id: true, isActive: true } },
-      skillRequirements: {
+  const requirements = job.serviceTemplateId
+    ? await client.serviceProfessionRequirement.findMany({
+        where: { serviceTemplateId: job.serviceTemplateId },
         include: {
-          professionSkill: { select: { id: true, slug: true } },
+          profession: { select: { id: true, isActive: true } },
+          skillRequirements: {
+            include: {
+              professionSkill: { select: { id: true, slug: true } },
+            },
+          },
         },
-      },
-    },
-  })
+      })
+    : []
 
   if (requirements.length === 0) {
     // Legacy fallback
@@ -346,7 +355,12 @@ async function evaluateCompanyProfession(
     }
     const hasSpecialty = company.specialties.some(s => s.categoryId === job.categoryId)
     if (hasSpecialty) {
-      return { gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: true, detail: 'Legacy specialty match' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
+      return {
+        gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: true, detail: 'Legacy specialty match' },
+        matchedProfessionId: null,
+        matchedSkills: [job.categoryId],
+        preferredSkillsMatched: [],
+      }
     }
     return { gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: false, reason: 'No matching capability' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
   }

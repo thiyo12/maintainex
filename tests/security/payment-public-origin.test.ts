@@ -46,11 +46,10 @@ describe('trusted payment public origin', () => {
     expect(resolvePaymentPublicOrigin('https://maintainex.lk/api/pay')).toBeNull()
   })
 
-  it('keeps every PayHere entry route on the shared trusted-origin resolver', () => {
+  it('keeps active payment entry routes on the shared trusted-origin resolver', () => {
     const routes = [
       'app/api/mobile/v2/jobs/[id]/payment/route.ts',
       'app/api/mobile/v2/jobs/[id]/pay/route.ts',
-      'app/api/payments/payhere/[intentId]/route.ts',
     ]
 
     for (const route of routes) {
@@ -58,5 +57,15 @@ describe('trusted payment public origin', () => {
       expect(source).toContain('resolvePaymentPublicOrigin(request.url)')
       expect(source).not.toContain('mutableEnv.NEXTAUTH_URL || new URL(request.url).origin')
     }
+  })
+
+  it('keeps retired PayHere hosted checkout closed without constructing a redirect origin', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'app/api/payments/payhere/[intentId]/route.ts'),
+      'utf-8'
+    )
+    expect(source).toContain('PAYHERE_DISABLED_FOR_NEW_CHECKOUT')
+    expect(source).toContain('status: 410')
+    expect(source).not.toContain('resolvePaymentPublicOrigin')
   })
 })
