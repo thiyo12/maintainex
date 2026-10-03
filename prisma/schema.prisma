@@ -3718,6 +3718,8 @@ model ProviderIdentity {
   financialAccounts   ProviderFinancialAccount[]
   commissionReceivables ProviderCommissionReceivable[]
   commissionRecoveries ProviderCommissionRecovery[]
+  balanceAdjustments      ProviderBalanceAdjustment[]
+  balanceAdjustmentRecoveries ProviderBalanceAdjustmentRecovery[]
   photoChangeRequests ProviderPhotoChangeRequest[]
 
   @@unique([identityType, subjectId])
@@ -3752,6 +3754,7 @@ model ProviderFinancialAccount {
   providerIdentity         ProviderIdentity @relation(fields: [providerIdentityId], references: [id], onDelete: Restrict)
   currency                 String
   commissionDue            BigInt           @default(0)
+  adjustmentDue            BigInt           @default(0)
   availableEarnings        BigInt           @default(0)
   pendingEarnings          BigInt           @default(0)
   status                   String           @default("CLEAR") // CLEAR, WARNING, CASH_RESTRICTED, REVIEW_REQUIRED, FROZEN
@@ -3759,6 +3762,7 @@ model ProviderFinancialAccount {
   onlineJobsAllowed        Boolean          @default(true)
   manualReviewRequired     Boolean          @default(false)
   oldestCommissionDueAt    DateTime?
+  oldestAdjustmentDueAt    DateTime?
   version                  Int              @default(1)
   lastEvaluatedAt          DateTime?
   createdAt                DateTime         @default(now())
@@ -3768,6 +3772,7 @@ model ProviderFinancialAccount {
   @@index([status, currency])
   @@index([cashJobsAllowed, currency])
   @@index([commissionDue])
+  @@index([adjustmentDue])
 }
 
 model ProviderCommissionReceivable {
@@ -3811,6 +3816,57 @@ model ProviderCommissionRecovery {
 
   @@index([providerIdentityId, createdAt])
   @@index([receivableId])
+  @@index([sourceEscrowId])
+}
+
+model ProviderBalanceAdjustment {
+  id                 String           @id @default(cuid())
+  providerIdentityId String
+  providerIdentity   ProviderIdentity @relation(fields: [providerIdentityId], references: [id], onDelete: Restrict)
+  jobId              String
+  escrowId           String
+  paymentIntentId    String?
+  adjustmentType     String           // PAYMENT_CHARGEBACK, DISPUTE_BUYER_FAVOR, ADMIN_ADJUSTMENT
+  sourceProvider     String
+  sourceReference    String
+  amountOriginal     BigInt
+  amountRemaining    BigInt
+  currency           String
+  status             String           @default("OPEN") // OPEN, PARTIAL, SETTLED, WAIVED
+  dueAt              DateTime
+  settledAt          DateTime?
+  reason             String?
+  metadata           String?
+  idempotencyKey     String           @unique
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  recoveries ProviderBalanceAdjustmentRecovery[]
+
+  @@unique([sourceProvider, sourceReference, adjustmentType])
+  @@index([providerIdentityId, currency, status, dueAt])
+  @@index([jobId])
+  @@index([escrowId])
+  @@index([paymentIntentId])
+}
+
+model ProviderBalanceAdjustmentRecovery {
+  id                 String                    @id @default(cuid())
+  adjustmentId       String
+  adjustment         ProviderBalanceAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Restrict)
+  providerIdentityId String
+  providerIdentity   ProviderIdentity          @relation(fields: [providerIdentityId], references: [id], onDelete: Restrict)
+  sourceJobId        String?
+  sourceEscrowId     String?
+  amount             BigInt
+  currency           String
+  method             String                    // ONLINE_EARNINGS, DIRECT_SETTLEMENT, ADMIN_ADJUSTMENT
+  idempotencyKey     String                    @unique
+  createdBy          String
+  createdAt          DateTime                  @default(now())
+
+  @@index([providerIdentityId, createdAt])
+  @@index([adjustmentId])
   @@index([sourceEscrowId])
 }
 
