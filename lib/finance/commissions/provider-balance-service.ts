@@ -304,6 +304,35 @@ export async function evaluateStoredProviderFinancialStanding(
   return { account: updated, policy, decision }
 }
 
+export async function assertProviderAnyJobEligible(
+  tx: Prisma.TransactionClient,
+  input: {
+    providerId: string
+    providerType: FinancialProviderType
+    countryCode: string
+    currency: string
+  },
+) {
+  const identity = await ensureProviderIdentity(tx, input)
+  const standing = await evaluateStoredProviderFinancialStanding(tx, {
+    providerIdentityId: identity.id,
+    providerType: input.providerType,
+    countryCode: input.countryCode,
+    currency: input.currency,
+  })
+
+  if (!standing.decision.cashJobsAllowed && !standing.decision.onlineJobsAllowed) {
+    const error = new Error('PROVIDER_FINANCIALLY_RESTRICTED')
+    ;(error as Error & { code?: string }).code = 'PROVIDER_FINANCIALLY_RESTRICTED'
+    throw error
+  }
+
+  return {
+    providerIdentity: identity,
+    ...standing,
+  }
+}
+
 export async function assertProviderCashEligible(
   tx: Prisma.TransactionClient,
   input: {
