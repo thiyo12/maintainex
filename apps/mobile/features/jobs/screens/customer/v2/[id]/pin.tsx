@@ -431,7 +431,7 @@ export default function JobPinScreen() {
             <TouchableOpacity
               style={[styles.actionBtn, styles.primaryBtn]}
               onPress={handleGenerate}
-              disabled={!!actionLoading}
+              disabled={!!actionLoading || (needsWorkerIdentity && !workerMatched)}
             >
               {actionLoading === 'generate' ? (
                 <ActivityIndicator size="small" color="#000" />
@@ -520,6 +520,33 @@ function makeStyles(colors: any) {
     emptyState: { alignItems: 'center', paddingVertical: 40, marginBottom: 24 },
     emptyTitle: { fontSize: 18, fontFamily: fonts.semibold, color: colors.text, marginTop: 16 },
     emptySubtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, marginTop: 8, textAlign: 'center' },
+    identityCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 18,
+      marginBottom: 20,
+      borderWidth: 1.5,
+      borderColor: colors.amber,
+    },
+    identityHeader: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginBottom: 16 },
+    identityTitle: { fontSize: 16, fontFamily: fonts.semibold, color: colors.text },
+    identitySubtitle: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, lineHeight: 18, marginTop: 3 },
+    workerRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+    workerPhoto: { width: 72, height: 72, borderRadius: 18, backgroundColor: colors.surface },
+    workerPhotoFallback: { alignItems: 'center', justifyContent: 'center' },
+    workerName: { fontSize: 17, fontFamily: fonts.semibold, color: colors.text },
+    workerCompany: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, marginTop: 2 },
+    workerVerification: { fontSize: 12, fontFamily: fonts.medium, marginTop: 5 },
+    identityActions: { gap: 8, marginTop: 16 },
+    identityAction: { minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingHorizontal: 12 },
+    identityMatchBtn: { backgroundColor: colors.amber },
+    identityMatchText: { color: '#000', fontFamily: fonts.semibold, fontSize: 14 },
+    identityMismatchBtn: { borderWidth: 1, borderColor: colors.error, backgroundColor: 'transparent' },
+    identityMismatchText: { color: colors.error, fontFamily: fonts.semibold, fontSize: 14 },
+    identitySuccess: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 16, padding: 12, borderRadius: 10, backgroundColor: colors.surface },
+    identitySuccessText: { flex: 1, color: colors.success, fontFamily: fonts.medium, fontSize: 12, lineHeight: 17 },
+    identityDanger: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 16, padding: 12, borderRadius: 10, backgroundColor: colors.surface },
+    identityDangerText: { flex: 1, color: colors.error, fontFamily: fonts.medium, fontSize: 12, lineHeight: 17 },
     actions: { gap: 12 },
     actionBtn: {
       flexDirection: 'row',
