@@ -19,6 +19,16 @@ interface CommissionPayment {
   dueAt: string
 }
 
+interface CommissionRecovery {
+  id: string
+  amount: number
+  currency: string
+  method: string
+  sourceJobId?: string | null
+  originalCashJobId: string
+  createdAt: string
+}
+
 interface MaintainEXBalance {
   commissionDue: number
   commissionDueMinor: string
@@ -37,6 +47,7 @@ interface EarningsData {
   pendingAmount?: number
   transactions: { job: string; amount: number; date: string; status: string }[]
   pendingCommissionPayments?: CommissionPayment[]
+  recentCommissionRecoveries?: CommissionRecovery[]
   maintainexBalance?: MaintainEXBalance
 }
 
@@ -135,6 +146,33 @@ export default function TaskerEarnings() {
                   Your financial standing requires MaintainEX review.
                 </Text>
               )}
+            </View>
+          )}
+
+          {(data?.recentCommissionRecoveries || []).length > 0 && (
+            <View style={styles.recoverySection}>
+              <Text style={styles.recoveryTitle}>Recent automatic recoveries</Text>
+              <Text style={styles.recoveryHelp}>
+                These amounts were applied from online-job earnings to older cash-job commission due.
+              </Text>
+              {data?.recentCommissionRecoveries?.slice(0, 5).map((recovery) => (
+                <View key={recovery.id} style={styles.recoveryCard}>
+                  <View style={styles.recoveryIcon}>
+                    <Ionicons name="swap-horizontal-outline" size={18} color={colors.success} />
+                  </View>
+                  <View style={styles.recoveryBody}>
+                    <Text style={styles.recoveryAmount}>
+                      {recovery.currency} {recovery.amount.toLocaleString()} recovered
+                    </Text>
+                    <Text style={styles.recoveryMeta}>
+                      Online job {recovery.sourceJobId?.slice(0, 8) || '—'} → cash job {recovery.originalCashJobId.slice(0, 8)}
+                    </Text>
+                    <Text style={styles.recoveryMeta}>
+                      {new Date(recovery.createdAt).toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              ))}
             </View>
           )}
 
@@ -335,6 +373,53 @@ const makeStyles = (colors: any) => StyleSheet.create({
   maintainexRuleValue: { fontSize: 13, fontFamily: fonts.bodyMedium },
   maintainexHelp: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, lineHeight: 18, marginTop: 10 },
   maintainexWarning: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.error, lineHeight: 18, marginTop: 8 },
+  recoverySection: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+  },
+  recoveryTitle: {
+    fontSize: 16,
+    fontFamily: fonts.bodyMedium,
+    color: colors.ink,
+    marginBottom: 4,
+  },
+  recoveryHelp: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.muted,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  recoveryCard: {
+    flexDirection: 'row',
+    gap: 10,
+    backgroundColor: colors.white,
+    padding: 12,
+    borderRadius: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  recoveryIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  recoveryBody: { flex: 1 },
+  recoveryAmount: {
+    fontSize: 13,
+    fontFamily: fonts.bodyMedium,
+    color: colors.success,
+  },
+  recoveryMeta: {
+    fontSize: 11,
+    fontFamily: fonts.body,
+    color: colors.muted,
+    marginTop: 2,
+  },
   commissionSection: {
     marginHorizontal: 24,
     marginBottom: 16,
