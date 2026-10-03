@@ -65,6 +65,59 @@ export default function CompanyEarnings() {
         </View>
       </View>
 
+      {earnings?.maintainexBalance && (
+        <View style={styles.maintainexCard}>
+          <View style={styles.maintainexHeader}>
+            <View>
+              <Text style={styles.maintainexTitle}>Company MaintainEX Balance</Text>
+              <Text style={styles.maintainexStatus}>
+                {String(earnings.maintainexBalance.status || 'CLEAR').replaceAll('_', ' ')}
+              </Text>
+            </View>
+            <Ionicons
+              name={Number(earnings.maintainexBalance.commissionDue || 0) > 0 ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+              size={26}
+              color={Number(earnings.maintainexBalance.commissionDue || 0) > 0 ? colors.amber : colors.success}
+            />
+          </View>
+
+          <Text style={styles.maintainexDueLabel}>Commission due</Text>
+          <Text style={styles.maintainexDueValue}>
+            {earnings.maintainexBalance.currency || 'LKR'} {Number(earnings.maintainexBalance.commissionDue || 0).toLocaleString()}
+          </Text>
+
+          <View style={styles.maintainexRuleRow}>
+            <Text style={styles.maintainexRuleLabel}>Cash jobs</Text>
+            <Text style={[
+              styles.maintainexRuleValue,
+              { color: earnings.maintainexBalance.cashJobsAllowed ? colors.success : colors.error },
+            ]}>
+              {earnings.maintainexBalance.cashJobsAllowed ? 'Allowed' : 'Temporarily blocked'}
+            </Text>
+          </View>
+          <View style={styles.maintainexRuleRow}>
+            <Text style={styles.maintainexRuleLabel}>Online jobs</Text>
+            <Text style={[
+              styles.maintainexRuleValue,
+              { color: earnings.maintainexBalance.onlineJobsAllowed ? colors.success : colors.error },
+            ]}>
+              {earnings.maintainexBalance.onlineJobsAllowed ? 'Allowed' : 'Restricted'}
+            </Text>
+          </View>
+
+          {!earnings.maintainexBalance.cashJobsAllowed && earnings.maintainexBalance.onlineJobsAllowed && (
+            <Text style={styles.maintainexHelp}>
+              Online-paid jobs remain available so company commission debt can be recovered from future earnings.
+            </Text>
+          )}
+          {earnings.maintainexBalance.manualReviewRequired && (
+            <Text style={styles.maintainexWarning}>
+              This company account requires MaintainEX finance review.
+            </Text>
+          )}
+        </View>
+      )}
+
       {(earnings?.pendingCommissionPayments || []).length > 0 && (
         <View style={styles.commissionSection}>
           <Text style={styles.commissionTitle}>Pending Commission Payments</Text>
@@ -170,6 +223,35 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderRadius: 20,
   },
   changeText: { fontSize: 13, fontWeight: '600', color: colors.white },
+  maintainexCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: 24,
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  maintainexHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  maintainexTitle: { fontSize: 17, fontWeight: '800', color: colors.ink },
+  maintainexStatus: { fontSize: 12, fontWeight: '600', color: colors.muted, marginTop: 2 },
+  maintainexDueLabel: { fontSize: 12, color: colors.muted },
+  maintainexDueValue: { fontSize: 26, fontWeight: '800', color: colors.ink, marginTop: 2, marginBottom: 14 },
+  maintainexRuleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 7,
+  },
+  maintainexRuleLabel: { fontSize: 13, color: colors.muted },
+  maintainexRuleValue: { fontSize: 13, fontWeight: '700' },
+  maintainexHelp: { fontSize: 12, color: colors.muted, lineHeight: 18, marginTop: 10 },
+  maintainexWarning: { fontSize: 12, fontWeight: '700', color: colors.error, lineHeight: 18, marginTop: 8 },
   statsRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 10, marginBottom: 16 },
   statCard: {
     flex: 1,
