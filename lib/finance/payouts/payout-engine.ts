@@ -70,6 +70,38 @@ async function assertPayoutNotFrozenInTransaction(
   if (frozen) throw new Error('PAYOUTS_FROZEN')
 }
 
+async function assertProviderFinancialPayoutEligible(
+  userId: string,
+  currency: Currency,
+): Promise<{ ok: true } | { ok: false; error: string; code: string }> {
+  const identity = await prisma.providerIdentity.findFirst({
+    where: {
+      currentUserId: userId,
+      identityType: { in: ['TASKER', 'COMPANY'] },
+      closedAt: null,
+    },
+    select: {
+      financialAccounts: {
+        where: { currency },
+        select: {
+          adjustmentDue: true,
+          status: true,
+        },
+      },
+    },
+  })
+
+  const account = identity?.financialAccounts[0]
+  if (account?.adjustmentDue && account.adjustmentDue > 0n) {
+    return {
+      ok: false,
+      error: 'Payout is blocked while a post-payment financial adjustment is unresolved',
+      code: 'PROVIDER_BALANCE_ADJUSTMENT_DUE',
+    }
+  }
+  return { ok: true }
+}
+
 async function readCompletedIdempotency(idempotencyKey: string): Promise<{ payoutId: string; status: PayoutStatus; payloadHash?: string } | null> {
   const existing = await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey } })
   if (!existing?.metadata || existing.status !== 'COMPLETED') return null
@@ -122,6 +154,9 @@ export async function requestPayout(
   const wallet = await prisma.providerWallet.findUnique({ where: { userId } })
   if (!wallet) return { ok: false, error: 'Provider wallet not found', code: 'WALLET_NOT_FOUND' }
   if (wallet.isFrozen) return { ok: false, error: 'Wallet is frozen', code: 'WALLET_FROZEN' }
+
+  const financialEligibility = await assertProviderFinancialPayoutEligible(userId, currency)
+  if (!financialEligibility.ok) return financialEligibility
 
   const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { countryCode: true } })
   const payoutCountry = userRecord?.countryCode || (currency === 'CAD' ? 'CA' : 'LK')
