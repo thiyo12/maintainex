@@ -120,9 +120,9 @@ export default function CompanyEarnings() {
 
       {(earnings?.recentCommissionRecoveries || []).length > 0 && (
         <View style={styles.recoverySection}>
-          <Text style={styles.recoveryTitle}>Recent automatic recoveries</Text>
+          <Text style={styles.recoveryTitle}>Recent commission settlements</Text>
           <Text style={styles.recoveryHelp}>
-            Online company earnings used to clear older cash-job MaintainEX commission.
+            Online offsets and confirmed direct payments reduce older company cash-job commission.
           </Text>
           {earnings.recentCommissionRecoveries.slice(0, 5).map((recovery: any) => (
             <View key={recovery.id} style={styles.recoveryCard}>
@@ -131,10 +131,12 @@ export default function CompanyEarnings() {
               </View>
               <View style={styles.recoveryBody}>
                 <Text style={styles.recoveryAmount}>
-                  {recovery.currency} {Number(recovery.amount || 0).toLocaleString()} recovered
+                  {recovery.currency} {Number(recovery.amount || 0).toLocaleString()} {recovery.method === 'ONLINE_EARNINGS' ? 'recovered from online earnings' : 'direct payment confirmed'}
                 </Text>
                 <Text style={styles.recoveryMeta}>
-                  Online job {recovery.sourceJobId?.slice(0, 8) || '—'} → cash job {String(recovery.originalCashJobId || '').slice(0, 8)}
+                  {recovery.method === 'ONLINE_EARNINGS'
+                    ? `Online job ${recovery.sourceJobId?.slice(0, 8) || '—'} → cash job ${String(recovery.originalCashJobId || '').slice(0, 8)}`
+                    : `Cash job ${String(recovery.originalCashJobId || '').slice(0, 8)}`}
                 </Text>
                 <Text style={styles.recoveryMeta}>
                   {new Date(recovery.createdAt).toLocaleString()}
