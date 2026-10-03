@@ -45,8 +45,6 @@ CREATE TABLE "ProviderFinancialAccount" (
     "providerIdentityId" TEXT NOT NULL,
     "currency" TEXT NOT NULL,
     "commissionDue" BIGINT NOT NULL DEFAULT 0,
-    "availableEarnings" BIGINT NOT NULL DEFAULT 0,
-    "pendingEarnings" BIGINT NOT NULL DEFAULT 0,
     "status" TEXT NOT NULL DEFAULT 'CLEAR',
     "cashJobsAllowed" BOOLEAN NOT NULL DEFAULT true,
     "onlineJobsAllowed" BOOLEAN NOT NULL DEFAULT true,
