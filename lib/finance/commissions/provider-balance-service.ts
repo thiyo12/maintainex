@@ -483,6 +483,19 @@ export async function recoverProviderCommissionFromOnlineEarnings(
   const locked = lockedRows[0]
   if (!locked) throw new Error('PROVIDER_FINANCIAL_ACCOUNT_NOT_FOUND')
 
+  const currentCommissionDue = BigInt(locked.commissionDue)
+  if (currentCommissionDue <= 0n || input.availableOnlineEarningsMinor <= 0n) {
+    return {
+      providerIdentityId: identity.id,
+      recoveryMinor: 0n,
+      providerPayoutMinor: input.availableOnlineEarningsMinor > 0n
+        ? input.availableOnlineEarningsMinor
+        : 0n,
+      remainingCommissionDueMinor: currentCommissionDue > 0n ? currentCommissionDue : 0n,
+      allocations: [] as Array<{ receivableId: string; amount: bigint }>,
+    }
+  }
+
   const policy = await resolveProviderFinancialPolicy(tx, {
     countryCode: input.countryCode,
     providerType: input.providerType,
@@ -491,7 +504,7 @@ export async function recoverProviderCommissionFromOnlineEarnings(
 
   const decision = calculateOnlineDebtOffset({
     availableOnlineEarningsMinor: input.availableOnlineEarningsMinor,
-    commissionDueMinor: BigInt(locked.commissionDue),
+    commissionDueMinor: currentCommissionDue,
     autoOffsetEnabled: policy.autoOffsetOnlineEarnings,
   })
 
