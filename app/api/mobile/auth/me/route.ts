@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { safeParseJsonArr } from '@/lib/db-utils'
-import { closeAccountPreservingProviderIntegrity } from '@/lib/identity/account-closure'
+import {
+  closeAccountPreservingProviderIntegrity,
+  type AccountClosurePreflight,
+} from '@/lib/identity/account-closure'
 
 function computeTier(completedJobs: number, totalSpent: number): string {
   if (completedJobs >= 25 || totalSpent >= 150000) return 'ELITE'
@@ -127,8 +130,7 @@ export async function DELETE(request: NextRequest) {
         providerIdentityId: balance.providerIdentityId,
         identityType: balance.identityType,
         currency: balance.currency,
-        commissionDueMinor: balance.commissionDueMinor.toString(),
-        status: balance.status,
+        commissionDueMinor: balance.amountMinor,
       })),
       message: result.closesWithBalance
         ? 'Account access closed. Outstanding MaintainEX commission remains attached to the verified provider identity.'
@@ -137,23 +139,13 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
     if (message === 'ACCOUNT_CLOSURE_BLOCKED') {
-      const assessment = (error as Error & {
-        assessment?: {
-          blockers: string[]
-          activeJobIds: string[]
-          openDisputes: Array<{ id: string; jobId: string; status: string }>
-          pendingPayouts: Array<{ id: string; status: string }>
-        }
-      }).assessment
+      const preflight = (error as Error & { preflight?: AccountClosurePreflight }).preflight
 
       return NextResponse.json(
         {
-          error: 'Resolve active jobs, disputes, and pending payouts before closing the account.',
+          error: 'Resolve the listed account obligations before closing the account.',
           code: 'ACCOUNT_CLOSURE_BLOCKED',
-          blockers: assessment?.blockers || [],
-          activeJobCount: assessment?.activeJobIds.length || 0,
-          openDisputeCount: assessment?.openDisputes.length || 0,
-          pendingPayoutCount: assessment?.pendingPayouts.length || 0,
+          preflight,
         },
         { status: 409 },
       )
