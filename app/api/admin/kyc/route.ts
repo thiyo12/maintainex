@@ -90,9 +90,45 @@ export async function GET(request: NextRequest) {
       prisma.identityDocument.count({ where: { status: 'REJECTED', ...countryFilter } }),
     ])
 
+    const documentUserIds = [...new Set(documents.map(document => document.userId))]
+    const integritySignals = documentUserIds.length > 0
+      ? await prisma.providerIntegritySignal.findMany({
+          where: {
+            userId: { in: documentUserIds },
+            signalType: {
+              in: [
+                'STRONG_IDENTITY_MATCH_WITH_FINANCIAL_LIABILITY',
+                'STRONG_IDENTITY_REUSE',
+              ],
+            },
+          },
+          select: {
+            id: true,
+            userId: true,
+            signalType: true,
+            severity: true,
+            status: true,
+            resolution: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      : []
+
+    const integritySignalsByUser = new Map<string, typeof integritySignals>()
+    for (const signal of integritySignals) {
+      if (!signal.userId) continue
+      const current = integritySignalsByUser.get(signal.userId) || []
+      current.push(signal)
+      integritySignalsByUser.set(signal.userId, current)
+    }
+
     return NextResponse.json(
       {
-        documents,
+        documents: documents.map(document => ({
+          ...document,
+          integritySignals: integritySignalsByUser.get(document.userId) || [],
+        })),
         summary: { pending, verified, rejected },
         pagination: {
           page,
