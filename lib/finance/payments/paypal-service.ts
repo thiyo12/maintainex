@@ -296,6 +296,21 @@ export function extractPayPalEventReferences(event: RecordObject): {
     captureId = stringValue(relatedIds?.capture_id) || captureId
   }
 
+  const disputedTransactions = Array.isArray(resource?.disputed_transactions)
+    ? resource!.disputed_transactions.filter(
+        (value): value is RecordObject =>
+          Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+      )
+    : []
+  for (const disputed of disputedTransactions) {
+    const sellerTransaction = objectValue(disputed.seller_transaction)
+    const transactionId =
+      stringValue(disputed.seller_transaction_id) ||
+      stringValue(sellerTransaction?.id) ||
+      stringValue(disputed.transaction_id)
+    if (!captureId && transactionId) captureId = transactionId
+  }
+
   const links = Array.isArray(resource?.links)
     ? resource!.links.filter(
         (value): value is RecordObject =>
