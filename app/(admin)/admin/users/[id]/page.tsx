@@ -266,7 +266,7 @@ export default function User360Page() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="People · User 360"
         title={account.name || account.mxId || 'User'}
@@ -298,7 +298,7 @@ export default function User360Page() {
         </Link>
       </div>
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Identity"
           value={String(account.identityStatus || 'NOT SUBMITTED').replaceAll('_', ' ')}
@@ -339,8 +339,8 @@ export default function User360Page() {
         </div>
       </CrmCard>
 
-      <div className="grid xl:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
-        <div className="space-y-5">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_286px]">
+        <div className="space-y-4">
           {tab === 'overview' && <Overview data={data} />}
           {tab === 'work' && data.permissions.work && <Work data={data} />}
           {tab === 'finance' && data.permissions.finance && <Finance data={data} />}
@@ -348,7 +348,7 @@ export default function User360Page() {
           {tab === 'activity' && data.permissions.audit && <Activity data={data} />}
         </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-[92px]">
+        <aside className="space-y-3.5 xl:sticky xl:top-[72px]">
           <Card title="Account controls" subtitle="Role-gated and audited actions">
             <div className="space-y-2">
               {canSuspendAccount && account.role === 'COMPANY' && (
@@ -424,7 +424,7 @@ function Overview({ data }: { data: Payload }) {
   return (
     <>
       <Card title="Profile" subtitle="Canonical account and marketplace profile">
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Field label="Full name" value={u.name} />
           <Field label="Email" value={u.email} />
           <Field label="Phone" value={u.phone} />
@@ -436,7 +436,7 @@ function Overview({ data }: { data: Payload }) {
 
       {u.customerProfile && (
         <Card title="Customer 360" subtitle="Customer value, segmentation and CRM notes">
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <Metric label="Bookings" value={u.customerProfile.totalBookings || 0} />
             <Metric label="Total spent" value={fmtMoney(u.customerProfile.totalSpent)} />
             <Metric label="Lifetime value" value={fmtMoney(u.customerProfile.lifetimeValue)} />
@@ -469,13 +469,13 @@ function Overview({ data }: { data: Payload }) {
 
       {u.taskerProfile && (
         <Card title="Tasker 360" subtitle="Provider quality and availability">
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <Metric label="Rating" value={u.taskerProfile.rating?.toFixed?.(1) || u.taskerProfile.rating || 0} />
             <Metric label="Completed jobs" value={u.taskerProfile.completedJobs || 0} />
             <Metric label="Composite score" value={u.taskerProfile.compositeScore || 0} />
             <Metric label="Completion rate" value={`${u.taskerProfile.completionRate || 0}%`} />
           </div>
-          <div className="mt-5 grid md:grid-cols-2 gap-4">
+          <div className="mt-4 grid gap-3.5 md:grid-cols-2">
             <Field label="Verification" value={<Badge value={u.taskerProfile.verificationStatus} />} />
             <Field label="Online" value={u.taskerProfile.isOnline ? 'Yes' : 'No'} />
             <Field label="Skills" value={u.taskerProfile.skills} />
@@ -651,7 +651,7 @@ function Trust({ data }: { data: Payload }) {
         ) : <Empty icon={FiFileText} title="No KYC documents" text="This account has not submitted identity documents." />}
       </Card>
 
-      <div className="grid lg:grid-cols-2 gap-5">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Fraud / risk events">
           {u.fraudEvents?.length ? u.fraudEvents.map((event: any) => (
             <div key={event.id} className="mb-2 last:mb-0 rounded-xl border border-slate-200 p-3">
