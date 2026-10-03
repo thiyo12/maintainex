@@ -10,7 +10,7 @@ import {
 
 export type FinancialProviderType = 'INDIVIDUAL' | 'COMPANY'
 
-const DEFAULT_LK_LKR_POLICY: ProviderFinancialPolicy = {
+export const DEFAULT_LK_LKR_POLICY: ProviderFinancialPolicy = {
   warningThresholdMinor: 200_000n,
   cashRestrictionThresholdMinor: 500_000n,
   reviewThresholdMinor: 1_000_000n,
