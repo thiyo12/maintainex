@@ -394,7 +394,7 @@ export default function PaymentDetailPage() {
         </CrmCard>
       </section>
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <div className="rounded-[12px] border border-amber-200 bg-amber-50 p-3.5">
         <div className="flex items-start gap-3">
           <FiShield size={16} className="mt-0.5 shrink-0 text-amber-700" />
           <div>
