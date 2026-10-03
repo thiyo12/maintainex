@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 
 const mocks = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
+  conversationFindFirst: vi.fn(),
   participantFindUnique: vi.fn(),
   messageFindMany: vi.fn(),
   messageUpdateMany: vi.fn(),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    conversation: { findFirst: mocks.conversationFindFirst },
     message: { findMany: mocks.messageFindMany, updateMany: mocks.messageUpdateMany },
     conversationParticipant: {
       findUnique: mocks.participantFindUnique,
@@ -46,11 +48,13 @@ const params = { params: Promise.resolve({ id: 'conv-1' }) }
 describe('GET /api/mobile/conversations/[id]/messages — participant isolation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.conversationFindFirst.mockResolvedValue({ id: 'conv-1' })
   })
 
   it('returns 404 for a non-participant and never reads messages', async () => {
     const GET = await loadHandler()
     mocks.authenticateRequest.mockResolvedValue({ id: 'outsider-user', role: 'COMPANY' })
+    mocks.conversationFindFirst.mockResolvedValue(null)
     mocks.participantFindUnique.mockResolvedValue(null)
 
     const res = await GET(makeRequest(), params)
@@ -58,6 +62,14 @@ describe('GET /api/mobile/conversations/[id]/messages — participant isolation'
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toBe('Conversation not found')
+    expect(mocks.conversationFindFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'conv-1',
+        participants: { some: { userId: 'outsider-user' } },
+      },
+      select: { id: true },
+    })
+    expect(mocks.participantFindUnique).not.toHaveBeenCalled()
     expect(mocks.messageFindMany).not.toHaveBeenCalled()
     expect(mocks.messageUpdateMany).not.toHaveBeenCalled()
   })
