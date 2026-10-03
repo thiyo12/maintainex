@@ -205,7 +205,7 @@ export default function ApprovalQueuePage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Governance"
         title="Approval Queue"
@@ -218,7 +218,7 @@ export default function ApprovalQueuePage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Visible approvals"
           value={metrics.total}
@@ -291,7 +291,7 @@ export default function ApprovalQueuePage() {
                         {row.targetType} · {row.targetId}
                       </div>
 
-                      <div className="mt-4 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="mt-3.5 grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
                         <div>
                           <div className="text-slate-400">Amount</div>
                           <div className="mt-1 font-semibold text-slate-800">{formatAmount(row)}</div>
