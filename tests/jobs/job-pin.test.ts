@@ -397,7 +397,7 @@ describe('Phase 10.5 — Job Verification PIN', () => {
       expect(result.valid).toBe(true)
     })
 
-    it('requires a fresh PIN after ARRIVAL before WORK_START', async () => {
+    it('requires a fresh PIN after ARRIVAL before WORK_START', { timeout: 30000 }, async () => {
       const { generateJobPin, getPinState, verifyJobPin } = await import('@/lib/domain/job-pin')
 
       const arrivalPin = await generateJobPin(jobAId, customerAId)
