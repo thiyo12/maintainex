@@ -113,7 +113,7 @@ export default function FinanceControlCentrePage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Finance operations"
         title="Finance Control Centre"
@@ -125,9 +125,9 @@ export default function FinanceControlCentrePage() {
         }
       />
 
-      <section className="space-y-4">
+      <section className="space-y-3">
         {metrics.length ? metrics.map(row => (
-          <div key={row.currency} className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <div key={row.currency} className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <Metric icon={FiShield} label={`Protected / held escrow · ${row.currency}`} value={minor(row.protectedEscrow, row.currency)} detail="Customer funds protected" />
             <Metric icon={FiDollarSign} label={`Pending commission · ${row.currency}`} value={minor(row.pendingCommission, row.currency)} detail="MaintainEX receivable" />
             <Metric icon={FiCreditCard} label={`Pending payouts · ${row.currency}`} value={minor(row.pendingPayouts, row.currency)} detail="Provider payouts awaiting clearing" />
@@ -167,7 +167,7 @@ export default function FinanceControlCentrePage() {
         </Link>
       </div>
 
-      <section className="grid xl:grid-cols-2 gap-5">
+      <section className="grid gap-4 xl:grid-cols-2">
         <Panel title="Escrow state" subtitle="Canonical JobEscrow status distribution">
           <StatusRows rows={data?.escrow || []} amountField="total" />
           <div className="mt-4 flex flex-col gap-2">
@@ -214,7 +214,7 @@ export default function FinanceControlCentrePage() {
         </Panel>
       </section>
 
-      <section className="grid xl:grid-cols-2 gap-5">
+      <section className="grid gap-4 xl:grid-cols-2">
         <Panel title="Recent settlements" subtitle="Latest commission settlement records">
           {data?.recentSettlements?.length ? (
             <div className="space-y-2">
