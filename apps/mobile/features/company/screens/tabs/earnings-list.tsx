@@ -118,6 +118,33 @@ export default function CompanyEarnings() {
         </View>
       )}
 
+      {(earnings?.recentCommissionRecoveries || []).length > 0 && (
+        <View style={styles.recoverySection}>
+          <Text style={styles.recoveryTitle}>Recent automatic recoveries</Text>
+          <Text style={styles.recoveryHelp}>
+            Online company earnings used to clear older cash-job MaintainEX commission.
+          </Text>
+          {earnings.recentCommissionRecoveries.slice(0, 5).map((recovery: any) => (
+            <View key={recovery.id} style={styles.recoveryCard}>
+              <View style={styles.recoveryIcon}>
+                <Ionicons name="swap-horizontal-outline" size={18} color={colors.success} />
+              </View>
+              <View style={styles.recoveryBody}>
+                <Text style={styles.recoveryAmount}>
+                  {recovery.currency} {Number(recovery.amount || 0).toLocaleString()} recovered
+                </Text>
+                <Text style={styles.recoveryMeta}>
+                  Online job {recovery.sourceJobId?.slice(0, 8) || '—'} → cash job {String(recovery.originalCashJobId || '').slice(0, 8)}
+                </Text>
+                <Text style={styles.recoveryMeta}>
+                  {new Date(recovery.createdAt).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
       {(earnings?.pendingCommissionPayments || []).length > 0 && (
         <View style={styles.commissionSection}>
           <Text style={styles.commissionTitle}>Pending Commission Payments</Text>
@@ -307,6 +334,51 @@ const makeStyles = (colors: any) => StyleSheet.create({
   payoutAmount: { fontSize: 14, fontWeight: '700' },
   payoutStatus: { fontSize: 11, color: colors.muted, marginTop: 2 },
   emptyText: { textAlign: 'center', color: colors.muted, marginTop: 20, fontSize: 14 },
+  recoverySection: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+  },
+  recoveryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.ink,
+    marginBottom: 4,
+  },
+  recoveryHelp: {
+    fontSize: 12,
+    color: colors.muted,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  recoveryCard: {
+    flexDirection: 'row',
+    gap: 10,
+    backgroundColor: colors.white,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  recoveryIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  recoveryBody: { flex: 1 },
+  recoveryAmount: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.success,
+  },
+  recoveryMeta: {
+    fontSize: 11,
+    color: colors.muted,
+    marginTop: 2,
+  },
   commissionSection: {
     marginHorizontal: 24,
     marginBottom: 16,
