@@ -264,6 +264,10 @@ afterAll(async () => {
   await prisma.jobEscrow.deleteMany({
     where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] } },
   })
+  await prisma.marketplaceJob.update({
+    where: { id: jobAId },
+    data: { approvedQuoteId: null },
+  }).catch(() => {})
   await prisma.jobQuote.deleteMany({
     where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] } },
   })
