@@ -105,7 +105,7 @@ function CredentialsContent() {
   const totalPages = Math.ceil(total / 20)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Trust & Safety"
         title="Credential review"
