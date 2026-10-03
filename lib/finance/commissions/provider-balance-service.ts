@@ -526,6 +526,14 @@ export async function recoverProviderCommissionFromOnlineEarnings(
       currency,
       status: { in: ['OPEN', 'PARTIAL'] },
       amountRemaining: { gt: 0 },
+      OR: [
+        { weeklySettlementId: null },
+        {
+          weeklySettlement: {
+            commissionPayments: { none: { status: 'PENDING' } },
+          },
+        },
+      ],
     },
     orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
   })
@@ -661,6 +669,187 @@ export async function recoverProviderCommissionFromOnlineEarnings(
         : 0n,
     remainingCommissionDueMinor: remainingDue,
     allocations,
+  }
+}
+
+export async function settleProviderReceivablesFromDirectPayment(
+  tx: Prisma.TransactionClient,
+  input: {
+    weeklySettlementId: string
+    commissionPaymentId: string
+    amountPaidMinor: bigint
+    currency: string
+    createdBy: string
+  },
+) {
+  const currency = input.currency.trim().toUpperCase()
+  if (input.amountPaidMinor <= 0n) {
+    throw new Error('DIRECT_COMMISSION_PAYMENT_AMOUNT_INVALID')
+  }
+
+  const receivables = await tx.providerCommissionReceivable.findMany({
+    where: {
+      weeklySettlementId: input.weeklySettlementId,
+      currency,
+      status: { in: ['OPEN', 'PARTIAL'] },
+      amountRemaining: { gt: 0 },
+    },
+    orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    include: {
+      providerIdentity: {
+        select: {
+          id: true,
+          identityType: true,
+          countryCode: true,
+        },
+      },
+    },
+  })
+
+  // Historical weekly settlements predate the durable receivable layer.
+  // Keep their legacy reconciliation path working without inventing balances.
+  if (receivables.length === 0) {
+    return {
+      featureBacked: false,
+      recoveredMinor: 0n,
+      remainingCommissionDueMinor: 0n,
+      providerIdentityId: null as string | null,
+    }
+  }
+
+  const providerIdentityIds = [...new Set(receivables.map(item => item.providerIdentityId))]
+  if (providerIdentityIds.length !== 1) {
+    throw new Error('DIRECT_COMMISSION_PAYMENT_IDENTITY_MISMATCH')
+  }
+
+  const outstandingMinor = receivables.reduce(
+    (sum, item) => sum + item.amountRemaining,
+    0n,
+  )
+  if (outstandingMinor !== input.amountPaidMinor) {
+    throw new Error('DIRECT_COMMISSION_PAYMENT_AMOUNT_MISMATCH')
+  }
+
+  const identity = receivables[0].providerIdentity
+  const account = await tx.providerFinancialAccount.findUnique({
+    where: {
+      providerIdentityId_currency: {
+        providerIdentityId: identity.id,
+        currency,
+      },
+    },
+  })
+  if (!account) {
+    throw new Error('PROVIDER_FINANCIAL_ACCOUNT_NOT_FOUND')
+  }
+
+  await postLedgerTransaction({
+    entries: [
+      {
+        accountId: `commission-clearing:${currency}`,
+        accountType: 'PLATFORM_CASH_CLEARING',
+        entryType: 'DEBIT',
+        amount: input.amountPaidMinor,
+      },
+      {
+        accountId: `provider-receivable:${identity.id}`,
+        accountType: 'PROVIDER_COMMISSION_RECEIVABLE',
+        entryType: 'CREDIT',
+        amount: input.amountPaidMinor,
+      },
+    ],
+    currency: currency as Currency,
+    referenceType: 'COMMISSION_PAYMENT',
+    referenceId: input.commissionPaymentId,
+    idempotencyKey: `commission-payment-recovery:${input.commissionPaymentId}`,
+    description: `Direct provider commission settlement ${input.commissionPaymentId}`,
+    createdBy: input.createdBy,
+    metadata: JSON.stringify({
+      weeklySettlementId: input.weeklySettlementId,
+      providerIdentityId: identity.id,
+      currency,
+    }),
+  }, tx)
+
+  const settledAt = new Date()
+  for (const receivable of receivables) {
+    await tx.providerCommissionReceivable.update({
+      where: { id: receivable.id },
+      data: {
+        amountRemaining: 0n,
+        status: 'SETTLED',
+        settledAt,
+      },
+    })
+
+    await tx.providerCommissionRecovery.create({
+      data: {
+        receivableId: receivable.id,
+        providerIdentityId: identity.id,
+        amount: receivable.amountRemaining,
+        currency,
+        method: 'DIRECT_SETTLEMENT',
+        idempotencyKey: `direct-settlement:${input.commissionPaymentId}:${receivable.id}`,
+        createdBy: input.createdBy,
+      },
+    })
+  }
+
+  const previousDue = account.commissionDue
+  const remainingDue = previousDue > input.amountPaidMinor
+    ? previousDue - input.amountPaidMinor
+    : 0n
+
+  const oldestRemaining = await tx.providerCommissionReceivable.findFirst({
+    where: {
+      providerIdentityId: identity.id,
+      currency,
+      status: { in: ['OPEN', 'PARTIAL'] },
+      amountRemaining: { gt: 0 },
+    },
+    orderBy: [{ dueAt: 'asc' }, { createdAt: 'asc' }],
+    select: { dueAt: true },
+  })
+
+  const providerType: FinancialProviderType =
+    identity.identityType === 'COMPANY' ? 'COMPANY' : 'INDIVIDUAL'
+  const policy = await resolveProviderFinancialPolicy(tx, {
+    countryCode: identity.countryCode,
+    providerType,
+    currency,
+  })
+  const standing = evaluateProviderFinancialStanding(
+    {
+      commissionDueMinor: remainingDue,
+      oldestCommissionDueAt: oldestRemaining?.dueAt || null,
+    },
+    policy,
+  )
+
+  await tx.providerFinancialAccount.update({
+    where: { id: account.id },
+    data: {
+      commissionDue: remainingDue,
+      oldestCommissionDueAt: oldestRemaining?.dueAt || null,
+      status: standing.standing,
+      cashJobsAllowed: standing.cashJobsAllowed,
+      onlineJobsAllowed: standing.onlineJobsAllowed,
+      manualReviewRequired: standing.manualReviewRequired,
+      lastEvaluatedAt: settledAt,
+      version: { increment: 1 },
+    },
+  })
+
+  await tx.providerIdentity.update({
+    where: { id: identity.id },
+    data: { standingStatus: identityStanding(standing) },
+  })
+
+  return {
+    featureBacked: true,
+    recoveredMinor: input.amountPaidMinor,
+    remainingCommissionDueMinor: remainingDue,
+    providerIdentityId: identity.id,
   }
 }
 
