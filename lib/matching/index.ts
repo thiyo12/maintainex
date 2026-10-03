@@ -168,7 +168,7 @@ export async function findCandidates(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: input.countryCode ? { countryCode: input.countryCode } : undefined,
+      user: canonicalInput.countryCode ? { countryCode: canonicalInput.countryCode } : undefined,
     },
     include: {
       user: { select: { id: true, email: true, isSuspended: true, isBanned: true, identityStatus: true, createdAt: true, countryCode: true } },
@@ -218,7 +218,7 @@ export async function findCandidates(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: input.countryCode ? { countryCode: input.countryCode } : undefined,
+      user: canonicalInput.countryCode ? { countryCode: canonicalInput.countryCode } : undefined,
     },
     include: {
       user: { select: { id: true, email: true, isSuspended: true, isBanned: true, countryCode: true, createdAt: true } },
