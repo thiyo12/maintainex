@@ -159,6 +159,34 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    if (status === 'APPROVED') {
+      const blockingSignal = await prisma.providerIntegritySignal.findFirst({
+        where: {
+          userId: document.userId,
+          signalType: {
+            in: [
+              'STRONG_IDENTITY_MATCH_WITH_FINANCIAL_LIABILITY',
+              'STRONG_IDENTITY_REUSE',
+            ],
+          },
+          status: { in: ['OPEN', 'REVIEWED', 'CONFIRMED'] },
+          severity: { in: ['HIGH', 'CRITICAL'] },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      if (blockingSignal) {
+        return NextResponse.json(
+          {
+            error: 'Resolve the linked Trust & Safety identity-integrity event before approving KYC.',
+            code: 'IDENTITY_INTEGRITY_REVIEW_REQUIRED',
+            integritySignalId: blockingSignal.id,
+          },
+          { status: 409 },
+        )
+      }
+    }
+
     const action = status === 'APPROVED' ? 'APPROVE' : 'REJECT'
     const result = await transitionUserKyc(prisma, {
       userId: document.userId,
