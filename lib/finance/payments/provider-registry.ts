@@ -20,7 +20,8 @@ export const PAYMENT_PROVIDER_NOT_AVAILABLE = 'PAYMENT_PROVIDER_NOT_AVAILABLE' a
  * PayPal's official Sri Lanka documentation says Checkout is not yet live.
  */
 export const PAYPAL_MARKET_VERIFICATION_ENV = 'PAYPAL_MARKET_CHECKOUT_VERIFIED'
-const PAYPAL_SANDBOX_FIXTURE_COUNTRY = 'CA'
+export const PAYPAL_SANDBOX_FIXTURE_COUNTRY = 'CA'
+export const PAYPAL_SANDBOX_FIXTURE_CURRENCY = 'CAD'
 const PAYPAL_LIVE_HARD_BLOCKED_MARKETS = new Set(['LK'])
 
 export function isProviderSelectableForNewCheckout(provider: string): boolean {
@@ -62,7 +63,8 @@ export function isPayPalMarketVerified(
 export function blockedNewCheckoutReason(
   provider: string,
   countryCode: string,
-  environment: 'SANDBOX' | 'LIVE'
+  environment: 'SANDBOX' | 'LIVE',
+  currency: string
 ): string | null {
   const normalizedProvider = provider.trim().toUpperCase()
   if (!isProviderSelectableForNewCheckout(normalizedProvider)) {
@@ -73,6 +75,13 @@ export function blockedNewCheckoutReason(
     !isPayPalMarketVerified(countryCode, environment)
   ) {
     return `PayPal Checkout is not verified for ${countryCode.trim().toUpperCase()} in ${environment}`
+  }
+  if (
+    normalizedProvider === 'PAYPAL' &&
+    environment === 'SANDBOX' &&
+    currency.trim().toUpperCase() !== PAYPAL_SANDBOX_FIXTURE_CURRENCY
+  ) {
+    return `PayPal sandbox checkout is restricted to ${PAYPAL_SANDBOX_FIXTURE_COUNTRY}/${PAYPAL_SANDBOX_FIXTURE_CURRENCY}`
   }
   return null
 }
@@ -197,7 +206,8 @@ export function selectProviderFromConfigs(
         blockedNewCheckoutReason(
           provider,
           countryCode,
-          environment as 'SANDBOX' | 'LIVE'
+          environment as 'SANDBOX' | 'LIVE',
+          currency
         )
       ) return null
       if (!currencies.includes(currency)) return null
