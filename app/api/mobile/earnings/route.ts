@@ -213,6 +213,7 @@ export async function GET(request: NextRequest) {
       recentPayouts: payouts.slice(0, 20).map(p => ({
         id: p.id,
         amount: bigIntToSafeNumber(p.amount) / 100,
+        currency: p.currency,
         description: p.description,
         status: p.status,
         source: p.source,
