@@ -321,7 +321,7 @@ export default function CatalogManagementPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="App & Web · Canonical catalog"
         title="Services & categories"
@@ -366,7 +366,7 @@ export default function CatalogManagementPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Categories"
           value={data.categories.length.toLocaleString()}
@@ -592,7 +592,7 @@ export default function CatalogManagementPage() {
                 </select>
               </CrmField>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3.5 sm:grid-cols-2">
                 <CrmField label="Base price">
                   <input
                     type="number"

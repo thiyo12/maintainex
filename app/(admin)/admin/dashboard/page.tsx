@@ -11,7 +11,6 @@ import {
   FiDollarSign,
   FiServer,
   FiShield,
-  FiTool,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import {
@@ -210,7 +209,7 @@ function TrendChart({
 
   return (
     <div className="w-full">
-      <div className="mb-3 flex flex-wrap items-center gap-5 text-[11px] font-medium text-slate-500">
+      <div className="mb-3 flex flex-wrap items-center gap-4 text-[11px] font-medium text-slate-500">
         <span className="inline-flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-[var(--crm-accent)]" />
           Jobs created
@@ -424,27 +423,6 @@ export default function AdminDashboard() {
         ? formatCurrency(escrowEntries[0][1], escrowEntries[0][0])
         : `${escrowEntries.length} currencies`
 
-  const completedPayoutRows = (financeOverview?.payouts || []).filter(row =>
-    ['SUCCEEDED', 'CLEARED', 'SETTLED', 'PAID'].includes(String(row.status || '').toUpperCase())
-  )
-  const payoutsByCurrency = new Map<string, number>()
-  let processedPayoutCount = 0
-  for (const row of completedPayoutRows) {
-    processedPayoutCount += Number(row.count || 0)
-    payoutsByCurrency.set(
-      row.currency,
-      (payoutsByCurrency.get(row.currency) || 0) + Number(row.amount || 0) / 100
-    )
-  }
-  const payoutEntries = [...payoutsByCurrency.entries()]
-  const payoutsProcessedValue = !financeOverview
-    ? 'Restricted'
-    : payoutEntries.length === 0
-      ? formatCurrency(0)
-      : payoutEntries.length === 1
-        ? formatCurrency(payoutEntries[0][1], payoutEntries[0][0])
-        : `${payoutEntries.length} currencies`
-
   const totalForDonut = Math.max(1, jobStatus.total)
   const progressPct = (jobStatus.inProgress / totalForDonut) * 100
   const openPct = (jobStatus.open / totalForDonut) * 100
@@ -452,7 +430,7 @@ export default function AdminDashboard() {
   const cancelledPct = ((jobStatus.cancelled + jobStatus.other) / totalForDonut) * 100
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3.5">
       <CrmPageHeader
         title={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, ${user?.name || 'Admin'} 👋`}
         description="Here’s what’s happening with your marketplace today."
@@ -463,27 +441,27 @@ export default function AdminDashboard() {
         }
       />
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <CrmMetricCard
-          label="Total Jobs"
-          value={jobStatus.total.toLocaleString()}
-          helper={`${jobStatus.open.toLocaleString()} currently open`}
-          icon={<FiTool size={16} />}
-          tone="neutral"
-        />
-        <CrmMetricCard
-          label="In Progress"
-          value={jobStatus.inProgress.toLocaleString()}
-          helper="Active marketplace work"
+          label="Active Jobs"
+          value={(jobStatus.open + jobStatus.inProgress).toLocaleString()}
+          helper={`${jobStatus.inProgress.toLocaleString()} in progress · ${jobStatus.open.toLocaleString()} pending`}
           icon={<FiActivity size={16} />}
-          tone="info"
+          tone="success"
         />
         <CrmMetricCard
-          label="Completed"
-          value={jobStatus.completed.toLocaleString()}
-          helper="Jobs completed in this scope"
-          icon={<FiCheckCircle size={16} />}
-          tone="success"
+          label="Escrow Held"
+          value={escrowHeldValue}
+          helper={financeOverview ? `${escrowHeldCount} protected records` : 'Finance permission required'}
+          icon={<FiDollarSign size={16} />}
+          tone="amber"
+        />
+        <CrmMetricCard
+          label="Revenue"
+          value={revenueValue === null ? 'Restricted' : formatCurrency(revenueValue)}
+          helper={revenueValue === null ? 'Finance permission required' : 'MaintainEX commission revenue'}
+          icon={<FiCreditCard size={16} />}
+          tone="info"
         />
         <CrmMetricCard
           label="Disputes"
@@ -492,36 +470,9 @@ export default function AdminDashboard() {
           icon={<FiShield size={16} />}
           tone={openDisputes > 0 ? 'danger' : 'success'}
         />
-        <CrmMetricCard
-          label="Total Revenue"
-          value={revenueValue === null ? 'Restricted' : formatCurrency(revenueValue)}
-          helper={revenueValue === null ? 'Finance permission required' : 'MaintainEX commission revenue'}
-          icon={<FiCreditCard size={16} />}
-          tone="amber"
-        />
-        <CrmMetricCard
-          label="Payouts Processed"
-          value={payoutsProcessedValue}
-          helper={financeOverview ? `${processedPayoutCount} cleared payouts` : 'Finance permission required'}
-          icon={<FiDollarSign size={16} />}
-          tone="neutral"
-        />
       </section>
 
-      {financeOverview && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--crm-border)] bg-white px-4 py-2.5 text-xs text-slate-500 shadow-sm">
-          <FiShield className="text-amber-600" />
-          <span className="font-semibold text-slate-700">Protected escrow</span>
-          <span>{escrowHeldValue}</span>
-          <span className="text-slate-300">·</span>
-          <span>{escrowHeldCount} held / protected records</span>
-          <Link href="/admin/financial/escrow" className="ml-auto font-semibold text-amber-700 hover:text-amber-800">
-            Escrow operations →
-          </Link>
-        </div>
-      )}
-
-      <section className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
+      <section className="grid gap-3.5 xl:grid-cols-[1.7fr_1fr]">
         <CrmCard
           title="Jobs & Revenue Trend"
           description="Last 30 days in the selected market"
@@ -617,7 +568,7 @@ export default function AdminDashboard() {
         </div>
       </CrmCard>
 
-      <section className="grid gap-4 xl:grid-cols-3">
+      <section className="grid gap-3.5 xl:grid-cols-3">
         <CrmCard
           title="Alerts / Pending Actions"
           description="Authorized queues requiring attention"

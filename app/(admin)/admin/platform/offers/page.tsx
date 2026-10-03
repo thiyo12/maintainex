@@ -269,7 +269,7 @@ export default function OffersManagementPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="App & Web · Promotions"
         title="Offers & promotions"
@@ -307,7 +307,7 @@ export default function OffersManagementPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Seasonal offers"
           value={data.seasonal.length.toLocaleString()}
@@ -338,7 +338,7 @@ export default function OffersManagementPage() {
         />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-2">
+      <section className="grid gap-4 xl:grid-cols-2">
         <CrmCard
           title="Seasonal offers"
           description="Country-scoped campaigns and seasonal merchandising."
@@ -451,7 +451,7 @@ export default function OffersManagementPage() {
           </CrmField>
 
           {type === 'seasonal' ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3.5 sm:grid-cols-2">
               <CrmField label="Season">
                 <select
                   value={form.season}
@@ -479,7 +479,7 @@ export default function OffersManagementPage() {
             </div>
           ) : (
             <>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3.5 sm:grid-cols-2">
                 <CrmField label="Discount type">
                   <select
                     value={form.discountType}
@@ -509,7 +509,7 @@ export default function OffersManagementPage() {
                 </CrmField>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3.5 sm:grid-cols-2">
                 <CrmField label="Starts at">
                   <input
                     type="datetime-local"

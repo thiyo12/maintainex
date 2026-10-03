@@ -235,7 +235,7 @@ export default function SubscriptionsPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="App & Web · Subscriptions"
         title="Company subscriptions"
@@ -274,7 +274,7 @@ export default function SubscriptionsPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Active plans"
           value={data.metrics.activePlans.toLocaleString()}
@@ -305,7 +305,7 @@ export default function SubscriptionsPage() {
         />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1.05fr_1.4fr]">
+      <section className="grid gap-4 xl:grid-cols-[1.05fr_1.4fr]">
         <CrmCard
           title="Plan catalogue"
           description="Plans are immutable for price history. To change pricing, create a new plan and retire the old one."
@@ -439,7 +439,7 @@ export default function SubscriptionsPage() {
               placeholder="Professional"
             />
           </CrmField>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3.5 sm:grid-cols-2">
             <CrmField label="Market">
               <select
                 value={form.countryCode}

@@ -47,11 +47,11 @@ export function CrmModal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`relative w-full ${maxWidth} overflow-hidden rounded-[18px] border border-[var(--crm-border)] bg-white shadow-[var(--crm-shadow-float)]`}
+        className={`relative w-full ${maxWidth} overflow-hidden rounded-[14px] border border-[var(--crm-border)] bg-white shadow-[var(--crm-shadow-float)]`}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-[var(--crm-border)] px-5 py-4">
+        <header className="flex items-start justify-between gap-4 border-b border-[var(--crm-border)] px-4 py-3.5">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+            <h2 className="text-sm font-semibold text-slate-950">{title}</h2>
             {description && <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>}
           </div>
           <button
@@ -63,9 +63,9 @@ export function CrmModal({
             <FiX size={17} />
           </button>
         </header>
-        <div className="max-h-[72vh] overflow-y-auto px-5 py-5">{children}</div>
+        <div className="max-h-[72vh] overflow-y-auto px-4 py-4">{children}</div>
         {footer && (
-          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--crm-border)] bg-[#fafbf9] px-5 py-4">
+          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--crm-border)] bg-[#fafbfc] px-4 py-3">
             {footer}
           </footer>
         )}
@@ -108,9 +108,9 @@ export function CrmDrawer({
         aria-label={title}
         className={`absolute inset-y-0 right-0 flex w-full ${width} flex-col border-l border-[var(--crm-border)] bg-white shadow-[var(--crm-shadow-float)]`}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-[var(--crm-border)] px-5 py-4">
+        <header className="flex items-start justify-between gap-4 border-b border-[var(--crm-border)] px-4 py-3.5">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+            <h2 className="text-sm font-semibold text-slate-950">{title}</h2>
             {description && <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>}
           </div>
           <button
@@ -122,9 +122,9 @@ export function CrmDrawer({
             <FiX size={17} />
           </button>
         </header>
-        <div className="crm-scrollbar flex-1 overflow-y-auto px-5 py-5">{children}</div>
+        <div className="crm-scrollbar flex-1 overflow-y-auto px-4 py-4">{children}</div>
         {footer && (
-          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--crm-border)] bg-[#fafbf9] px-5 py-4">
+          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--crm-border)] bg-[#fafbfc] px-4 py-3">
             {footer}
           </footer>
         )}

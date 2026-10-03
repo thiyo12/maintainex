@@ -99,7 +99,7 @@ function RiskEventsContent() {
   const totalPages = Math.ceil(total / 20)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Trust & Safety"
         title="Risk events"
@@ -170,15 +170,15 @@ function RiskEventsContent() {
                   {!e.reviewedAt && canResolve && (
                     <div className="flex items-center space-x-1">
                       <button onClick={() => handleReview(e.id, 'CONFIRMED', 'Confirmed by admin')} disabled={actionLoading === e.id}
-                        className="flex items-center space-x-1 px-2 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 disabled:opacity-50 text-xs" title="Confirm">
+                        className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-red-200 bg-red-50 px-2.5 text-[11px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50" title="Confirm">
                         <FiCheck className="w-3 h-3" />
                       </button>
                       <button onClick={() => handleReview(e.id, 'DISMISSED')} disabled={actionLoading === e.id}
-                        className="flex items-center space-x-1 px-2 py-1 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 disabled:opacity-50 text-xs" title="Dismiss">
+                        className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-emerald-200 bg-emerald-50 px-2.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50" title="Dismiss">
                         <FiMinus className="w-3 h-3" />
                       </button>
                       <button onClick={() => handleReview(e.id, 'ESCALATED', 'Escalated for review')} disabled={actionLoading === e.id}
-                        className="flex items-center space-x-1 px-2 py-1 bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30 disabled:opacity-50 text-xs" title="Escalate">
+                        className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-amber-200 bg-amber-50 px-2.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50" title="Escalate">
                         <FiArrowUp className="w-3 h-3" />
                       </button>
                     </div>

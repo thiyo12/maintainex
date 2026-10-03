@@ -111,7 +111,7 @@ export default function PlatformManagementPage() {
   const activeOffers = data.offers.activeSeasonal + data.offers.activeFlash
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Control plane"
         title="App & Web"
@@ -126,7 +126,7 @@ export default function PlatformManagementPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard label="Active website services" value={data.catalog.services.active.toLocaleString()} helper={`${data.catalog.services.trending} trending`} icon={<FiMonitor size={16} />} tone="success" />
         <CrmMetricCard label="Marketplace templates" value={data.catalog.serviceTemplates.active.toLocaleString()} helper={`${data.catalog.serviceTemplates.inactive} inactive`} icon={<FiSmartphone size={16} />} tone="info" />
         <CrmMetricCard label="Active offers" value={activeOffers.toLocaleString()} helper="Seasonal + flash" icon={<FiTag size={16} />} tone="amber" />
@@ -134,7 +134,7 @@ export default function PlatformManagementPage() {
       </section>
 
       <CrmCard title="Management modules" description="Each module controls or observes a real runtime-backed MaintainEX capability." action={<FiShield size={18} className="text-emerald-600" />} padding="md">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-4">
           {moduleCards.map(module => (
             <Link key={module.title} href={module.href} className="group h-full">
               <div className="crm-subtle-card h-full p-4 transition-all group-hover:border-[var(--crm-border-strong)] group-hover:bg-white group-hover:shadow-[var(--crm-shadow-card)]">

@@ -261,7 +261,7 @@ export default function WalletsPage() {
         : transactions
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Finance"
         title="Wallets & Ledger"
@@ -274,9 +274,9 @@ export default function WalletsPage() {
         }
       />
 
-      <section className="space-y-4">
+      <section className="space-y-3">
         {summaryRows.length > 0 ? summaryRows.map(summary => (
-          <div key={summary.currency} className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          <div key={summary.currency} className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <CrmMetricCard
               label={`Provider available · ${summary.currency}`}
               value={formatCurrency(summary.providerAvailable, summary.currency)}
@@ -568,7 +568,7 @@ export default function WalletsPage() {
         </CrmTableFrame>
       )}
 
-      <div className="rounded-2xl border border-[var(--crm-border)] bg-white p-4">
+      <div className="rounded-[12px] border border-[var(--crm-border)] bg-white p-3.5 shadow-[var(--crm-shadow-card)]">
         <div className="flex items-start gap-3">
           <FiShield className="mt-0.5 shrink-0 text-amber-600" size={16} />
           <p className="text-xs leading-5 text-slate-500">

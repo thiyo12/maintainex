@@ -379,7 +379,7 @@ export default function ProfessionsManagementPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="App & Web · Provider taxonomy"
         title="Professions & skills"
@@ -417,7 +417,7 @@ export default function ProfessionsManagementPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Professions"
           value={professions.length.toLocaleString()}
@@ -482,7 +482,7 @@ export default function ProfessionsManagementPage() {
             description="No profession records match this search."
           />
         ) : (
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-3.5 xl:grid-cols-2">
             {filtered.map(profession => (
               <CrmCard
                 key={profession.id}

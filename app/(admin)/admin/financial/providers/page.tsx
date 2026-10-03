@@ -303,7 +303,7 @@ export default function PaymentProvidersPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Finance · International provider control"
         title="Payment Providers"
@@ -349,7 +349,7 @@ export default function PaymentProvidersPage() {
         </Link>
       </div>
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Configured providers"
           value={totals.configured}
@@ -493,7 +493,7 @@ export default function PaymentProvidersPage() {
         </table>
       </CrmTableFrame>
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-3.5 xl:grid-cols-2">
         <CrmCard
           title="Provider transaction economics"
           description="Gross, provider fee and provider net settlement captured from provider records."
@@ -574,7 +574,7 @@ export default function PaymentProvidersPage() {
           </>
         }
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3.5 sm:grid-cols-2">
           <CrmField label="Country code" hint="ISO alpha-2 market code.">
             <input
               value={form.countryCode}

@@ -146,7 +146,7 @@ export default function TrustSafetyControlCentrePage() {
   ].filter(Boolean) as Array<{ href: string; icon: any; label: string }>
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Marketplace protection"
         title="Trust & Safety"
@@ -167,7 +167,7 @@ export default function TrustSafetyControlCentrePage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Urgent signals"
           value={urgent.toLocaleString()}
@@ -220,7 +220,7 @@ export default function TrustSafetyControlCentrePage() {
         </CrmCard>
       )}
 
-      <section className="grid gap-5 xl:grid-cols-2">
+      <section className="grid gap-4 xl:grid-cols-2">
         {data.permissions.risk && (
           <CrmCard title="Recent marketplace risk" description="Anti-bypass and abnormal-behavior signals" padding="none">
             {data.recent.risk.length ? (

@@ -175,7 +175,7 @@ export default function KYCPage() {
 
   return (
     <>
-      <div className="space-y-5">
+      <div className="space-y-4">
         <CrmPageHeader
           eyebrow="Trust & Safety"
           title="KYC verification"
@@ -190,7 +190,7 @@ export default function KYCPage() {
           }
         />
 
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <CrmMetricCard
             label="Pending"
             value={summary.pending.toLocaleString()}
@@ -312,7 +312,7 @@ export default function KYCPage() {
                           <button
                             onClick={() => handleApprove(doc.id)}
                             disabled={actionLoading}
-                            className="p-2 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 transition disabled:opacity-50"
+                            className="grid h-8 w-8 place-items-center rounded-[8px] border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
                             title="Approve"
                           >
                             <FiCheck size={16} />
@@ -322,7 +322,7 @@ export default function KYCPage() {
                           <button
                             onClick={() => setReviewModal(doc)}
                             disabled={actionLoading}
-                            className="p-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition disabled:opacity-50"
+                            className="grid h-8 w-8 place-items-center rounded-[8px] border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 disabled:opacity-50"
                             title="Reject"
                           >
                             <FiX size={16} />

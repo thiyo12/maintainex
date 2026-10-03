@@ -157,7 +157,7 @@ export default function AnalyticsOverview() {
   const maxRole = Math.max(...Object.values(data.usersByRole), 1)
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Intelligence"
         title="Analytics"
@@ -181,7 +181,7 @@ export default function AnalyticsOverview() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4 2xl:grid-cols-8">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-8">
         <CrmMetricCard label="Total users" value={formatNumber(data.summary.totalUsers)} icon={<FiUsers size={16} />} tone="info" />
         <CrmMetricCard label="Active taskers" value={formatNumber(data.summary.activeTaskers)} helper={`${data.summary.avgTaskerResponseMin}m avg response`} icon={<FiUserCheck size={16} />} tone="success" />
         <CrmMetricCard label="Active companies" value={formatNumber(data.summary.activeCompanies)} icon={<FiBriefcase size={16} />} tone="neutral" />
@@ -192,7 +192,7 @@ export default function AnalyticsOverview() {
         <CrmMetricCard label="Real Estate" value={data.visibility.realEstate?formatNumber(data.summary.realEstateTotal):'Restricted'} helper={data.visibility.realEstate?`${data.summary.realEstatePending} pending review`:'Real-estate permission required'} icon={<FiBriefcase size={16} />} tone="info" />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-2">
+      <section className="grid gap-4 xl:grid-cols-2">
         <CrmCard title="Jobs by status" description="Current distribution across the job lifecycle" action={<CrmBadge tone="neutral">{formatNumber(data.summary.totalJobs)} jobs</CrmBadge>}>
           <div className="space-y-4">
             {Object.entries(data.jobsByStatus).map(([status, count]) => {

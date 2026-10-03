@@ -211,7 +211,7 @@ export default function SettlementsPage() {
   const summaries = payload?.summaryByCurrency || []
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Finance · Historical reconciliation"
         title="Settlement History"
@@ -240,7 +240,7 @@ export default function SettlementsPage() {
         </Link>
       </div>
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Paid settlements"
           value={payload?.pagination.total || 0}
@@ -409,7 +409,7 @@ export default function SettlementsPage() {
         </CrmTableFrame>
       )}
 
-      <div className="rounded-2xl border border-[var(--crm-border)] bg-white p-4">
+      <div className="rounded-[12px] border border-[var(--crm-border)] bg-white p-3.5 shadow-[var(--crm-shadow-card)]">
         <p className="text-xs leading-5 text-slate-500">
           This page is historical and read-only. It does not settle money, clear debt, or change provider access.
           Use Commission Control for payment evidence and enforcement workflows.

@@ -227,7 +227,7 @@ export default function RealEstateOperationsPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Marketplace · Real Estate"
         title="Real-estate operations"
@@ -249,7 +249,7 @@ export default function RealEstateOperationsPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-6">
         <CrmMetricCard label="Listings" value={data.metrics.total.toLocaleString()} helper="In selected scope" icon={<FiHome size={16} />} tone="info" />
         <CrmMetricCard label="Pending review" value={data.metrics.pending.toLocaleString()} helper="Needs moderation" icon={<FiEye size={16} />} tone={data.metrics.pending > 0 ? 'warning' : 'neutral'} />
         <CrmMetricCard label="Public" value={data.metrics.approved.toLocaleString()} helper="Approved + published" icon={<FiCheck size={16} />} tone="success" />

@@ -330,7 +330,7 @@ export default function PayoutQueuePage() {
     freezes.some(freeze => freeze.market === 'GLOBAL' || freeze.market === market)
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Finance · External disbursements"
         title="Payout Queue"
@@ -362,7 +362,7 @@ export default function PayoutQueuePage() {
       </div>
 
       {hasAnyFreeze && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+        <div className="rounded-[12px] border border-red-200 bg-red-50 p-3.5">
           <div className="flex items-start gap-3">
             <FiShield className="mt-0.5 shrink-0 text-red-700" size={17} />
             <div>
@@ -378,7 +378,7 @@ export default function PayoutQueuePage() {
       )}
 
       {metrics.map(row => (
-        <section key={row.currency} className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <section key={row.currency} className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <CrmMetricCard
             label={`Reserved · ${row.currency}`}
             value={money(row.awaitingAmount, row.currency)}
@@ -595,7 +595,7 @@ export default function PayoutQueuePage() {
         </CrmTableFrame>
       )}
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <div className="rounded-[12px] border border-amber-200 bg-amber-50 p-3.5">
         <div className="flex items-start gap-3">
           <FiShield className="mt-0.5 shrink-0 text-amber-700" size={16} />
           <div>

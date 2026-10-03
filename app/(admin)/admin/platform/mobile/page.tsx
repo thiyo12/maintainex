@@ -149,7 +149,7 @@ export default function MobileManagementPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="App & Web · Mobile surfaces"
         title="Mobile app management"
@@ -177,7 +177,7 @@ export default function MobileManagementPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Active templates"
           value={data.catalog.serviceTemplates.active.toLocaleString()}
@@ -208,7 +208,7 @@ export default function MobileManagementPage() {
         />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-2">
+      <section className="grid gap-4 xl:grid-cols-2">
         <CrmCard
           title="Market configuration"
           description="Country-level pricing and marketplace limits consumed by server-side marketplace logic."
@@ -233,7 +233,7 @@ export default function MobileManagementPage() {
                     <CrmBadge tone="success" dot>CONFIGURED</CrmBadge>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                  <div className="mt-3.5 grid grid-cols-2 gap-3 text-sm">
                     <Info label="Currency" value={config.currency} />
                     <Info label="Commission" value={`${config.commissionBps / 100}%`} />
                     <Info label="Minimum job" value={minor(config.minJobAmountCents, config.currency)} />

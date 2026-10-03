@@ -253,7 +253,7 @@ export default function LocationsManagementPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="App & Web · Market coverage"
         title="Locations & service areas"
@@ -297,7 +297,7 @@ export default function LocationsManagementPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard label="Countries" value={totals.countries} helper="Scoped markets" icon={<FiMapPin size={16} />} tone="info" />
         <CrmMetricCard label="States / provinces" value={totals.states} helper="Regional hierarchy" icon={<FiMapPin size={16} />} tone="neutral" />
         <CrmMetricCard label="Cities" value={totals.cities} helper="Bookable cities" icon={<FiMapPin size={16} />} tone="amber" />

@@ -458,7 +458,7 @@ export default function StaffManagementPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Governance"
         title="Staff"
@@ -485,7 +485,7 @@ export default function StaffManagementPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Staff accounts"
           value={staff.length.toLocaleString()}
@@ -840,13 +840,13 @@ export default function StaffManagementPage() {
             description="SUPER_ADMIN capabilities are governed by the owner role and cannot be rewritten through staff overrides."
           />
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-4">
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
               Explicit DENY wins over the role template. Explicit ALLOW is only accepted for delegable permissions. OWNER_ONLY and SYSTEM_ONLY capabilities cannot be overridden. Saving changes revokes this staff member&apos;s active CRM sessions.
             </div>
 
             {groupedPermissions.map(group => (
-              <section key={group.group} className="rounded-2xl border border-[var(--crm-border)] bg-white">
+              <section key={group.group} className="rounded-[12px] border border-[var(--crm-border)] bg-white shadow-[var(--crm-shadow-card)]">
                 <div className="border-b border-[var(--crm-border)] px-4 py-3">
                   <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
                     {group.group}

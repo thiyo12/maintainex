@@ -277,7 +277,7 @@ export default function TaskerManagementPage() {
     : 'Tasker action'
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="People"
         title="Taskers"
@@ -290,7 +290,7 @@ export default function TaskerManagementPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Taskers"
           value={total.toLocaleString()}

@@ -239,7 +239,7 @@ export default function CustomerManagementPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="People"
         title="Customers"
@@ -252,7 +252,7 @@ export default function CustomerManagementPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Customers"
           value={total.toLocaleString()}

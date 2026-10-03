@@ -151,7 +151,7 @@ export default function JobsCommandCentrePage() {
   }, [activeStatus, source])
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Operations"
         title="Jobs Command Centre"
@@ -166,7 +166,7 @@ export default function JobsCommandCentrePage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           icon={<FiBriefcase size={16} />}
           label="Matching jobs"

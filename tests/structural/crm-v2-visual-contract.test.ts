@@ -61,12 +61,10 @@ describe('CRM V2 visual contract', () => {
     const dashboard = readFileSync(resolve(process.cwd(), 'app/(admin)/admin/dashboard/page.tsx'), 'utf8')
 
     for (const marker of [
-      'Total Jobs',
-      'In Progress',
-      'Completed',
+      'Active Jobs',
+      'Escrow Held',
+      'Revenue',
       'Disputes',
-      'Total Revenue',
-      'Payouts Processed',
       'Jobs & Revenue Trend',
       'Job Status',
       'Recent Jobs',
@@ -93,7 +91,9 @@ describe('CRM V2 visual contract', () => {
       'Audit',
       'Quick Actions',
       'Payment / Escrow',
-      'Risk / Verification',
+      'Financials',
+      'Schedule / SLA',
+      'Risk Assessment',
       'Provider / Company / Worker',
       'Location',
       'Schedule',
