@@ -42,10 +42,9 @@ async function resolvePhotoIdentity(userId: string, requestedCompanyId?: string 
     if (memberships.length === 0) {
       throw new Error('PROVIDER_IDENTITY_NOT_ELIGIBLE')
     }
-    if (!requestedCompanyId && memberships.length > 1) {
-      throw new Error('COMPANY_CONTEXT_REQUIRED')
-    }
-
+    // Public worker photo is person-level. If the worker belongs to multiple
+    // companies, create/reuse one approved person photo from the oldest active
+    // membership; later company-worker identities inherit that approved photo.
     const membership = memberships[0]
     const resolved = await ensureCompanyWorkerIdentity(tx, {
       companyId: membership.companyId,
@@ -96,15 +95,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
-    if (message === 'COMPANY_CONTEXT_REQUIRED') {
-      return NextResponse.json(
-        {
-          error: 'Select the company you are updating your worker identity for.',
-          code: 'COMPANY_CONTEXT_REQUIRED',
-        },
-        { status: 409 },
-      )
-    }
     if (message === 'PROVIDER_IDENTITY_NOT_ELIGIBLE') {
       return NextResponse.json(
         { error: 'No eligible tasker or company-worker identity found' },
@@ -235,15 +225,6 @@ export async function POST(request: NextRequest) {
     console.error('Photo change request error:', error)
     const message = error instanceof Error ? error.message : ''
 
-    if (message === 'COMPANY_CONTEXT_REQUIRED') {
-      return NextResponse.json(
-        {
-          error: 'Select the company you are updating your worker identity for.',
-          code: 'COMPANY_CONTEXT_REQUIRED',
-        },
-        { status: 409 },
-      )
-    }
     if (
       message === 'PROVIDER_KYC_NOT_VERIFIED' ||
       message === 'PROVIDER_IDENTITY_NOT_ELIGIBLE'
