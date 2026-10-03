@@ -1,3 +1,6 @@
+ALTER TABLE "MarketplaceJob"
+ADD COLUMN "workerIdentityCheckRequired" BOOLEAN NOT NULL DEFAULT false;
+
 -- Provider identity, financial standing, cash-commission controls, and worker identity verification.
 -- Additive only. Existing payment, escrow, settlement, wallet, and ledger tables remain authoritative.
 
@@ -178,6 +181,9 @@ ON "ProviderPhotoChangeRequest"("providerIdentityId", "status");
 
 CREATE INDEX "ProviderPhotoChangeRequest_status_createdAt_idx"
 ON "ProviderPhotoChangeRequest"("status", "createdAt");
+
+CREATE UNIQUE INDEX "JobWorkerIdentityCheck_jobId_providerIdentityId_key"
+ON "JobWorkerIdentityCheck"("jobId", "providerIdentityId");
 
 CREATE INDEX "JobWorkerIdentityCheck_jobId_status_idx"
 ON "JobWorkerIdentityCheck"("jobId", "status");
