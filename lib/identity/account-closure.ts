@@ -242,7 +242,9 @@ export async function evaluateAccountClosure(
       providerIdentityId: item.providerIdentityId,
       identityType: item.identityType,
       currency: item.currency,
-      commissionDueMinor: BigInt(item.amountMinor),
+      commissionDueMinor: BigInt(item.commissionDueMinor),
+      adjustmentDueMinor: BigInt(item.adjustmentDueMinor),
+      totalDueMinor: BigInt(item.amountMinor),
     })),
   }
 }
