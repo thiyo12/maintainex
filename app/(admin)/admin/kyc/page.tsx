@@ -1,8 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { FiShield, FiCheck, FiX, FiEye, FiFileText, FiClock, FiUser, FiExternalLink } from 'react-icons/fi'
+import { FiShield, FiCheck, FiX, FiEye, FiFileText, FiClock, FiUser, FiExternalLink, FiCamera } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import {
   CrmBadge,
@@ -180,6 +181,15 @@ export default function KYCPage() {
           eyebrow="Trust & Safety"
           title="KYC verification"
           description="Review protected identity documents and move eligible users through the governed verification lifecycle."
+          actions={
+            <Link
+              href="/admin/kyc/photos"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+            >
+              <FiCamera size={14} />
+              Verified photo reviews
+            </Link>
+          }
           context={
             <>
               <CrmBadge tone={(canApprove || canReject) ? 'success' : 'neutral'} dot>
