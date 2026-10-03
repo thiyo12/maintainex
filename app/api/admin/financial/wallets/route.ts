@@ -167,6 +167,26 @@ export async function GET(request: NextRequest) {
                     },
                   },
                 },
+                balanceAdjustmentRecoveries: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 5,
+                  select: {
+                    id: true,
+                    sourceJobId: true,
+                    amount: true,
+                    currency: true,
+                    method: true,
+                    createdAt: true,
+                    adjustment: {
+                      select: {
+                        id: true,
+                        adjustmentType: true,
+                        jobId: true,
+                        sourceProvider: true,
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -237,6 +257,21 @@ export async function GET(request: NextRequest) {
             method: recovery.method,
             sourceJobId: recovery.sourceJobId,
             originalCashJobId: recovery.receivable.jobId,
+            createdAt: recovery.createdAt.toISOString(),
+          })),
+        recentAdjustmentRecoveries: account.providerIdentity.balanceAdjustmentRecoveries
+          .filter(recovery => recovery.currency === account.currency)
+          .map(recovery => ({
+            id: recovery.id,
+            amountMinor: recovery.amount.toString(),
+            amount: Number(recovery.amount) / 100,
+            currency: recovery.currency,
+            method: recovery.method,
+            sourceJobId: recovery.sourceJobId,
+            adjustmentId: recovery.adjustment.id,
+            adjustmentType: recovery.adjustment.adjustmentType,
+            originalJobId: recovery.adjustment.jobId,
+            sourceProvider: recovery.adjustment.sourceProvider,
             createdAt: recovery.createdAt.toISOString(),
           })),
         user: account.providerIdentity.currentUserId
