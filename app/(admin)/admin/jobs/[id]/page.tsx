@@ -593,7 +593,7 @@ function OverviewTab({ payload, location }: { payload: Job360Payload; location: 
       </div>
 
       <Card title="Service Details" subtitle="Request scope and operational notes">
-        <div className="grid gap-5 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3">
           <Field label="Service / category" value={isV2 ? job.category?.name || job.categoryId : job.category} />
           <Field label="Priority" value={label(job.urgency)} />
           <Field label="Source" value={payload.source === 'V2' ? 'Marketplace' : 'Classic'} />
@@ -648,7 +648,7 @@ function LifecycleTab({ payload }: { payload: Job360Payload }) {
       ) : (
         <div className="relative">
           <div className="absolute left-[17px] top-4 bottom-4 w-px bg-slate-200" />
-          <div className="space-y-5">
+          <div className="space-y-4">
             {events.map((event: any, index: number) => (
               <div key={event.id || index} className="relative flex gap-4">
                 <div className="relative z-10 w-9 h-9 shrink-0 rounded-full bg-white border border-slate-200 flex items-center justify-center">
@@ -711,7 +711,7 @@ function QuotesTab({ payload, currency }: { payload: Job360Payload; currency: st
       ) : (
         <div className="space-y-4">
           {quotes.map((quote: any) => (
-            <div key={quote.id} className={`rounded-2xl border p-4 ${quote.status === 'ACCEPTED' ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200'}`}>
+            <div key={quote.id} className={`rounded-[12px] border p-4 ${quote.status === 'ACCEPTED' ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200'}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -753,7 +753,7 @@ function WorkspaceTab({ payload }: { payload: Job360Payload }) {
   if (payload.source === 'V1') {
     return (
       <Card title="Classic workspace" subtitle="Assignment and dispute context for this legacy job">
-        <div className="grid md:grid-cols-2 gap-5">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <h3 className="text-sm font-semibold text-slate-800">Assignments</h3>
             <div className="mt-3 space-y-2">
@@ -786,7 +786,7 @@ function WorkspaceTab({ payload }: { payload: Job360Payload }) {
 
   return (
     <>
-      <div className="grid lg:grid-cols-2 gap-5">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Workspace state" subtitle="Progress and verification controls">
           <div className="grid grid-cols-2 gap-4">
             <Field label="Progress" value={label(payload.workspace?.progressStatus)} />
@@ -1331,7 +1331,7 @@ function AuditTab({ rows }: { rows: any[] }) {
 
 function FinanceMetric({ label: metricLabel, value, amount }: { label: string; value: string; amount: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-[12px] border border-[var(--crm-border)] bg-white p-4 shadow-[var(--crm-shadow-card)]">
       <div className="text-xs text-slate-400">{metricLabel}</div>
       <div className="mt-2"><StatusBadge value={value} /></div>
       <div className="mt-3 text-sm font-semibold text-slate-900">{amount}</div>
