@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { bigIntToSafeNumber, getCurrencyForCountry } from '@/lib/shared/money/money'
+import { readCanonicalProviderBalance } from '@/lib/financial-read'
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     const currency = getCurrencyForCountry(company.countryCode || 'LK')
+    const canonicalBalance = await readCanonicalProviderBalance(company.userId, currency)
     const financialIdentity = await prisma.providerIdentity.findUnique({
       where: {
         identityType_subjectId: {
@@ -123,6 +125,10 @@ export async function GET(request: NextRequest) {
       maintainexBalance: {
         commissionDueMinor: (financialAccount?.commissionDue ?? 0n).toString(),
         commissionDue: bigIntToSafeNumber(financialAccount?.commissionDue ?? 0n) / 100,
+        availableEarningsMinor: (canonicalBalance?.availableBalance ?? 0n).toString(),
+        pendingEarningsMinor: (canonicalBalance?.pendingBalance ?? 0n).toString(),
+        availableEarnings: bigIntToSafeNumber(canonicalBalance?.availableBalance ?? 0n) / 100,
+        pendingEarnings: bigIntToSafeNumber(canonicalBalance?.pendingBalance ?? 0n) / 100,
         status: financialAccount?.status ?? 'CLEAR',
         cashJobsAllowed: financialAccount?.cashJobsAllowed ?? true,
         onlineJobsAllowed: financialAccount?.onlineJobsAllowed ?? true,
