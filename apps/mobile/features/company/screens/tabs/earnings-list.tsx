@@ -75,9 +75,9 @@ export default function CompanyEarnings() {
               </Text>
             </View>
             <Ionicons
-              name={Number(earnings.maintainexBalance.commissionDue || 0) > 0 ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+              name={Number(earnings.maintainexBalance.totalLiability || 0) > 0 ? 'alert-circle-outline' : 'checkmark-circle-outline'}
               size={26}
-              color={Number(earnings.maintainexBalance.commissionDue || 0) > 0 ? colors.amber : colors.success}
+              color={Number(earnings.maintainexBalance.totalLiability || 0) > 0 ? colors.amber : colors.success}
             />
           </View>
 
@@ -85,6 +85,14 @@ export default function CompanyEarnings() {
           <Text style={styles.maintainexDueValue}>
             {earnings.maintainexBalance.currency || 'LKR'} {Number(earnings.maintainexBalance.commissionDue || 0).toLocaleString()}
           </Text>
+          {Number(earnings.maintainexBalance.adjustmentDue || 0) > 0 && (
+            <>
+              <Text style={styles.maintainexDueLabel}>Post-payment adjustment due</Text>
+              <Text style={[styles.maintainexDueValue, { color: colors.error }]}>
+                {earnings.maintainexBalance.currency || 'LKR'} {Number(earnings.maintainexBalance.adjustmentDue || 0).toLocaleString()}
+              </Text>
+            </>
+          )}
 
           <View style={styles.maintainexRuleRow}>
             <Text style={styles.maintainexRuleLabel}>Cash jobs</Text>
