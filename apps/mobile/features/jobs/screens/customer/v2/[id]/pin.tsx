@@ -272,7 +272,106 @@ export default function JobPinScreen() {
         <Text style={styles.title}>{t('jobPin.title')}</Text>
         <Text style={styles.subtitle}>{t('jobPin.description')}</Text>
 
-        {generatedPin && (
+        {needsWorkerIdentity && (
+          <View style={[
+            styles.identityCard,
+            workerMismatch && { borderColor: colors.error },
+            workerMatched && { borderColor: colors.success },
+          ]}>
+            <View style={styles.identityHeader}>
+              <ShieldCheck
+                size={22}
+                color={workerMatched ? colors.success : workerMismatch ? colors.error : colors.amber}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.identityTitle}>Confirm your arriving tasker</Text>
+                <Text style={styles.identitySubtitle}>
+                  Make sure the person at your location matches this MaintainEX verified profile before work starts.
+                </Text>
+              </View>
+            </View>
+
+            {workerIdentity?.worker ? (
+              <>
+                <View style={styles.workerRow}>
+                  {workerIdentity.worker.verifiedPhotoUrl ? (
+                    <Image
+                      source={{ uri: workerIdentity.worker.verifiedPhotoUrl }}
+                      style={styles.workerPhoto}
+                    />
+                  ) : (
+                    <View style={[styles.workerPhoto, styles.workerPhotoFallback]}>
+                      <ShieldSlash size={28} color={colors.muted} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.workerName}>{workerIdentity.worker.displayName}</Text>
+                    {workerIdentity.worker.companyName && (
+                      <Text style={styles.workerCompany}>{workerIdentity.worker.companyName}</Text>
+                    )}
+                    <Text style={[
+                      styles.workerVerification,
+                      { color: workerIdentity.worker.identityVerified ? colors.success : colors.error },
+                    ]}>
+                      {workerIdentity.worker.identityVerified
+                        ? '✓ Identity verified by MaintainEX'
+                        : 'Identity photo verification pending'}
+                    </Text>
+                  </View>
+                </View>
+
+                {workerMatched ? (
+                  <View style={styles.identitySuccess}>
+                    <CheckCircle size={18} color={colors.success} />
+                    <Text style={styles.identitySuccessText}>Person confirmed. Start Work PIN is available.</Text>
+                  </View>
+                ) : workerMismatch ? (
+                  <View style={styles.identityDanger}>
+                    <WarningCircle size={18} color={colors.error} />
+                    <Text style={styles.identityDangerText}>
+                      Identity mismatch reported. Do not allow work to start.
+                    </Text>
+                  </View>
+                ) : workerIdentity.worker.identityVerified ? (
+                  <View style={styles.identityActions}>
+                    <TouchableOpacity
+                      style={[styles.identityAction, styles.identityMatchBtn]}
+                      onPress={handleWorkerMatch}
+                      disabled={!!actionLoading}
+                    >
+                      {actionLoading === 'identity-match'
+                        ? <ActivityIndicator size="small" color="#000" />
+                        : <Text style={styles.identityMatchText}>Person matches</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.identityAction, styles.identityMismatchBtn]}
+                      onPress={handleWorkerMismatch}
+                      disabled={!!actionLoading}
+                    >
+                      <Text style={styles.identityMismatchText}>Different person arrived</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.identityDanger}>
+                    <WarningCircle size={18} color={colors.error} />
+                    <Text style={styles.identityDangerText}>
+                      Do not share the Start Work PIN until MaintainEX verifies this worker's public identity photo.
+                    </Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={styles.identityDanger}>
+                <WarningCircle size={18} color={colors.error} />
+                <Text style={styles.identityDangerText}>
+                  The assigned worker is not ready for identity confirmation yet.
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {generatedPin && (!needsWorkerIdentity || workerMatched) && (
           <View style={styles.pinReveal}>
             <Text style={styles.pinLabel}>{nextPurpose}</Text>
             <Text style={styles.pinValue}>{generatedPin}</Text>
