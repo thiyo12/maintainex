@@ -70,7 +70,7 @@ export default function AuditLogPage() {
     return <CrmState type="loading" title="Loading audit history" description="Reading immutable operator audit entries."/>
   }
 
-  return <div className="space-y-5">
+  return <div className="space-y-4">
     <CrmPageHeader
       eyebrow="Intelligence · Audit"
       title="Audit history"
@@ -106,7 +106,7 @@ export default function AuditLogPage() {
               <td className={crmTdClass}>{(log.oldValue||log.newValue)?<CrmButton size="sm" variant="ghost" onClick={()=>setExpanded(expanded===log.id?null:log.id)}>{expanded===log.id?<FiChevronUp/>:<FiChevronDown/>}{expanded===log.id?'Hide':'View'}</CrmButton>:<span className="text-xs text-slate-400">—</span>}</td>
             </tr>
             {expanded===log.id&&<tr key={`${log.id}-detail`}><td colSpan={6} className="border-b border-[var(--crm-border)] bg-[#fafbf9] px-4 py-4">
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-3.5 lg:grid-cols-2">
                 <AuditValue title="Previous" value={log.oldValue}/><AuditValue title="New" value={log.newValue}/>
               </div>
             </td></tr>}
