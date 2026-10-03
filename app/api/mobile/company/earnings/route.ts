@@ -75,6 +75,35 @@ export async function GET(request: NextRequest) {
         })
       : []
 
+    const recentBalanceAdjustmentRecoveries = financialIdentity
+      ? await prisma.providerBalanceAdjustmentRecovery.findMany({
+          where: {
+            providerIdentityId: financialIdentity.id,
+            currency,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            sourceJobId: true,
+            sourceEscrowId: true,
+            amount: true,
+            currency: true,
+            method: true,
+            createdAt: true,
+            adjustment: {
+              select: {
+                id: true,
+                adjustmentType: true,
+                jobId: true,
+                sourceProvider: true,
+                sourceReference: true,
+              },
+            },
+          },
+        })
+      : []
+
     const contracts = await prisma.contract.findMany({
       where: { companyId: context!.companyId },
       include: { milestones: true },
@@ -122,9 +151,30 @@ export async function GET(request: NextRequest) {
         originalCashJobId: recovery.receivable.jobId,
         createdAt: recovery.createdAt.toISOString(),
       })),
+      recentBalanceAdjustmentRecoveries: recentBalanceAdjustmentRecoveries.map(recovery => ({
+        id: recovery.id,
+        amountMinor: recovery.amount.toString(),
+        amount: bigIntToSafeNumber(recovery.amount) / 100,
+        currency: recovery.currency,
+        method: recovery.method,
+        sourceJobId: recovery.sourceJobId,
+        sourceEscrowId: recovery.sourceEscrowId,
+        adjustmentId: recovery.adjustment.id,
+        adjustmentType: recovery.adjustment.adjustmentType,
+        originalJobId: recovery.adjustment.jobId,
+        sourceProvider: recovery.adjustment.sourceProvider,
+        sourceReference: recovery.adjustment.sourceReference,
+        createdAt: recovery.createdAt.toISOString(),
+      })),
       maintainexBalance: {
         commissionDueMinor: (financialAccount?.commissionDue ?? 0n).toString(),
         commissionDue: bigIntToSafeNumber(financialAccount?.commissionDue ?? 0n) / 100,
+        adjustmentDueMinor: (financialAccount?.adjustmentDue ?? 0n).toString(),
+        adjustmentDue: bigIntToSafeNumber(financialAccount?.adjustmentDue ?? 0n) / 100,
+        totalLiabilityMinor: ((financialAccount?.commissionDue ?? 0n) + (financialAccount?.adjustmentDue ?? 0n)).toString(),
+        totalLiability: bigIntToSafeNumber(
+          (financialAccount?.commissionDue ?? 0n) + (financialAccount?.adjustmentDue ?? 0n)
+        ) / 100,
         availableEarningsMinor: (canonicalBalance?.availableBalance ?? 0n).toString(),
         pendingEarningsMinor: (canonicalBalance?.pendingBalance ?? 0n).toString(),
         availableEarnings: bigIntToSafeNumber(canonicalBalance?.availableBalance ?? 0n) / 100,
