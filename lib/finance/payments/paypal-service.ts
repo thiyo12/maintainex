@@ -15,6 +15,7 @@ import {
   markProviderEventProcessed,
   recordVerifiedProviderEvent,
 } from '@/lib/finance/payments/provider-events'
+import { recordPostPayoutProviderAdjustmentForEscrow } from '@/lib/finance/commissions/provider-balance-service'
 
 type RecordObject = Record<string, unknown>
 
@@ -547,6 +548,98 @@ async function recordExternalPayPalRefund(
   })
 }
 
+function disputeOutcomeCode(resource: RecordObject | null): string | null {
+  const outcome = objectValue(resource?.dispute_outcome)
+  return stringValue(outcome?.outcome_code)?.toUpperCase() || null
+}
+
+async function resolveProviderDispute(
+  refs: ReturnType<typeof extractPayPalEventReferences>,
+  resolved: NonNullable<Awaited<ReturnType<typeof resolveIntentForPayPalEvent>>>
+) {
+  const outcome = disputeOutcomeCode(refs.resource)
+  const disputeId = stringValue(refs.resource?.dispute_id) || stringValue(refs.resource?.id) || refs.eventId
+  const sellerProtectedOutcome =
+    outcome === 'RESOLVED_SELLER_FAVOUR' ||
+    outcome === 'CANCELED_BY_BUYER' ||
+    outcome === 'RESOLVED_WITH_PAYOUT'
+
+  await prisma.$transaction(async tx => {
+    if (sellerProtectedOutcome) {
+      await tx.jobEscrow.updateMany({
+        where: { id: resolved.intent.escrowId, status: 'ON_HOLD' },
+        data: { status: 'PROTECTED' },
+      })
+    } else if (outcome === 'RESOLVED_BUYER_FAVOUR' || outcome === 'ACCEPTED') {
+      const escrow = await tx.jobEscrow.findUnique({
+        where: { id: resolved.intent.escrowId },
+        select: { status: true },
+      })
+
+      if (escrow?.status === 'RELEASED') {
+        await recordPostPayoutProviderAdjustmentForEscrow(tx, {
+          escrowId: resolved.intent.escrowId,
+          paymentIntentId: resolved.intent.id,
+          sourceProvider: 'PAYPAL',
+          sourceReference: disputeId || refs.eventId || resolved.intent.id,
+          adjustmentType: 'PAYMENT_CHARGEBACK',
+          reason: 'PayPal dispute resolved in the buyer’s favor after provider earnings were released',
+          createdBy: 'system:paypal-webhook',
+          metadata: {
+            eventType: refs.eventType,
+            outcome,
+            providerOrderId: refs.orderId,
+            providerCaptureId: refs.captureId,
+          },
+        })
+      } else {
+        await tx.jobEscrow.updateMany({
+          where: {
+            id: resolved.intent.escrowId,
+            status: { in: ['PROTECTED', 'ON_HOLD'] },
+          },
+          data: { status: 'ON_HOLD' },
+        })
+      }
+
+      await tx.paymentIntent.updateMany({
+        where: { id: resolved.intent.id, status: { not: 'REFUNDED' } },
+        data: { status: 'CHARGEDBACK' },
+      })
+    } else {
+      await tx.marketplaceRiskEvent.create({
+        data: {
+          jobId: resolved.intent.jobId,
+          actorUserId: resolved.intent.customerId,
+          eventType: 'PAYMENT_PROVIDER_DISPUTE_RESOLUTION_REVIEW',
+          severity: 'HIGH',
+          metadata: JSON.stringify({
+            paymentIntentId: resolved.intent.id,
+            provider: 'PAYPAL',
+            eventType: refs.eventType,
+            outcome,
+            disputeId,
+          }),
+        },
+      })
+    }
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: resolved.intent.jobId,
+      actorId: 'system:paypal-webhook',
+      actorType: 'SYSTEM',
+      action: 'PAYMENT_PROVIDER_DISPUTE_RESOLVED',
+      metadata: {
+        paymentIntentId: resolved.intent.id,
+        provider: 'PAYPAL',
+        eventType: refs.eventType,
+        outcome,
+        disputeId,
+      },
+    })
+  })
+}
+
 async function holdEscrowForProviderDispute(
   refs: ReturnType<typeof extractPayPalEventReferences>,
   resolved: NonNullable<Awaited<ReturnType<typeof resolveIntentForPayPalEvent>>>
@@ -664,8 +757,13 @@ export async function processVerifiedPayPalWebhook(input: {
       // is not treated as funded and a reversed approval cannot fulfill a job.
     } else if (refs.eventType === 'PAYMENT.CAPTURE.REFUNDED') {
       await recordExternalPayPalRefund(refs, resolved)
-    } else if (refs.eventType === 'CUSTOMER.DISPUTE.CREATED') {
+    } else if (
+      refs.eventType === 'CUSTOMER.DISPUTE.CREATED' ||
+      refs.eventType === 'CUSTOMER.DISPUTE.UPDATED'
+    ) {
       await holdEscrowForProviderDispute(refs, resolved)
+    } else if (refs.eventType === 'CUSTOMER.DISPUTE.RESOLVED') {
+      await resolveProviderDispute(refs, resolved)
     } else {
       await markProviderEventProcessed(eventRecord.eventId, 'IGNORED')
       return { success: true, ignored: true }
