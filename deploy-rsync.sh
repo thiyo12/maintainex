@@ -38,7 +38,7 @@ echo "=== 1/7 Verify production service and required environment names ==="
 set -eu
 docker service inspect "$SERVICE" >/dev/null
 env_names=$(docker service inspect "$SERVICE" --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}' | cut -d= -f1)
-required='DATABASE_URL MARKETPLACE_JWT_SECRET STAFF_JWT_SECRET PASSWORD_PEPPER CRON_SECRET INTERNAL_SYNC_SECRET'
+required='DATABASE_URL MARKETPLACE_JWT_SECRET STAFF_JWT_SECRET PASSWORD_PEPPER IDENTITY_CLAIM_PEPPER CRON_SECRET INTERNAL_SYNC_SECRET'
 missing=''
 for name in $required; do
   if ! printf '%s\n' "$env_names" | grep -qx "$name"; then
