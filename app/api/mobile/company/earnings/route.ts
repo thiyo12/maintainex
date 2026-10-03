@@ -104,6 +104,16 @@ export async function GET(request: NextRequest) {
         })
       : []
 
+    const payouts = await prisma.payout.findMany({
+      where: {
+        userId: company.userId,
+        countryCode: company.countryCode || 'LK',
+        currency,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    })
+
     const contracts = await prisma.contract.findMany({
       where: { companyId: context!.companyId },
       include: { milestones: true },
@@ -120,6 +130,8 @@ export async function GET(request: NextRequest) {
       where: {
         providerId: company.userId,
         status: 'PENDING',
+        countryCode: company.countryCode || 'LK',
+        currency,
       },
       include: {
         weeklySettlement: {
@@ -134,12 +146,28 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json({
+      countryCode: company.countryCode || 'LK',
+      currency,
       totalRevenue,
       completedRevenue,
       pendingRevenue,
       contractCount: contracts.length,
       completedCount: completedContracts.length,
       pendingCount: contracts.filter(c => c.status === 'IN_PROGRESS').length,
+      availableBalance: bigIntToSafeNumber(canonicalBalance?.availableBalance ?? 0n) / 100,
+      pendingAmount: bigIntToSafeNumber(canonicalBalance?.pendingBalance ?? 0n) / 100,
+      paidOut: payouts
+        .filter(payout => ['SUCCEEDED', 'CLEARED', 'COMPLETED'].includes(payout.status))
+        .reduce((sum, payout) => sum + bigIntToSafeNumber(payout.amount) / 100, 0),
+      recentPayouts: payouts.map(payout => ({
+        id: payout.id,
+        amount: bigIntToSafeNumber(payout.amount) / 100,
+        currency: payout.currency,
+        status: payout.status,
+        description: payout.description,
+        createdAt: payout.createdAt.toISOString(),
+        clearedAt: payout.clearedAt?.toISOString() || null,
+      })),
       recentCommissionRecoveries: recentCommissionRecoveries.map(recovery => ({
         id: recovery.id,
         amountMinor: recovery.amount.toString(),
