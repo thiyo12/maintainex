@@ -63,6 +63,8 @@ describe('PayPal-only launch strategy', () => {
 
     expect(service).toContain('requestRequiredPayHereRefund')
     expect(service).toContain('reconcilePayHereRefund')
+    expect(service).not.toContain('getPaymentCheckoutForm')
+    expect(service).not.toContain('generateCheckoutHash')
     expect(bootstrap).toContain("where: { provider: 'PAYHERE' }")
     expect(bootstrap).not.toContain('paymentProviderConfig.upsert')
     expect(hostedRoute).toContain('status: 410')
