@@ -6,6 +6,7 @@ import { getCommissionRate } from '@/lib/mxid'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { resolveProviderActor } from '@/lib/domain/job-actors'
 import { resolvePayoutIdentity, recordWeeklySettlement } from '@/lib/finance/commissions/settlement-service'
+import { assertProviderCashEligible, recordCashPlatformReceivable } from '@/lib/finance/commissions/provider-balance-service'
 import type { TransitionContext } from '@/lib/domain/job-lifecycle'
 import { resolveEscrowFundingSource } from '@/lib/finance/payments/funding-source'
 
@@ -132,6 +133,9 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
   ])
   if (!quote) throw new Error('No accepted quote found')
   if (!escrow) throw new Error('Escrow not initialized')
+  if (quote.providerType !== 'INDIVIDUAL' && quote.providerType !== 'COMPANY') {
+    throw new Error('Quote provider type is invalid for cash payment')
+  }
 
   const authorizedAmount = job.finalAuthorizedAmountCents ?? quote.totalCents ?? quote.price
   const serviceFee = escrow.serviceFee ?? 0n
@@ -170,6 +174,13 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
     if (!lockedJob) throw new Error('Job not found')
     if (lockedJob.customerId !== ctx.actorId) throw new Error('Only the customer can select cash payment')
     if (lockedJob.status !== 'QUOTE_ACCEPTED') throw new Error('Job is not ready for cash payment')
+
+    await assertProviderCashEligible(tx, {
+      providerId: quote.providerId,
+      providerType: quote.providerType,
+      countryCode: job.countryCode || 'LK',
+      currency: escrow.currency,
+    })
 
     const claimed = await tx.jobEscrow.updateMany({
       where: {
@@ -905,6 +916,17 @@ export async function completeAndReleaseEscrow(
           commissionCents: platformDueCents,
           currency: escrowCurrency,
           countryCode: job.countryCode || 'LK',
+        })
+
+        await recordCashPlatformReceivable(tx, {
+          jobId,
+          escrowId: escrow.id,
+          providerId: quote.providerId,
+          providerType: quote.providerType,
+          countryCode: job.countryCode || 'LK',
+          currency: escrowCurrency,
+          platformDueMinor: platformDueCents,
+          createdBy: ctx.actorId,
         })
       }
 
