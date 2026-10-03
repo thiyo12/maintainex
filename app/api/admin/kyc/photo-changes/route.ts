@@ -197,7 +197,7 @@ export async function PATCH(request: NextRequest) {
       )
     }
     if (
-      photoRequest.providerIdentity.identityType !== 'TASKER' ||
+      !['TASKER', 'COMPANY_WORKER'].includes(photoRequest.providerIdentity.identityType) ||
       !photoRequest.providerIdentity.currentUserId
     ) {
       return NextResponse.json({ error: 'Unsupported provider identity type' }, { status: 409 })
@@ -218,19 +218,36 @@ export async function PATCH(request: NextRequest) {
         },
       },
     })
-    if (!user?.taskerProfile) {
-      return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
+    if (!user) {
+      return NextResponse.json({ error: 'Provider user not found' }, { status: 404 })
     }
 
-    const identityVerified =
-      (user.identityStatus === 'VERIFIED' || user.identityStatus === 'APPROVED') &&
-      user.taskerProfile.isVerified &&
-      user.taskerProfile.verificationStatus === 'VERIFIED'
+    const baseIdentityVerified =
+      user.identityStatus === 'VERIFIED' || user.identityStatus === 'APPROVED'
 
-    if (status === 'APPROVED' && !identityVerified) {
+    const requestedIdentityValid =
+      photoRequest.providerIdentity.identityType === 'TASKER'
+        ? Boolean(
+            baseIdentityVerified &&
+            user.taskerProfile?.isVerified &&
+            user.taskerProfile?.verificationStatus === 'VERIFIED'
+          )
+        : Boolean(
+            baseIdentityVerified &&
+            await prisma.teamMember.findFirst({
+              where: {
+                id: photoRequest.providerIdentity.subjectId,
+                userId: user.id,
+                status: 'ACTIVE',
+              },
+              select: { id: true },
+            })
+          )
+
+    if (status === 'APPROVED' && !requestedIdentityValid) {
       return NextResponse.json(
         {
-          error: 'Tasker KYC must remain verified before a public identity photo can be approved.',
+          error: 'Provider KYC and active worker identity must remain verified before a public identity photo can be approved.',
           code: 'KYC_NOT_VERIFIED',
         },
         { status: 409 },
@@ -260,10 +277,13 @@ export async function PATCH(request: NextRequest) {
       })
 
       if (status === 'APPROVED') {
-        await tx.providerIdentity.update({
-          where: { id: photoRequest.providerIdentityId },
-          data: {
+        await tx.providerIdentity.updateMany({
+          where: {
+            currentUserId: user.id,
+            identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
             kycStatus: 'VERIFIED',
+          },
+          data: {
             verifiedDisplayName: user.name,
             verifiedPhotoUrl: photoRequest.requestedPhotoUrl,
             photoLocked: true,
@@ -271,12 +291,17 @@ export async function PATCH(request: NextRequest) {
           },
         })
 
-        await tx.taskerProfile.update({
-          where: { id: user.taskerProfile!.id },
-          data: {
-            profileImage: photoRequest.requestedPhotoUrl,
-          },
-        })
+        if (
+          user.taskerProfile?.isVerified &&
+          user.taskerProfile.verificationStatus === 'VERIFIED'
+        ) {
+          await tx.taskerProfile.update({
+            where: { id: user.taskerProfile.id },
+            data: {
+              profileImage: photoRequest.requestedPhotoUrl,
+            },
+          })
+        }
 
         await tx.providerIntegritySignal.create({
           data: {
@@ -308,8 +333,8 @@ export async function PATCH(request: NextRequest) {
           entityName: user.name,
           description:
             status === 'APPROVED'
-              ? 'Verified tasker public profile photo approved'
-              : 'Verified tasker public profile photo rejected',
+              ? 'Verified provider public profile photo approved'
+              : 'Verified provider public profile photo rejected',
           oldValue: JSON.stringify({
             status: photoRequest.status,
             verifiedPhotoUrl: photoRequest.providerIdentity.verifiedPhotoUrl,
