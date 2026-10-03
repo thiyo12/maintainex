@@ -156,8 +156,12 @@ export async function GET(request: NextRequest) {
                   ...identity,
                   closedAt: identity.closedAt?.toISOString() || null,
                   financialAccounts: identity.financialAccounts.map(account => ({
-                    ...account,
+                    currency: account.currency,
                     commissionDueMinor: account.commissionDue.toString(),
+                    status: account.status,
+                    cashJobsAllowed: account.cashJobsAllowed,
+                    onlineJobsAllowed: account.onlineJobsAllowed,
+                    manualReviewRequired: account.manualReviewRequired,
                   })),
                 }
               : null,
