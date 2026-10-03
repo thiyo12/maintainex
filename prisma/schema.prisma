@@ -3214,6 +3214,7 @@ model WeeklySettlement {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   commissionPayments CommissionPayment[]
+  providerReceivables ProviderCommissionReceivable[]
 
   @@unique([providerId, weekStart])
   @@index([providerId])
@@ -3715,6 +3716,8 @@ model ProviderIdentity {
 
   claims              ProviderIdentityClaim[]
   financialAccounts   ProviderFinancialAccount[]
+  commissionReceivables ProviderCommissionReceivable[]
+  commissionRecoveries ProviderCommissionRecovery[]
   photoChangeRequests ProviderPhotoChangeRequest[]
 
   @@unique([identityType, subjectId])
@@ -3765,6 +3768,50 @@ model ProviderFinancialAccount {
   @@index([status, currency])
   @@index([cashJobsAllowed, currency])
   @@index([commissionDue])
+}
+
+model ProviderCommissionReceivable {
+  id                 String           @id @default(cuid())
+  providerIdentityId String
+  providerIdentity   ProviderIdentity @relation(fields: [providerIdentityId], references: [id], onDelete: Restrict)
+  weeklySettlementId String?
+  weeklySettlement   WeeklySettlement? @relation(fields: [weeklySettlementId], references: [id], onDelete: SetNull)
+  jobId              String
+  escrowId           String           @unique
+  currency           String
+  amountOriginal     BigInt
+  amountRemaining    BigInt
+  status             String           @default("OPEN") // OPEN, PARTIAL, SETTLED, WAIVED
+  dueAt              DateTime
+  settledAt          DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  recoveries ProviderCommissionRecovery[]
+
+  @@index([providerIdentityId, currency, status, dueAt])
+  @@index([jobId])
+  @@index([weeklySettlementId])
+}
+
+model ProviderCommissionRecovery {
+  id                 String                       @id @default(cuid())
+  receivableId       String
+  receivable         ProviderCommissionReceivable @relation(fields: [receivableId], references: [id], onDelete: Restrict)
+  providerIdentityId String
+  providerIdentity   ProviderIdentity             @relation(fields: [providerIdentityId], references: [id], onDelete: Restrict)
+  sourceJobId        String?
+  sourceEscrowId     String?
+  amount             BigInt
+  currency           String
+  method             String                       // ONLINE_EARNINGS, DIRECT_SETTLEMENT, ADMIN_ADJUSTMENT
+  idempotencyKey     String                       @unique
+  createdBy          String
+  createdAt          DateTime                     @default(now())
+
+  @@index([providerIdentityId, createdAt])
+  @@index([receivableId])
+  @@index([sourceEscrowId])
 }
 
 model ProviderFinancialPolicyConfig {
