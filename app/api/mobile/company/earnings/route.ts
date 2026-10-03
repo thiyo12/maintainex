@@ -47,6 +47,32 @@ export async function GET(request: NextRequest) {
         })
       : null
 
+    const recentCommissionRecoveries = financialIdentity
+      ? await prisma.providerCommissionRecovery.findMany({
+          where: {
+            providerIdentityId: financialIdentity.id,
+            currency,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            sourceJobId: true,
+            sourceEscrowId: true,
+            amount: true,
+            currency: true,
+            method: true,
+            createdAt: true,
+            receivable: {
+              select: {
+                jobId: true,
+                escrowId: true,
+              },
+            },
+          },
+        })
+      : []
+
     const contracts = await prisma.contract.findMany({
       where: { companyId: context!.companyId },
       include: { milestones: true },
@@ -83,6 +109,17 @@ export async function GET(request: NextRequest) {
       contractCount: contracts.length,
       completedCount: completedContracts.length,
       pendingCount: contracts.filter(c => c.status === 'IN_PROGRESS').length,
+      recentCommissionRecoveries: recentCommissionRecoveries.map(recovery => ({
+        id: recovery.id,
+        amountMinor: recovery.amount.toString(),
+        amount: bigIntToSafeNumber(recovery.amount) / 100,
+        currency: recovery.currency,
+        method: recovery.method,
+        sourceJobId: recovery.sourceJobId,
+        sourceEscrowId: recovery.sourceEscrowId,
+        originalCashJobId: recovery.receivable.jobId,
+        createdAt: recovery.createdAt.toISOString(),
+      })),
       maintainexBalance: {
         commissionDueMinor: (financialAccount?.commissionDue ?? 0n).toString(),
         commissionDue: bigIntToSafeNumber(financialAccount?.commissionDue ?? 0n) / 100,
