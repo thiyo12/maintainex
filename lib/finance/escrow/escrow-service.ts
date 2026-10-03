@@ -327,12 +327,20 @@ export async function releaseEscrow(
         amount: providerPayoutCents,
       })
     }
-    if (commissionRecovery.recoveryMinor > 0n) {
+    if (commissionRecovery.commissionRecoveryMinor > 0n) {
       ledgerEntries.push({
         accountId: `provider-receivable:${commissionRecovery.providerIdentityId}`,
         accountType: 'PROVIDER_COMMISSION_RECEIVABLE',
         entryType: 'CREDIT',
-        amount: commissionRecovery.recoveryMinor,
+        amount: commissionRecovery.commissionRecoveryMinor,
+      })
+    }
+    if (commissionRecovery.adjustmentRecoveryMinor > 0n) {
+      ledgerEntries.push({
+        accountId: `provider-adjustment-receivable:${commissionRecovery.providerIdentityId}`,
+        accountType: 'PROVIDER_BALANCE_ADJUSTMENT_RECEIVABLE',
+        entryType: 'CREDIT',
+        amount: commissionRecovery.adjustmentRecoveryMinor,
       })
     }
     if (platformCents > 0n) {
@@ -353,8 +361,10 @@ export async function releaseEscrow(
         providerType: quote.providerType,
         serviceFeeCents: escrow.serviceFee.toString(),
         commissionCents: commissionCents.toString(),
-        cashCommissionRecoveryCents: commissionRecovery.recoveryMinor.toString(),
+        cashCommissionRecoveryCents: commissionRecovery.commissionRecoveryMinor.toString(),
+        balanceAdjustmentRecoveryCents: commissionRecovery.adjustmentRecoveryMinor.toString(),
         remainingCashCommissionDueCents: commissionRecovery.remainingCommissionDueMinor.toString(),
+        remainingBalanceAdjustmentDueCents: commissionRecovery.remainingAdjustmentDueMinor.toString(),
         providerPayoutCents: providerPayoutCents.toString(),
         recoveryAllocations: commissionRecovery.allocations.map(allocation => ({
           receivableId: allocation.receivableId,
@@ -1071,12 +1081,20 @@ export async function completeAndReleaseEscrow(
         amount: providerPayoutCents,
       })
     }
-    if (commissionRecovery.recoveryMinor > 0n) {
+    if (commissionRecovery.commissionRecoveryMinor > 0n) {
       ledgerEntries.push({
         accountId: `provider-receivable:${commissionRecovery.providerIdentityId}`,
         accountType: 'PROVIDER_COMMISSION_RECEIVABLE',
         entryType: 'CREDIT',
-        amount: commissionRecovery.recoveryMinor,
+        amount: commissionRecovery.commissionRecoveryMinor,
+      })
+    }
+    if (commissionRecovery.adjustmentRecoveryMinor > 0n) {
+      ledgerEntries.push({
+        accountId: `provider-adjustment-receivable:${commissionRecovery.providerIdentityId}`,
+        accountType: 'PROVIDER_BALANCE_ADJUSTMENT_RECEIVABLE',
+        entryType: 'CREDIT',
+        amount: commissionRecovery.adjustmentRecoveryMinor,
       })
     }
     if (platformDueCents > 0n) {
@@ -1102,8 +1120,10 @@ export async function completeAndReleaseEscrow(
         providerType: quote.providerType,
         serviceFeeCents: escrow.serviceFee.toString(),
         commissionCents: commissionCents.toString(),
-        cashCommissionRecoveryCents: commissionRecovery.recoveryMinor.toString(),
+        cashCommissionRecoveryCents: commissionRecovery.commissionRecoveryMinor.toString(),
+        balanceAdjustmentRecoveryCents: commissionRecovery.adjustmentRecoveryMinor.toString(),
         remainingCashCommissionDueCents: commissionRecovery.remainingCommissionDueMinor.toString(),
+        remainingBalanceAdjustmentDueCents: commissionRecovery.remainingAdjustmentDueMinor.toString(),
         providerPayoutCents: providerPayoutCents.toString(),
         recoveryAllocations: commissionRecovery.allocations.map(allocation => ({
           receivableId: allocation.receivableId,
@@ -1188,9 +1208,11 @@ export async function completeAndReleaseEscrow(
         workspaceToState: 'COMPLETED',
         commissionMinor: commissionCents,
         providerNetBeforeRecoveryMinor: netCents,
-        cashCommissionRecoveryMinor: commissionRecovery.recoveryMinor,
+        cashCommissionRecoveryMinor: commissionRecovery.commissionRecoveryMinor,
+        balanceAdjustmentRecoveryMinor: commissionRecovery.adjustmentRecoveryMinor,
         providerNetMinor: providerPayoutCents,
         remainingCashCommissionDueMinor: commissionRecovery.remainingCommissionDueMinor,
+        remainingBalanceAdjustmentDueMinor: commissionRecovery.remainingAdjustmentDueMinor,
         serviceFeeMinor: escrow.serviceFee,
         platformCollectedMinor: platformDueCents,
         currency: escrowCurrency,
