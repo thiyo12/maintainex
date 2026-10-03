@@ -65,12 +65,12 @@ export default function SecurityMonitorPage(){
   if(loading&&!data) return <CrmState type="loading" title="Loading security monitor" description="Loading failed-login, session, threat and security-audit signals."/>
   if(!data) return <CrmState type="error" title="Security monitor unavailable" description="Security data could not be loaded." action={<CrmButton variant="secondary" onClick={load}>Retry</CrmButton>}/>
 
-  return <div className="space-y-5">
+  return <div className="space-y-4">
     <CrmPageHeader eyebrow="Intelligence · Security" title="Security monitor" description="Operational security signals with guarded IP controls and audit-backed mutations."
       actions={<><CrmButton variant="secondary" onClick={load}><FiRefreshCw size={14}/>Refresh</CrmButton>{canManage&&<CrmButton variant="primary" onClick={()=>setModal(true)}><FiPlus size={14}/>Block IP</CrmButton>}</>}
       context={<><CrmBadge tone="success" dot>Live security data</CrmBadge><CrmBadge tone={canManage?'warning':'neutral'}>{canManage?'Sensitive controls enabled':'Read-only'}</CrmBadge></>}/>
 
-    <section className="grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-6">
+    <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
       <CrmMetricCard label="Events today" value={data.summary.totalEventsToday.toLocaleString()} icon={<FiShield/>} tone="info"/>
       <CrmMetricCard label="Blocked IPs" value={data.summary.blockedIPs.toLocaleString()} icon={<FiLock/>} tone="warning"/>
       <CrmMetricCard label="Failed logins" value={data.summary.failedLogins.toLocaleString()} icon={<FiUserX/>} tone={data.summary.failedLogins>10?'danger':'warning'}/>
@@ -79,7 +79,7 @@ export default function SecurityMonitorPage(){
       <CrmMetricCard label="API req / hour" value={data.summary.apiRequestsLastHour.toLocaleString()} helper="Rate-limit telemetry" tone="neutral"/>
     </section>
 
-    <section className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
+    <section className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
       <CrmTableFrame title="Recent security events" description="High-risk events and suspicious activity are retained in the security audit.">
         <table className={`${crmTableClass} min-w-[780px]`}><thead><tr><th className={crmThClass}>Time</th><th className={crmThClass}>Action</th><th className={crmThClass}>Risk</th><th className={crmThClass}>Description</th><th className={crmThClass}>Source</th></tr></thead>
           <tbody>{data.recentEvents.length===0?<tr><td colSpan={5} className={`${crmTdClass} text-center text-slate-400`}>No recent security events.</td></tr>:data.recentEvents.map(e=><tr key={e.id}><td className={crmTdClass}><span className="text-xs text-slate-600">{fmt(e.createdAt)}</span></td><td className={crmTdClass}><span className="text-xs font-semibold text-slate-800">{e.action}</span></td><td className={crmTdClass}><CrmBadge tone={riskTone(e.riskLevel)}>{e.riskLevel}</CrmBadge></td><td className={crmTdClass}><div className="max-w-[320px] truncate text-xs text-slate-600">{e.description}</div></td><td className={crmTdClass}><span className="font-mono text-[11px] text-slate-400">{maskIp(e.ipAddress)}</span></td></tr>)}</tbody>
@@ -87,11 +87,11 @@ export default function SecurityMonitorPage(){
       </CrmTableFrame>
 
       <CrmCard title="Risk distribution" description="Security audit risk classification for today.">
-        <div className="space-y-3">{Object.entries(data.riskDistribution).map(([level,count])=><div key={level} className="flex items-center justify-between rounded-xl border border-[var(--crm-border)] p-3"><CrmBadge tone={riskTone(level)}>{level}</CrmBadge><span className="text-lg font-semibold text-slate-900">{count.toLocaleString()}</span></div>)}</div>
+        <div className="space-y-3">{Object.entries(data.riskDistribution).map(([level,count])=><div key={level} className="flex items-center justify-between rounded-[10px] border border-[var(--crm-border)] bg-[#fbfcfd] p-3"><CrmBadge tone={riskTone(level)}>{level}</CrmBadge><span className="text-lg font-semibold text-slate-900">{count.toLocaleString()}</span></div>)}</div>
       </CrmCard>
     </section>
 
-    <section className="grid gap-5 xl:grid-cols-2">
+    <section className="grid gap-4 xl:grid-cols-2">
       <CrmTableFrame title="Blocked IPs" description="Only authorized security operators can change this list.">
         <table className={`${crmTableClass} min-w-[680px]`}><thead><tr><th className={crmThClass}>IP</th><th className={crmThClass}>Reason</th><th className={crmThClass}>Expires</th><th className={crmThClass}>Control</th></tr></thead>
           <tbody>{data.blockedIPs.length===0?<tr><td colSpan={4} className={`${crmTdClass} text-center text-slate-400`}>No active IP blocks.</td></tr>:data.blockedIPs.map(b=><tr key={b.ip}><td className={crmTdClass}><span className="font-mono text-xs text-slate-700">{b.ip}</span></td><td className={crmTdClass}><div className="max-w-[280px] truncate text-xs text-slate-600">{b.reason}</div></td><td className={crmTdClass}><span className="text-xs text-slate-500">{fmt(b.expiresAt)}</span></td><td className={crmTdClass}>{canManage?<CrmButton size="sm" variant="secondary" onClick={()=>unblockIp(b.ip)}>Unblock</CrmButton>:<span className="text-xs text-slate-400">View only</span>}</td></tr>)}</tbody>
@@ -100,7 +100,7 @@ export default function SecurityMonitorPage(){
 
       <CrmCard title="Threat signals" description="Aggregated failed-login and credential-stuffing indicators; no credential values are exposed.">
         <div className="space-y-2">
-          {data.topThreats.slice(0,8).map(t=><div key={t.ip} className="flex items-center justify-between rounded-xl border border-[var(--crm-border)] p-3"><div><div className="font-mono text-xs text-slate-700">{maskIp(t.ip)}</div><div className="mt-1 text-[10px] text-slate-400">{t.attempts} attempts · {t.reason}</div></div><CrmBadge tone={riskTone(t.riskLevel)}>{t.riskLevel}</CrmBadge></div>)}
+          {data.topThreats.slice(0,8).map(t=><div key={t.ip} className="flex items-center justify-between rounded-[10px] border border-[var(--crm-border)] bg-[#fbfcfd] p-3"><div><div className="font-mono text-xs text-slate-700">{maskIp(t.ip)}</div><div className="mt-1 text-[10px] text-slate-400">{t.attempts} attempts · {t.reason}</div></div><CrmBadge tone={riskTone(t.riskLevel)}>{t.riskLevel}</CrmBadge></div>)}
           {data.credentialStuffs.length>0&&<div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{data.credentialStuffs.length} credential-stuffing patterns detected in the last hour.</div>}
           {data.botsDetected.length>0&&<div className="rounded-xl border border-[var(--crm-border)] bg-slate-50 p-3 text-xs text-slate-600">{data.botsDetected.length} regular-interval bot patterns detected today.</div>}
         </div>
