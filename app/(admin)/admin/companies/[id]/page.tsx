@@ -114,7 +114,7 @@ function Badge({ value }: { value?: string | null }) {
 
 function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+    <section className="overflow-hidden rounded-[14px] border border-[var(--crm-border)] bg-white shadow-[var(--crm-shadow-card)]">
       <div className="px-5 py-4 border-b border-slate-100">
         <h2 className="font-semibold text-slate-900">{title}</h2>
         {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
@@ -266,8 +266,8 @@ export default function Company360Page() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+    <div className="space-y-4">
+      <section className="overflow-hidden rounded-[14px] border border-[var(--crm-border)] bg-white shadow-[var(--crm-shadow-card)]">
         <div className="p-5 md:p-6">
           <Link href="/admin/users/companies" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900">
             <FiArrowLeft size={15} /> Back to companies
@@ -297,7 +297,7 @@ export default function Company360Page() {
             </CrmButton>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
             <Summary icon={FiUsers} label="Active staff" value={String(activeWorkers)} />
             <Summary icon={FiBriefcase} label="Marketplace jobs" value={data.permissions.work ? String(jobCount) : 'Restricted'} />
             <Summary icon={FiCheckCircle} label="Completed projects" value={String(company.completedProjects || 0)} />
@@ -314,8 +314,8 @@ export default function Company360Page() {
         </div>
       </section>
 
-      <div className="grid xl:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
-        <div className="space-y-5">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_286px]">
+        <div className="space-y-4">
           {tab === 'overview' && <Overview data={data} />}
           {tab === 'workforce' && <Workforce data={data} />}
           {tab === 'jobs' && data.permissions.work && <Jobs data={data} />}
@@ -324,7 +324,7 @@ export default function Company360Page() {
           {tab === 'audit' && data.permissions.audit && <Audit data={data} />}
         </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-[92px]">
+        <aside className="space-y-3.5 xl:sticky xl:top-[72px]">
           <Card title="Company controls" subtitle="Permission-gated and audited">
             <div className="space-y-2">
               {data.permissions.actions.suspend && (
@@ -434,7 +434,7 @@ function Overview({ data }: { data: Payload }) {
   return (
     <>
       <Card title="Company profile" subtitle="Legal, service and marketplace information">
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Field label="Company name" value={c.companyName} />
           <Field label="Registration number" value={c.registrationNo} />
           <Field label="Tax ID" value={c.taxId} />
@@ -452,7 +452,7 @@ function Overview({ data }: { data: Payload }) {
         )}
       </Card>
 
-      <div className="grid lg:grid-cols-2 gap-5">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Owner" subtitle="Primary account controlling this company">
           <div className="grid grid-cols-2 gap-4">
             <Field label="Name" value={c.user.name} />
