@@ -120,6 +120,19 @@ export async function POST(
       const worker = await resolveJobWorkerIdentity(tx, jobId)
       if (!worker) throw new Error('WORKER_NOT_ASSIGNED')
 
+      const existingCheck = await tx.jobWorkerIdentityCheck.findUnique({
+        where: {
+          jobId_providerIdentityId: {
+            jobId,
+            providerIdentityId: worker.providerIdentityId,
+          },
+        },
+        select: { status: true },
+      })
+      if (existingCheck?.status === 'MISMATCH_REPORTED') {
+        throw new Error('WORKER_IDENTITY_MISMATCH_REVIEW_REQUIRED')
+      }
+
       if (decision === 'MATCH' && !worker.identityVerified) {
         throw new Error('WORKER_IDENTITY_NOT_VERIFIED')
       }
@@ -244,6 +257,15 @@ export async function POST(
     if (message === 'WORKER_NOT_ASSIGNED') {
       return NextResponse.json(
         { error: 'No assigned worker is available for identity confirmation', code: 'WORKER_NOT_ASSIGNED' },
+        { status: 409 },
+      )
+    }
+    if (message === 'WORKER_IDENTITY_MISMATCH_REVIEW_REQUIRED') {
+      return NextResponse.json(
+        {
+          error: 'A worker identity mismatch was already reported. Trust & Safety must review it before work can start.',
+          code: 'WORKER_IDENTITY_MISMATCH_REVIEW_REQUIRED',
+        },
         { status: 409 },
       )
     }
