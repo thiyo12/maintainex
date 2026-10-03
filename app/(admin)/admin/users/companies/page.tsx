@@ -279,7 +279,7 @@ export default function CompanyManagementPage() {
     : 'Company action'
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="People"
         title="Companies"
@@ -292,7 +292,7 @@ export default function CompanyManagementPage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Companies"
           value={total.toLocaleString()}
