@@ -163,16 +163,20 @@ beforeAll(async () => {
   })
   inspectionFirstJobId = inspectionJob.id
 
-  await prisma.jobQuote.create({
+  const jobAQuote = await prisma.jobQuote.create({
     data: {
       jobId: jobAId,
       providerId,
       providerType: 'INDIVIDUAL',
       price: 5000n,
       estimatedCompletionTime: '2 hours',
-        attachments: '[]',
+      attachments: '[]',
       status: 'ACCEPTED',
     },
+  })
+  await prisma.marketplaceJob.update({
+    where: { id: jobAId },
+    data: { approvedQuoteId: jobAQuote.id },
   })
 
   await prisma.jobQuote.create({
@@ -326,7 +330,7 @@ describe('Phase 10.5 — Job Verification PIN', () => {
       })
 
       try {
-        await expect(generateJobPin(jobAId, customerAId)).rejects.toThrow('Payment must be protected')
+        await expect(generateJobPin(jobAId, customerAId)).rejects.toThrow('Payment method must be confirmed')
       } finally {
         await prisma.jobEscrow.update({
           where: { id: escrow!.id },
