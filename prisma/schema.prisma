@@ -3755,8 +3755,6 @@ model ProviderFinancialAccount {
   currency                 String
   commissionDue            BigInt           @default(0)
   adjustmentDue            BigInt           @default(0)
-  availableEarnings        BigInt           @default(0)
-  pendingEarnings          BigInt           @default(0)
   status                   String           @default("CLEAR") // CLEAR, WARNING, CASH_RESTRICTED, REVIEW_REQUIRED, FROZEN
   cashJobsAllowed          Boolean          @default(true)
   onlineJobsAllowed        Boolean          @default(true)
