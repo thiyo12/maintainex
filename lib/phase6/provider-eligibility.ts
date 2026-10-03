@@ -116,7 +116,13 @@ export async function checkWorkerEligibility(
   if (requiredJobId) {
     const job = await prisma.marketplaceJob.findUnique({
       where: { id: requiredJobId },
-      select: { categoryId: true, serviceTemplateId: true, preferredDate: true, preferredTimeSlot: true },
+      select: {
+        categoryId: true,
+        serviceTemplateId: true,
+        preferredDate: true,
+        preferredTimeSlot: true,
+        workerIdentityCheckRequired: true,
+      },
     })
     if (!job) {
       reasons.push('Job not found')
@@ -169,6 +175,21 @@ export async function checkWorkerEligibility(
 
       if (!relationalCapability && !declaredCapability) {
         reasons.push('Worker lacks required capability for this job')
+      }
+
+      if (job.workerIdentityCheckRequired) {
+        const approvedIdentity = await prisma.providerIdentity.findFirst({
+          where: {
+            currentUserId: userId,
+            identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
+            kycStatus: 'VERIFIED',
+            verifiedPhotoUrl: { not: null },
+          },
+          select: { id: true },
+        })
+        if (!approvedIdentity) {
+          reasons.push('Worker verified profile photo not approved')
+        }
       }
 
       if (job.preferredDate) {
