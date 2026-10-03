@@ -1,160 +1,319 @@
-import type { Prisma } from '@prisma/client'
+import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
 
-const ACTIVE_JOB_STATUSES = ['OPEN', 'QUOTE_ACCEPTED', 'IN_PROGRESS'] as const
-const ACTIVE_ASSIGNMENT_STATUSES = ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] as const
-const OPEN_DISPUTE_STATUSES = ['OPEN', 'UNDER_REVIEW', 'RESOLVING'] as const
-const PENDING_PAYOUT_STATUSES = ['PENDING', 'REQUESTED', 'RESERVED', 'PROCESSING'] as const
+const ACTIVE_JOB_STATUSES = ['OPEN', 'QUOTE_ACCEPTED', 'IN_PROGRESS']
+const ACTIVE_ASSIGNMENT_STATUSES = ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS']
+const OPEN_DISPUTE_STATUSES = ['OPEN', 'UNDER_REVIEW', 'RESOLVING']
+const PENDING_PAYOUT_STATUSES = ['PENDING', 'REQUESTED', 'RESERVED', 'PROCESSING']
+const PENDING_PAYOUT_REQUEST_STATUSES = ['pending', 'processing']
+const UNRESOLVED_PAYMENT_STATUSES = ['CREATED', 'PENDING', 'REFUND_REQUIRED', 'REFUND_PROCESSING']
+const UNRESOLVED_ESCROW_STATUSES = ['PENDING', 'PENDING_PAYMENT', 'PROTECTED', 'ON_HOLD', 'CASH_CONFIRMED']
 
-export type AccountClosureBlocker =
+export type AccountClosureBlockerCode =
   | 'ACTIVE_JOBS'
   | 'OPEN_DISPUTES'
   | 'PENDING_PAYOUTS'
+  | 'UNRESOLVED_PAYMENTS'
+  | 'UNRESOLVED_ESCROW'
+  | 'COMPANY_OWNERSHIP_TRANSFER_REQUIRED'
 
-export async function evaluateAccountClosure(
-  tx: Prisma.TransactionClient,
+export type AccountClosureBlocker = {
+  code: AccountClosureBlockerCode
+  label: string
+  count: number
+}
+
+export type AccountClosurePreflight = {
+  canClose: boolean
+  alreadyClosed: boolean
+  blockers: AccountClosureBlocker[]
+  outstandingCommission: Array<{
+    providerIdentityId: string
+    identityType: string
+    currency: string
+    amountMinor: string
+  }>
+  closesWithBalance: boolean
+}
+
+async function resolveProviderIds(tx: PrismaClientOrTx, userId: string) {
+  const [tasker, company] = await Promise.all([
+    tx.taskerProfile.findUnique({
+      where: { userId },
+      select: { id: true, userId: true },
+    }),
+    tx.companyProfile.findUnique({
+      where: { userId },
+      select: { id: true, userId: true },
+    }),
+  ])
+
+  const providerIds = [userId]
+  if (tasker?.id) providerIds.push(tasker.id)
+  if (company?.id) providerIds.push(company.id)
+
+  return {
+    tasker,
+    company,
+    providerIds: [...new Set(providerIds)],
+  }
+}
+
+export async function getAccountClosurePreflight(
+  tx: PrismaClientOrTx,
   userId: string,
-) {
+): Promise<AccountClosurePreflight> {
   const user = await tx.user.findUnique({
     where: { id: userId },
+    select: { id: true, isActive: true },
+  })
+  if (!user) throw new Error('USER_NOT_FOUND')
+
+  const provider = await resolveProviderIds(tx, userId)
+  const acceptedProviderQuotes = await tx.jobQuote.findMany({
+    where: {
+      providerId: { in: provider.providerIds },
+      status: 'ACCEPTED',
+    },
+    select: { jobId: true },
+  })
+  const providerJobIds = [...new Set(acceptedProviderQuotes.map(item => item.jobId))]
+
+  const [
+    activeCustomerJobs,
+    activeProviderJobs,
+    activeWorkerAssignments,
+    openDisputes,
+    pendingPayouts,
+    pendingPayoutRequests,
+    unresolvedCustomerPayments,
+    unresolvedEscrows,
+    otherActiveCompanyMembers,
+    identities,
+  ] = await Promise.all([
+    tx.marketplaceJob.count({
+      where: {
+        customerId: userId,
+        status: { in: ACTIVE_JOB_STATUSES },
+      },
+    }),
+    providerJobIds.length
+      ? tx.marketplaceJob.count({
+          where: {
+            id: { in: providerJobIds },
+            status: { in: ACTIVE_JOB_STATUSES },
+          },
+        })
+      : Promise.resolve(0),
+    tx.companyJobAssignment.count({
+      where: {
+        workerUserId: userId,
+        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+      },
+    }),
+    tx.marketplaceDispute.count({
+      where: {
+        status: { in: OPEN_DISPUTE_STATUSES },
+        OR: [
+          { raisedById: userId },
+          { job: { customerId: userId } },
+          ...(providerJobIds.length ? [{ jobId: { in: providerJobIds } }] : []),
+        ],
+      },
+    }),
+    tx.payout.count({
+      where: {
+        userId,
+        status: { in: PENDING_PAYOUT_STATUSES },
+      },
+    }),
+    tx.payoutRequest.count({
+      where: {
+        userId,
+        status: { in: PENDING_PAYOUT_REQUEST_STATUSES },
+      },
+    }),
+    tx.paymentIntent.count({
+      where: {
+        customerId: userId,
+        status: { in: UNRESOLVED_PAYMENT_STATUSES },
+      },
+    }),
+    tx.jobEscrow.count({
+      where: {
+        OR: [
+          { customerId: userId },
+          { providerId: { in: provider.providerIds } },
+        ],
+        status: { in: UNRESOLVED_ESCROW_STATUSES },
+      },
+    }),
+    provider.company
+      ? tx.teamMember.count({
+          where: {
+            companyId: provider.company.id,
+            status: 'ACTIVE',
+            userId: { not: userId },
+          },
+        })
+      : Promise.resolve(0),
+    tx.providerIdentity.findMany({
+      where: {
+        OR: [
+          { currentUserId: userId },
+          ...(provider.tasker?.id
+            ? [{ identityType: 'TASKER', subjectId: provider.tasker.id }]
+            : []),
+          ...(provider.company?.id
+            ? [{ identityType: 'COMPANY', subjectId: provider.company.id }]
+            : []),
+        ],
+      },
+      select: {
+        id: true,
+        identityType: true,
+        financialAccounts: {
+          where: { commissionDue: { gt: 0 } },
+          select: {
+            currency: true,
+            commissionDue: true,
+          },
+        },
+      },
+    }),
+  ])
+
+  const activeJobs = activeCustomerJobs + activeProviderJobs + activeWorkerAssignments
+
+  const blockers: AccountClosureBlocker[] = [
+    { code: 'ACTIVE_JOBS', label: 'Active customer/provider jobs or assignments', count: activeJobs },
+    { code: 'OPEN_DISPUTES', label: 'Open disputes', count: openDisputes },
+    { code: 'PENDING_PAYOUTS', label: 'Pending payouts', count: pendingPayouts + pendingPayoutRequests },
+    { code: 'UNRESOLVED_PAYMENTS', label: 'Payments/refunds still processing', count: unresolvedCustomerPayments },
+    { code: 'UNRESOLVED_ESCROW', label: 'Escrow/cash jobs still unsettled', count: unresolvedEscrows },
+    {
+      code: 'COMPANY_OWNERSHIP_TRANSFER_REQUIRED',
+      label: 'Active company members require ownership/closure handling',
+      count: otherActiveCompanyMembers,
+    },
+  ].filter(item => item.count > 0) as AccountClosureBlocker[]
+
+  const outstandingCommission = identities.flatMap(identity =>
+    identity.financialAccounts.map(account => ({
+      providerIdentityId: identity.id,
+      identityType: identity.identityType,
+      currency: account.currency,
+      amountMinor: account.commissionDue.toString(),
+    }))
+  )
+
+  return {
+    canClose: blockers.length === 0,
+    alreadyClosed: !user.isActive,
+    blockers,
+    outstandingCommission,
+    closesWithBalance: outstandingCommission.length > 0,
+  }
+}
+
+/**
+ * Compatibility assessment retained for existing domain callers/tests.
+ * The richer app preflight is available through getAccountClosurePreflight.
+ */
+export async function evaluateAccountClosure(
+  tx: PrismaClientOrTx,
+  userId: string,
+) {
+  const preflight = await getAccountClosurePreflight(tx, userId)
+  return {
+    ...preflight,
+    blockers: preflight.blockers.map(item => item.code),
+    blockerDetails: preflight.blockers,
+    outstandingBalances: preflight.outstandingCommission.map(item => ({
+      providerIdentityId: item.providerIdentityId,
+      identityType: item.identityType,
+      currency: item.currency,
+      commissionDueMinor: BigInt(item.amountMinor),
+    })),
+  }
+}
+
+async function closeAccountWithTx(
+  tx: PrismaClientOrTx,
+  input: {
+    userId: string
+    ipAddress?: string | null
+    userAgent?: string | null
+  },
+) {
+  const user = await tx.user.findUnique({
+    where: { id: input.userId },
     select: {
       id: true,
+      email: true,
       role: true,
+      name: true,
       isActive: true,
-      taskerProfile: { select: { id: true } },
-      companyProfile: { select: { id: true } },
     },
   })
   if (!user) throw new Error('USER_NOT_FOUND')
 
-  const providerIdentities = await tx.providerIdentity.findMany({
-    where: { currentUserId: userId },
+  const preflight = await getAccountClosurePreflight(tx, input.userId)
+  if (!user.isActive) {
+    return {
+      alreadyClosed: true,
+      closedAt: null,
+      preflight,
+      closesWithBalance: preflight.closesWithBalance,
+      outstandingBalances: preflight.outstandingCommission,
+    }
+  }
+
+  if (!preflight.canClose) {
+    const error = new Error('ACCOUNT_CLOSURE_BLOCKED') as Error & {
+      preflight?: AccountClosurePreflight
+      assessment?: {
+        blockers: AccountClosureBlockerCode[]
+        blockerDetails: AccountClosureBlocker[]
+      }
+    }
+    error.preflight = preflight
+    error.assessment = {
+      blockers: preflight.blockers.map(item => item.code),
+      blockerDetails: preflight.blockers,
+    }
+    throw error
+  }
+
+  const now = new Date()
+  const claimed = await tx.user.updateMany({
+    where: {
+      id: input.userId,
+      isActive: true,
+    },
+    data: {
+      isActive: false,
+      pushToken: null,
+    },
+  })
+  if (claimed.count !== 1) {
+    throw new Error('ACCOUNT_CLOSURE_CHANGED_CONCURRENTLY')
+  }
+
+  const identities = await tx.providerIdentity.findMany({
+    where: { currentUserId: input.userId },
     select: {
       id: true,
       identityType: true,
-      subjectId: true,
-      standingStatus: true,
       financialAccounts: {
         select: {
-          currency: true,
           commissionDue: true,
-          status: true,
+          currency: true,
         },
       },
     },
   })
 
-  const providerClauses: Array<Record<string, unknown>> = []
-  if (user.taskerProfile) {
-    providerClauses.push({
-      providerType: 'INDIVIDUAL',
-      providerId: userId,
-      status: 'ACCEPTED',
-    })
-  }
-  if (user.companyProfile) {
-    providerClauses.push({
-      providerType: 'COMPANY',
-      providerId: user.companyProfile.id,
-      status: 'ACCEPTED',
-    })
-  }
-
-  const [customerJobs, providerQuotes, workerAssignments, pendingPayouts] = await Promise.all([
-    tx.marketplaceJob.findMany({
-      where: {
-        customerId: userId,
-        status: { in: [...ACTIVE_JOB_STATUSES] },
-      },
-      select: { id: true },
-    }),
-    providerClauses.length > 0
-      ? tx.jobQuote.findMany({
-          where: { OR: providerClauses as any },
-          select: {
-            jobId: true,
-            job: { select: { status: true } },
-          },
-        })
-      : Promise.resolve([]),
-    tx.companyJobAssignment.findMany({
-      where: {
-        workerUserId: userId,
-        status: { in: [...ACTIVE_ASSIGNMENT_STATUSES] },
-      },
-      select: { jobId: true },
-    }),
-    tx.payout.findMany({
-      where: {
-        userId,
-        status: { in: [...PENDING_PAYOUT_STATUSES] },
-      },
-      select: { id: true, status: true, amount: true, currency: true },
-    }),
-  ])
-
-  const activeProviderJobIds = providerQuotes
-    .filter(quote => ACTIVE_JOB_STATUSES.includes(quote.job.status as any))
-    .map(quote => quote.jobId)
-
-  const activeJobIds = [...new Set([
-    ...customerJobs.map(job => job.id),
-    ...activeProviderJobIds,
-    ...workerAssignments.map(assignment => assignment.jobId),
-  ])]
-
-  const openDisputes = activeJobIds.length > 0
-    ? await tx.marketplaceDispute.findMany({
-        where: {
-          jobId: { in: activeJobIds },
-          status: { in: [...OPEN_DISPUTE_STATUSES] },
-        },
-        select: { id: true, jobId: true, status: true },
-      })
-    : []
-
-  const blockers: AccountClosureBlocker[] = []
-  if (activeJobIds.length > 0) blockers.push('ACTIVE_JOBS')
-  if (openDisputes.length > 0) blockers.push('OPEN_DISPUTES')
-  if (pendingPayouts.length > 0) blockers.push('PENDING_PAYOUTS')
-
-  const outstandingBalances = providerIdentities.flatMap(identity =>
-    identity.financialAccounts
-      .filter(account => account.commissionDue > 0n)
-      .map(account => ({
-        providerIdentityId: identity.id,
-        identityType: identity.identityType,
-        currency: account.currency,
-        commissionDueMinor: account.commissionDue,
-        status: account.status,
-      }))
-  )
-
-  return {
-    user,
-    providerIdentities,
-    blockers,
-    activeJobIds,
-    openDisputes,
-    pendingPayouts,
-    outstandingBalances,
-    canClose: blockers.length === 0,
-    closesWithBalance: outstandingBalances.length > 0,
-  }
-}
-
-export async function closeAccountPreservingProviderIntegrity(
-  tx: Prisma.TransactionClient,
-  userId: string,
-) {
-  const assessment = await evaluateAccountClosure(tx, userId)
-  if (!assessment.canClose) {
-    const error = new Error('ACCOUNT_CLOSURE_BLOCKED')
-    ;(error as Error & { assessment?: typeof assessment }).assessment = assessment
-    throw error
-  }
-
-  const now = new Date()
-  for (const identity of assessment.providerIdentities) {
+  for (const identity of identities) {
     const hasDebt = identity.financialAccounts.some(account => account.commissionDue > 0n)
     await tx.providerIdentity.update({
       where: { id: identity.id },
@@ -163,24 +322,32 @@ export async function closeAccountPreservingProviderIntegrity(
         closedAt: now,
       },
     })
+
+    await tx.providerIntegritySignal.create({
+      data: {
+        providerIdentityId: identity.id,
+        userId: input.userId,
+        signalType: hasDebt ? 'ACCOUNT_CLOSED_WITH_BALANCE' : 'ACCOUNT_CLOSED',
+        severity: hasDebt ? 'HIGH' : 'LOW',
+        source: 'ACCOUNT_CLOSURE',
+        status: hasDebt ? 'OPEN' : 'CONFIRMED',
+        metadata: JSON.stringify({
+          identityType: identity.identityType,
+          closedAt: now.toISOString(),
+          commissionBalances: identity.financialAccounts
+            .filter(account => account.commissionDue > 0n)
+            .map(account => ({
+              currency: account.currency,
+              amountMinor: account.commissionDue.toString(),
+            })),
+        }),
+      },
+    })
   }
-
-  await tx.taskerProfile.updateMany({
-    where: { userId },
-    data: { isOnline: false },
-  })
-
-  await tx.teamMember.updateMany({
-    where: { userId, status: 'ACTIVE' },
-    data: {
-      status: 'SUSPENDED',
-      isOnline: false,
-    },
-  })
 
   await tx.userSession.updateMany({
     where: {
-      userId,
+      userId: input.userId,
       isValid: true,
     },
     data: {
@@ -190,14 +357,82 @@ export async function closeAccountPreservingProviderIntegrity(
     },
   })
 
-  await tx.user.update({
-    where: { id: userId },
-    data: { isActive: false },
+  await tx.oTP.updateMany({
+    where: {
+      userId: input.userId,
+      isUsed: false,
+    },
+    data: { isUsed: true },
+  })
+
+  await tx.taskerProfile.updateMany({
+    where: { userId: input.userId },
+    data: { isOnline: false },
+  })
+
+  await tx.teamMember.updateMany({
+    where: {
+      userId: input.userId,
+      status: 'ACTIVE',
+    },
+    data: {
+      isOnline: false,
+      status: 'SUSPENDED',
+    },
+  })
+
+  await tx.companyProfile.updateMany({
+    where: { userId: input.userId },
+    data: {
+      subscriptionStatus: 'CANCELLED',
+    },
+  })
+
+  await tx.securityAudit.create({
+    data: {
+      action: 'UPDATE',
+      category: 'AUTH',
+      userId: input.userId,
+      userEmail: user.email,
+      userRole: user.role,
+      entityType: 'User',
+      entityId: input.userId,
+      entityName: user.name,
+      description: preflight.closesWithBalance
+        ? 'Marketplace account closed; durable provider identity retained with outstanding commission'
+        : 'Marketplace account closed; durable provider identity and audit history retained',
+      newValue: JSON.stringify({
+        isActive: false,
+        closesWithBalance: preflight.closesWithBalance,
+        outstandingCommission: preflight.outstandingCommission,
+      }),
+      ipAddress: input.ipAddress || undefined,
+      userAgent: input.userAgent || undefined,
+      riskLevel: preflight.closesWithBalance ? 'HIGH' : 'MEDIUM',
+      isSuspicious: false,
+    },
   })
 
   return {
+    alreadyClosed: false,
     closedAt: now,
-    closesWithBalance: assessment.closesWithBalance,
-    outstandingBalances: assessment.outstandingBalances,
+    preflight,
+    closesWithBalance: preflight.closesWithBalance,
+    outstandingBalances: preflight.outstandingCommission,
   }
+}
+
+export async function closeAccountPreservingProviderIntegrity(
+  tx: PrismaClientOrTx,
+  userId: string,
+) {
+  return closeAccountWithTx(tx, { userId })
+}
+
+export async function closeMarketplaceAccount(input: {
+  userId: string
+  ipAddress?: string | null
+  userAgent?: string | null
+}) {
+  return prisma.$transaction(tx => closeAccountWithTx(tx, input))
 }
