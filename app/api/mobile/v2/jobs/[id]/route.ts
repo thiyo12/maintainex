@@ -10,6 +10,47 @@ function redactSensitive(data: Record<string, any>, _isOwner: boolean): Record<s
   return { ...data, phone: null, email: null }
 }
 
+async function getVerifiedTaskerPublicIdentity(userId: string) {
+  const profile = await prisma.taskerProfile.findUnique({
+    where: { userId },
+    select: {
+      id: true,
+      latitude: true,
+      longitude: true,
+      rating: true,
+      completedJobs: true,
+      isVerified: true,
+      verificationStatus: true,
+    },
+  })
+  if (!profile) return null
+
+  const identity = await prisma.providerIdentity.findUnique({
+    where: {
+      identityType_subjectId: {
+        identityType: 'TASKER',
+        subjectId: profile.id,
+      },
+    },
+    select: {
+      kycStatus: true,
+      verifiedPhotoUrl: true,
+    },
+  })
+
+  const identityVerified =
+    profile.isVerified &&
+    profile.verificationStatus === 'VERIFIED' &&
+    identity?.kycStatus === 'VERIFIED'
+
+  return {
+    ...profile,
+    identityVerified,
+    profileImage: identityVerified ? identity?.verifiedPhotoUrl || null : null,
+    profilePhotoVerified: identityVerified && Boolean(identity?.verifiedPhotoUrl),
+  }
+}
+
 async function getReadableCompanyIds(userId: string): Promise<string[]> {
   const [ownedCompany, memberships] = await Promise.all([
     prisma.companyProfile.findUnique({ where: { userId }, select: { id: true } }),
@@ -213,10 +254,7 @@ export async function GET(
           where: { id: acceptedQuote.providerId },
           select: { id: true, name: true },
         })
-        const providerProfile = await prisma.taskerProfile.findUnique({
-          where: { userId: acceptedQuote.providerId },
-          select: { latitude: true, longitude: true, rating: true },
-        })
+        const providerProfile = await getVerifiedTaskerPublicIdentity(acceptedQuote.providerId)
         if (providerUser) acceptedProvider = { ...providerUser, ...providerProfile }
       } else {
         const company = await prisma.companyProfile.findUnique({
@@ -282,15 +320,17 @@ export async function GET(
               where: { id: q.providerId },
               select: { id: true, name: true },
             }),
-            prisma.taskerProfile.findUnique({
-              where: { userId: q.providerId },
-              select: { rating: true, completedJobs: true, profileImage: true },
-            }),
+            getVerifiedTaskerPublicIdentity(q.providerId),
           ])
           providerRating = profile?.rating ?? 0
           completedJobs = profile?.completedJobs ?? 0
           provider = providerUser
-            ? { ...redactSensitive(providerUser, q.providerId === user.id), profileImage: profile?.profileImage ?? null }
+            ? {
+                ...redactSensitive(providerUser, q.providerId === user.id),
+                profileImage: profile?.profileImage ?? null,
+                identityVerified: profile?.identityVerified ?? false,
+                profilePhotoVerified: profile?.profilePhotoVerified ?? false,
+              }
             : null
         } else {
           const company = await prisma.companyProfile.findUnique({
