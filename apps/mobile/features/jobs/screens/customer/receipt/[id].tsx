@@ -81,7 +81,7 @@ export default function ReceiptScreen() {
     job?.escrow?.paymentMethod === 'CASH'
       ? 'Cash'
       : job?.escrow?.paymentMethod === 'CARD'
-        ? 'PayHere / Card'
+        ? 'Online payment'
         : job?.escrow?.paymentMethod || 'Protected payment'
 
   const handleShare = async () => {
