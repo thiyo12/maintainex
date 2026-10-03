@@ -209,7 +209,7 @@ export default function PaymentOperationsPage() {
   }, [payload])
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Finance · Gateway operations"
         title="Payment Operations"
@@ -251,7 +251,7 @@ export default function PaymentOperationsPage() {
       </div>
 
       {metrics.length ? metrics.map(row => (
-        <section key={row.currency} className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <section key={row.currency} className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <CrmMetricCard
             label={`Captured · ${row.currency}`}
             value={money(row.captured, row.currency)}
