@@ -166,7 +166,8 @@ describe('Part W — Negative Security Tests', () => {
   describe('Matching engine filters by country at DB level', () => {
     it('canonical matching filters provider candidates by countryCode in Prisma where', () => {
       const engine = readFile('lib/matching/index.ts')
-      expect(engine).toContain('user: input.countryCode ? { countryCode: input.countryCode } : undefined')
+      expect(engine).toContain('user: canonicalInput.countryCode ? { countryCode: canonicalInput.countryCode } : undefined')
+      expect(engine.match(/user: canonicalInput\.countryCode \? \{ countryCode: canonicalInput\.countryCode \} : undefined/g)?.length).toBe(2)
     })
 
     it('canonical matching applies job countryCode to scoped queries in Prisma where', () => {
