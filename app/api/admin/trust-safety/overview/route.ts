@@ -46,6 +46,15 @@ export async function GET(request: NextRequest) {
       : scopedCountryCodes.length === 0
         ? { id: '__NONE__' }
         : { user: { countryCode: { in: scopedCountryCodes } } }
+    const providerIntegrityCountryFilter = scopedCountryCodes === null
+      ? {}
+      : {
+          providerIdentity: {
+            countryCode: {
+              in: scopedCountryCodes.length > 0 ? scopedCountryCodes : ['__NONE__'],
+            },
+          },
+        }
 
     const [
       pendingKyc,
@@ -54,6 +63,8 @@ export async function GET(request: NextRequest) {
       pendingCheating,
       pendingRisk,
       highRisk,
+      pendingIntegrity,
+      criticalIntegrity,
       suspiciousLogins,
       recentRisk,
       recentDisputes,
@@ -83,6 +94,23 @@ export async function GET(request: NextRequest) {
               reviewedAt: null,
               severity: { in: ['HIGH', 'CRITICAL'] },
               ...jobCountryFilter,
+            },
+          })
+        : Promise.resolve(0),
+      canRisk
+        ? prisma.providerIntegritySignal.count({
+            where: {
+              reviewedAt: null,
+              ...providerIntegrityCountryFilter,
+            },
+          })
+        : Promise.resolve(0),
+      canRisk
+        ? prisma.providerIntegritySignal.count({
+            where: {
+              reviewedAt: null,
+              severity: 'CRITICAL',
+              ...providerIntegrityCountryFilter,
             },
           })
         : Promise.resolve(0),
@@ -160,6 +188,8 @@ export async function GET(request: NextRequest) {
           pendingCheating,
           pendingRisk,
           highRisk,
+          pendingIntegrity,
+          criticalIntegrity,
           suspiciousLogins,
         },
         recent: {
