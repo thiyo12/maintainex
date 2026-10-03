@@ -32,6 +32,10 @@ interface CommissionRecovery {
 interface MaintainEXBalance {
   commissionDue: number
   commissionDueMinor: string
+  adjustmentDue: number
+  adjustmentDueMinor: string
+  totalLiability: number
+  totalLiabilityMinor: string
   status: string
   cashJobsAllowed: boolean
   onlineJobsAllowed: boolean
@@ -106,9 +110,9 @@ export default function TaskerEarnings() {
                   </Text>
                 </View>
                 <Ionicons
-                  name={data.maintainexBalance.commissionDue > 0 ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+                  name={data.maintainexBalance.totalLiability > 0 ? 'alert-circle-outline' : 'checkmark-circle-outline'}
                   size={26}
-                  color={data.maintainexBalance.commissionDue > 0 ? colors.amber : colors.success}
+                  color={data.maintainexBalance.totalLiability > 0 ? colors.amber : colors.success}
                 />
               </View>
 
@@ -116,6 +120,14 @@ export default function TaskerEarnings() {
               <Text style={styles.maintainexDueValue}>
                 {data.maintainexBalance.currency} {data.maintainexBalance.commissionDue.toLocaleString()}
               </Text>
+              {data.maintainexBalance.adjustmentDue > 0 && (
+                <>
+                  <Text style={styles.maintainexDueLabel}>Post-payment adjustment due</Text>
+                  <Text style={[styles.maintainexDueValue, { color: colors.error }]}>
+                    {data.maintainexBalance.currency} {data.maintainexBalance.adjustmentDue.toLocaleString()}
+                  </Text>
+                </>
+              )}
 
               <View style={styles.maintainexRuleRow}>
                 <Text style={styles.maintainexRuleLabel}>Cash jobs</Text>
