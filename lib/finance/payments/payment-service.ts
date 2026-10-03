@@ -15,6 +15,7 @@ import {
 } from '@/lib/finance/payments/paypal-adapter'
 import { bigIntToSafeNumber, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
 import {
+  getPayHereConfig,
   parsePayHereAmount,
   requestPayHereRefund,
   retrievePayHerePayment,
