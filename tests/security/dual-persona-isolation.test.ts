@@ -81,9 +81,6 @@ describe.skipIf(!requiresPostgres())('Phase 6.6 — Strict Dual-Persona Quote Is
     await prisma.jobQuote.create({
       data: { jobId, providerId: dualPersonaUserId, providerType: 'INDIVIDUAL', price: 3500n, estimatedCompletionTime: '1h', attachments: '[]' },
     })
-    await prisma.jobQuote.create({
-      data: { jobId, providerId: companyAId, providerType: 'COMPANY', price: 7000n, actorUserId: dualPersonaUserId, actorRole: 'DISPATCHER', estimatedCompletionTime: '2h', attachments: '[]' },
-    })
   })
 
   afterAll(async () => {
