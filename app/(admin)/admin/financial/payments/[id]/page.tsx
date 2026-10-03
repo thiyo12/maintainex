@@ -174,7 +174,7 @@ export default function PaymentDetailPage() {
   const currency = payment.currency || 'LKR'
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Finance · Payment 360"
         title={payment.merchantOrderId}
@@ -208,7 +208,7 @@ export default function PaymentDetailPage() {
         </Link>
       </div>
 
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <CrmMetricCard
           label="Gross payment"
           value={money(payment.amount, currency)}
@@ -239,9 +239,9 @@ export default function PaymentDetailPage() {
         />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-3.5 xl:grid-cols-2">
         <CrmCard title="Payment & booking" description="Canonical references and current marketplace state">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3.5 sm:grid-cols-2">
             <Field label="Payment intent" value={payment.id} mono />
             <Field label="Provider order" value={transaction?.providerOrderId || payment.merchantOrderId} mono />
             <Field label="Provider capture" value={transaction?.providerCaptureId || payment.paymentId || '—'} mono />
@@ -254,7 +254,7 @@ export default function PaymentDetailPage() {
         </CrmCard>
 
         <CrmCard title="Customer & protected funds" description="Customer, escrow and dispute linkage">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3.5 sm:grid-cols-2">
             <Field
               label="Customer"
               value={data.customer?.id
@@ -287,7 +287,7 @@ export default function PaymentDetailPage() {
                     </CrmButton>
                   )}
                 </div>
-                <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <div className="mt-3.5 grid gap-3 sm:grid-cols-3">
                   <Field label="Order ID" value={item.providerOrderId || '—'} mono />
                   <Field label="Capture ID" value={item.providerCaptureId || '—'} mono />
                   <Field label="Authorization ID" value={item.providerAuthorizationId || '—'} mono />
@@ -304,7 +304,7 @@ export default function PaymentDetailPage() {
         ) : <div className="py-8 text-center text-xs text-slate-400">No provider transaction has been recorded.</div>}
       </CrmCard>
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-3.5 xl:grid-cols-2">
         <CrmCard title="Refund history" description="Provider refund records; partial refunds are not operator-enabled until canonical partial-ledger support exists">
           {data.providerRefunds.length ? (
             <div className="space-y-3">
@@ -352,7 +352,7 @@ export default function PaymentDetailPage() {
         </CrmCard>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-3.5 xl:grid-cols-2">
         <CrmCard title="Approval history" description="Maker-checker decisions and execution events">
           {data.approvals.length ? (
             <div className="space-y-3">
