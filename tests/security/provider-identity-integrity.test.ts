@@ -66,6 +66,7 @@ describe('provider identity integrity lifecycle', () => {
 
     expect(closure).toContain("'CLOSED_WITH_BALANCE'")
     expect(closure).toContain('commissionDue > 0n')
+    expect(closure).toContain('adjustmentDue > 0n')
     expect(closure).toContain('ACCOUNT_CLOSURE_BLOCKED')
     expect(closure).toContain("'ACTIVE_JOBS'")
     expect(closure).toContain("'OPEN_DISPUTES'")
