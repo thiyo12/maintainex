@@ -71,6 +71,26 @@ describe('provider cash receivable recovery contract', () => {
     expect(escrow).toContain('remainingCashCommissionDueCents')
   })
 
+  it('does not auto-offset a receivable while a direct commission payment is pending', () => {
+    const service = source('lib/finance/commissions/provider-balance-service.ts')
+
+    expect(service).toContain("commissionPayments: { none: { status: 'PENDING' } }")
+  })
+
+  it('reconciles a confirmed direct payment against the receivable instead of recognizing revenue twice', () => {
+    const service = source('lib/finance/commissions/provider-balance-service.ts')
+    const route = source('app/api/admin/financial/commission/payments/route.ts')
+
+    expect(service).toContain('settleProviderReceivablesFromDirectPayment')
+    expect(service).toContain("accountType: 'PLATFORM_CASH_CLEARING'")
+    expect(service).toContain("accountType: 'PROVIDER_COMMISSION_RECEIVABLE'")
+    expect(service).toContain("method: 'DIRECT_SETTLEMENT'")
+    expect(service).toContain('commission-payment-recovery:')
+    expect(route).toContain('remainingReceivableMinor')
+    expect(route).toContain('settleProviderReceivablesFromDirectPayment')
+    expect(route).toContain('Payment amount does not match the remaining commission due')
+  })
+
   it('keeps cash-job restriction separate from online-job recovery eligibility', () => {
     const policy = source('lib/finance/commissions/provider-financial-policy.ts')
     const balance = source('lib/finance/commissions/provider-balance-service.ts')
