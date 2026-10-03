@@ -21,7 +21,6 @@ import {
   getPayHereReturnUrl,
   getPayHereCancelUrl,
   getPayHereNotifyUrl,
-  generateMerchantOrderId,
   formatPayHereAmount,
   parsePayHereAmount,
   requestPayHereRefund,
@@ -467,12 +466,6 @@ function validateProviderRuntimeConfig(
 
 function checkoutToken(intentId: string, secret: string): string {
   return crypto.createHmac('sha256', secret).update(`maintainex-payhere:${intentId}`).digest('hex')
-}
-
-function buildHostedCheckoutUrl(baseUrl: string, intentId: string, secret: string): string {
-  const origin = new URL(baseUrl).origin
-  const token = checkoutToken(intentId, secret)
-  return `${origin}/api/payments/payhere/${encodeURIComponent(intentId)}?token=${token}`
 }
 
 export function verifyHostedCheckoutToken(intentId: string, token: string, secret: string): boolean {
