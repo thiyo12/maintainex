@@ -166,11 +166,11 @@ function CredentialsContent() {
                   {canReviewCredentials && c.verificationStatus === 'PENDING' && (
                     <div className="flex items-center space-x-2">
                       <button onClick={() => handleReview(c.id, 'VERIFIED')} disabled={actionLoading === c.id}
-                        className="flex items-center space-x-1 px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 disabled:opacity-50 text-xs">
+                        className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-emerald-200 bg-emerald-50 px-2.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
                         <FiCheck className="w-3 h-3" /><span>Approve</span>
                       </button>
                       <button onClick={() => setRejectModal({ id: c.id, name: c.name })} disabled={actionLoading === c.id}
-                        className="flex items-center space-x-1 px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 disabled:opacity-50 text-xs">
+                        className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-red-200 bg-red-50 px-2.5 text-[11px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50">
                         <FiX className="w-3 h-3" /><span>Reject</span>
                       </button>
                     </div>
