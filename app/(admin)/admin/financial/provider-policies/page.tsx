@@ -408,14 +408,16 @@ export default function ProviderFinancialPoliciesPage() {
             </CrmField>
           </div>
 
-          <CrmField label="Change reason" className="mt-4">
-            <textarea
-              className={`${crmInputClass} min-h-[100px] py-2.5`}
-              value={form.reason}
-              onChange={event => setForm({ ...form, reason: event.target.value })}
-              placeholder="Why is this policy changing?"
-            />
-          </CrmField>
+          <div className="mt-4">
+            <CrmField label="Change reason">
+              <textarea
+                className={`${crmInputClass} min-h-[100px] py-2.5`}
+                value={form.reason}
+                onChange={event => setForm({ ...form, reason: event.target.value })}
+                placeholder="Why is this policy changing?"
+              />
+            </CrmField>
+          </div>
 
           <div className="mt-4 flex items-center justify-end gap-2">
             <CrmButton
