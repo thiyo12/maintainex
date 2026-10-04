@@ -750,13 +750,11 @@ export async function recordPostPayoutProviderAdjustmentForEscrow(
         referenceId: escrow.id,
         entryType: 'CREDIT',
         currency: escrow.currency,
-        accountType: {
-          in: [
-            'PROVIDER_WALLET',
-            'PROVIDER_COMMISSION_RECEIVABLE',
-            'PROVIDER_BALANCE_ADJUSTMENT_RECEIVABLE',
-          ],
-        },
+        OR: [
+          { accountType: 'PROVIDER_WALLET' },
+          { accountType: 'PROVIDER_COMMISSION_RECEIVABLE' },
+          { accountType: 'PROVIDER_BALANCE_ADJUSTMENT_RECEIVABLE' },
+        ],
       },
       _sum: { amount: true },
     }),
