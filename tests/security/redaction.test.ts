@@ -72,6 +72,23 @@ describe('Redaction', () => {
     }
   })
 
+  it('keeps sensitive booking and conversation routes off raw console error sinks', () => {
+    const sensitiveRoutes = [
+      'app/api/bookings/[id]/route.ts',
+      'app/api/mobile/bookings/[id]/route.ts',
+      'app/api/mobile/conversations/[id]/route.ts',
+      'app/api/mobile/conversations/[id]/messages/route.ts',
+      'app/api/mobile/conversations/route.ts',
+      'app/api/mobile/quick-bookings/[id]/route.ts',
+    ]
+
+    for (const path of sensitiveRoutes) {
+      const route = readFileSync(resolve(process.cwd(), path), 'utf8')
+      expect(route).toContain("logger.error(")
+      expect(route).not.toMatch(/\bconsole\.error\s*\(/)
+    }
+  })
+
   it('preserves safe values', () => {
     const input = { name: 'John', age: 30, active: true }
     const result = redactObject(input)

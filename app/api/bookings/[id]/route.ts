@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
@@ -106,7 +107,7 @@ export async function GET(
     if (!access.ok) return access.response
     return NextResponse.json(await withBookingRelations(access.booking))
   } catch (error) {
-    console.error('Error fetching booking:', error)
+    logger.error('Booking read failed unexpectedly', { err: error, route: '/api/bookings/[id]', method: 'GET' })
     return NextResponse.json({ error: 'Failed to fetch booking' }, { status: 500 })
   }
 }
@@ -207,7 +208,7 @@ export async function PATCH(
         { status: 409 },
       )
     }
-    console.error('Error updating booking:', error)
+    logger.error('Booking update failed unexpectedly', { err: error, route: '/api/bookings/[id]', method: 'PATCH' })
     return NextResponse.json({ error: 'Failed to update booking' }, { status: 500 })
   }
 }
@@ -237,7 +238,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting booking:', error)
+    logger.error('Booking delete failed unexpectedly', { err: error, route: '/api/bookings/[id]', method: 'DELETE' })
     return NextResponse.json({ error: 'Failed to delete booking' }, { status: 500 })
   }
 }
