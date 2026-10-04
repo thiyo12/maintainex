@@ -176,7 +176,7 @@ describe('Phase 10.4 — Inspection Lifecycle', () => {
   describe('scheduleInspection', () => {
     it('schedules inspection from REQUESTED', async () => {
       const client = mockPrisma({
-        foundInspection: { id: 'inspection-1', status: 'REQUESTED', jobId: 'job-1' },
+        foundInspection: { id: 'inspection-1', status: 'REQUESTED', jobId: 'job-1', taskerId: 'provider-1', companyId: null },
       })
       const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
       const result = await scheduleInspection(client, {
