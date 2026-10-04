@@ -55,21 +55,39 @@ beforeAll(async () => {
   })
   jobId = job.id
 
-  await prisma.jobQuote.create({
+  const quote = await prisma.jobQuote.create({
     data: {
       jobId,
       providerId,
       providerType: 'INDIVIDUAL',
       price: 5000n,
+      currency: 'LKR',
       estimatedCompletionTime: '2 hours',
-        attachments: '[]',
+      attachments: '[]',
       status: 'ACCEPTED',
+    },
+  })
+
+  await prisma.jobEscrow.create({
+    data: {
+      jobId,
+      quoteId: quote.id,
+      customerId: customerAId,
+      providerId,
+      amount: 5000n,
+      serviceFee: 0n,
+      totalAmount: 5000n,
+      currency: 'LKR',
+      paymentMethod: 'CARD',
+      status: 'PROTECTED',
+      heldAt: new Date(),
     },
   })
 })
 
 afterAll(async () => {
   await prisma.jobVerificationPin.deleteMany({ where: { jobId } })
+  await prisma.jobEscrow.deleteMany({ where: { jobId } })
   await prisma.jobQuote.deleteMany({ where: { jobId } })
   await prisma.marketplaceJob.deleteMany({ where: { id: jobId } })
   await prisma.user.deleteMany({ where: { id: { in: [customerAId, providerId] } } })
