@@ -22,7 +22,7 @@ describePG('Phase 5E.2 — Balance Underflow / Double-Spend Guard (PostgreSQL)',
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES ($1, $2, 'CUSTOMER', 0, 0, 0, 1, now(), now())
-       ON CONFLICT ("walletType", "walletId") DO NOTHING`, `wb-${TEST_WALLET_ID}`, TEST_WALLET_ID
+       ON CONFLICT ("walletType", "walletId", "currency") DO NOTHING`, `wb-${TEST_WALLET_ID}`, TEST_WALLET_ID
     )
   })
 
