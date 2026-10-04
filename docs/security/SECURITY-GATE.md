@@ -6,39 +6,39 @@ This file is the running security release gate for `security/production-hardenin
 
 | Phase | Area | Status | Release blocker |
 |---|---|---|---|
-| 0 | Security baseline / feature freeze | CONDITIONAL | YES |
-| 1 | Production test/debug bypasses | IN PROGRESS — code closure complete; CI pending | YES |
-| 2 | Secrets / credentials | NOT STARTED | YES |
-| 3 | VPS / network perimeter | NOT STARTED | YES |
-| 4 | Docker / Dokploy | NOT STARTED | YES |
-| 5 | GitHub / CI supply chain | NOT STARTED | YES |
-| 6 | API attack-surface inventory | NOT STARTED | YES |
-| 7 | IDOR / broken access control | NOT STARTED | YES |
-| 8 | Company / tenant isolation | NOT STARTED | YES |
-| 9 | CRM / staff authorization | NOT STARTED | YES |
-| 10 | High-risk CRM governance | NOT STARTED | YES |
-| 11 | Admin auth / sessions / MFA | NOT STARTED | YES |
-| 12 | Password / OTP / recovery | NOT STARTED | HIGH |
-| 13 | Identity / KYC security | NOT STARTED | HIGH |
-| 14 | Payment / escrow authorization | NOT STARTED | YES |
-| 15 | PayHere webhook security | NOT STARTED | YES |
-| 16 | PayPal production completion | NOT STARTED | YES before PayPal live |
-| 17 | Financial concurrency / idempotency | NOT STARTED | YES |
-| 18 | Wallet / commission / account abuse | NOT STARTED | YES |
-| 19 | File / upload security | NOT STARTED | YES |
-| 20 | CSRF / CORS / browser security | NOT STARTED | HIGH |
-| 21 | Rate limiting / abuse protection | NOT STARTED | HIGH |
-| 22 | Database hardening | NOT STARTED | HIGH |
-| 23 | Privacy / data minimization | NOT STARTED | HIGH |
-| 24 | Logging / audit safety | NOT STARTED | HIGH |
-| 25 | Security monitoring / alerts | NOT STARTED | HARDENING |
-| 26 | Cloudflare / edge hardening | NOT STARTED | HIGH |
-| 27 | IP / proxy trust | NOT STARTED | HIGH |
-| 28 | Backup / disaster recovery | NOT STARTED | YES |
-| 29 | Dependency / supply chain | NOT STARTED | HARDENING |
-| 30 | Automated security regression | NOT STARTED | YES |
-| 31 | External attack simulation | NOT STARTED | YES |
-| 32 | Final security release gate | NOT STARTED | YES |
+| 0 | Security baseline / feature freeze | CONDITIONAL — external runtime proof required | YES |
+| 1 | Production test/debug bypasses | IN PROGRESS — code closure complete; full CI running | YES |
+| 2 | Secrets / credentials | PARTIAL — code controls present; rotation/runtime proof remains | YES |
+| 3 | VPS / network perimeter | PARTIAL — source hardening present; live VPS proof remains | YES |
+| 4 | Docker / Dokploy | PARTIAL — Docker controls present; Dokploy runtime proof remains | YES |
+| 5 | GitHub / CI supply chain | PARTIAL — pinned CI/Dependabot/audits present; settings review remains | YES |
+| 6 | API attack-surface inventory | PARTIAL — automated inventory present; deep closure review remains | YES |
+| 7 | IDOR / broken access control | PARTIAL — multiple IDOR suites present; exhaustive matrix remains | YES |
+| 8 | Company / tenant isolation | PARTIAL — tenant/persona suites present; exhaustive review remains | YES |
+| 9 | CRM / staff authorization | PARTIAL — CRM/RBAC suites present; full role-action review remains | YES |
+| 10 | High-risk CRM governance | PARTIAL — approval/step-up policy tests present; full action map remains | YES |
+| 11 | Admin auth / sessions / MFA | PARTIAL — MFA/session lifecycle coverage present; adversarial closure remains | YES |
+| 12 | Password / OTP / recovery | PARTIAL — recovery/OTP/refresh coverage present; abuse review remains | HIGH |
+| 13 | Identity / KYC security | PARTIAL — identity/privacy/storage controls present; E2E review remains | HIGH |
+| 14 | Payment / escrow authorization | PARTIAL — payment/escrow authorization tests present; closure review remains | YES |
+| 15 | PayHere webhook security | PARTIAL — webhook/env controls present; reconciliation proof remains | YES |
+| 16 | PayPal production completion | PARTIAL — provider/webhook controls present; sandbox/live verification remains | YES before PayPal live |
+| 17 | Financial concurrency / idempotency | PARTIAL — concurrency/ledger tests present; exhaustive writer review remains | YES |
+| 18 | Wallet / commission / account abuse | PARTIAL — commission/restriction controls present; abuse scenarios remain | YES |
+| 19 | File / upload security | PARTIAL — traversal/content/upload controls present; full corpus review remains | YES |
+| 20 | CSRF / CORS / browser security | PARTIAL — origin/browser controls present; complete mutation review remains | HIGH |
+| 21 | Rate limiting / abuse protection | PARTIAL — fail-closed/rate-limit tests present; endpoint coverage review remains | HIGH |
+| 22 | Database hardening | PARTIAL — schema/deploy controls present; live DB least-privilege proof remains | HIGH |
+| 23 | Privacy / data minimization | PARTIAL — privacy suites present; full field-retention review remains | HIGH |
+| 24 | Logging / audit safety | PARTIAL — redaction/security-event tests present; complete sink review remains | HIGH |
+| 25 | Security monitoring / alerts | PARTIAL — risk/event logic present; live alert delivery proof remains | HARDENING |
+| 26 | Cloudflare / edge hardening | PARTIAL — code assumes hardened edge; live Cloudflare config proof remains | HIGH |
+| 27 | IP / proxy trust | PARTIAL — canonical proxy/IP tests present; live topology proof remains | HIGH |
+| 28 | Backup / disaster recovery | PARTIAL — backup contracts present; successful restore drill remains | YES |
+| 29 | Dependency / supply chain | PARTIAL — npm audits/Dependabot/pinned actions present; audit closure remains | HARDENING |
+| 30 | Automated security regression | PARTIAL — blocking security suite wired; current full CI running | YES |
+| 31 | External attack simulation | PARTIAL — automated negative/adversarial suites exist; external simulation remains | YES |
+| 32 | Final security release gate | BLOCKED — cannot close until dependent internal/external gates are green | YES |
 
 ## Findings
 
@@ -166,4 +166,32 @@ REMAINING BLOCKERS:
 - Phase 0 runtime evidence remains external and CONDITIONAL
 
 NEXT PHASE:
-- after the final Phase 1 branch validation is green, continue to Phase 2 secrets/credentials without reopening already validated architecture.
+- continue partial evidence work across Phases 2–31 in parallel while Phase 1 full validation runs; preserve dependency order for declaring phases PASS and for the Phase 32 final GO.
+
+
+## Cross-phase partial evidence pass
+
+STATUS: ACTIVE
+
+The user authorized parallel partial work across all phases while preserving the dependency order for final closure. This does **not** mean later phases are PASS before earlier blockers are resolved.
+
+Repository evidence now exists for every phase from 0 through 32 and is guarded by `tests/security/security-phase-evidence-matrix.test.ts`. That test verifies the evidence index is complete and that repository evidence is not misrepresented as a final production GO.
+
+Current interpretation:
+- **PARTIAL** means relevant code/tests/controls already exist and are being audited further.
+- **CONDITIONAL / external proof required** means code can be reviewed now, but real production state must be proven from the actual system.
+- **BLOCKED** means the phase cannot legitimately close until prerequisite evidence is green.
+
+External-only or external-final-verification work remains specifically for:
+- production deployed SHA/environment/migrations/topology;
+- VPS reachable ports and DB exposure;
+- Dokploy runtime configuration;
+- production credential rotation proof;
+- PayPal sandbox/live provider verification;
+- Cloudflare/origin firewall configuration;
+- live DB least-privilege verification;
+- monitoring/alert delivery;
+- successful backup restore drill;
+- external attacker simulation.
+
+No production deployment is authorized by this partial pass.
