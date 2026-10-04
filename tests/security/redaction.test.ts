@@ -140,6 +140,31 @@ describe('Redaction', () => {
     }
   })
 
+  it('keeps identity, KYC and credential review routes on structured redacted logging', () => {
+    const routes = [
+      'app/api/mobile/v2/identity/route.ts',
+      'app/api/mobile/v2/identity/photo-change/route.ts',
+      'app/api/mobile/v2/jobs/[id]/worker-identity/route.ts',
+      'app/api/admin/kyc/[id]/file/route.ts',
+      'app/api/admin/kyc/photo-changes/[id]/file/route.ts',
+      'app/api/admin/companies/[id]/verification/route.ts',
+      'app/api/admin/credentials/[id]/review/route.ts',
+      'app/api/admin/credentials/route.ts',
+      'app/api/admin/kyc/photo-changes/route.ts',
+      'app/api/admin/kyc/route.ts',
+      'app/api/mobile/v2/admin/identity/[id]/route.ts',
+      'app/api/mobile/v2/admin/identity/route.ts',
+      'app/api/upload/route.ts',
+    ]
+
+    for (const routePath of routes) {
+      const route = readFileSync(resolve(process.cwd(), routePath), 'utf8')
+      expect(route).toContain("from '@/lib/shared/observability/logger'")
+      expect(route).toContain('logger.error(')
+      expect(route).not.toMatch(/\bconsole\.error\s*\(/)
+    }
+  })
+
   it('preserves safe values', () => {
     const input = { name: 'John', age: 30, active: true }
     const result = redactObject(input)
