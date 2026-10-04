@@ -63,6 +63,13 @@ function mockPrisma(overrides: Record<string, any> = {}) {
     providerAvailability: {
       findUnique: vi.fn().mockResolvedValue(null),
     },
+    providerIdentity: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
+    providerFinancialAccount: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     $queryRaw: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as any
