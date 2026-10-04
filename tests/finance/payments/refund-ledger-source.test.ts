@@ -55,6 +55,7 @@ function paymentIntent(overrides: Record<string, unknown> = {}) {
     paymentId: 'pay-1',
     amount: 10000n,
     currency: 'LKR',
+    gateway: 'PAYHERE',
     status: 'REFUND_REQUIRED',
     gatewayResponse: null,
     ...overrides,
