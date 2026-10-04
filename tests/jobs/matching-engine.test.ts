@@ -35,6 +35,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
   let unverifiedIdentityProviderId: string
   let noCapabilitiesProviderId: string
   let memberOfCompanyAId: string
+  let templateJobId: string
 
   beforeAll(async () => {
     try {
@@ -53,6 +54,22 @@ describe('Phase 7 — Matching Engine Integration', () => {
       },
     })
     testCategoryId = category.id
+
+    const templateJob = await prisma.templateJob.create({
+      data: {
+        categoryId: testCategoryId,
+        name: `ME Service ${ts}`,
+        description: 'Matching engine capability fixture',
+        whatIsIncluded: 'Test capability',
+        typicalDurationMinutes: 60,
+        priceMin: 1000,
+        priceMax: 50000,
+        currency: 'LKR',
+        countries: '["LK"]',
+        isActive: true,
+      },
+    })
+    templateJobId = templateJob.id
 
     // Customer
     const customer = await prisma.user.create({
@@ -90,6 +107,9 @@ describe('Phase 7 — Matching Engine Integration', () => {
       },
     })
     companyAId = companyA.id
+    await prisma.companySpecialty.create({
+      data: { companyId: companyAId, categoryId: testCategoryId, jobId: templateJobId },
+    })
     await prisma.teamMember.create({
       data: {
         companyId: companyAId,
@@ -125,6 +145,9 @@ describe('Phase 7 — Matching Engine Integration', () => {
       },
     })
     companyBId = companyB.id
+    await prisma.companySpecialty.create({
+      data: { companyId: companyBId, categoryId: testCategoryId, jobId: templateJobId },
+    })
     await prisma.teamMember.create({
       data: {
         companyId: companyBId,
@@ -147,7 +170,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       },
     })
     individualProviderId = indivUser.id
-    await prisma.taskerProfile.create({
+    const individualProfile = await prisma.taskerProfile.create({
       data: {
         userId: individualProviderId,
         skills: JSON.stringify([`me-cat-${ts}`, 'renovation']),
@@ -155,6 +178,14 @@ describe('Phase 7 — Matching Engine Integration', () => {
         verificationStatus: 'VERIFIED',
         completedJobs: 15,
         rating: 4.2,
+      },
+    })
+    await prisma.taskerSkill.create({
+      data: {
+        taskerId: individualProfile.id,
+        jobId: templateJobId,
+        countryCode: 'LK',
+        currency: 'LKR',
       },
     })
 
@@ -283,6 +314,11 @@ describe('Phase 7 — Matching Engine Integration', () => {
     if (jobId) await prisma.marketplaceJob.delete({ where: { id: jobId } }).catch(() => {})
     const companyIds = [companyAId, companyBId].filter(Boolean) as string[]
     if (companyIds.length) await prisma.teamMember.deleteMany({ where: { companyId: { in: companyIds } } })
+    if (templateJobId) {
+      await prisma.taskerSkill.deleteMany({ where: { jobId: templateJobId } }).catch(() => {})
+      await prisma.companySpecialty.deleteMany({ where: { jobId: templateJobId } }).catch(() => {})
+      await prisma.templateJob.delete({ where: { id: templateJobId } }).catch(() => {})
+    }
     const profileIds = [individualProviderId, suspendedProviderId, bannedProviderId, unverifiedIdentityProviderId, noCapabilitiesProviderId, memberOfCompanyAId].filter(Boolean) as string[]
     if (profileIds.length) await prisma.taskerProfile.deleteMany({ where: { userId: { in: profileIds } } })
     if (companyIds.length) await prisma.companyProfile.deleteMany({ where: { id: { in: companyIds } } }).catch(() => {})
@@ -377,7 +413,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     const result = await findCandidates(prisma, input)
     const excluded = result.excluded.find(e => e.providerId === noCapabilitiesProviderId)
     expect(excluded).toBeDefined()
-    expect(excluded!.reason).toBe('NO_SERVICE_CAPABILITIES')
+    expect(excluded!.reason).toBe('PROFESSION_MISMATCH')
   })
 
   it('candidates ranked by score descending', async () => {
@@ -415,6 +451,8 @@ describe('Phase 7 — Matching Engine Integration', () => {
       availability: 15,
       travel: 10,
       experience: 5,
+      fairness: 0,
+      preferredSkill: 0,
     })
   })
 
