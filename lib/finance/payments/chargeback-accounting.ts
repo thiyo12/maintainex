@@ -15,7 +15,7 @@ export async function accountFinalProviderChargeback(
   input: {
     paymentIntentId: string
     escrowId: string
-    provider: string
+    sourceProvider: string
     sourceReference: string
     amountMinor: bigint
     currency: string
@@ -24,7 +24,7 @@ export async function accountFinalProviderChargeback(
     metadata?: Record<string, unknown> | null
   },
 ): Promise<FinalChargebackResult> {
-  const provider = input.provider.trim().toUpperCase()
+  const provider = input.sourceProvider.trim().toUpperCase()
   const currency = input.currency.trim().toUpperCase()
   const sourceReference = input.sourceReference.trim()
   if (!provider || !sourceReference || input.amountMinor <= 0n) {
