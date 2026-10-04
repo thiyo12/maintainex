@@ -839,7 +839,7 @@ export async function processPaymentFailure(notification: PayHereNotification): 
       await accountFinalProviderChargeback(tx, {
         escrowId: paymentIntent.escrowId,
         paymentIntentId: paymentIntent.id,
-        provider: 'PAYHERE',
+        sourceProvider: 'PAYHERE',
         sourceReference: notification.payment_id || notification.order_id,
         amountMinor: paymentIntent.amount,
         currency: paymentIntent.currency,
