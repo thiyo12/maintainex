@@ -80,6 +80,13 @@ export const RATE_LIMIT_POLICIES: Record<string, RateLimitPolicy> = {
     failureMode: 'fail-closed',
     riskLevel: 'medium',
   },
+  PUBLIC_SUBMISSION: {
+    name: 'public_submission',
+    limit: 10,
+    windowMs: 60 * 60 * 1000,
+    failureMode: 'fail-closed',
+    riskLevel: 'high',
+  },
   FINANCIAL_MUTATION: {
     name: 'financial_mutation',
     limit: 20,
