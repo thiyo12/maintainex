@@ -46,6 +46,7 @@ jobs:
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: phase07-ci-nextauth-secret-0123456789
       MARKETPLACE_JWT_SECRET: phase07-ci-marketplace-jwt-secret-01234567890123456789
+      STAFF_JWT_SECRET: phase07-ci-staff-jwt-secret-012345678901234567890
       JWT_SECRET: phase07-ci-jwt-secret-01234567890123456789
       JWT_REFRESH_SECRET: phase07-ci-refresh-secret-0123456789012345
       PASSWORD_PEPPER: phase07-ci-pepper-012345678901234567890
@@ -348,6 +349,7 @@ jobs:
       - name: Production build
         env:
           NODE_ENV: production
+          ALLOW_TEST_OTP: "false"
         run: npm run build 2>&1 | tee /tmp/build-output.txt
         if: always()
 
@@ -377,13 +379,14 @@ jobs:
             -e NEXTAUTH_URL="http://localhost:3199" \
             -e NEXTAUTH_SECRET="phase07-ci-nextauth-secret-0123456789" \
             -e MARKETPLACE_JWT_SECRET="phase07-ci-marketplace-jwt-secret-01234567890123456789" \
+            -e STAFF_JWT_SECRET="phase07-ci-staff-jwt-secret-012345678901234567890" \
             -e JWT_SECRET="phase07-ci-jwt-secret-01234567890123456789" \
             -e JWT_REFRESH_SECRET="phase07-ci-refresh-secret-0123456789012345" \
             -e PASSWORD_PEPPER="phase07-ci-pepper-012345678901234567890" \
             -e IDENTITY_CLAIM_PEPPER="phase07-ci-identity-claim-pepper-0123456789012345" \
             -e CRON_SECRET="phase07-ci-cron-secret-012345678901234567" \
             -e INTERNAL_SYNC_SECRET="phase07-ci-sync-secret-01234567890123456" \
-            -e ALLOW_TEST_OTP="true" \
+            -e ALLOW_TEST_OTP="false" \
             -e CLOUDINARY_CLOUD_NAME="test" \
             -e CLOUDINARY_API_KEY="test" \
             -e CLOUDINARY_API_SECRET="test" \
