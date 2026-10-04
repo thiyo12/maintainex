@@ -19,6 +19,7 @@ function validProductionEnv() {
   process.env.INTERNAL_SYNC_SECRET = strong('internal-sync')
   process.env.CRON_SECRET = strong('cron')
   process.env.ALLOW_TEST_OTP = 'false'
+  process.env.APP_RELEASE_SHA = '0123456789abcdef0123456789abcdef01234567'
 
   delete process.env.PAYPAL_CLIENT_ID
   delete process.env.PAYPAL_CLIENT_SECRET
@@ -48,6 +49,19 @@ describe('production security configuration fails closed', () => {
     expect(validateRequiredSecrets()).toEqual({ valid: true, errors: [] })
   })
 
+  it('requires an exact traceable release SHA in production', async () => {
+    const { validateRequiredSecrets } = await import('@/lib/config/env-validation')
+
+    delete process.env.APP_RELEASE_SHA
+    let result = validateRequiredSecrets()
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain('[CRITICAL] APP_RELEASE_SHA is required in production')
+
+    process.env.APP_RELEASE_SHA = 'not-a-git-sha'
+    result = validateRequiredSecrets()
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain('[CRITICAL] APP_RELEASE_SHA must be a lowercase 40-character git SHA')
+  })
   it('rejects ALLOW_TEST_OTP=true in production', async () => {
     process.env.ALLOW_TEST_OTP = 'true'
     const { validateRequiredSecrets } = await import('@/lib/config/env-validation')
@@ -136,6 +150,12 @@ describe('production seed/setup endpoints are independently disabled', () => {
     })
   }
 
+  it('production preflight refuses an unknown release identity', () => {
+    const preflight = source('scripts/crm-v2-production-preflight.sh')
+    expect(preflight).toContain('APP_RELEASE_SHA')
+    expect(preflight).toContain('ERROR|APP_RELEASE_SHA is required')
+    expect(preflight).not.toContain('release_sha=unknown')
+  })
   it('runs production secret validation during Node startup', () => {
     const instrumentation = source('instrumentation.ts')
     expect(instrumentation).toContain("process.env.NEXT_RUNTIME === 'nodejs'")
