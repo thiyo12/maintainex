@@ -58,7 +58,8 @@ describe('admin JWT country scope preservation', () => {
     })
 
     expect(session).toMatchObject({
-      id: 'admin-cookie-test',
+      sub: 'admin-cookie-test',
+      sid: 'session-cookie-test',
       email: 'finance@example.com',
       role: 'FINANCE',
       firstName: 'Finance',
