@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => {
       updateMany: vi.fn(),
       findUnique: vi.fn(),
     },
-    jobEscrow: { updateMany: vi.fn() },
+    jobEscrow: { findUnique: vi.fn(), updateMany: vi.fn() },
     marketplaceRiskEvent: { create: vi.fn() },
     jobLifecycleEvent: { create: vi.fn() },
     $queryRaw: vi.fn(),
@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
     paymentIntentFindFirst: vi.fn(),
     paymentIntentUpdateMany: vi.fn(),
     jobEscrowFindUnique: vi.fn(),
+    txJobEscrowFindUnique: tx.jobEscrow.findUnique,
     marketplaceJobFindUnique: vi.fn(),
     jobQuoteFindFirst: vi.fn(),
     companyProfileFindUnique: vi.fn(),
@@ -124,6 +125,12 @@ describe('PayHere payment-to-work lifecycle', () => {
     ])
     mocks.tx.paymentIntent.updateMany.mockResolvedValue({ count: 1 })
     mocks.tx.paymentIntent.findUnique.mockResolvedValue({ status: 'REFUND_REQUIRED' })
+    mocks.tx.jobEscrow.findUnique.mockResolvedValue({
+      id: 'escrow-1',
+      totalAmount: 10000n,
+      currency: 'LKR',
+      status: 'PROTECTED',
+    })
     mocks.tx.jobEscrow.updateMany.mockResolvedValue({ count: 1 })
     mocks.tx.marketplaceRiskEvent.create.mockResolvedValue({ id: 'risk-1' })
     mocks.paymentIntentUpdateMany.mockResolvedValue({ count: 1 })
@@ -319,7 +326,7 @@ describe('PayHere payment-to-work lifecycle', () => {
     )
   })
 
-  it('moves a protected escrow to ON_HOLD on chargeback and raises a critical risk event', async () => {
+  it('finalizes a protected escrow reversal on chargeback and raises a critical risk event', async () => {
     const { processPaymentFailure } = await import('@/lib/payment/payment-service')
 
     mocks.paymentIntentFindFirst.mockResolvedValue({
@@ -346,10 +353,34 @@ describe('PayHere payment-to-work lifecycle', () => {
         data: expect.objectContaining({ status: 'CHARGEDBACK' }),
       })
     )
+    expect(mocks.tx.jobEscrow.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'escrow-1' } })
+    )
     expect(mocks.tx.jobEscrow.updateMany).toHaveBeenCalledWith({
-      where: { id: 'escrow-1', status: 'PROTECTED' },
-      data: { status: 'ON_HOLD' },
+      where: { id: 'escrow-1', status: { in: ['PROTECTED', 'ON_HOLD'] } },
+      data: expect.objectContaining({ status: 'REFUNDED' }),
     })
+    expect(mocks.postLedgerTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entries: [
+          expect.objectContaining({
+            accountId: 'escrow:escrow-1',
+            accountType: 'ESCROW',
+            entryType: 'DEBIT',
+            amount: 10000n,
+          }),
+          expect.objectContaining({
+            accountId: 'external:payhere',
+            accountType: 'EXTERNAL_PAYOUT',
+            entryType: 'CREDIT',
+            amount: 10000n,
+          }),
+        ],
+        referenceType: 'PAYMENT_CHARGEBACK',
+        referenceId: 'pi-1',
+      }),
+      mocks.tx,
+    )
     expect(mocks.tx.marketplaceRiskEvent.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
