@@ -30,7 +30,7 @@ This file is the running security release gate for `security/production-hardenin
 | 21 | Rate limiting / abuse protection | PARTIAL — fail-closed/rate-limit tests present; endpoint coverage review remains | HIGH |
 | 22 | Database hardening | PARTIAL — schema/deploy controls present; live DB least-privilege proof remains | HIGH |
 | 23 | Privacy / data minimization | PARTIAL — privacy suites present; full field-retention review remains | HIGH |
-| 24 | Logging / audit safety | PARTIAL — auth/booking/finance/KYC/reports/helpers/high-risk workers hardened; lower-risk route sweep + live log controls remain | HIGH |
+| 24 | Logging / audit safety | CODE CLOSURE — exhaustive 358-file server sink inventory migrated/blocked; full CI + live log controls remain | HIGH |
 | 25 | Security monitoring / alerts | PARTIAL — risk/event logic present; live alert delivery proof remains | HARDENING |
 | 26 | Cloudflare / edge hardening | PARTIAL — code assumes hardened edge; live Cloudflare config proof remains | HIGH |
 | 27 | IP / proxy trust | PARTIAL — canonical proxy/IP tests present; live topology proof remains | HIGH |
@@ -230,6 +230,21 @@ This file is the running security release gate for `security/production-hardenin
 - Status: FIXED — exact-head full release CI pending.
 
 
+### SG-0014 — Server-sensitive source retained 268 raw console sinks
+
+- ID: SG-0014
+- Severity: MEDIUM
+- Attack path: exceptional or diagnostic paths across API, CRM, auth, security, payment and finance code emit raw values through `console.error`, `console.warn` or `console.log`, bypassing centralized production redaction and structured request context.
+- Affected component: 181 server files under `app/api`, `lib/auth`, `lib/crm`, `lib/security`, `lib/payment` and `lib/finance`.
+- Reproduction/evidence: `tests/security/server-log-sink-inventory.test.ts` recursively scanned 358 server-sensitive files and reported 268 raw sinks on pre-fix head `504dd9dc`.
+- Root cause: long-lived route/helper code used direct console logging before the centralized observability layer became the required server logging boundary.
+- Fix: added `secureConsole`, a compatibility adapter that suppresses raw production arguments and routes events through the centralized redacting logger; migrated all 268 detected raw sinks mechanically across the approved server roots.
+- Test/verification: the isolated migration workflow passed web TypeScript plus `server-log-sink-inventory.test.ts`, `redaction.test.ts` and `secret-boundary-contract.test.ts` before committing the migration. The inventory remains as a permanent blocking regression.
+- Commit SHA: migration `ebc8e7cb6fb7bef64905999144e5fd80e37756b4`; permanent inventory `504dd9dceda6073badb236f173cc43f8cc113994`.
+- Residual risk: live log aggregation access, retention, export and alerting still require production evidence; repository server code is now structurally blocked from reintroducing raw console sinks in the audited roots.
+- Status: FIXED — exact-head full release CI pending.
+
+
 ## Phase 0 report
 
 PHASE: 0 — Security baseline / feature freeze
@@ -426,6 +441,7 @@ NEW FINDINGS:
 - SG-0011 fixed: CRM messaging/admin audit/token cleanup retained raw sensitive sinks.
 - SG-0012 fixed: high-risk MFA/cron/internal/mobile-auth routes retained raw exception sinks.
 - SG-0013 fixed: PayHere refund cron used ordinary bearer-secret comparison.
+- SG-0014 fixed: exhaustive server inventory found and migrated 268 raw console sinks.
 
 REMAINING:
 - continue repository-wide review for direct `console.*` sinks and unsafe raw exception logging

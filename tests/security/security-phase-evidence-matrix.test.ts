@@ -33,7 +33,7 @@ const PHASE_EVIDENCE: PhaseEvidence[] = [
   { phase: 21, area: 'rate limiting/abuse controls', evidence: ['tests/security/rate-limiting.test.ts', 'tests/security/rate-limit-fail-closed.test.ts', 'tests/security/otp-demo-rate-limit.test.ts'] },
   { phase: 22, area: 'database hardening', evidence: ['tests/security/infrastructure-hardening-contract.test.ts', 'prisma/schema.prisma', 'scripts/crm-v2-production-preflight.sh'] },
   { phase: 23, area: 'privacy/data minimization', evidence: ['tests/security/privacy.test.ts', 'tests/security/chat-privacy-boundary.test.ts', 'tests/security/real-estate-public-privacy.test.ts'] },
-  { phase: 24, area: 'logging/audit safety', evidence: ['tests/security/redaction.test.ts', 'tests/security/security-events.test.ts', 'tests/security/risk-events.test.ts'] },
+  { phase: 24, area: 'logging/audit safety', evidence: ['tests/security/redaction.test.ts', 'tests/security/server-log-sink-inventory.test.ts', 'tests/security/security-events.test.ts', 'tests/security/risk-events.test.ts'] },
   { phase: 25, area: 'security monitoring/alerts', evidence: ['tests/security/risk-events.test.ts', 'tests/security/risk-scoring.test.ts', 'tests/security/security-events.test.ts'] },
   { phase: 26, area: 'Cloudflare/edge security', evidence: ['tests/security/trusted-proxy-hardening.test.ts', 'tests/security/browser-origin-hardening.test.ts', 'lib/config/env-validation.ts'] },
   { phase: 27, area: 'IP/proxy trust', evidence: ['tests/security/trusted-proxy-hardening.test.ts', 'lib/security/client-ip.ts'] },
