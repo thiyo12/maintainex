@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM credentials GET error:', error)
+    logger.error('CRM credential list failed unexpectedly', { err: error, route: '/api/admin/credentials', method: 'GET' })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
