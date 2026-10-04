@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
@@ -95,7 +96,7 @@ export async function PATCH(
     if (message.includes('Rejection reason')) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
-    console.error('CRM credential review error:', error)
+    logger.error('CRM credential review failed unexpectedly', { err: error, route: '/api/admin/credentials/[id]/review' })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
