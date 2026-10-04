@@ -3,10 +3,18 @@ import type { NextRequest } from 'next/server'
 import { getInMemoryRateLimit } from '@/lib/shared/rate-limit/ip-fixed-window'
 import { getTrustedClientIp } from '@/lib/security/client-ip'
 
-function getJwtSecret(): string {
+function getLegacyJwtSecret(): string {
   const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
   if (!secret) {
     throw new Error('JWT_SECRET environment variable is required')
+  }
+  return secret
+}
+
+function getMarketplaceJwtSecret(): string {
+  const secret = process.env.MARKETPLACE_JWT_SECRET
+  if (!secret) {
+    throw new Error('MARKETPLACE_JWT_SECRET environment variable is required')
   }
   return secret
 }
@@ -88,7 +96,7 @@ async function verifyJwtSignature(
   }
 }
 
-async function verifySimpleToken(token: string): Promise<any> {
+async function verifyLegacyToken(token: string): Promise<any> {
   try {
     const parts = token.split('.')
     if (parts.length === 3) {
@@ -97,7 +105,7 @@ async function verifySimpleToken(token: string): Promise<any> {
         headerB64,
         payloadB64,
         signatureB64,
-        getJwtSecret(),
+        getLegacyJwtSecret(),
       )
       if (!signatureValid) return null
       const payload = JSON.parse(b64UrlDecode(payloadB64))
@@ -117,12 +125,39 @@ async function verifySimpleToken(token: string): Promise<any> {
     }
     const [encoded, legacySig] = parts
     if (!encoded) return null
-    const expectedSig = Buffer.from(getJwtSecret() + encoded).toString('base64').slice(0, 32)
+    const expectedSig = Buffer.from(getLegacyJwtSecret() + encoded).toString('base64').slice(0, 32)
     if (legacySig !== expectedSig) return null
     const payload = JSON.parse(b64UrlDecode(encoded))
     const maxAge = 30 * 24 * 60 * 60 * 1000
     if (Date.now() - payload.created > maxAge) return null
     return payload
+  } catch {
+    return null
+  }
+}
+
+async function verifyMarketplaceToken(token: string): Promise<{ id: string; sessionId: string } | null> {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const [headerB64, payloadB64, signatureB64] = parts
+    const signatureValid = await verifyJwtSignature(
+      headerB64,
+      payloadB64,
+      signatureB64,
+      getMarketplaceJwtSecret(),
+    )
+    if (!signatureValid) return null
+
+    const payload = JSON.parse(b64UrlDecode(payloadB64))
+    if (payload.exp && Date.now() / 1000 > payload.exp) return null
+    if (payload.aud !== 'maintainex-marketplace') return null
+    if (payload.iss !== 'maintainex') return null
+    if (payload.type !== 'marketplace_access') return null
+    if (typeof payload.sub !== 'string' || !payload.sub) return null
+    if (typeof payload.sid !== 'string' || !payload.sid) return null
+
+    return { id: payload.sub, sessionId: payload.sid }
   } catch {
     return null
   }
@@ -168,40 +203,69 @@ async function getStaffSession(request: NextRequest) {
 
 async function getSession(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7)
-    const payload = await verifySimpleToken(token)
-    if (payload && payload.id && payload.email && payload.role) {
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7)
+
+    const marketplace = await verifyMarketplaceToken(token)
+    if (marketplace) {
+      return {
+        id: marketplace.id,
+        sessionId: marketplace.sessionId,
+        authType: 'MARKETPLACE' as const,
+      }
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      const payload = await verifyLegacyToken(token)
+      if (payload?.id) {
+        return {
+          id: payload.id,
+          email: payload.email || null,
+          role: payload.role || null,
+          branchId: payload.branchId || null,
+          province: payload.province || null,
+          region: payload.region || null,
+          name: payload.name || null,
+          canEditServices: payload.canEditServices || false,
+          authType: 'LEGACY' as const,
+          sessionId: payload.sessionId || payload.sid || null,
+        }
+      }
+    }
+    return null
+  }
+
+  const token = request.cookies.get('admin_token')?.value
+  if (!token) return null
+
+  const staff = await verifyStaffToken(token)
+  if (staff) {
+    return {
+      id: staff.id,
+      sessionId: staff.sessionId,
+      authType: 'STAFF' as const,
+    }
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    const payload = await verifyLegacyToken(token)
+    if (payload?.id) {
       return {
         id: payload.id,
-        email: payload.email,
-        role: payload.role,
+        email: payload.email || null,
+        role: payload.role || null,
         branchId: payload.branchId || null,
         province: payload.province || null,
         region: payload.region || null,
         name: payload.name || null,
         canEditServices: payload.canEditServices || false,
-        authType: payload.authType || 'admin',
-        sessionId: payload.sessionId || null,
+        authType: 'LEGACY' as const,
+        sessionId: payload.sessionId || payload.sid || null,
       }
     }
   }
-  const token = request.cookies.get('admin_token')?.value
-  if (!token) return null
-  const payload = await verifySimpleToken(token)
-  if (!payload) return null
-  return {
-    id: payload.id,
-    email: payload.email,
-    role: payload.role,
-    branchId: payload.branchId,
-    province: payload.province || null,
-    region: payload.region || null,
-    name: payload.name,
-    canEditServices: payload.canEditServices || false,
-    authType: payload.authType || 'admin',
-    sessionId: payload.sessionId || payload.sid || null,
-  }
+
+  return null
 }
 
 const IP_BLOCKLIST = new Set<string>()
@@ -547,7 +611,10 @@ export async function middleware(request: NextRequest) {
     }
     response = NextResponse.next()
     response.headers.set('X-User-Id', session.id)
-    response.headers.set('X-User-Role', session.role)
+    response.headers.set('X-Auth-Type', session.authType)
+    if ('role' in session && typeof session.role === 'string') {
+      response.headers.set('X-User-Role', session.role)
+    }
     applyRequestId(response, requestId)
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
