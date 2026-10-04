@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { prisma } from '@/lib/prisma'
 import { verifyPasswordWithMigration } from '@/lib/security/password'
 import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
@@ -6,7 +7,7 @@ import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const ip = getTrustedClientIp(request.headers)
     const { allowed, resetAt } = checkRateLimit(ip)
     if (!allowed) {
       return NextResponse.json({ error: 'Too many requests. Try again later.', resetAt: new Date(resetAt).toISOString() }, { status: 429 })
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    const failIp = request.headers.get('x-forwarded-for')?.split(',')[0] || ip
+    const failIp = ip
     const failedRecord = await prisma.failedLogin.findUnique({
       where: { email_ipAddress: { email: identifier, ipAddress: failIp } }
     })
