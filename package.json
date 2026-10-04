@@ -36,7 +36,7 @@
     "@tanstack/react-table": "^8.21.3",
     "@types/aos": "^3.0.8",
     "aos": "^2.3.4",
-    "axios": "^1.17.0",
+    "axios": "^1.20.0",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.10.0",
