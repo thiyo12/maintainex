@@ -110,6 +110,17 @@ beforeAll(async () => {
     where: { name: 'PlumbG107' }, update: {},
     create: { name: 'PlumbG107', slug: `plumb-g107-${now}`, iconName: 'wrench', colorHex: '#3B82F6', countries: '["LK"]', isActive: true },
   })).id
+
+  // Current worker eligibility is capability-aware. These workers are the
+  // positive fixtures for assignment/concurrency tests, so explicitly grant
+  // the category the jobs below require.
+  await prisma.teamMember.updateMany({
+    where: {
+      companyId: companyAId,
+      userId: { in: [workerAUserId, workerBUserId, workerCUserId] },
+    },
+    data: { skills: JSON.stringify([catId, 'plumbing']) },
+  })
 })
 
 afterAll(async () => {
@@ -464,7 +475,7 @@ describe('Gate 15: Cross-Company/Cross-Worker IDOR', () => {
     expect(r1.success).toBe(true)
     const r2 = await revokeAssignment(r1.assignmentId!, companyBId, ownerBUserId, 'COMPANY_OWNER', 'test')
     expect(r2.success).toBe(false)
-    expect(r2.error).toContain('does not belong')
+    expect(r2.error).toContain('not authorized')
   })
   it('Worker B cannot accept Worker A assignment', async () => {
     const jid = await freshJob()
@@ -512,7 +523,7 @@ describe('Gate 16: Client Ownership Override', () => {
       assignedByUserId: ownerAUserId, actorRole: 'COMPANY_OWNER',
     })
     expect(r.success).toBe(false)
-    expect(r.error).toContain('No accepted quote')
+    expect(r.error).toContain('not authorized')
   })
   it('wrong companyId rejected for revoke', async () => {
     const jid = await freshJob()
