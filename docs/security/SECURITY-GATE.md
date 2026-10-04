@@ -17,11 +17,11 @@ This file is the running security release gate for `security/production-hardenin
 | 8 | Company / tenant isolation | PARTIAL — tenant/persona suites present; exhaustive review remains | YES |
 | 9 | CRM / staff authorization | PARTIAL — CRM/RBAC suites present; full role-action review remains | YES |
 | 10 | High-risk CRM governance | PARTIAL — approval/step-up policy tests present; full action map remains | YES |
-| 11 | Admin auth / sessions / MFA | PARTIAL — MFA/session lifecycle coverage present; adversarial closure remains | YES |
-| 12 | Password / OTP / recovery | PARTIAL — recovery/OTP/refresh coverage present; abuse review remains | HIGH |
+| 11 | Admin auth / sessions / MFA | PARTIAL — MFA/session lifecycle + redacted MFA/step-up failure paths verified; adversarial closure remains | YES |
+| 12 | Password / OTP / recovery | PARTIAL — recovery/OTP/refresh controls + redacted mobile-auth failure paths verified; abuse review remains | HIGH |
 | 13 | Identity / KYC security | PARTIAL — identity/storage/CRM review controls + redacted failure paths verified; E2E review remains | HIGH |
 | 14 | Payment / escrow authorization | PARTIAL — authorization reviewed; financial error paths hardened; closure review remains | YES |
-| 15 | PayHere webhook security | PARTIAL — signature/body controls + safe failure logging present; reconciliation proof remains | YES |
+| 15 | PayHere webhook security | PARTIAL — signature/body controls + safe failure logging + constant-time refund-worker auth present; reconciliation proof remains | YES |
 | 16 | PayPal production completion | PARTIAL — provider/webhook controls + safe failure logging present; sandbox/live verification remains | YES before PayPal live |
 | 17 | Financial concurrency / idempotency | PARTIAL — concurrency/ledger tests present; exhaustive writer review remains | YES |
 | 18 | Wallet / commission / account abuse | PARTIAL — commission/restriction controls present; abuse scenarios remain | YES |
@@ -30,7 +30,7 @@ This file is the running security release gate for `security/production-hardenin
 | 21 | Rate limiting / abuse protection | PARTIAL — fail-closed/rate-limit tests present; endpoint coverage review remains | HIGH |
 | 22 | Database hardening | PARTIAL — schema/deploy controls present; live DB least-privilege proof remains | HIGH |
 | 23 | Privacy / data minimization | PARTIAL — privacy suites present; full field-retention review remains | HIGH |
-| 24 | Logging / audit safety | PARTIAL — auth/booking/finance/KYC/reports/helper-library sinks hardened; complete route sweep + live log controls remain | HIGH |
+| 24 | Logging / audit safety | PARTIAL — auth/booking/finance/KYC/reports/helpers/high-risk workers hardened; lower-risk route sweep + live log controls remain | HIGH |
 | 25 | Security monitoring / alerts | PARTIAL — risk/event logic present; live alert delivery proof remains | HARDENING |
 | 26 | Cloudflare / edge hardening | PARTIAL — code assumes hardened edge; live Cloudflare config proof remains | HIGH |
 | 27 | IP / proxy trust | PARTIAL — canonical proxy/IP tests present; live topology proof remains | HIGH |
@@ -198,6 +198,35 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: `tests/security/redaction.test.ts` locks the three server helpers off raw console sinks and raw WhatsApp exception strings.
 - Commit SHA: atomic fix commit containing SG-0011 remediation and regression.
 - Residual risk: route-level repository sweep continues; live log aggregation retention/access still requires production evidence.
+- Status: FIXED — exact-head full release CI pending.
+
+
+### SG-0012 — High-risk MFA, cron, internal and mobile-auth routes retained raw exception sinks
+
+- ID: SG-0012
+- Severity: MEDIUM
+- Attack path: an attacker or malformed request triggers an exceptional path in MFA/step-up, authentication, cron, or internal maintenance code and raw runtime/provider/database exception details are emitted directly to process logs outside the centralized production redaction policy.
+- Affected component: admin MFA confirm/setup and step-up routes; daily maintenance, response escalation, matching wave, offer timeout, PayHere refund, re-engagement and reputation workers; internal security seed; mobile forgot-password/login/me/profile/register/reset-password/send-OTP/switch-role routes.
+- Reproduction/evidence: exhaustive high-risk route-family review found direct `console.error(..., error)` sinks in the listed routes after earlier route-specific redaction migrations.
+- Root cause: older route-local exception handlers were not covered by the first auth/finance/KYC logging migrations.
+- Fix: migrated all reviewed high-risk handlers to the centralized structured logger with `err` context and preserved generic client-facing failure responses.
+- Test added: `tests/security/redaction.test.ts` now locks the complete reviewed MFA/cron/internal/mobile-auth route set off raw `console.*` sinks.
+- Commit SHA: admin MFA/cron fixes `a4899c15e07da11599741c6a4b9d0e9f5300e6fc`; internal/mobile-auth fixes + regression `7466303df9ec48270b5832a14597e2f3a876b417`.
+- Residual risk: lower-risk route families still require repository-wide review; live log aggregation retention/access remains external evidence.
+- Status: FIXED — exact-head full release CI pending.
+
+### SG-0013 — PayHere refund cron used ordinary bearer-secret comparison
+
+- ID: SG-0013
+- Severity: LOW
+- Attack path: repeated probes against the PayHere refund worker could exercise ordinary string comparison against `CRON_SECRET`, leaving an avoidable timing side channel at a finance-sensitive worker boundary.
+- Affected component: `app/api/cron/payhere-refunds/route.ts`.
+- Reproduction/evidence: the worker compared the Authorization header directly with `request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`` while other internal/cron boundaries had already migrated to constant-time helpers.
+- Root cause: the refund worker was omitted from the earlier shared-secret comparison migration.
+- Fix: migrated authorization to `matchesBearerSecret` and moved worker/item failures to structured redacted logging.
+- Test added: `tests/security/secret-boundary-contract.test.ts` now requires the PayHere refund worker to use the constant-time bearer helper and rejects reintroduction of the direct comparison.
+- Commit SHA: `a4899c15e07da11599741c6a4b9d0e9f5300e6fc`; regression completed in `7466303df9ec48270b5832a14597e2f3a876b417`.
+- Residual risk: external origin/network isolation remains a Phase 3/26 control; the avoidable application-level timing signal is removed.
 - Status: FIXED — exact-head full release CI pending.
 
 
@@ -395,6 +424,8 @@ NEW FINDINGS:
 - SG-0009 fixed: critical financial/payment routes used raw error sinks and selected internal error responses.
 - SG-0010 fixed: identity/KYC/admin review routes retained raw exception sinks.
 - SG-0011 fixed: CRM messaging/admin audit/token cleanup retained raw sensitive sinks.
+- SG-0012 fixed: high-risk MFA/cron/internal/mobile-auth routes retained raw exception sinks.
+- SG-0013 fixed: PayHere refund cron used ordinary bearer-secret comparison.
 
 REMAINING:
 - continue repository-wide review for direct `console.*` sinks and unsafe raw exception logging
