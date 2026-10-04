@@ -26,7 +26,7 @@ describe('legacy company finance boundary', () => {
 
   it('uses the company payout identity for commission payment reads', () => {
     const route = read('app/api/mobile/company/earnings/route.ts')
-    expect(route).toContain('select: { userId: true }')
+    expect(route).toMatch(/select:\s*\{\s*userId:\s*true\s*\}/)
     expect(route).toContain('providerId: company.userId')
     expect(route).not.toContain("providerId: user.id,\n        status: 'PENDING'")
   })
