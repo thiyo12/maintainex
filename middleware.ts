@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getInMemoryRateLimit } from '@/lib/shared/rate-limit/ip-fixed-window'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
@@ -324,9 +325,7 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(response)
   }
 
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
-             request.headers.get('x-real-ip') ||
-             'unknown'
+  const ip = getTrustedClientIp(request.headers)
 
   await syncIPBlocklist(request)
 
