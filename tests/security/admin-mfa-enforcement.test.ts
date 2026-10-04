@@ -17,10 +17,13 @@ describe('mandatory super-admin MFA', () => {
 
   it('revokes refresh access if a SUPER_ADMIN loses MFA enrollment', () => {
     const refresh = source('app/api/admin/auth/refresh/route.ts')
-    expect(refresh).toContain("adminUser.role === 'SUPER_ADMIN'")
-    expect(refresh).toContain('!adminUser.totpEnabled || !adminUser.totpSecret')
-    expect(refresh).toContain('isRevoked: true')
-    expect(refresh).toContain("code: 'MFA_ENROLLMENT_REQUIRED'")
+    const rotation = source('lib/auth/staff-rotation.ts')
+
+    expect(refresh).toContain('rotateStaffRefreshToken')
+    expect(rotation).toContain("adminUser.role === 'SUPER_ADMIN'")
+    expect(rotation).toContain('!adminUser.totpEnabled || !adminUser.totpSecret')
+    expect(rotation).toContain('isRevoked: true')
+    expect(rotation).toContain('return null')
   })
 
   it('enforces live MFA state on every guarded CRM request', () => {
