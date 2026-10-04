@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       secure: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 24 * 60 * 60,
+      maxAge: 30 * 60,
     })
 
     response.cookies.set('refresh_token', refreshToken, {
