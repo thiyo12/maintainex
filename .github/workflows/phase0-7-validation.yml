@@ -90,7 +90,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Audit mobile production dependencies
-        run: npm audit --omit=dev --audit-level=high --prefix apps/mobile
+        run: node scripts/mobile-production-audit.mjs
 
       - name: Generate Prisma client
         run: npx prisma generate
