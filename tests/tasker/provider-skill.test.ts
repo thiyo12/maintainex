@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
+import { addTaskerProfessionSkill } from '../../lib/profession'
 
 const prisma = new PrismaClient()
 
-describe('Phase 10.1 — Provider Skill FK Integrity', () => {
+describe('Phase 10.1 — Provider Skill Domain Integrity', () => {
   let professionId: string
   let skillId: string
   let taskerProfileId: string
@@ -81,13 +82,11 @@ describe('Phase 10.1 — Provider Skill FK Integrity', () => {
     })
 
     await expect(
-      prisma.taskerProfessionSkill.create({
-        data: {
-          taskerProfessionId,
-          professionSkillId: otherSkill.id,
-        },
+      addTaskerProfessionSkill(prisma, {
+        taskerProfessionId,
+        professionSkillId: otherSkill.id,
       })
-    ).rejects.toThrow()
+    ).rejects.toThrow('Skill does not belong to this profession')
 
     // Cleanup
     await prisma.professionSkill.deleteMany({ where: { professionId: otherProf.id } })
