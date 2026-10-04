@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+
+async function authorizeServiceMutation(request: NextRequest, id: string) {
+  const guard = await guardCrmRequest(request, {
+    permission: 'catalog:edit',
+    level: 'mutation',
+    requireCountryScope: true,
+  })
+  if (!guard.ok) return { ok: false as const, response: guard.response }
+
+  const service = await prisma.service.findUnique({ where: { id } })
+  if (!service) {
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: 'Service not found' }, { status: 404 }),
+    }
+  }
+
+  if (!assertCrmCountryAllowed(guard.context, service.countryCode)) {
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: 'Service is outside your assigned countries' }, { status: 403 }),
+    }
+  }
+
+  return { ok: true as const, guard: guard.context, service }
+}
 
 export async function DELETE(
   request: NextRequest,
@@ -8,52 +34,29 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const canEdit = session.role === 'SUPER_ADMIN' || session.canEditServices
+    const access = await authorizeServiceMutation(request, id)
+    if (!access.ok) return access.response
 
-    if (!canEdit) {
-      return NextResponse.json({ error: 'Only Super Admin or authorized admins can delete services' }, { status: 403 })
-    }
-
-    const serviceId = id
-
-    const service = await prisma.service.findUnique({
-      where: { id: serviceId }
-    })
-
-    if (!service) {
-      return NextResponse.json({ error: 'Service not found' }, { status: 404 })
-    }
-
-    await prisma.service.delete({
-      where: { id: serviceId }
-    })
-
+    await prisma.service.delete({ where: { id } })
     return NextResponse.json({ success: true, message: 'Service deleted successfully' })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Delete service error:', error)
     return NextResponse.json({ error: 'Failed to delete service' }, { status: 500 })
   }
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
     const service = await prisma.service.findFirst({
       where: {
-        OR: [
-          { id },
-          { slug: id },
-        ]
+        isActive: true,
+        OR: [{ id }, { slug: id }],
       },
-      include: { category: true }
+      include: { category: true },
     })
 
     if (!service) {
@@ -62,19 +65,19 @@ export async function GET(
 
     await prisma.service.update({
       where: { id: service.id },
-      data: { views: { increment: 1 } }
+      data: { views: { increment: 1 } },
     })
 
-    // Fetch related services
     const relatedServices = await prisma.service.findMany({
       where: {
         categoryId: service.categoryId,
+        countryCode: service.countryCode,
         id: { not: service.id },
         isActive: true,
       },
       take: 4,
       orderBy: { views: 'desc' },
-      include: { category: { select: { name: true } } }
+      include: { category: { select: { name: true } } },
     })
 
     return NextResponse.json({
@@ -82,7 +85,7 @@ export async function GET(
       price: service.price ? Number(service.price) : null,
       relatedServices,
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch service' }, { status: 500 })
   }
 }
@@ -93,44 +96,71 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const session = await getSession(request)
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized', reason: 'No session' }, { status: 401 })
-    }
-    
-    const canEdit = session.role === 'SUPER_ADMIN' || session.canEditServices
-
-    if (!canEdit) {
-      return NextResponse.json({ error: 'Only Super Admin or authorized admins can update services' }, { status: 403 })
-    }
+    const access = await authorizeServiceMutation(request, id)
+    if (!access.ok) return access.response
 
     const body = await request.json()
-    const { name, description, shortDescription, image, price, duration, categoryId, isActive, isTrending, displayOrder, features } = body
+    const {
+      name,
+      description,
+      shortDescription,
+      image,
+      price,
+      duration,
+      categoryId,
+      isActive,
+      isTrending,
+      displayOrder,
+      features,
+    } = body
+
+    if (categoryId) {
+      const category = await prisma.category.findUnique({
+        where: { id: categoryId },
+        select: { id: true, countryCode: true },
+      })
+      if (!category || category.countryCode !== access.service.countryCode) {
+        return NextResponse.json({ error: 'Invalid category for service market' }, { status: 400 })
+      }
+    }
+
+    const parsedPrice = price !== undefined ? Number(price) : undefined
+    const parsedDuration = duration !== undefined ? Number(duration) : undefined
+    const parsedDisplayOrder = displayOrder !== undefined ? Number(displayOrder) : undefined
+
+    if (parsedPrice !== undefined && (!Number.isFinite(parsedPrice) || parsedPrice < 0)) {
+      return NextResponse.json({ error: 'Invalid price' }, { status: 400 })
+    }
+    if (parsedDuration !== undefined && (!Number.isInteger(parsedDuration) || parsedDuration < 0)) {
+      return NextResponse.json({ error: 'Invalid duration' }, { status: 400 })
+    }
+    if (parsedDisplayOrder !== undefined && (!Number.isInteger(parsedDisplayOrder) || parsedDisplayOrder < 0)) {
+      return NextResponse.json({ error: 'Invalid displayOrder' }, { status: 400 })
+    }
 
     const service = await prisma.service.update({
       where: { id },
       data: {
-        ...(name && { name }),
-        ...(description !== undefined && { description }),
-        ...(shortDescription !== undefined && { shortDescription }),
-        ...(image !== undefined && { image }),
-        ...(price !== undefined && { price: parseFloat(price) || 0 }),
-        ...(duration !== undefined && { duration: parseInt(duration) || 0 }),
+        ...(typeof name === 'string' && name.trim() && { name: name.trim().slice(0, 160) }),
+        ...(description !== undefined && { description: String(description).slice(0, 5000) }),
+        ...(shortDescription !== undefined && { shortDescription: String(shortDescription).slice(0, 1000) }),
+        ...(image !== undefined && { image: image ? String(image).slice(0, 2000) : null }),
+        ...(parsedPrice !== undefined && { price: parsedPrice }),
+        ...(parsedDuration !== undefined && { duration: parsedDuration }),
         ...(categoryId && { categoryId }),
-        ...(isActive !== undefined && { isActive }),
-        ...(isTrending !== undefined && { isTrending }),
-        ...(displayOrder !== undefined && { displayOrder: parseInt(displayOrder) || 0 }),
-        ...(features !== undefined && { features })
+        ...(typeof isActive === 'boolean' && { isActive }),
+        ...(typeof isTrending === 'boolean' && { isTrending }),
+        ...(parsedDisplayOrder !== undefined && { displayOrder: parsedDisplayOrder }),
+        ...(features !== undefined && { features: String(features).slice(0, 10000) }),
       },
-      include: { category: true }
+      include: { category: true },
     })
 
     return NextResponse.json({
       ...service,
       price: service.price ? Number(service.price) : null,
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Update service error:', error)
     return NextResponse.json({ error: 'Failed to update service' }, { status: 500 })
   }
