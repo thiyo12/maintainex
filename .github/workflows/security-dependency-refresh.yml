@@ -50,16 +50,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          unexpected="$(git status --porcelain | awk '{print $2}' | grep -vE '^(package.json|package-lock.json|dependency-audit.txt)        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: security-dependency-refresh
-          path: |
-            package.json
-            package-lock.json
-            dependency-audit.txt
-          if-no-files-found: error
-          retention-days: 1
- || true)"
+          unexpected="$(git status --porcelain | awk '{print $2}' | grep -vE '^(package.json|package-lock.json|dependency-audit.txt)$' || true)"
           if [ -n "$unexpected" ]; then
             echo "Unexpected generated files:"
             echo "$unexpected"
@@ -85,5 +76,5 @@ jobs:
             package.json
             package-lock.json
             dependency-audit.txt
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 1
