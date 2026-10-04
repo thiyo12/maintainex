@@ -302,6 +302,7 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
   describe('WORK_START Atomicity (PIN + Lifecycle Transition)', () => {
     it('10 concurrent WORK_START PIN verifications produce exactly one lifecycle transition', { timeout: 30000 }, async () => {
       const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
+      await prisma.jobVerificationPin.deleteMany({ where: { jobId: workStartJobId } })
       const arrivalPin = await generateJobPin(workStartJobId, customerAId)
 
       const beforeArrival = await verifyJobPin(workStartJobId, providerId, arrivalPin.pin, 'WORK_START')
