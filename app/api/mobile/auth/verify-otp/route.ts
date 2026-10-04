@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
@@ -39,7 +40,8 @@ function accountBlocked(user: any): NextResponse | null {
 }
 
 async function buildPhoneVerificationAuthResponse(request: NextRequest, userId: string) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || undefined
+  const resolvedIp = getTrustedClientIp(request.headers)
+  const ip = resolvedIp === 'unknown' ? undefined : resolvedIp
   const userAgent = request.headers.get('user-agent') || undefined
   const authSession = await createMarketplaceAuthSession(userId, { ipAddress: ip, userAgent })
   const response = buildAuthResponse(authSession)
