@@ -29,6 +29,7 @@ jobs:
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
           failures=0
+          blocked=0
           passes=0
 
           pass() {
@@ -39,6 +40,11 @@ jobs:
           fail() {
             echo "::error::$1"
             failures=$((failures + 1))
+          }
+
+          block() {
+            echo "::warning::$1"
+            blocked=$((blocked + 1))
           }
 
           request() {
@@ -71,7 +77,7 @@ jobs:
               fail "Production health JSON did not prove healthy + 40-char release SHA + test OTP disabled"
             fi
           elif [ "$health_status" = "403" ] && is_cloudflare "$tmp/health.headers"; then
-            fail "Cloudflare blocked /api/health from the external runner; release identity is not externally provable from this vantage point"
+            block "Cloudflare blocked /api/health from the external runner; release identity remains externally unproven from this vantage point"
           else
             fail "Unexpected /api/health status: $health_status"
           fi
@@ -80,12 +86,21 @@ jobs:
           home_status="$(request "$tmp/home.headers" "$tmp/home.body" "$PRIMARY_ORIGIN/")"
           case "$home_status" in
             2??|3??) pass "Public homepage reachable over HTTPS" ;;
+            403)
+              if is_cloudflare "$tmp/home.headers"; then
+                block "Cloudflare blocked public homepage from the external runner"
+              else
+                fail "Public homepage returned non-Cloudflare 403"
+              fi
+              ;;
             *) fail "Public homepage HTTPS status was $home_status" ;;
           esac
           for header in             strict-transport-security             x-content-type-options             content-security-policy             referrer-policy             permissions-policy
           do
             if grep -qi "^$header:" "$tmp/home.headers"; then
               pass "Public security header $header"
+            elif [ "$home_status" = "403" ] && is_cloudflare "$tmp/home.headers"; then
+              block "Public security header $header cannot be proven on the application response because Cloudflare returned the denial page"
             else
               fail "Missing public security header: $header"
             fi
@@ -115,7 +130,7 @@ jobs:
           if [ "$readiness_status" = "403" ] && grep -Eq '"error"[[:space:]]*:[[:space:]]*"Forbidden"' "$tmp/readiness.body"; then
             pass "Application readiness endpoint denies unauthenticated access"
           elif [ "$readiness_status" = "403" ] && is_cloudflare "$tmp/readiness.headers"; then
-            fail "Cloudflare blocked readiness before the application auth boundary could be proven"
+            block "Cloudflare blocked readiness before the application auth boundary could be proven"
           else
             fail "Readiness endpoint did not return the expected application 403 boundary (status=$readiness_status)"
           fi
@@ -151,10 +166,19 @@ jobs:
           admin_status="$(request "$tmp/admin.headers" "$tmp/admin.body" "$ADMIN_ORIGIN/admin/login")"
           case "$admin_status" in
             2??|3??) pass "Admin login host reachable over HTTPS" ;;
+            403)
+              if is_cloudflare "$tmp/admin.headers"; then
+                block "Cloudflare blocked admin login from the external runner"
+              else
+                fail "Admin login host returned non-Cloudflare 403"
+              fi
+              ;;
             *) fail "Admin login host unavailable or unsafe status: $admin_status" ;;
           esac
           if grep -qi '^strict-transport-security:' "$tmp/admin.headers"; then
             pass "Admin host HSTS"
+          elif [ "$admin_status" = "403" ] && is_cloudflare "$tmp/admin.headers"; then
+            block "Admin HSTS cannot be proven on the application response because Cloudflare returned the denial page"
           else
             fail "Admin host missing HSTS"
           fi
@@ -178,13 +202,18 @@ jobs:
             echo "## MaintainEX public black-box evidence"
             echo
             echo "- Pass checks: $passes"
-            echo "- Failed/blocked checks: $failures"
+            echo "- Blocked checks: $blocked"
+            echo "- Failed checks: $failures"
             echo "- Health status observed: $health_status"
             echo "- Readiness status observed: $readiness_status"
             echo "- Admin login status observed: $admin_status"
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$failures" -ne 0 ]; then
-            echo "::error::Public black-box evidence has $failures failed or blocked checks"
+            echo "::error::Public black-box evidence has $failures insecure/failed checks"
             exit 1
+          fi
+
+          if [ "$blocked" -ne 0 ]; then
+            echo "::warning::Public black-box evidence completed with $blocked checks blocked by the Cloudflare vantage point; those checks remain conditional"
           fi
