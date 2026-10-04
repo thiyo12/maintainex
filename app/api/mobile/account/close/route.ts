@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import {
   closeMarketplaceAccount,
@@ -8,11 +9,8 @@ import {
 import { prisma } from '@/lib/prisma'
 
 function ipFromRequest(request: NextRequest): string | null {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    null
-  )
+  const ip = getTrustedClientIp(request.headers)
+  return ip === 'unknown' ? null : ip
 }
 
 export async function GET(request: NextRequest) {
