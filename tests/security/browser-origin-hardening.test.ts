@@ -87,8 +87,9 @@ describe('browser and CORS production boundaries', () => {
   it('keeps CRM state-changing requests behind origin-aware guardCrmRequest', () => {
     const crm = source('lib/crm/security.ts')
     expect(crm).toContain('trustedRequestOrigins')
-    expect(crm).toContain('assertSameOrigin')
+    expect(crm).toContain('isTrustedCrmMutationRequest')
     expect(crm).toContain('sec-fetch-site')
     expect(crm).toContain('x-forwarded-proto')
+    expect(crm).toContain("'CRM_ORIGIN_REJECTED'")
   })
 })
