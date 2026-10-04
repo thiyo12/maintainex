@@ -103,6 +103,26 @@ if [ -n "$payhere_configured" ]; then
   fi
 fi
 
+
+SUPER_ADMIN_MFA_MISSING=$(docker exec "$container" node -e '
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient();
+prisma.adminUser.count({
+  where: {
+    role: "SUPER_ADMIN",
+    isActive: true,
+    deletedAt: null,
+    OR: [{ totpEnabled: false }, { totpSecret: null }],
+  },
+}).then(count => {
+  process.stdout.write(String(count));
+}).finally(() => prisma.$disconnect());
+')
+if [ "$SUPER_ADMIN_MFA_MISSING" != "0" ]; then
+  echo "ERROR|active SUPER_ADMIN account is missing required MFA enrollment"
+  exit 1
+fi
+
 release_sha=$(env_value APP_RELEASE_SHA)
 if [ -z "$release_sha" ]; then
   release_sha=unknown
