@@ -42,10 +42,12 @@ describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {
     expect(cron).not.toContain('providerWallet.upsert(')
   })
 
-  it('cash settlement fails closed instead of creating unfunded wallet money', () => {
-    expect(cash).toContain('CASH_PAYMENT_DISABLED')
-    expect(cash).toContain('status: 503')
+  it('cash lifecycle records no fake escrow/wallet money and delegates to canonical receivable accounting', () => {
+    expect(cash).toContain('confirmCashPayment')
+    expect(cash).toContain("status: 'CASH_CONFIRMED'")
     expect(cash).not.toContain('providerWallet.upsert(')
+    expect(lifecycle).toContain('recordCashPlatformReceivable')
+    expect(lifecycle).toContain("paymentMethod === 'CASH'")
   })
 
   it('canonical lifecycle posts deposit, release and refund through the ledger', () => {

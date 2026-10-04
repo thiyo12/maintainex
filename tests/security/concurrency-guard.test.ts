@@ -17,7 +17,7 @@ describe.skipIf(!requiresPostgres())('Concurrency Guard — Escrow Serialization
         title: 'Concurrency Test Job',
         description: 'Test',
         categoryId: 'test-category',
-        status: 'MATCHED',
+        status: 'QUOTE_ACCEPTED',
         budgetAmount: 10000,
         budgetType: 'FIXED',
         countryCode: 'LK',
@@ -35,23 +35,24 @@ describe.skipIf(!requiresPostgres())('Concurrency Guard — Escrow Serialization
         serviceFee: 1000,
         totalAmount: 11000,
         currency: 'LKR',
-        status: 'HELD',
+        status: 'PROTECTED',
       },
     })
 
-    const concurrentResults = await Promise.allSettled([
-      prisma.jobEscrow.update({
-        where: { id: escrow.id },
+    const concurrentResults = await Promise.all([
+      prisma.jobEscrow.updateMany({
+        where: { id: escrow.id, status: 'PROTECTED' },
         data: { status: 'RELEASED' },
       }),
-      prisma.jobEscrow.update({
-        where: { id: escrow.id },
+      prisma.jobEscrow.updateMany({
+        where: { id: escrow.id, status: 'PROTECTED' },
         data: { status: 'REFUNDED' },
       }),
     ])
 
-    const successful = concurrentResults.filter(r => r.status === 'fulfilled')
-    expect(successful.length).toBe(1)
+    expect(concurrentResults[0].count + concurrentResults[1].count).toBe(1)
+    const finalEscrow = await prisma.jobEscrow.findUnique({ where: { id: escrow.id } })
+    expect(['RELEASED', 'REFUNDED']).toContain(finalEscrow?.status)
 
     await prisma.jobEscrow.delete({ where: { id: escrow.id } })
     await prisma.marketplaceJob.delete({ where: { id: job.id } })

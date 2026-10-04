@@ -63,6 +63,13 @@ function mockPrisma(overrides: Record<string, any> = {}) {
     providerAvailability: {
       findUnique: vi.fn().mockResolvedValue(null),
     },
+    providerIdentity: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
+    providerFinancialAccount: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     $queryRaw: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as any
@@ -77,7 +84,7 @@ function makeIndivInput(overrides: Record<string, any> = {}) {
     job: {
       jobId: 'job-1',
       categoryId: 'cat-1',
-      serviceTemplateId: undefined,
+      serviceTemplateId: undefined as string | undefined,
       jobMode: 'QUOTE' as const,
       urgency: 'NORMAL' as const,
       countryCode: 'US',
@@ -225,6 +232,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
           },
         },
       })
+      input.job.serviceTemplateId = 'service-1'
       const result = await evaluateEligibility(input)
       expect(result.gates.find(g => g.gate === 'PROFESSION_MATCH')?.passed).toBe(true)
       expect(input.client.taskerProfession.findMany).toHaveBeenCalledWith(
@@ -504,6 +512,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
           },
         },
       })
+      input.job.serviceTemplateId = 'service-1'
       const result = await evaluateEligibility(input)
       expect(result.eligible).toBe(false)
       expect(result.gates.find(g => g.gate === 'JURISDICTION_CREDENTIAL')?.passed).toBe(false)
@@ -535,6 +544,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
           },
         },
       })
+      input.job.serviceTemplateId = 'service-1'
       const result = await evaluateEligibility(input)
       expect(result.gates.find(g => g.gate === 'JURISDICTION_CREDENTIAL')?.passed).toBe(true)
     })

@@ -51,11 +51,13 @@ describe('Phase 5E — Financial Atomicity Guard', () => {
       expect(cronRelease).not.toContain('walletTransaction.create(')
     })
 
-    it('cash settlement fails closed until funded accounting exists', () => {
-      expect(cashPayment).toContain('CASH_PAYMENT_DISABLED')
-      expect(cashPayment).toContain('status: 503')
+    it('cash selection delegates to canonical escrow lifecycle without manufacturing wallet funds', () => {
+      expect(cashPayment).toContain('confirmCashPayment')
+      expect(cashPayment).toContain("paymentMethod: 'CASH'")
+      expect(cashPayment).toContain("status: 'CASH_CONFIRMED'")
       expect(cashPayment).not.toContain('providerWallet.upsert(')
       expect(cashPayment).not.toContain('postLedgerTransaction')
+      expect(lifecycle).toContain('recordCashPlatformReceivable')
     })
   })
 

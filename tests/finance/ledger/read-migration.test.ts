@@ -35,14 +35,14 @@ describe.skipIf(!requiresPostgres())('Phase 5D — Canonical Financial Read Migr
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES (gen_random_uuid()::text, $1, 'PROVIDER', 50000, 50000, 0, 1, now(), now())
-       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = 50000, "availableBalance" = 50000, "updatedAt" = now()`,
+       ON CONFLICT ("walletType", "walletId", "currency") DO UPDATE SET "balance" = 50000, "availableBalance" = 50000, "updatedAt" = now()`,
       testProviderWalletId
     )
 
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES (gen_random_uuid()::text, $1, 'CUSTOMER', 30000, 30000, 0, 1, now(), now())
-       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = 30000, "availableBalance" = 30000, "updatedAt" = now()`,
+       ON CONFLICT ("walletType", "walletId", "currency") DO UPDATE SET "balance" = 30000, "availableBalance" = 30000, "updatedAt" = now()`,
       testCustomerWalletId
     )
 

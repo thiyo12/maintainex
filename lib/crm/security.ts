@@ -150,8 +150,13 @@ function trustedRequestOrigins(request: NextRequest): Set<string> {
     if (protocol === 'http' || protocol === 'https') protocols.add(protocol)
   }
 
-  const nextProtocol = request.nextUrl.protocol.replace(/:$/, '').toLowerCase()
-  if (nextProtocol === 'http' || nextProtocol === 'https') protocols.add(nextProtocol)
+  // When a trusted reverse proxy supplied the public protocol, do not also
+  // trust the internal Next.js transport scheme for reconstructed public hosts.
+  // Otherwise an HTTPS CRM behind an HTTP proxy hop could accept an HTTP Origin.
+  if (protocols.size === 0) {
+    const nextProtocol = request.nextUrl.protocol.replace(/:$/, '').toLowerCase()
+    if (nextProtocol === 'http' || nextProtocol === 'https') protocols.add(nextProtocol)
+  }
 
   for (const host of hosts) {
     for (const protocol of protocols) {

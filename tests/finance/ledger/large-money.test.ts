@@ -31,7 +31,7 @@ describe.skipIf(!requiresPostgres())('WalletBalance BigInt precision >MAX_SAFE_I
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES ($1, $1, 'CUSTOMER', 0, 0, 0, 1, NOW(), NOW())
-       ON CONFLICT ("walletType", "walletId") DO NOTHING`,
+       ON CONFLICT ("walletType", "walletId", "currency") DO NOTHING`,
       cw.id
     )
   })

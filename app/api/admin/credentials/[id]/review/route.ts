@@ -12,7 +12,7 @@ export async function PATCH(
 ) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'credentials:write',
+      permission: 'credentials:manage',
       level: 'sensitive',
       requireCountryScope: true,
     })

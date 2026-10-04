@@ -63,8 +63,11 @@ vi.mock('@/lib/domain/job-lifecycle', () => ({
   transitionJobWorkspace: mocks.transitionJobWorkspace,
   completeAndReleaseEscrow: mocks.completeAndReleaseEscrow,
   raiseJobDispute: mocks.raiseJobDispute,
-  resolveProviderActor: mocks.resolveProviderActor,
   cancelJob: mocks.cancelJob,
+}))
+
+vi.mock('@/lib/domain/job-actors', () => ({
+  resolveProviderActor: mocks.resolveProviderActor,
 }))
 
 vi.mock('@/lib/notifications', () => ({
@@ -181,7 +184,8 @@ describe('F-6 — job PIN version sequence', () => {
 
   it('continues version numbering after revoke (no unique-constraint 500)', async () => {
     const { generateJobPin } = await import('@/lib/domain/job-pin')
-    mocks.marketplaceJobFindUnique.mockResolvedValue({ id: 'job-1', customerId: 'cust-1' })
+    mocks.marketplaceJobFindUnique.mockResolvedValue({ id: 'job-1', customerId: 'cust-1', status: 'QUOTE_ACCEPTED' })
+    mocks.jobEscrowFindFirst.mockResolvedValue({ id: 'esc-1', paymentMethod: 'CARD' })
 
     mocks.jobVerificationPinFindFirst.mockImplementation(async () => ({ id: 'pin-1', status: 'ACTIVE', version: 1 }))
     await expect(generateJobPin('job-1', 'cust-1')).rejects.toThrow('An active PIN already exists')
@@ -253,7 +257,7 @@ describe('F-5 — CANCEL action on POST /v2/jobs/[id]/complete', () => {
     const res = await POST(postRequest('https://maintainex.lk/x', { action: 'CANCEL', reason: 'No longer needed' }), params)
     expect(res.status).toBe(200)
     expect(mocks.cancelJob).toHaveBeenCalledWith(
-      { jobId: 'job-1', actorId: 'cust-1', actorType: 'CUSTOMER' },
+      { jobId: 'job-1', actorId: 'cust-1', actorType: 'CUSTOMER', reason: 'No longer needed' },
     )
     expect(mocks.notifyJobCancelled).toHaveBeenCalledWith(
       'job-1', 'prov-profile-1', 'Plumbing', 'customer', 'No longer needed',
@@ -270,7 +274,7 @@ describe('F-5 — CANCEL action on POST /v2/jobs/[id]/complete', () => {
     const res = await POST(postRequest('https://maintainex.lk/x', { action: 'CANCEL', reason: 'Unavailable' }), params)
     expect(res.status).toBe(200)
     expect(mocks.cancelJob).toHaveBeenCalledWith(
-      { jobId: 'job-1', actorId: 'prov-user-1', actorType: 'PROVIDER' },
+      { jobId: 'job-1', actorId: 'prov-user-1', actorType: 'PROVIDER', reason: 'Unavailable' },
     )
     expect(mocks.notifyJobCancelled).toHaveBeenCalledWith(
       'job-1', 'cust-1', 'Plumbing', 'provider', 'Unavailable',

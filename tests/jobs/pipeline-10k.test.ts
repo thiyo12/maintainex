@@ -42,7 +42,16 @@ function mockPrisma(overrides: Record<string, any> = {}) {
     professionJurisdictionRequirement: { findMany: vi.fn().mockResolvedValue([]) },
     certification: { count: vi.fn().mockResolvedValue(0) },
     teamMember: { count: vi.fn().mockResolvedValue(1) },
-    marketplaceJob: { count: vi.fn().mockResolvedValue(0) },
+    marketplaceJob: {
+      count: vi.fn().mockResolvedValue(0),
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
+    providerAvailability: { findUnique: vi.fn().mockResolvedValue(null) },
+    providerIdentity: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
+    providerFinancialAccount: { findUnique: vi.fn().mockResolvedValue(null) },
     $queryRaw: vi.fn().mockResolvedValue([]),
     providerOpportunity: {
       groupBy: vi.fn().mockResolvedValue([]),

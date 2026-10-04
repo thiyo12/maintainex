@@ -19,6 +19,12 @@ function mockPrisma(overrides: Record<string, any> = {}) {
         status: 'OPEN',
       }),
     },
+    jobQuote: {
+      findFirst: vi.fn().mockResolvedValue(overrides.acceptedQuote ?? {
+        providerId: 'provider-1',
+        providerType: 'INDIVIDUAL',
+      }),
+    },
     jobInspection: {
       create: vi.fn().mockResolvedValue(overrides.inspection ?? { id: 'inspection-1', status: 'REQUESTED' }),
       findFirst: vi.fn().mockResolvedValue(overrides.existingInspection ?? null),
@@ -170,19 +176,20 @@ describe('Phase 10.4 — Inspection Lifecycle', () => {
   describe('scheduleInspection', () => {
     it('schedules inspection from REQUESTED', async () => {
       const client = mockPrisma({
-        foundInspection: { id: 'inspection-1', status: 'REQUESTED', jobId: 'job-1' },
+        foundInspection: { id: 'inspection-1', status: 'REQUESTED', jobId: 'job-1', taskerId: 'provider-1', companyId: null },
       })
+      const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
       const result = await scheduleInspection(client, {
         inspectionId: 'inspection-1',
         userId: 'provider-1',
-        scheduledAt: new Date('2026-09-15T10:00:00Z'),
+        scheduledAt,
       })
       expect(result.success).toBe(true)
       expect(client.jobInspection.update).toHaveBeenCalledWith({
         where: { id: 'inspection-1' },
         data: expect.objectContaining({
           status: 'SCHEDULED',
-          scheduledAt: new Date('2026-09-15T10:00:00Z'),
+          scheduledAt,
         }),
       })
     })

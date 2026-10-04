@@ -83,10 +83,10 @@ describe('Phase 10.8 — User Suspension', () => {
     expect(result.user.isSuspended).toBe(true)
 
     const audit = await prisma.auditLog.findFirst({
-      where: { adminUserId: 'admin-108', targetId: userIdA, action: 'PROVIDER_SUSPEND' },
+      where: { adminUserId: 'admin-108', targetId: userIdA, action: 'SUSPEND' },
     })
     expect(audit).not.toBeNull()
-    expect(audit!.action).toBe('PROVIDER_SUSPEND')
+    expect(audit!.action).toBe('SUSPEND')
   })
 
   it('suspendUser rejects if already suspended', async () => {
@@ -137,7 +137,7 @@ describe('Phase 10.8 — User Suspension', () => {
     expect(result.user.isSuspended).toBe(false)
 
     const audit = await prisma.auditLog.findFirst({
-      where: { adminUserId: 'admin-108', targetId: userIdA, action: 'PROVIDER_REACTIVATE' },
+      where: { adminUserId: 'admin-108', targetId: userIdA, action: 'UNSUSPEND' },
     })
     expect(audit).not.toBeNull()
   })

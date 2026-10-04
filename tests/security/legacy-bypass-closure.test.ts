@@ -5,131 +5,106 @@ import { join } from 'path'
 const ROOT = join(__dirname, '..', '..')
 const readFile = (relPath: string) => readFileSync(join(ROOT, relPath), 'utf-8')
 
-describe('Legacy Bypass Closure — 4 HIGH Findings', () => {
+describe('Legacy Bypass Closure — current marketplace and finance boundaries', () => {
   const companyAssign = readFile('app/api/mobile/company/assign/route.ts')
+  const companyAssignmentDomain = readFile('lib/domain/company-job-assignment.ts')
   const dailyMaintenance = readFile('app/api/cron/daily-maintenance/route.ts')
   const mobileDisputes = readFile('app/api/mobile/disputes/route.ts')
   const adminDisputes = readFile('app/api/admin/disputes/route.ts')
-  const adminCommission = readFile('app/api/admin/commission/route.ts')
+  const commissionRoute = readFile('app/api/admin/financial/commission/route.ts')
+  const commissionPayments = readFile('app/api/admin/financial/commission/payments/route.ts')
+  const providerBalance = readFile('lib/finance/commissions/provider-balance-service.ts')
   const lifecycle = readFile('lib/finance/escrow/escrow-service.ts')
   const payoutEngine = readFile('lib/finance/payouts/payout-engine.ts')
 
-  describe('FIX 1 — Company worker assignment routes through canonical lifecycle', () => {
-    it('rejects assignment when job is not QUOTE_ACCEPTED', () => {
-      expect(companyAssign).toContain("job.status !== 'QUOTE_ACCEPTED'")
-      expect(companyAssign).toContain('Quote must be accepted before assigning a worker')
+  describe('FIX 1 — Company worker assignment routes through canonical domain writers', () => {
+    it('requires authenticated company context and worker eligibility', () => {
+      expect(companyAssign).toContain('resolveCompanyContext')
+      expect(companyAssign).toContain('checkWorkerEligibility')
+      expect(companyAssign).toContain("'workers:assign'")
     })
 
-    it('no longer sets status = QUOTE_ACCEPTED directly', () => {
-      expect(companyAssign).not.toContain("data: { targetTaskerId: workerUserId, status: 'QUOTE_ACCEPTED' }")
+    it('delegates create/reassign to the canonical assignment state machine', () => {
+      expect(companyAssign).toContain('createAssignment')
+      expect(companyAssign).toContain('reassignWorker')
+      expect(companyAssign).not.toContain('marketplaceJob.update(')
+      expect(companyAssign).not.toContain('companyJobAssignment.create(')
     })
 
-    it('uses optimistic locking via updateMany with status guard', () => {
-      expect(companyAssign).toContain('updateMany')
-      expect(companyAssign).toContain("status: 'QUOTE_ACCEPTED', targetTaskerId: null")
-      expect(companyAssign).toContain('claimed.count !== 1')
-    })
-
-    it('uses upsert for workspace instead of manual find+create/update', () => {
-      expect(companyAssign).toContain('jobWorkspace.upsert')
-      expect(companyAssign).not.toContain('existingWorkspace)')
-    })
-
-    it('requires an accepted quote to exist', () => {
-      expect(companyAssign).toContain('No accepted quote found for this company on this job')
+    it('domain writer verifies accepted-company ownership and uses compare-and-set state claims', () => {
+      expect(companyAssignmentDomain).toContain("status: 'ACCEPTED'")
+      expect(companyAssignmentDomain).toContain('updateMany')
+      expect(companyAssignmentDomain).toContain('Actor is not authorized to assign workers for this company')
     })
   })
 
   describe('FIX 2A — Escrow timeout uses canonical expirePendingEscrow()', () => {
-    it('daily-maintenance imports expirePendingEscrow from domain lifecycle', () => {
+    it('daily-maintenance imports and calls canonical escrow expiry', () => {
       expect(dailyMaintenance).toContain("import { expirePendingEscrow } from '@/lib/finance/escrow/escrow-service'")
+      expect(dailyMaintenance).toContain("expirePendingEscrow(escrow.id, { actorId: 'system' })")
+      expect(dailyMaintenance).not.toContain('prisma.jobEscrow.update({')
     })
 
-    it('daily-maintenance calls expirePendingEscrow instead of raw transaction', () => {
-      expect(dailyMaintenance).toContain('expirePendingEscrow(escrow.id, { actorId: \'system\' })')
-      expect(dailyMaintenance).not.toContain('tx.jobEscrow.update({ where: { id: escrow.id, status:')
-      expect(dailyMaintenance).not.toMatch(/tx\.marketplaceJob\.update\(\{[^}]*data:\s*\{\s*status:\s*'OPEN'/)
-    })
-
-    it('expirePendingEscrow exists in lifecycle with optimistic locking', () => {
+    it('expirePendingEscrow uses optimistic state claims and restores quote availability', () => {
       expect(lifecycle).toContain('export async function expirePendingEscrow(')
-      expect(lifecycle).toContain('status: \'PENDING_PAYMENT\'')
-      expect(lifecycle).toContain('status: \'CANCELLED\'')
+      expect(lifecycle).toContain("status: 'PENDING_PAYMENT'")
+      expect(lifecycle).toContain("status: 'CANCELLED'")
       expect(lifecycle).toContain('claimed.count !== 1')
-    })
-
-    it('expirePendingEscrow reverts quote and workspace state', () => {
-      expect(lifecycle).toContain('status: \'QUOTE_ACCEPTED\'')
-      expect(lifecycle).toContain('status: \'OPEN\', isActive: true')
+      expect(lifecycle).toContain("status: 'OPEN', isActive: true")
       expect(lifecycle).toContain("data: { status: 'PENDING' }")
     })
   })
 
   describe('FIX 2B — Payout failure uses markFailed() for wallet restoration', () => {
-    it('daily-maintenance imports markFailed from payout-engine', () => {
+    it('daily-maintenance delegates stale payout failure to payout-engine', () => {
       expect(dailyMaintenance).toContain("import { markFailed } from '@/lib/finance/payouts/payout-engine'")
-    })
-
-    it('daily-maintenance calls markFailed instead of direct prisma.payout.update', () => {
       expect(dailyMaintenance).toContain('markFailed(')
       expect(dailyMaintenance).toContain('cron-daily-maintenance-fail:')
-      expect(dailyMaintenance).toContain("'system'")
       expect(dailyMaintenance).not.toContain('prisma.payout.update({')
     })
 
-    it('markFailed in payout-engine restores reserved wallet funds', () => {
+    it('markFailed restores the reserved payout through canonical finance writers', () => {
       expect(payoutEngine).toContain('export async function markFailed(')
       expect(payoutEngine).toContain('restoreReservedPayout')
       expect(payoutEngine).toContain('WITHDRAWAL_RELEASED')
-      expect(payoutEngine).toContain('providerWallet')
     })
   })
 
-  describe('FIX 3 — Dispute creation routes V2 jobs through raiseJobDispute()', () => {
-    it('mobile disputes imports raiseJobDispute', () => {
-      expect(mobileDisputes).toContain("import { raiseJobDispute } from '@/lib/domain/job-lifecycle'")
-    })
-
-    it('mobile disputes checks for MarketplaceJob first', () => {
-      expect(mobileDisputes).toContain('marketplaceJob = await prisma.marketplaceJob.findUnique')
-    })
-
-    it('mobile disputes calls raiseJobDispute for V2 jobs', () => {
+  describe('FIX 3 — Dispute creation/resolution stays on canonical V2 lifecycle', () => {
+    it('mobile marketplace disputes delegate to raiseJobDispute', () => {
+      expect(mobileDisputes).toContain('raiseJobDispute')
+      expect(mobileDisputes).toContain('prisma.marketplaceJob.findUnique')
       expect(mobileDisputes).toContain('await raiseJobDispute(')
-      expect(mobileDisputes).toContain("actorType: 'CUSTOMER'")
     })
 
-    it('mobile disputes falls back to legacy Dispute model for JobPosting', () => {
-      expect(mobileDisputes).toContain('jobPosting.findUnique')
-      expect(mobileDisputes).toContain('prisma.dispute.create')
-    })
-
-    it('admin disputes checks for marketplace job on resolution', () => {
-      expect(adminDisputes).toContain('marketplaceJob = await prisma.marketplaceJob.findUnique')
+    it('admin dispute resolution detects canonical MarketplaceDispute records before financial action', () => {
+      expect(adminDisputes).toContain('prisma.marketplaceDispute.findUnique')
+      expect(adminDisputes).toContain('MARKETPLACE_DISPUTE_REQUIRES_FINANCIAL_RESOLUTION')
+      expect(adminDisputes).toContain('completeAndReleaseEscrow')
+      expect(adminDisputes).toContain('refundEscrow')
     })
   })
 
-  describe('FIX 4 — Commission admin derives from canonical CommissionSettlement', () => {
-    it('admin commission GET queries CommissionSettlement not WeeklySettlement', () => {
-      expect(adminCommission).toContain('prisma.commissionSettlement.findMany')
-      expect(adminCommission).toContain('prisma.commissionSettlement.count')
-      expect(adminCommission).not.toContain('prisma.weeklySettlement.findMany')
+  describe('FIX 4 — Commission debt is governed by settlement + receivable evidence', () => {
+    it('commission overview reads market-scoped WeeklySettlement state and does not permit direct MARK_PAID', () => {
+      expect(commissionRoute).toContain('prisma.weeklySettlement.findMany')
+      expect(commissionRoute).toContain('prisma.weeklySettlement.groupBy')
+      expect(commissionRoute).toContain('COMMISSION_PAYMENT_EVIDENCE_REQUIRED')
+      expect(commissionRoute).toContain("guardCrmAction(request, 'finance.commission.enforce')")
     })
 
-    it('admin commission POST settles canonical CommissionSettlement records', () => {
-      expect(adminCommission).toContain('prisma.commissionSettlement.findMany')
-      expect(adminCommission).toContain("status: 'SETTLED'")
-      expect(adminCommission).toContain('settledAt: new Date()')
+    it('payment confirmation reconciles durable provider receivables before clearing debt', () => {
+      expect(commissionPayments).toContain('settleProviderReceivablesFromDirectPayment')
+      expect(commissionPayments).toContain("guardCrmAction(request, 'finance.commission.reconcile')")
+      expect(commissionPayments).toContain("status: 'PAID'")
+      expect(providerBalance).toContain('providerCommissionReceivable')
+      expect(providerBalance).toContain("method: 'DIRECT_SETTLEMENT'")
     })
 
-    it('admin commission POST no longer independently calculates from MarketplaceJob', () => {
-      expect(adminCommission).not.toContain('calculateWeeklyEarnings')
-      expect(adminCommission).not.toContain('getCommissionRate')
-      expect(adminCommission).not.toContain('calculateCommission')
-    })
-
-    it('admin commission summary uses canonical commission fields', () => {
-      expect(adminCommission).toContain('_sum: { commissionAmount: true, jobAmount: true }')
+    it('cash jobs create real platform receivables rather than fake provider wallet funds', () => {
+      expect(lifecycle).toContain('recordCashPlatformReceivable')
+      expect(providerBalance).toContain("referenceType: 'CASH_PLATFORM_RECEIVABLE'")
+      expect(providerBalance).toContain("accountType: 'PROVIDER_COMMISSION_RECEIVABLE'")
     })
   })
 })

@@ -344,7 +344,7 @@ describe('payment provider PATCH security gates', () => {
     expect(JSON.parse(written.create.supportedCurrencies)).toEqual(['CAD'])
   })
 
-  it('rejects a runtime environment mismatch against the server sandbox flag', async () => {
+  it('rejects a LIVE enable while the server runs PayPal sandbox (fail closed)', async () => {
     guardMocks.guardCrmRequest.mockResolvedValue({
       ok: true,
       context: superAdminContext(),
@@ -355,9 +355,11 @@ describe('payment provider PATCH security gates', () => {
       providerPatchRequest({ ...CA_SANDBOX_PAYLOAD, environment: 'LIVE' })
     )
 
+    // The market-verification gate fires first for an unverified LIVE market;
+    // either way the request must be rejected with 409 and nothing written.
     expect(response.status).toBe(409)
     const body = await response.json()
-    expect(String(body.error)).toMatch(/cannot be enabled until its server runtime/)
+    expect(String(body.error)).toMatch(/not verified for CA in LIVE|cannot be enabled until its server runtime/)
     expect(guardMocks.providerConfigUpsert).not.toHaveBeenCalled()
   })
 

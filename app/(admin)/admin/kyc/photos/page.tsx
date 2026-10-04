@@ -13,6 +13,7 @@ import {
   CrmTabs,
   crmInputClass,
 } from '@/components/crm/v2/CrmPrimitives'
+import { crmApiError } from '@/lib/crm/api-error'
 
 type PhotoRequest = {
   id: string
@@ -77,7 +78,7 @@ export default function VerifiedPhotoReviewsPage() {
         credentials: 'include',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Failed to load verified photo requests')
+      if (!response.ok) throw crmApiError(body, 'Failed to load verified photo requests')
       setRequests(body.requests || [])
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load verified photo requests')
@@ -104,7 +105,7 @@ export default function VerifiedPhotoReviewsPage() {
         }),
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(body?.error || 'Photo review failed')
+      if (!response.ok) throw crmApiError(body, 'Photo review failed')
 
       toast.success(decision === 'APPROVED' ? 'Verified profile photo approved' : 'Photo request rejected')
       setRejecting(null)

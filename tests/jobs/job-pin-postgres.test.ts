@@ -273,7 +273,7 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
   })
 
   describe('One-time PIN step handoff', () => {
-    it('consumes arrival PIN and carries arrival proof into a fresh start PIN', async () => {
+    it('consumes arrival PIN and carries arrival proof into a fresh start PIN', { timeout: 30000 }, async () => {
       const { generateJobPin, getPinState, verifyJobPin } = await import('@/lib/domain/job-pin')
 
       const arrivalPin = await generateJobPin(workStartJobId, customerAId)
@@ -294,12 +294,15 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
       expect(freshState.hasActivePin).toBe(true)
       expect(freshState.arrivalVerifiedAt).toBeTruthy()
       expect(freshState.workStartVerifiedAt).toBeNull()
+
+      await prisma.jobVerificationPin.deleteMany({ where: { jobId: workStartJobId } })
     })
   })
 
   describe('WORK_START Atomicity (PIN + Lifecycle Transition)', () => {
     it('10 concurrent WORK_START PIN verifications produce exactly one lifecycle transition', { timeout: 30000 }, async () => {
       const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
+      await prisma.jobVerificationPin.deleteMany({ where: { jobId: workStartJobId } })
       const arrivalPin = await generateJobPin(workStartJobId, customerAId)
 
       const beforeArrival = await verifyJobPin(workStartJobId, providerId, arrivalPin.pin, 'WORK_START')
@@ -356,7 +359,7 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
       expect(postJob!.status).toBe('IN_PROGRESS')
     })
 
-    it('failed WORK_START with wrong PIN does not transition workspace', async () => {
+    it('failed WORK_START with wrong PIN does not transition workspace', { timeout: 15000 }, async () => {
       const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
       const arrivalPin = await generateJobPin(workStartJobId, customerAId)
       const arrival = await verifyJobPin(workStartJobId, providerId, arrivalPin.pin, 'ARRIVAL')

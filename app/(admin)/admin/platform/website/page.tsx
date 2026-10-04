@@ -61,7 +61,7 @@ export default function WebsiteManagementPage() {
         cache: 'no-store',
       })
       const body = await response.json().catch(() => ({}))
-      if (!response.ok) crmApiError(body, 'Unable to load website operations')
+      if (!response.ok) throw crmApiError(body, 'Unable to load website operations')
       setOverview(body)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load website operations')

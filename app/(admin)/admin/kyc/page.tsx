@@ -14,6 +14,7 @@ import {
   CrmTabs,
   crmInputClass,
 } from '@/components/crm/v2/CrmPrimitives'
+import { crmApiError } from '@/lib/crm/api-error'
 
 interface KYCDocument {
   id: string
@@ -133,7 +134,7 @@ export default function KYCPage() {
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error(body?.error || 'Failed to approve document')
+        throw crmApiError(body, 'Failed to approve document')
       }
       toast.success('Document approved')
       setReviewModal(null)
