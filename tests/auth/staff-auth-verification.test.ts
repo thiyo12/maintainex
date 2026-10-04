@@ -27,6 +27,8 @@ function makeRequest(token: string | null, body: Record<string, unknown>, compan
   const octet = (requestCounter++ % 200) + 20
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Origin': 'https://test.com',
+    'Sec-Fetch-Site': 'same-origin',
     'x-forwarded-for': `127.0.0.${octet}`,
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
