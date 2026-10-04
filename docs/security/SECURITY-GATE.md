@@ -126,6 +126,36 @@ This file is the running security release gate for `security/production-hardenin
 - Residual risk: normal full release validation must still prove TypeScript, regression, build and Docker compatibility with the refreshed lockfile.
 - Status: FIXED — full release CI pending.
 
+
+### SG-0007 — Mobile production dependency graph contained uncontrolled HIGH advisories
+
+- ID: SG-0007
+- Severity: HIGH
+- Attack path: known vulnerable packages remain reachable in the mobile production dependency graph and could expose application/build paths to denial-of-service, parser, cache or related advisory classes depending on the dependency path.
+- Affected component: `apps/mobile` production dependency graph and mobile release validation.
+- Reproduction/evidence: the blocking controlled audit rejected uncontrolled HIGH advisories on the pre-fix graph. The dedicated resolver then regenerated the graph, reran the controlled production audit, installed the resolved graph, passed mobile TypeScript and passed native Android/iOS Expo export.
+- Root cause: build/development tooling including `@expo/ngrok` was classified as a production dependency and the mobile lockfile had accumulated fixable transitive advisories.
+- Fix: moved `@expo/ngrok` to devDependencies, applied non-breaking lockfile audit fixes, pinned the required `image-size` override, and preserved only exact indirect self-expiring upstream exceptions. The resolver now validates Android and iOS targets rather than failing on an unsupported `react-native-maps` web export.
+- Test/verification: `scripts/mobile-production-audit.mjs`, native Expo export in `.github/workflows/security-mobile-dependency-review.yml`, and `tests/security/supply-chain-hardening.test.ts`.
+- Commit SHA: dependency resolution `72cc0bd4`; resolver target/credential hardening `1b977d2a`; regression `7ba87c61`.
+- Residual risk: two exact indirect HIGH advisories remain temporarily controlled in Expo build tooling (`braces` and `node-forge`) because the current upstream graph has no compatible patched release. The audit self-expires each exception when a newer upstream package becomes available. They are not accepted as a blanket allowlist.
+- Status: FIXED / CONTROLLED — exact-head full release CI still required before Phase 29 can close.
+
+### SG-0008 — Mobile upload failures bypassed structured log redaction
+
+- ID: SG-0008
+- Severity: MEDIUM
+- Attack path: an authenticated caller triggers a filesystem/runtime failure during upload handling; the raw exception is written with `console.error`, potentially exposing filesystem paths, provider/runtime details or embedded sensitive values to production log sinks.
+- Affected component: `app/api/mobile/upload/route.ts` / Phase 19 upload handling / Phase 24 logging safety.
+- Reproduction/evidence: the upload catch path directly called `console.error('Upload error:', error)` instead of the central redacting logger.
+- Root cause: an older direct logging path remained after the shared production error-redaction layer was introduced.
+- Fix: routed upload failures through `logger.error(..., { err: error })`, which suppresses raw production error messages and redacts non-production details.
+- Test added: `tests/security/redaction.test.ts` now locks the upload route to the safe structured logger and rejects reintroduction of the raw `console.error` sink.
+- Commit SHA: fix `003da957`; regression `86b8a4bb`.
+- Residual risk: repository-wide direct console/error sink review continues under Phase 24 and external log-retention/access controls still require production evidence.
+- Status: FIXED — exact-head CI pending.
+
+
 ## Phase 0 report
 
 PHASE: 0 — Security baseline / feature freeze
@@ -328,6 +358,8 @@ PHASE: 29 — Dependency / supply-chain security
 STATUS: PARTIAL
 
 CODE/CI EVIDENCE:
+- mobile production graph resolver has passed the controlled HIGH/CRITICAL audit and native Android/iOS validation
+- write-capable mobile resolver keeps checkout credentials disabled during npm/Expo execution and scopes the token to the final push step
 - pinned GitHub Actions commits
 - least-privilege normal workflow permissions
 - Dependabot coverage for web, mobile and Actions
@@ -335,8 +367,9 @@ CODE/CI EVIDENCE:
 - production dependency audit blocks HIGH/CRITICAL vulnerabilities
 - production dependency graph refreshed to zero known npm-audit vulnerabilities in the isolated resolver
 
-NEW FINDING:
-- SG-0006 fixed: release validation exposed 7 HIGH production dependency findings.
+NEW FINDINGS:
+- SG-0006 fixed: web release validation exposed 7 HIGH production dependency findings.
+- SG-0007 fixed/controlled: mobile release validation exposed uncontrolled HIGH findings; fixable advisories were resolved and only exact self-expiring upstream build-tool exceptions remain.
 
 CURRENT LOCKED SECURITY UPDATES:
 - Axios 1.20.0
