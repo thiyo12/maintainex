@@ -165,6 +165,18 @@ describe('Redaction', () => {
     }
   })
 
+  it('keeps report analytics routes on structured redacted logging', () => {
+    for (const routePath of [
+      'app/api/reports/route.ts',
+      'app/api/reports/export/route.ts',
+    ]) {
+      const route = readFileSync(resolve(process.cwd(), routePath), 'utf8')
+      expect(route).toContain("from '@/lib/shared/observability/logger'")
+      expect(route).toContain('logger.error(')
+      expect(route).not.toMatch(/\bconsole\.error\s*\(/)
+    }
+  })
+
   it('preserves safe values', () => {
     const input = { name: 'John', age: 30, active: true }
     const result = redactObject(input)
