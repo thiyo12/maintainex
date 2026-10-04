@@ -116,12 +116,12 @@ export async function GET(
       const standing = await prisma.$transaction(async tx => {
         const identity = await ensureProviderIdentity(tx, {
           providerId: acceptedQuote.providerId,
-          providerType: acceptedQuote.providerType,
+          providerType: acceptedQuote.providerType as 'INDIVIDUAL' | 'COMPANY',
           countryCode: job.countryCode,
         })
         return evaluateStoredProviderFinancialStanding(tx, {
           providerIdentityId: identity.id,
-          providerType: acceptedQuote.providerType,
+          providerType: acceptedQuote.providerType as 'INDIVIDUAL' | 'COMPANY',
           countryCode: job.countryCode,
           currency: escrow.currency,
         })
