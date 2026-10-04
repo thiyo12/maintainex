@@ -394,10 +394,10 @@ export async function middleware(request: NextRequest) {
   await syncIPBlocklist(request)
 
   if (isIpBlocked(ip)) {
-    return applyRequestId(new NextResponse(
+    return applySecurityHeaders(applyRequestId(new NextResponse(
       JSON.stringify({ error: 'Access denied', code: 'IP_BLOCKED' }),
       { status: 403, headers: { 'Content-Type': 'application/json' } }
-    ), requestId)
+    ), requestId))
   }
 
   const isLoginRoute = pathname.startsWith('/api/admin/auth')
@@ -405,7 +405,7 @@ export async function middleware(request: NextRequest) {
   const rateLimit = getInMemoryRateLimit(ip, rateLimitType)
 
   if (rateLimit.limited) {
-    return applyRequestId(new NextResponse(
+    return applySecurityHeaders(applyRequestId(new NextResponse(
       JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }),
       {
         status: 429,
@@ -416,7 +416,7 @@ export async function middleware(request: NextRequest) {
           'X-RateLimit-Reset': Math.floor(rateLimit.resetAt.getTime() / 1000).toString(),
         },
       }
-    ), requestId)
+    ), requestId))
   }
 
   let response: NextResponse
@@ -456,10 +456,10 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/api/seed/')) {
     if (process.env.NODE_ENV === 'production') {
-      return applyRequestId(new NextResponse(
+      return applySecurityHeaders(applyRequestId(new NextResponse(
         JSON.stringify({ error: 'Not available in production' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
-      ), requestId)
+      ), requestId))
     }
     response = NextResponse.next()
     applyRequestId(response, requestId)
@@ -468,10 +468,10 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/setup') || pathname.startsWith('/api/industries/init')) {
     if (process.env.NODE_ENV === 'production') {
-      return applyRequestId(new NextResponse(
+      return applySecurityHeaders(applyRequestId(new NextResponse(
         JSON.stringify({ error: 'Not available in production' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
-      ), requestId)
+      ), requestId))
     }
     const session = await getSession(request)
     if (!session || !('role' in session) || session.role !== 'SUPER_ADMIN') {
@@ -540,7 +540,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/api/mobile/')) {
     if (rateLimit.limited) {
-      return applyRequestId(new NextResponse(
+      return applySecurityHeaders(applyRequestId(new NextResponse(
         JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }),
         {
           status: 429,
@@ -551,7 +551,7 @@ export async function middleware(request: NextRequest) {
             'X-RateLimit-Reset': Math.floor(rateLimit.resetAt.getTime() / 1000).toString(),
           },
         }
-      ), requestId)
+      ), requestId))
     }
     response = NextResponse.next()
     applySecurityHeaders(response)
