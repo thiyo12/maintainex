@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -102,7 +103,7 @@ export async function GET(request: NextRequest) {
         { status: 404 },
       )
     }
-    console.error('Photo change status error:', error)
+    logger.error('Verified photo change status failed unexpectedly', { err: error, route: '/api/mobile/v2/identity/photo-change', method: 'GET' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -238,7 +239,7 @@ export async function POST(request: NextRequest) {
       { status: result.created ? 201 : 200 },
     )
   } catch (error) {
-    console.error('Photo change request error:', error)
+    logger.error('Verified photo change request failed unexpectedly', { err: error, route: '/api/mobile/v2/identity/photo-change', method: 'POST' })
     const message = error instanceof Error ? error.message : ''
 
     if (
