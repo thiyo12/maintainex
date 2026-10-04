@@ -20,6 +20,7 @@ function validProductionEnv() {
   process.env.CRON_SECRET = strong('cron')
   process.env.ALLOW_TEST_OTP = 'false'
   process.env.APP_RELEASE_SHA = '0123456789abcdef0123456789abcdef01234567'
+  process.env.TRUSTED_PROXY_MODE = 'cloudflare'
 
   delete process.env.PAYPAL_CLIENT_ID
   delete process.env.PAYPAL_CLIENT_SECRET
