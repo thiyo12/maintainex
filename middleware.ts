@@ -474,7 +474,7 @@ export async function middleware(request: NextRequest) {
       ), requestId)
     }
     const session = await getSession(request)
-    if (!session || session.role !== 'SUPER_ADMIN') {
+    if (!session || !('role' in session) || session.role !== 'SUPER_ADMIN') {
       const loginUrl = new URL('/admin/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
       response = NextResponse.redirect(loginUrl)
