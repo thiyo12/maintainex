@@ -3818,6 +3818,7 @@ model ProviderCommissionRecovery {
 }
 
 model ProviderBalanceAdjustment {
+  // FinancialLedger accountType for this receivable: PROVIDER_BALANCE_ADJUSTMENT_RECEIVABLE
   id                 String           @id @default(cuid())
   providerIdentityId String
   providerIdentity   ProviderIdentity @relation(fields: [providerIdentityId], references: [id], onDelete: Restrict)
