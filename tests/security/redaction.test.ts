@@ -89,6 +89,37 @@ describe('Redaction', () => {
     }
   })
 
+  it('keeps financial and payment routes off raw error sinks and internal error responses', () => {
+    const sensitiveRoutes = [
+      'app/api/mobile/v2/jobs/[id]/cash-payment/route.ts',
+      'app/api/mobile/v2/jobs/[id]/escrow/refund/route.ts',
+      'app/api/mobile/v2/jobs/[id]/escrow/route.ts',
+      'app/api/mobile/v2/jobs/[id]/payment/route.ts',
+      'app/api/mobile/v2/jobs/[id]/release-escrow/route.ts',
+      'app/api/webhooks/payhere/route.ts',
+      'app/api/webhooks/paypal/route.ts',
+      'app/api/cron/escrow-release/route.ts',
+    ]
+
+    for (const routePath of sensitiveRoutes) {
+      const route = readFileSync(resolve(process.cwd(), routePath), 'utf8')
+      expect(route).toMatch(/logger\.(?:error|warn)\s*\(/)
+      expect(route).not.toMatch(/\bconsole\.error\s*\(/)
+    }
+
+    const refund = readFileSync(
+      resolve(process.cwd(), 'app/api/mobile/v2/jobs/[id]/escrow/refund/route.ts'),
+      'utf8',
+    )
+    expect(refund).not.toContain("return NextResponse.json({ error: message }, { status: 500 })")
+    expect(refund).toContain("return NextResponse.json({ error: 'Failed to process refund' }, { status: 500 })")
+
+    const payHere = readFileSync(resolve(process.cwd(), 'app/api/webhooks/payhere/route.ts'), 'utf8')
+    const payPal = readFileSync(resolve(process.cwd(), 'app/api/webhooks/paypal/route.ts'), 'utf8')
+    expect(payHere).not.toContain("NextResponse.json({ error: result.error }")
+    expect(payPal).not.toContain("result.error || 'Webhook processing failed'")
+  })
+
   it('preserves safe values', () => {
     const input = { name: 'John', age: 30, active: true }
     const result = redactObject(input)
