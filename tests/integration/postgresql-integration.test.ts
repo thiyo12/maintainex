@@ -32,22 +32,27 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
   const lkTemplateJobId = `${PREFIX}-lk-template`
   const caTemplateJobId = `${PREFIX}-ca-template`
 
-  async function createEligibleLocalLkProvider(userId: string) {
+  async function createEligibleProviderFixture(
+    userId: string,
+    countryCode = 'LK',
+    templateJobId = lkTemplateJobId,
+    currency = 'LKR',
+  ) {
     const profile = await prisma.taskerProfile.create({
       data: {
         userId,
         isOnline: true,
         isVerified: true,
         verificationStatus: 'VERIFIED',
-        countryCode: 'LK',
+        countryCode,
       },
     })
     await prisma.taskerSkill.create({
       data: {
         taskerId: profile.id,
-        jobId: lkTemplateJobId,
-        countryCode: 'LK',
-        currency: 'LKR',
+        jobId: templateJobId,
+        countryCode,
+        currency,
       },
     })
     return profile
@@ -366,14 +371,21 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       const custId = `${newPrefix}-cust`
       const provId = `${newPrefix}-prov`
       const jobId = `${newPrefix}-job`
+      const zeroCountry = 'XZ'
+
+      await prisma.marketConfig.upsert({
+        where: { countryCode: zeroCountry },
+        create: { countryCode: zeroCountry, defaultCurrency: 'LKR', commissionRateBps: 0, pricingVersion: 'test-zero' },
+        update: { defaultCurrency: 'LKR', commissionRateBps: 0, pricingVersion: 'test-zero' },
+      })
 
       await prisma.user.createMany({
         data: [
-          { id: custId, email: `${newPrefix}@test.com`, passwordHash: 'h', name: 'Zero Comm Cust', role: 'CUSTOMER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
-          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Zero Comm Prov', role: 'TASKER', countryCode: 'LK', identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
+          { id: custId, email: `${newPrefix}@test.com`, passwordHash: 'h', name: 'Zero Comm Cust', role: 'CUSTOMER', countryCode: zeroCountry, isActive: true, updatedAt: new Date() },
+          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Zero Comm Prov', role: 'TASKER', countryCode: zeroCountry, identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
         ],
       })
-      await createEligibleLocalLkProvider(provId)
+      await createEligibleProviderFixture(provId, zeroCountry)
 
       const custWalletId = `${newPrefix}-cw`
       const provWalletId = `${newPrefix}-pw`
@@ -386,29 +398,17 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
         data: {
           id: jobId, customerId: custId, title: 'Zero Commission Job', description: 'x',
           categoryId: lkCategoryId, photos: '[]', budgetType: 'FIXED', budgetAmount: 100000n,
-          status: 'OPEN', urgency: 'normal', workersCount: 1, materialHandling: 'tasker_brings', countryCode: 'LK',
+          status: 'OPEN', urgency: 'normal', workersCount: 1, materialHandling: 'tasker_brings', countryCode: zeroCountry,
         },
       })
       const quote = await prisma.jobQuote.create({
         data: { id: `${newPrefix}-q`, jobId, providerId: provId, providerType: 'INDIVIDUAL', price: 100000n, currency: 'LKR', message: 'x', estimatedCompletionTime: '1h', attachments: '[]', status: 'PENDING' },
       })
 
-      const previousMarket = await prisma.marketConfig.findUnique({ where: { countryCode: 'LK' } })
-      await prisma.marketConfig.update({
-        where: { countryCode: 'LK' },
-        data: { commissionRateBps: 0 },
-      })
-      try {
-        const ctx = { jobId, actorId: custId, actorType: 'CUSTOMER' as const }
-        await acceptJobQuote(ctx, quote.id)
-        await fundEscrow(ctx, jobId)
-        await releaseEscrow(ctx, jobId)
-      } finally {
-        await prisma.marketConfig.update({
-          where: { countryCode: 'LK' },
-          data: { commissionRateBps: previousMarket?.commissionRateBps ?? 1000 },
-        })
-      }
+      const ctx = { jobId, actorId: custId, actorType: 'CUSTOMER' as const }
+      await acceptJobQuote(ctx, quote.id)
+      await fundEscrow(ctx, jobId)
+      await releaseEscrow(ctx, jobId)
 
       const canonical = await prisma.walletBalance.findFirst({
         where: { walletId: provWalletId, walletType: 'PROVIDER', currency: 'LKR' },
@@ -433,6 +433,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       await prisma.providerWallet.deleteMany({ where: { id: provWalletId } }).catch(() => {})
       await prisma.taskerProfile.deleteMany({ where: { userId: provId } }).catch(() => {})
       await prisma.user.deleteMany({ where: { id: { in: [custId, provId] } } }).catch(() => {})
+      await prisma.marketConfig.deleteMany({ where: { countryCode: zeroCountry } }).catch(() => {})
     })
   })
 
@@ -449,7 +450,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
           { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Double Prov', role: 'TASKER', countryCode: 'LK', identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
         ],
       })
-      await createEligibleLocalLkProvider(provId)
+      await createEligibleProviderFixture(provId)
 
       const custWalletId = `${newPrefix}-cw`
       const provWalletId = `${newPrefix}-pw`
@@ -500,7 +501,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
           { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Unfunded Prov', role: 'TASKER', countryCode: 'LK', identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
         ],
       })
-      await createEligibleLocalLkProvider(provId)
+      await createEligibleProviderFixture(provId)
 
       const custWalletId = `${newPrefix}-cw`
       await prisma.customerWallet.create({ data: { id: custWalletId, userId: custId } })
@@ -600,7 +601,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
           { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Refund Prov', role: 'TASKER', countryCode: 'LK', identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
         ],
       })
-      await createEligibleLocalLkProvider(provId)
+      await createEligibleProviderFixture(provId)
 
       const custWalletId = `${newPrefix}-cw`
       await prisma.customerWallet.create({ data: { id: custWalletId, userId: custId } })
