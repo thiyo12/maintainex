@@ -19,18 +19,18 @@ This file is the running security release gate for `security/production-hardenin
 | 10 | High-risk CRM governance | PARTIAL — approval/step-up policy tests present; full action map remains | YES |
 | 11 | Admin auth / sessions / MFA | PARTIAL — MFA/session lifecycle coverage present; adversarial closure remains | YES |
 | 12 | Password / OTP / recovery | PARTIAL — recovery/OTP/refresh coverage present; abuse review remains | HIGH |
-| 13 | Identity / KYC security | PARTIAL — identity/privacy/storage controls present; E2E review remains | HIGH |
+| 13 | Identity / KYC security | PARTIAL — identity/storage/CRM review controls + redacted failure paths verified; E2E review remains | HIGH |
 | 14 | Payment / escrow authorization | PARTIAL — authorization reviewed; financial error paths hardened; closure review remains | YES |
 | 15 | PayHere webhook security | PARTIAL — signature/body controls + safe failure logging present; reconciliation proof remains | YES |
 | 16 | PayPal production completion | PARTIAL — provider/webhook controls + safe failure logging present; sandbox/live verification remains | YES before PayPal live |
 | 17 | Financial concurrency / idempotency | PARTIAL — concurrency/ledger tests present; exhaustive writer review remains | YES |
 | 18 | Wallet / commission / account abuse | PARTIAL — commission/restriction controls present; abuse scenarios remain | YES |
-| 19 | File / upload security | PARTIAL — traversal/content/upload controls present; full corpus review remains | YES |
+| 19 | File / upload security | PARTIAL — traversal/content/upload controls + protected KYC storage reviewed; full corpus review remains | YES |
 | 20 | CSRF / CORS / browser security | PARTIAL — origin/browser controls present; complete mutation review remains | HIGH |
 | 21 | Rate limiting / abuse protection | PARTIAL — fail-closed/rate-limit tests present; endpoint coverage review remains | HIGH |
 | 22 | Database hardening | PARTIAL — schema/deploy controls present; live DB least-privilege proof remains | HIGH |
 | 23 | Privacy / data minimization | PARTIAL — privacy suites present; full field-retention review remains | HIGH |
-| 24 | Logging / audit safety | PARTIAL — auth/booking/finance critical sinks hardened; complete repository sink review remains | HIGH |
+| 24 | Logging / audit safety | PARTIAL — auth/booking/finance/KYC critical sinks hardened; complete repository sink review remains | HIGH |
 | 25 | Security monitoring / alerts | PARTIAL — risk/event logic present; live alert delivery proof remains | HARDENING |
 | 26 | Cloudflare / edge hardening | PARTIAL — code assumes hardened edge; live Cloudflare config proof remains | HIGH |
 | 27 | IP / proxy trust | PARTIAL — canonical proxy/IP tests present; live topology proof remains | HIGH |
@@ -168,6 +168,21 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: `tests/security/redaction.test.ts` now locks customer finance, payment webhooks, auto-release cron, and CRM finance routes off raw `console.error` sinks and checks the known internal-error response regressions.
 - Commit SHA: customer/payment/webhook/cron fixes `ef93c653`, `ef0ec177`, `b565c9c0`, `882e46e3`, `76a540cb`, `2ded9754`, `2ed54b72`, `73ed2465`; customer/payment regression `ac64e6b7`; CRM finance fixes `8a88e640`, `0e41f1a5`, `e96c8afc`, `08a4949d`, `c5189cc0`, `6abce527`, `c8d3c4db`, `261f515a`; CRM finance regression `72077714`.
 - Residual risk: repository-wide direct log-sink review is not yet complete, and external log aggregation retention/access controls still require live production evidence.
+- Status: FIXED — exact-head full release CI pending.
+
+
+### SG-0010 — Identity, KYC and upload review routes retained raw exception sinks
+
+- ID: SG-0010
+- Severity: MEDIUM
+- Attack path: an authenticated provider, staff reviewer, or file uploader triggers an exceptional identity/KYC/storage path and causes raw runtime/database/filesystem exception details to be written directly to process logs outside the centralized production redaction policy.
+- Affected component: provider identity submission/status, verified photo changes, job worker identity checks, protected KYC/photo file reads, company verification, credential review, KYC review queues, legacy mobile-admin identity review, and the authenticated generic upload route.
+- Reproduction/evidence: the Phase 13/19/24 audit found direct `console.error(..., error)` sinks across the reviewed identity/KYC/admin review routes. Protected KYC storage itself was already guarded by CRM permission/country scope, local-file ownership resolution, content validation, no-store headers and audit records.
+- Root cause: identity and review routes pre-dated the centralized structured logger and had not been included in earlier auth/upload redaction migrations.
+- Fix: migrated the reviewed routes to `logger.error` so production error messages/stacks are suppressed by the shared sanitizer while preserving route behavior and authorization.
+- Test added: `tests/security/redaction.test.ts` now asserts the identity/KYC/credential/generic-upload route set imports the structured logger and contains no raw `console.error` sink.
+- Commit SHA: fixes `934e1fc9`, `f13e0c70`, `5c4f1ae2`, `3688088d`, `b1459aec`, `4bb9c03a`, `2c95ef73`, `6115ed9f`, `5a8b5563`, `9225ed0c`, `e0710d20`, `bea056f5`, `0f6c90f5`; regression `9d373b65`.
+- Residual risk: complete repository-wide logging sink review and live log-retention/access verification remain open under Phase 24.
 - Status: FIXED — exact-head full release CI pending.
 
 
@@ -363,6 +378,7 @@ NEW FINDINGS:
 - SG-0005 fixed: raw Error serialization bypassed normal production context redaction.
 - SG-0008 fixed: mobile upload failures bypassed structured log redaction.
 - SG-0009 fixed: critical financial/payment routes used raw error sinks and selected internal error responses.
+- SG-0010 fixed: identity/KYC/admin review routes retained raw exception sinks.
 
 REMAINING:
 - continue repository-wide review for direct `console.*` sinks and unsafe raw exception logging
