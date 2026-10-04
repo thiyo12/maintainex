@@ -14,6 +14,7 @@ function mockPrisma(opts: {
     status: 'QUOTE_ACCEPTED',
     finalAuthorizedAmountCents: null,
     approvedQuoteId: 'quote-1',
+    countryCode: 'LK',
   }
 
   const job = opts.job ?? jobDefault
@@ -35,7 +36,15 @@ function mockPrisma(opts: {
   }
 
   const co = opts.changeOrder !== undefined
-    ? (opts.changeOrder === null ? null : { ...opts.changeOrder, job: { customerId: job.customerId, finalAuthorizedAmountCents: job.finalAuthorizedAmountCents } })
+    ? (opts.changeOrder === null ? null : {
+        ...opts.changeOrder,
+        job: {
+          customerId: job.customerId,
+          finalAuthorizedAmountCents: job.finalAuthorizedAmountCents,
+          countryCode: job.countryCode ?? 'LK',
+          status: job.status ?? 'QUOTE_ACCEPTED',
+        },
+      })
     : changeOrderDefault
 
   const quoteDefault = {
