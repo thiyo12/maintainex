@@ -65,6 +65,13 @@ export function validateRequiredSecrets(): { valid: boolean; errors: string[] } 
       errors.push('[CRITICAL] ALLOW_TEST_OTP must not be enabled in production')
     }
 
+    const releaseSha = process.env.APP_RELEASE_SHA
+    if (!releaseSha) {
+      errors.push('[CRITICAL] APP_RELEASE_SHA is required in production')
+    } else if (!/^[0-9a-f]{40}$/.test(releaseSha)) {
+      errors.push('[CRITICAL] APP_RELEASE_SHA must be a lowercase 40-character git SHA')
+    }
+
     const paypalVars = ['PAYPAL_CLIENT_ID', 'PAYPAL_CLIENT_SECRET', 'PAYPAL_WEBHOOK_ID'] as const
     if (anyConfigured(paypalVars)) {
       for (const name of paypalVars) {
