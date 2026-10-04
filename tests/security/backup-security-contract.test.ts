@@ -55,6 +55,9 @@ describe('backup security contract', () => {
 ")
     expect(source).toContain('APP_RELEASE_SHA must be a lowercase 40-character git SHA')
     expect(source).toContain('release SHA does not match immutable image tag')
+    expect(source).toContain('umask 077')
+    expect(source).toContain('chmod 700 "$BACKUP_DIR"')
+    expect(source).toContain('chmod 600 "$backup"')
   })
 
   it('fails closed without an encryption key and writes encrypted archives only', () => {
