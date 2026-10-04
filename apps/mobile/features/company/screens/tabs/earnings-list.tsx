@@ -156,6 +156,33 @@ export default function CompanyEarnings() {
         </View>
       )}
 
+      {(earnings?.recentBalanceAdjustmentRecoveries || []).length > 0 && (
+        <View style={styles.recoverySection}>
+          <Text style={styles.recoveryTitle}>Recent balance adjustments</Text>
+          <Text style={styles.recoveryHelp}>
+            Post-payment losses such as chargebacks are tracked separately from company commission.
+          </Text>
+          {earnings.recentBalanceAdjustmentRecoveries.slice(0, 5).map((recovery: any) => (
+            <View key={recovery.id} style={styles.recoveryCard}>
+              <View style={styles.recoveryIcon}>
+                <Ionicons name="shield-checkmark-outline" size={18} color={colors.success} />
+              </View>
+              <View style={styles.recoveryBody}>
+                <Text style={styles.recoveryAmount}>
+                  {recovery.currency} {Number(recovery.amount || 0).toLocaleString()} recovered
+                </Text>
+                <Text style={styles.recoveryMeta}>
+                  {String(recovery.adjustmentType || '').replaceAll('_', ' ')} · job {String(recovery.originalJobId || '').slice(0, 8)}
+                </Text>
+                <Text style={styles.recoveryMeta}>
+                  {new Date(recovery.createdAt).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
       {(earnings?.pendingCommissionPayments || []).length > 0 && (
         <View style={styles.commissionSection}>
           <Text style={styles.commissionTitle}>Pending Commission Payments</Text>
@@ -212,16 +239,24 @@ export default function CompanyEarnings() {
           <Text style={styles.emptyText}>{t('wallet.noTransactions')}</Text>
         ) : (
           payouts.map((p, i) => {
-            const status = p.status || (p.paid ? 'Paid' : 'Pending')
-            const isPaid = status === 'Paid' || status === 'paid'
+            const status = String(p.status || (p.paid ? 'SUCCEEDED' : 'PENDING')).toUpperCase()
+            const isPaid = ['PAID', 'SUCCEEDED', 'CLEARED', 'COMPLETED'].includes(status)
             const statusLabel = isPaid ? t('common.success') : t('common.pending')
             return (
               <View key={p.id || i} style={styles.payoutCard}>
                 <View style={styles.payoutLeft}>
                   <View style={[styles.payoutDot, { backgroundColor: isPaid ? colors.success : colors.amber }]} />
                   <View style={styles.payoutInfo}>
-                    <Text style={styles.payoutContract} numberOfLines={1}>{p.contract || p.title}</Text>
-                    <Text style={styles.payoutDate}>{p.date || (p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '')}</Text>
+                    <Text style={styles.payoutContract} numberOfLines={1}>
+                      {p.description || p.contract || p.title || 'Provider payout'}
+                    </Text>
+                    <Text style={styles.payoutDate}>
+                      {p.clearedAt
+                        ? new Date(p.clearedAt).toLocaleDateString()
+                        : p.createdAt
+                          ? new Date(p.createdAt).toLocaleDateString()
+                          : p.date || ''}
+                    </Text>
                   </View>
                 </View>
                 <View style={styles.payoutRight}>
