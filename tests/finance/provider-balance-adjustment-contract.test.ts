@@ -18,15 +18,18 @@ describe('provider balance adjustment lifecycle', () => {
 
   it('creates idempotent ledger-backed adjustments from the actual provider payout credit', () => {
     const balance = source('lib/finance/commissions/provider-balance-service.ts')
+    const chargeback = source('lib/finance/payments/chargeback-accounting.ts')
     expect(balance).toContain('recordPostPayoutProviderAdjustmentForEscrow')
     expect(balance).toContain("referenceType: 'ESCROW_RELEASE'")
     expect(balance).toContain("accountType: 'PROVIDER_WALLET'")
     expect(balance).toContain("'PROVIDER_COMMISSION_RECEIVABLE'")
     expect(balance).toContain("'PROVIDER_BALANCE_ADJUSTMENT_RECEIVABLE'")
     expect(balance).toContain('providerBenefitCredits.reduce')
-    expect(balance).toContain("entryType: 'CREDIT'")
     expect(balance).toContain('provider-balance-adjustment:')
     expect(balance).toContain("accountType: 'CHARGEBACK_CLEARING'")
+    expect(chargeback).toContain("accountType: 'PLATFORM_CHARGEBACK_LOSS'")
+    expect(chargeback).toContain("accountType: 'EXTERNAL_PAYOUT'")
+    expect(chargeback).toContain("referenceType: 'PAYMENT_CHARGEBACK'")
   })
 
   it('recovers commission and balance adjustments without double-counting platform revenue', () => {
@@ -47,7 +50,7 @@ describe('provider balance adjustment lifecycle', () => {
     expect(paypal).toContain("'CUSTOMER.DISPUTE.RESOLVED'")
     expect(paypal).toContain("'RESOLVED_BUYER_FAVOUR'")
     expect(paypal).toContain("'RESOLVED_SELLER_FAVOUR'")
-    expect(paypal).toContain('recordPostPayoutProviderAdjustmentForEscrow')
+    expect(paypal).toContain('accountFinalProviderChargeback')
     expect(paypal).toContain('disputed_transactions')
   })
 
@@ -55,7 +58,7 @@ describe('provider balance adjustment lifecycle', () => {
     const payments = source('lib/finance/payments/payment-service.ts')
     expect(payments).toContain("statusCode === -3")
     expect(payments).toContain("sourceProvider: 'PAYHERE'")
-    expect(payments).toContain('recordPostPayoutProviderAdjustmentForEscrow')
+    expect(payments).toContain('accountFinalProviderChargeback')
   })
 
   it('blocks withdrawals while a provider balance adjustment remains due', () => {
@@ -74,5 +77,15 @@ describe('provider balance adjustment lifecycle', () => {
     expect(companyApi).toContain('adjustmentDueMinor')
     expect(crmApi).toContain('recentAdjustmentRecoveries')
     expect(crmPage).toContain('Post-payment liability')
+  })
+
+  it('reverses protected escrow on a final pre-payout chargeback', () => {
+    const chargeback = source('lib/finance/payments/chargeback-accounting.ts')
+    expect(chargeback).toContain("escrow.status === 'PROTECTED' || escrow.status === 'ON_HOLD'")
+    expect(chargeback).toContain("status: 'REFUNDED'")
+    expect(chargeback).toContain("accountType: 'ESCROW'")
+    expect(chargeback).toContain("entryType: 'DEBIT'")
+    expect(chargeback).toContain("accountType: 'EXTERNAL_PAYOUT'")
+    expect(chargeback).toContain("entryType: 'CREDIT'")
   })
 })
