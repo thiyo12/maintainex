@@ -12,12 +12,19 @@ export function generateStaffRefreshToken(): { raw: string; secretHash: string }
 }
 
 export function parseStaffRefreshToken(token: string): { sessionId: string; secret: string } | null {
+  const expectedSecretLength = REFRESH_TOKEN_BYTES * 2
+  if (!token || token.length > 384) return null
+
   const dotIndex = token.indexOf('.')
-  if (dotIndex < 1) return null
+  if (dotIndex < 1 || token.indexOf('.', dotIndex + 1) !== -1) return null
+
   const sessionId = token.slice(0, dotIndex)
   const secret = token.slice(dotIndex + 1)
-  if (!sessionId || !secret) return null
-  if (secret.length < 32) return null
+  if (!sessionId || sessionId.length > 191) return null
+  if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) return null
+  if (secret.length !== expectedSecretLength) return null
+  if (!/^[0-9a-f]+$/.test(secret)) return null
+
   return { sessionId, secret }
 }
 
