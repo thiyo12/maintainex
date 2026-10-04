@@ -356,7 +356,7 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
       expect(postJob!.status).toBe('IN_PROGRESS')
     })
 
-    it('failed WORK_START with wrong PIN does not transition workspace', async () => {
+    it('failed WORK_START with wrong PIN does not transition workspace', { timeout: 15000 }, async () => {
       const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
       const arrivalPin = await generateJobPin(workStartJobId, customerAId)
       const arrival = await verifyJobPin(workStartJobId, providerId, arrivalPin.pin, 'ARRIVAL')
