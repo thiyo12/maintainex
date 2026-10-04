@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { unlinkSync, readdirSync, statSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { matchesBearerSecret } from '@/lib/security/secret-compare'
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads', 'mobile')
 const MAX_AGE_MS = 4 * 24 * 60 * 60 * 1000
@@ -20,7 +21,7 @@ function saveIndex(idx: Record<string, string>) {
 export async function POST(request: Request) {
   if (!process.env.CRON_SECRET) throw new Error('[SECURITY] CRON_SECRET env var is required')
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!matchesBearerSecret(authHeader, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
