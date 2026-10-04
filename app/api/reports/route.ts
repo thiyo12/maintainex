@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { getActivityLogs, getStatsForPeriod } from '@/lib/activity-log'
@@ -166,7 +167,7 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Reports API error:', error)
+    logger.error('Reports API failed unexpectedly', { err: error, route: '/api/reports', method: 'GET' })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
