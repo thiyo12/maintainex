@@ -44,7 +44,5 @@ export async function createAuditLog(params: {
 }
 
 export function getIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]
-    || request.headers.get('x-real-ip')
-    || 'unknown'
+  return getTrustedClientIp(request.headers)
 }
