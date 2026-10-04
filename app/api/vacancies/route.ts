@@ -1,37 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { guardCrmRequest } from '@/lib/crm/security'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const isActive = searchParams.get('isActive')
-    const branchId = searchParams.get('branchId')
+    const requestedBranchId = searchParams.get('branchId')
+    const adminMode = isActive === 'false' || Boolean(requestedBranchId)
 
-    const session = await getSession(request)
-
-    let where: any = {}
-    if (session) {
-      if (isActive === 'true') where.isActive = true
-      if (isActive === 'false') where.isActive = false
-      if (branchId) where.branchId = branchId
-    } else {
-      where.isActive = true
+    if (!adminMode) {
+      const vacancies = await prisma.jobVacancy.findMany({
+        where: { isActive: true },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          location: true,
+          isActive: true,
+          createdAt: true,
+        },
+      })
+      return NextResponse.json(vacancies)
     }
+
+    const guard = await guardCrmRequest(request, {
+      permission: 'users:view',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+
+    const scope = await resolveReportBranchScope(guard.context, requestedBranchId)
+    if (!scope.ok) {
+      return NextResponse.json({ error: scope.error }, { status: scope.status })
+    }
+
+    const where: any = {}
+    if (isActive === 'true') where.isActive = true
+    if (isActive === 'false') where.isActive = false
+    if (scope.scope.branchIds !== null) where.branchId = { in: scope.scope.branchIds }
 
     const vacancies = await prisma.jobVacancy.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      select: session ? undefined : {
-        id: true,
-        title: true,
-        description: true,
-        location: true,
-        isActive: true,
-        createdAt: true,
-      }
     })
-
     return NextResponse.json(vacancies)
   } catch (error) {
     console.error('Vacancies GET error:', error)
@@ -41,39 +56,41 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const isSuper = session.role === 'SUPER_ADMIN'
-    const canManage = ['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(session.role)
-
-    if (!canManage) {
-      return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'users:edit',
+      level: 'mutation',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
 
     const body = await request.json()
     const { title, description, location, isActive, branchId } = body
 
-    if (!title || title.trim().length < 2) {
+    if (typeof title !== 'string' || title.trim().length < 2 || title.length > 200) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
     }
 
-    // Determine branchId
-    let vacancyBranchId = branchId
-    if (!isSuper && session.branchId) {
-      vacancyBranchId = session.branchId
+    let vacancyBranchId: string | null = typeof branchId === 'string' && branchId ? branchId : null
+    if (vacancyBranchId) {
+      const scope = await resolveReportBranchScope(guard.context, vacancyBranchId)
+      if (!scope.ok || scope.scope.branchId !== vacancyBranchId) {
+        return NextResponse.json(
+          { error: scope.ok ? 'Branch is outside your assigned countries' : scope.error },
+          { status: scope.ok ? 403 : scope.status }
+        )
+      }
+    } else if (!guard.context.isSuperAdmin) {
+      return NextResponse.json({ error: 'A branch in your assigned country is required' }, { status: 400 })
     }
 
     const vacancy = await prisma.jobVacancy.create({
       data: {
-        title,
-        description,
-        location,
-        isActive: isActive ?? true,
-        branchId: vacancyBranchId
-      }
+        title: title.trim(),
+        description: typeof description === 'string' ? description.slice(0, 10000) : null,
+        location: typeof location === 'string' ? location.slice(0, 500) : null,
+        isActive: typeof isActive === 'boolean' ? isActive : true,
+        branchId: vacancyBranchId,
+      },
     })
 
     return NextResponse.json(vacancy, { status: 201 })
