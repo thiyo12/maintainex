@@ -1,10 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 import { getTrustedClientIp } from '@/lib/security/client-ip'
 
 function source(path: string) {
   return readFileSync(resolve(process.cwd(), path), 'utf8')
+}
+
+function walk(root: string): string[] {
+  if (!existsSync(root)) return []
+  const out: string[] = []
+  for (const entry of readdirSync(root)) {
+    if (['node_modules', '.next', 'dist', 'build', 'coverage', 'tests'].includes(entry)) continue
+    const path = join(root, entry)
+    const stat = statSync(path)
+    if (stat.isDirectory()) out.push(...walk(path))
+    else if (/\.(?:ts|tsx|js|jsx)$/.test(path)) out.push(path)
+  }
+  return out
 }
 
 function headers(values: Record<string, string>): { get(name: string): string | null } {
@@ -78,6 +91,32 @@ describe('trusted proxy client IP boundary', () => {
     expect(source('lib/shared/rate-limit/middleware.ts')).not.toContain(
       "request.headers.get('x-forwarded-for')?.split(',')[0]"
     )
+  })
+
+  it('does not read spoofable client-IP headers outside the canonical resolver', () => {
+    const roots = [
+      resolve(process.cwd(), 'app'),
+      resolve(process.cwd(), 'lib'),
+    ]
+    const files = [
+      resolve(process.cwd(), 'middleware.ts'),
+      ...roots.flatMap(walk),
+    ]
+    const allowed = new Set([
+      'lib/security/client-ip.ts',
+    ])
+    const violations: Array<{ path: string; header: string }> = []
+
+    for (const file of files) {
+      const path = relative(process.cwd(), file).replaceAll('\\', '/')
+      if (allowed.has(path)) continue
+      const code = readFileSync(file, 'utf8')
+      for (const header of ['x-forwarded-for', 'x-real-ip', 'cf-connecting-ip']) {
+        if (code.toLowerCase().includes(header)) violations.push({ path, header })
+      }
+    }
+
+    expect(violations).toEqual([])
   })
 
   it('requires explicit proxy trust in production startup and deployment checks', () => {
