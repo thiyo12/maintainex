@@ -365,44 +365,63 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
     })
   })
 
-  describe('Test D: zero-commission provider gets full amount', () => {
-    it('provider with commissionRate=0 receives full escrow amount in canonical balance', async () => {
+  describe('Test D: zero-commission company gets full job amount', () => {
+    it('company commissionRate=0 receives the full authorized job amount while service fee remains platform revenue', async () => {
       const newPrefix = `${PREFIX}-zero`
       const custId = `${newPrefix}-cust`
-      const provId = `${newPrefix}-prov`
+      const ownerId = `${newPrefix}-owner`
       const jobId = `${newPrefix}-job`
-      const zeroCountry = 'XZ'
-
-      await prisma.marketConfig.upsert({
-        where: { countryCode: zeroCountry },
-        create: { countryCode: zeroCountry, defaultCurrency: 'LKR', commissionRateBps: 0, pricingVersion: 'test-zero' },
-        update: { defaultCurrency: 'LKR', commissionRateBps: 0, pricingVersion: 'test-zero' },
-      })
 
       await prisma.user.createMany({
         data: [
-          { id: custId, email: `${newPrefix}@test.com`, passwordHash: 'h', name: 'Zero Comm Cust', role: 'CUSTOMER', countryCode: zeroCountry, isActive: true, updatedAt: new Date() },
-          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Zero Comm Prov', role: 'TASKER', countryCode: zeroCountry, identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
+          { id: custId, email: `${newPrefix}@test.com`, passwordHash: 'h', name: 'Zero Comm Cust', role: 'CUSTOMER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
+          { id: ownerId, email: `${newPrefix}-owner@test.com`, passwordHash: 'h', name: 'Zero Comm Owner', role: 'COMPANY', countryCode: 'LK', isActive: true, updatedAt: new Date() },
         ],
       })
-      await createEligibleProviderFixture(provId, zeroCountry)
+
+      const company = await prisma.companyProfile.create({
+        data: {
+          userId: ownerId,
+          companyName: `Zero Commission Company ${newPrefix}`,
+          services: '["plumbing"]',
+          serviceAreas: '[]',
+          countryCode: 'LK',
+          verificationStatus: 'VERIFIED',
+          isVerified: true,
+          subscriptionStatus: 'ACTIVE',
+          commissionRate: 0,
+        },
+      })
+      await prisma.teamMember.create({
+        data: {
+          companyId: company.id,
+          userId: ownerId,
+          name: 'Zero Comm Owner',
+          role: 'COMPANY_OWNER',
+          status: 'ACTIVE',
+          skills: '[]',
+        },
+      })
+      await prisma.companySpecialty.create({
+        data: { companyId: company.id, categoryId: lkCategoryId },
+      })
 
       const custWalletId = `${newPrefix}-cw`
       const provWalletId = `${newPrefix}-pw`
       await prisma.customerWallet.create({ data: { id: custWalletId, userId: custId } })
-      await prisma.providerWallet.create({ data: { id: provWalletId, userId: provId } })
+      await prisma.providerWallet.create({ data: { id: provWalletId, userId: ownerId } })
       await prisma.walletBalance.create({ data: { walletId: custWalletId, walletType: 'CUSTOMER', balance: 1000000n, availableBalance: 1000000n, pendingBalance: 0n, currency: 'LKR' } })
       await prisma.walletBalance.create({ data: { walletId: provWalletId, walletType: 'PROVIDER', balance: 0n, availableBalance: 0n, pendingBalance: 0n, currency: 'LKR' } })
 
-      const job = await prisma.marketplaceJob.create({
+      await prisma.marketplaceJob.create({
         data: {
           id: jobId, customerId: custId, title: 'Zero Commission Job', description: 'x',
           categoryId: lkCategoryId, photos: '[]', budgetType: 'FIXED', budgetAmount: 100000n,
-          status: 'OPEN', urgency: 'normal', workersCount: 1, materialHandling: 'tasker_brings', countryCode: zeroCountry,
+          status: 'OPEN', urgency: 'normal', workersCount: 1, materialHandling: 'tasker_brings', countryCode: 'LK',
         },
       })
       const quote = await prisma.jobQuote.create({
-        data: { id: `${newPrefix}-q`, jobId, providerId: provId, providerType: 'INDIVIDUAL', price: 100000n, currency: 'LKR', message: 'x', estimatedCompletionTime: '1h', attachments: '[]', status: 'PENDING' },
+        data: { id: `${newPrefix}-q`, jobId, providerId: company.id, providerType: 'COMPANY', price: 100000n, currency: 'LKR', message: 'x', estimatedCompletionTime: '1h', attachments: '[]', status: 'PENDING' },
       })
 
       const ctx = { jobId, actorId: custId, actorType: 'CUSTOMER' as const }
@@ -419,10 +438,9 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       const settlement = await prisma.commissionSettlement.findFirst({ where: { jobId } })
       expect(settlement).toBeNull()
 
-      const weekly = await prisma.weeklySettlement.findFirst({ where: { providerId: provId } })
+      const weekly = await prisma.weeklySettlement.findFirst({ where: { providerId: ownerId } })
       expect(weekly).toBeNull()
 
-      await prisma.weeklySettlement.deleteMany({ where: { providerId: provId } }).catch(() => {})
       await prisma.financialLedger.deleteMany({ where: { referenceId: { contains: newPrefix } } }).catch(() => {})
       await prisma.jobEscrow.deleteMany({ where: { jobId } }).catch(() => {})
       await prisma.jobWorkspace.deleteMany({ where: { jobId } }).catch(() => {})
@@ -431,9 +449,10 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       await prisma.walletBalance.deleteMany({ where: { walletId: { in: [custWalletId, provWalletId] } } }).catch(() => {})
       await prisma.customerWallet.deleteMany({ where: { id: custWalletId } }).catch(() => {})
       await prisma.providerWallet.deleteMany({ where: { id: provWalletId } }).catch(() => {})
-      await prisma.taskerProfile.deleteMany({ where: { userId: provId } }).catch(() => {})
-      await prisma.user.deleteMany({ where: { id: { in: [custId, provId] } } }).catch(() => {})
-      await prisma.marketConfig.deleteMany({ where: { countryCode: zeroCountry } }).catch(() => {})
+      await prisma.companySpecialty.deleteMany({ where: { companyId: company.id } }).catch(() => {})
+      await prisma.teamMember.deleteMany({ where: { companyId: company.id } }).catch(() => {})
+      await prisma.companyProfile.deleteMany({ where: { id: company.id } }).catch(() => {})
+      await prisma.user.deleteMany({ where: { id: { in: [custId, ownerId] } } }).catch(() => {})
     })
   })
 
