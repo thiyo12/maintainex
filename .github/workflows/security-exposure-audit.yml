@@ -102,9 +102,17 @@ jobs:
               "example",
               "test",
               "phase07-ci-",
+              "phase-",
               "ci-only",
               "maintainex_dev_",
+              "sandbox-",
+              "original_",
+              "original.",
+              "postgresql://...",
               "postgresql://user:password@host",
+              "postgresql://user:pass@host",
+              "new_pass",
+              "new_db_host",
               "maintainex_ci@",
           )
 
