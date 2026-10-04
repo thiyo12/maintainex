@@ -20,9 +20,9 @@ This file is the running security release gate for `security/production-hardenin
 | 11 | Admin auth / sessions / MFA | PARTIAL — MFA/session lifecycle coverage present; adversarial closure remains | YES |
 | 12 | Password / OTP / recovery | PARTIAL — recovery/OTP/refresh coverage present; abuse review remains | HIGH |
 | 13 | Identity / KYC security | PARTIAL — identity/privacy/storage controls present; E2E review remains | HIGH |
-| 14 | Payment / escrow authorization | PARTIAL — payment/escrow authorization tests present; closure review remains | YES |
-| 15 | PayHere webhook security | PARTIAL — webhook/env controls present; reconciliation proof remains | YES |
-| 16 | PayPal production completion | PARTIAL — provider/webhook controls present; sandbox/live verification remains | YES before PayPal live |
+| 14 | Payment / escrow authorization | PARTIAL — authorization reviewed; financial error paths hardened; closure review remains | YES |
+| 15 | PayHere webhook security | PARTIAL — signature/body controls + safe failure logging present; reconciliation proof remains | YES |
+| 16 | PayPal production completion | PARTIAL — provider/webhook controls + safe failure logging present; sandbox/live verification remains | YES before PayPal live |
 | 17 | Financial concurrency / idempotency | PARTIAL — concurrency/ledger tests present; exhaustive writer review remains | YES |
 | 18 | Wallet / commission / account abuse | PARTIAL — commission/restriction controls present; abuse scenarios remain | YES |
 | 19 | File / upload security | PARTIAL — traversal/content/upload controls present; full corpus review remains | YES |
@@ -30,7 +30,7 @@ This file is the running security release gate for `security/production-hardenin
 | 21 | Rate limiting / abuse protection | PARTIAL — fail-closed/rate-limit tests present; endpoint coverage review remains | HIGH |
 | 22 | Database hardening | PARTIAL — schema/deploy controls present; live DB least-privilege proof remains | HIGH |
 | 23 | Privacy / data minimization | PARTIAL — privacy suites present; full field-retention review remains | HIGH |
-| 24 | Logging / audit safety | PARTIAL — redaction/security-event tests present; complete sink review remains | HIGH |
+| 24 | Logging / audit safety | PARTIAL — auth/booking/finance critical sinks hardened; complete repository sink review remains | HIGH |
 | 25 | Security monitoring / alerts | PARTIAL — risk/event logic present; live alert delivery proof remains | HARDENING |
 | 26 | Cloudflare / edge hardening | PARTIAL — code assumes hardened edge; live Cloudflare config proof remains | HIGH |
 | 27 | IP / proxy trust | PARTIAL — canonical proxy/IP tests present; live topology proof remains | HIGH |
@@ -154,6 +154,21 @@ This file is the running security release gate for `security/production-hardenin
 - Commit SHA: fix `003da957`; regression `86b8a4bb`.
 - Residual risk: repository-wide direct console/error sink review continues under Phase 24 and external log-retention/access controls still require production evidence.
 - Status: FIXED — exact-head CI pending.
+
+
+### SG-0009 — Financial and payment routes bypassed structured error redaction
+
+- ID: SG-0009
+- Severity: MEDIUM
+- Attack path: an authenticated customer, staff operator, cron execution, or signed payment-provider request triggers an exceptional finance path whose raw Error/provider result is written directly to process logs; selected refund/webhook paths could also echo internal processing text in 5xx/409 responses.
+- Affected component: mobile payment/escrow/refund/release routes, PayHere and PayPal webhooks, escrow auto-release cron, and CRM commission/escrow/ledger/payment/payout/refund/wallet routes.
+- Reproduction/evidence: the Phase 14–16/24 audit found raw `console.error(..., error)` sinks across the reviewed financial routes. The customer escrow refund fallback returned `error.message` with HTTP 500, while payment webhook conflict/failure responses returned provider/service error text.
+- Root cause: finance routes pre-dated the centralized redacting logger and retained direct exception logging/response patterns after the shared observability layer was hardened.
+- Fix: routed reviewed finance/payment errors through `logger.error` / `logger.warn`, removed raw provider/internal error strings from customer/webhook failure responses, and preserved existing authorization, transaction, approval and idempotency behavior.
+- Test added: `tests/security/redaction.test.ts` now locks customer finance, payment webhooks, auto-release cron, and CRM finance routes off raw `console.error` sinks and checks the known internal-error response regressions.
+- Commit SHA: customer/payment/webhook/cron fixes `ef93c653`, `ef0ec177`, `b565c9c0`, `882e46e3`, `76a540cb`, `2ded9754`, `2ed54b72`, `73ed2465`; customer/payment regression `ac64e6b7`; CRM finance fixes `8a88e640`, `0e41f1a5`, `e96c8afc`, `08a4949d`, `c5189cc0`, `6abce527`, `c8d3c4db`, `261f515a`; CRM finance regression `72077714`.
+- Residual risk: repository-wide direct log-sink review is not yet complete, and external log aggregation retention/access controls still require live production evidence.
+- Status: FIXED — exact-head full release CI pending.
 
 
 ## Phase 0 report
@@ -344,8 +359,10 @@ CODE/CI EVIDENCE:
 - CRM audit old/new value redaction
 - security/financial audit event coverage
 
-NEW FINDING:
+NEW FINDINGS:
 - SG-0005 fixed: raw Error serialization bypassed normal production context redaction.
+- SG-0008 fixed: mobile upload failures bypassed structured log redaction.
+- SG-0009 fixed: critical financial/payment routes used raw error sinks and selected internal error responses.
 
 REMAINING:
 - continue repository-wide review for direct `console.*` sinks and unsafe raw exception logging
