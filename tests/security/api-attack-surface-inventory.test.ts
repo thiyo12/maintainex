@@ -65,8 +65,12 @@ const PUBLIC_ABUSE_MARKERS = [
 ] as const
 
 function exportedMethods(code: string): string[] {
-  return [...code.matchAll(/export\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE)/g)]
+  const functionExports = [...code.matchAll(/export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE)\b/g)]
     .map(match => match[1])
+  const constExports = [...code.matchAll(/export\s+const\s+(GET|POST|PUT|PATCH|DELETE)\s*=/g)]
+    .map(match => match[1])
+
+  return [...new Set([...functionExports, ...constExports])]
 }
 
 function hasBoundary(code: string): boolean {
@@ -105,6 +109,12 @@ describe('API attack-surface inventory', () => {
 
   it('maintains a non-empty inventory of API routes', () => {
     expect(routes.length).toBeGreaterThan(200)
+  })
+
+  it('detects both function-style and const-style Next.js route exports', () => {
+    expect(exportedMethods('export async function POST() {}')).toEqual(['POST'])
+    expect(exportedMethods('export function DELETE() {}')).toEqual(['DELETE'])
+    expect(exportedMethods('export const PATCH = async () => {}')).toEqual(['PATCH'])
   })
 
   it('classifies every mutation-capable API route behind a security boundary or explicit public contract', () => {
