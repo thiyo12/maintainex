@@ -41,12 +41,16 @@ describe('Redaction', () => {
   it('never passes raw Error objects to the production structured logger path', () => {
     const logger = readFileSync(resolve(process.cwd(), 'lib/shared/observability/logger.ts'), 'utf8')
     const crmAudit = readFileSync(resolve(process.cwd(), 'lib/crm/audit.ts'), 'utf8')
+    const mobileUpload = readFileSync(resolve(process.cwd(), 'app/api/mobile/upload/route.ts'), 'utf8')
 
     expect(logger).toContain('sanitizeErrorForLog')
     expect(logger).toContain("message: '[REDACTED]'")
     expect(logger).not.toContain('baseLogger.error({ ...enriched, err }, message)')
     expect(crmAudit).toContain("logger.error('Failed to create audit log', { err: error })")
     expect(crmAudit).not.toContain("console.error('Failed to create audit log:'")
+    expect(mobileUpload).toContain("logger.error('Mobile upload failed', {")
+    expect(mobileUpload).toContain('err: error')
+    expect(mobileUpload).not.toContain("console.error('Upload error:'")
   })
 
   it('preserves safe values', () => {
