@@ -8,15 +8,18 @@ const source = readFileSync(
 )
 
 describe('CRM website management error state', () => {
-  it('does not render editable defaults after canonical settings fail to load', () => {
-    expect(source).toContain('const [loadError, setLoadError]')
+  it('fails closed when the canonical website overview cannot be loaded', () => {
+    expect(source).toContain("if (!response.ok) throw crmApiError(body, 'Unable to load website operations')")
     expect(source).toContain('setOverview(null)')
-    expect(source).toContain('if (loadError || !overview)')
-    expect(source).toContain('Website management could not be loaded')
-    expect(source).toContain('onClick={() => void load()}')
+    expect(source).toContain('if (!overview)')
+    expect(source).toContain('Website operations unavailable')
+    expect(source).toContain('onClick={load}')
   })
 
-  it('blocks save while the canonical settings snapshot is unavailable', () => {
-    expect(source).toContain('if (!canEdit || loadError || !overview) return')
+  it('never treats an API error body as a valid overview snapshot', () => {
+    const throwIndex = source.indexOf("if (!response.ok) throw crmApiError(body, 'Unable to load website operations')")
+    const setIndex = source.indexOf('setOverview(body)')
+    expect(throwIndex).toBeGreaterThanOrEqual(0)
+    expect(setIndex).toBeGreaterThan(throwIndex)
   })
 })
