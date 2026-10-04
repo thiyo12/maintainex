@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { acceptJobQuote } from '@/lib/domain/job-lifecycle'
-import { fundEscrow, releaseEscrow } from '@/lib/finance/escrow/escrow-service'
+import { fundEscrow, refundEscrow, releaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { bigIntToSafeNumber, type Currency } from '@/lib/shared/money/money'
 
 const TEST_DB_URL = process.env.DATABASE_URL
@@ -587,8 +587,8 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
     })
   })
 
-  describe('Test I: refEscrow succeeds after refund', () => {
-    it('escrow can be refunded then re-created and funded for same job', async () => {
+  describe('Test I: canonical refund closes the funded booking', () => {
+    it('refundEscrow restores the customer balance and closes the job without reusable funded state', async () => {
       const newPrefix = `${PREFIX}-refund`
       const custId = `${newPrefix}-cust`
       const provId = `${newPrefix}-prov`
@@ -606,7 +606,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       await prisma.customerWallet.create({ data: { id: custWalletId, userId: custId } })
       await prisma.walletBalance.create({ data: { walletId: custWalletId, walletType: 'CUSTOMER', balance: 5000000n, availableBalance: 5000000n, pendingBalance: 0n, currency: 'LKR' } })
 
-      const job = await prisma.marketplaceJob.create({
+      await prisma.marketplaceJob.create({
         data: {
           id: jobId, customerId: custId, title: 'Refund Job', description: 'x',
           categoryId: lkCategoryId, photos: '[]', budgetType: 'FIXED', budgetAmount: 100000n,
@@ -621,18 +621,23 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       await acceptJobQuote(ctx, quote.id)
       await fundEscrow(ctx, jobId)
 
-      const escrow = await prisma.jobEscrow.findFirst({ where: { jobId } })
-      expect(escrow!.status).toBe('PROTECTED')
+      const funded = await prisma.jobEscrow.findFirst({ where: { jobId } })
+      expect(funded?.status).toBe('PROTECTED')
 
-      await prisma.jobEscrow.update({ where: { id: escrow!.id }, data: { status: 'REFUNDED', refundedAt: new Date() } })
+      const refund = await refundEscrow(ctx, jobId)
+      expect(refund.refundPendingExternal).toBe(false)
 
-      const refundedEscrow = await prisma.jobEscrow.findUnique({ where: { id: escrow!.id } })
-      expect(refundedEscrow!.status).toBe('REFUNDED')
-
-      const canonicalAfter = await prisma.walletBalance.findFirst({
-        where: { walletId: custWalletId, walletType: 'CUSTOMER', currency: 'LKR' },
-      })
-      expect(canonicalAfter!.balance).toBe(5000000n)
+      const [refundedEscrow, closedJob, canonicalAfter] = await Promise.all([
+        prisma.jobEscrow.findUnique({ where: { id: funded!.id } }),
+        prisma.marketplaceJob.findUnique({ where: { id: jobId } }),
+        prisma.walletBalance.findFirst({
+          where: { walletId: custWalletId, walletType: 'CUSTOMER', currency: 'LKR' },
+        }),
+      ])
+      expect(refundedEscrow?.status).toBe('REFUNDED')
+      expect(closedJob?.status).toBe('CANCELLED')
+      expect(canonicalAfter?.balance).toBe(5000000n)
+      expect(canonicalAfter?.availableBalance).toBe(5000000n)
 
       await prisma.financialLedger.deleteMany({ where: { referenceId: { contains: newPrefix } } }).catch(() => {})
       await prisma.jobEscrow.deleteMany({ where: { jobId } }).catch(() => {})
