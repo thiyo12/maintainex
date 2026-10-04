@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSetting } from '@/lib/settings'
@@ -111,7 +112,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, processed })
   } catch (error) {
-    console.error('[CRON] Escrow auto-release error:', error)
+    logger.error('Escrow auto-release cron failed unexpectedly', { err: error, route: '/api/cron/escrow-release', method: 'GET' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
