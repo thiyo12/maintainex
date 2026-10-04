@@ -42,25 +42,25 @@ describe.skipIf(!requiresPostgres())('Phase 5D — Opening Balance Cutover', () 
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES ($1, $2, 'CUSTOMER', 50000, 50000, 0, 1, now(), now())
-       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = 50000, "availableBalance" = 50000`,
+       ON CONFLICT ("walletType", "walletId", "currency") DO UPDATE SET "balance" = 50000, "availableBalance" = 50000`,
       `${prefix}-cust-wb`, customerWalletId
     );
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES ($1, $2, 'PROVIDER', 30000, 30000, 0, 1, now(), now())
-       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = 30000, "availableBalance" = 30000`,
+       ON CONFLICT ("walletType", "walletId", "currency") DO UPDATE SET "balance" = 30000, "availableBalance" = 30000`,
       `${prefix}-prov-wb`, providerWalletId
     );
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES ($1, $2, 'CUSTOMER', 0, 0, 0, 1, now(), now())
-       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = 0, "availableBalance" = 0`,
+       ON CONFLICT ("walletType", "walletId", "currency") DO UPDATE SET "balance" = 0, "availableBalance" = 0`,
       `${prefix}-zero-wb`, zeroWalletId
     );
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES ($1, $2, 'CUSTOMER', 20000, 20000, 0, 1, now(), now())
-       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = 20000, "availableBalance" = 20000`,
+       ON CONFLICT ("walletType", "walletId", "currency") DO UPDATE SET "balance" = 20000, "availableBalance" = 20000`,
       `${prefix}-preexist-wb`, preExistingWalletId
     );
 
