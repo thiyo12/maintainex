@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getInMemoryRateLimit } from '@/lib/shared/rate-limit/ip-fixed-window'
-import { ADMIN_ROLES } from '@/lib/auth/rbac/permissions'
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
   if (!secret) {
     throw new Error('JWT_SECRET environment variable is required')
+  }
+  return secret
+}
+
+function getStaffJwtSecret(): string {
+  const secret = process.env.STAFF_JWT_SECRET
+  if (!secret) {
+    throw new Error('STAFF_JWT_SECRET environment variable is required')
   }
   return secret
 }
@@ -58,13 +65,18 @@ function b64UrlDecode(str: string): string {
   return new TextDecoder().decode(new Uint8Array(out))
 }
 
-async function verifyJwtSignature(headerB64: string, payloadB64: string, signatureB64: string): Promise<boolean> {
+async function verifyJwtSignature(
+  headerB64: string,
+  payloadB64: string,
+  signatureB64: string,
+  secret: string,
+): Promise<boolean> {
   try {
     const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`)
     const signature = Uint8Array.from(atob(signatureB64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
     const key = await crypto.subtle.importKey(
       'raw',
-      new TextEncoder().encode(getJwtSecret()),
+      new TextEncoder().encode(secret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['verify']
@@ -80,7 +92,12 @@ async function verifySimpleToken(token: string): Promise<any> {
     const parts = token.split('.')
     if (parts.length === 3) {
       const [headerB64, payloadB64, signatureB64] = parts
-      const signatureValid = await verifyJwtSignature(headerB64, payloadB64, signatureB64)
+      const signatureValid = await verifyJwtSignature(
+        headerB64,
+        payloadB64,
+        signatureB64,
+        getJwtSecret(),
+      )
       if (!signatureValid) return null
       const payload = JSON.parse(b64UrlDecode(payloadB64))
       if (payload.exp && Date.now() / 1000 > payload.exp) return null
@@ -108,6 +125,44 @@ async function verifySimpleToken(token: string): Promise<any> {
   } catch {
     return null
   }
+}
+
+async function verifyStaffToken(token: string): Promise<{ id: string; sessionId: string } | null> {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const [headerB64, payloadB64, signatureB64] = parts
+    const signatureValid = await verifyJwtSignature(
+      headerB64,
+      payloadB64,
+      signatureB64,
+      getStaffJwtSecret(),
+    )
+    if (!signatureValid) return null
+
+    const payload = JSON.parse(b64UrlDecode(payloadB64))
+    if (payload.exp && Date.now() / 1000 > payload.exp) return null
+    if (payload.aud !== 'maintainex-staff') return null
+    if (payload.iss !== 'maintainex') return null
+    if (payload.type !== 'staff_access') return null
+    if (typeof payload.sub !== 'string' || !payload.sub) return null
+    if (typeof payload.sid !== 'string' || !payload.sid) return null
+
+    return { id: payload.sub, sessionId: payload.sid }
+  } catch {
+    return null
+  }
+}
+
+async function getStaffSession(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    return verifyStaffToken(authHeader.slice(7))
+  }
+
+  const token = request.cookies.get('admin_token')?.value
+  if (!token) return null
+  return verifyStaffToken(token)
 }
 
 async function getSession(request: NextRequest) {
@@ -369,7 +424,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
-    const session = await getSession(request)
+    // Middleware performs only the cryptographic staff-token boundary. Every
+    // CRM API request revalidates the live AdminUser + AdminSession + RBAC
+    // state through guardCrmRequest; role/country permissions are never
+    // trusted from access-token claims.
+    const session = await getStaffSession(request)
     if (!session) {
       const loginUrl = new URL('/admin/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
@@ -378,29 +437,9 @@ export async function middleware(request: NextRequest) {
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
 
-    const validWebRoles = Object.keys(ADMIN_ROLES)
-
-    if (!validWebRoles.includes(session.role)) {
-      response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
-      applyRequestId(response, requestId)
-      return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
-    }
-
-    if (!session.sessionId) {
-      response = NextResponse.redirect(new URL('/admin/login?error=session_required', request.url))
-      applyRequestId(response, requestId)
-      return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
-    }
-
     response = NextResponse.next()
     response.headers.set('X-Admin-Id', session.id)
-    response.headers.set('X-Admin-Role', session.role)
     applyRequestId(response, requestId)
-
-    if (pathname.startsWith('/admin/api/') || pathname.startsWith('/api/')) {
-      response.headers.set('Cache-Control', 'no-store, must-revalidate')
-    }
-
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
