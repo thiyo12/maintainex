@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getMetricsSummary, type MetricType } from '@/lib/metrics'
+import { matchesSharedSecret } from '@/lib/security/secret-compare'
 
 interface MetricEntry {
   name: string
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
   const authHeader = request.headers.get('x-internal-sync')
   const expectedSecret = process.env.INTERNAL_SYNC_SECRET
 
-  if (!expectedSecret || authHeader !== expectedSecret) {
+  if (!matchesSharedSecret(authHeader, expectedSecret)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
