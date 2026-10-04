@@ -171,7 +171,7 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
     expect(denied.status).toBe(403)
   })
 
-  it('FINANCE admin approves RESERVED payout to SUCCEEDED (one-click, auto PROCESSING)', async () => {
+  it('FINANCE admin external payout confirmation creates a governed approval request', async () => {
     const requested = await requestPayout(
       providerUserId, 50000n, 'BANK', '{"account":"test-acc"}',
       `payout-admin-api-${ts}-approve`, 'test'
@@ -185,19 +185,18 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
     })
     expect(availableAfterReserve!.availableBalance).toBe(50000n)
 
-    const res = await PATCH(makePatch(financeToken, requested.payoutId, { action: 'SUCCEEDED', providerRef: 'BANK-REF-1' }), params(requested.payoutId))
-    expect(res.status).toBe(200)
+    const res = await PATCH(makePatch(financeToken, requested.payoutId, {
+      action: 'CONFIRM_EXTERNAL',
+      providerRef: 'BANK-REF-1',
+      idempotencyKey: `payout-admin-api-${ts}-confirm-${requested.payoutId}`,
+    }), params(requested.payoutId))
+    expect(res.status).toBe(202)
     const data = await res.json()
-    expect(data.status).toBe('SUCCEEDED')
+    expect(data.mode).toBe('APPROVAL_REQUIRED')
+    expect(data.approval?.id).toBeTruthy()
 
     const payout = await prisma.payout.findUnique({ where: { id: requested.payoutId } })
-    expect(payout!.status).toBe('SUCCEEDED')
-    expect(payout!.clearedAt).not.toBeNull()
-
-    const external = await prisma.financialLedger.findFirst({
-      where: { referenceType: 'PAYOUT_SUCCEEDED', referenceId: requested.payoutId, accountType: 'EXTERNAL_PAYOUT' },
-    })
-    expect(external).not.toBeNull()
+    expect(payout!.status).toBe('RESERVED')
   })
 
   it('FAILED action requires reason; restores reserved funds to provider wallet', async () => {
@@ -216,27 +215,28 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
     })
     expect(before!.availableBalance).toBe(0n)
 
-    const res = await PATCH(makePatch(financeToken, requested.payoutId, { action: 'FAILED', reason: 'Bank account rejected' }), params(requested.payoutId))
-    expect(res.status).toBe(200)
+    const res = await PATCH(makePatch(financeToken, requested.payoutId, {
+      action: 'FAILED',
+      reason: 'Bank account rejected',
+    }), params(requested.payoutId))
+    expect(res.status).toBe(403)
     const data = await res.json()
-    expect(data.status).toBe('FAILED')
+    expect(data.code).toBe('STEP_UP_REQUIRED')
 
     const after = await prisma.walletBalance.findUnique({
       where: { walletType_walletId_currency: { walletType: 'PROVIDER', walletId: providerWalletId, currency: 'LKR' } },
     })
-    expect(after!.availableBalance).toBe(50000n)
-
-    const restore = await prisma.financialLedger.findFirst({
-      where: { referenceType: 'WITHDRAWAL_RELEASED', referenceId: requested.payoutId },
-    })
-    expect(restore).not.toBeNull()
+    expect(after!.availableBalance).toBe(0n)
   })
 
   it('invalid action and unknown payout are rejected', async () => {
     const badAction = await PATCH(makePatch(financeToken, 'nonexistent', { action: 'TELEPORT' }), params('nonexistent'))
     expect(badAction.status).toBe(400)
 
-    const notFound = await PATCH(makePatch(financeToken, 'payout-does-not-exist', { action: 'PROCESSING' }), params('payout-does-not-exist'))
+    const notFound = await PATCH(makePatch(financeToken, 'payout-does-not-exist', {
+      action: 'FAILED',
+      reason: 'Missing payout record',
+    }), params('payout-does-not-exist'))
     expect(notFound.status).toBe(404)
   })
 })
