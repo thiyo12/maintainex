@@ -65,6 +65,11 @@ export function validateRequiredSecrets(): { valid: boolean; errors: string[] } 
       errors.push('[CRITICAL] ALLOW_TEST_OTP must not be enabled in production')
     }
 
+    const trustedProxyMode = process.env.TRUSTED_PROXY_MODE?.trim().toLowerCase()
+    if (trustedProxyMode !== 'cloudflare' && trustedProxyMode !== 'reverse-proxy') {
+      errors.push('[CRITICAL] TRUSTED_PROXY_MODE must be explicitly configured as cloudflare or reverse-proxy in production')
+    }
+
     const mobileCorsOrigin = process.env.MOBILE_CORS_ORIGIN?.trim()
     if (mobileCorsOrigin) {
       if (mobileCorsOrigin === '*') {
