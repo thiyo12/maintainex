@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import { notifyEscrowTimeout } from '@/lib/notifications'
 import { sendExpoPush } from '@/lib/push'
@@ -110,7 +111,7 @@ export async function GET(request: NextRequest) {
       pendingPayouts: pendingPayoutCount,
     })
   } catch (error) {
-    console.error('[CRON] Daily maintenance error:', error)
+    logger.error('Daily maintenance cron failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

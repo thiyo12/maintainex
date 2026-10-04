@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import { createWorkItem } from '@/lib/work-queue'
 import { notifyJobEscalated } from '@/lib/notifications'
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, escalated, respondedLate, scanned: overdueJobs.length })
   } catch (error) {
-    console.error('[CRON] Job response escalation error:', error)
+    logger.error('Job response escalation cron failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

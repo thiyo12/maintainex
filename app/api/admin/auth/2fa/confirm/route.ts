@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import { verifyTotp } from '@/lib/admin-2fa'
 import { guardCrmRequest } from '@/lib/crm/security'
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('2FA enrollment confirmation error:', error)
+    logger.error('2FA enrollment confirmation failed unexpectedly', { err: error })
     return NextResponse.json(
       { error: 'Unable to confirm two-factor authentication.' },
       { status: 500 }
