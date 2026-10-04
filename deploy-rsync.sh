@@ -51,7 +51,7 @@ set -eu
 docker service inspect "$SERVICE" >/dev/null
 service_env=$(docker service inspect "$SERVICE" --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}')
 env_names=$(printf '%s\n' "$service_env" | cut -d= -f1)
-required='DATABASE_URL MARKETPLACE_JWT_SECRET STAFF_JWT_SECRET PASSWORD_PEPPER IDENTITY_CLAIM_PEPPER CRON_SECRET INTERNAL_SYNC_SECRET'
+required='DATABASE_URL MARKETPLACE_JWT_SECRET STAFF_JWT_SECRET PASSWORD_PEPPER IDENTITY_CLAIM_PEPPER CRON_SECRET INTERNAL_SYNC_SECRET TRUSTED_PROXY_MODE'
 missing=''
 for name in $required; do
   if ! printf '%s\n' "$env_names" | grep -qx "$name"; then
@@ -70,6 +70,11 @@ env_value() {
 
 if [ "$(env_value ALLOW_TEST_OTP)" = "true" ]; then
   echo "ERROR: ALLOW_TEST_OTP must be disabled in production" >&2
+  exit 1
+fi
+
+if [ "$(env_value TRUSTED_PROXY_MODE)" != "cloudflare" ]; then
+  echo "ERROR: TRUSTED_PROXY_MODE must be cloudflare for the current production edge topology" >&2
   exit 1
 fi
 
