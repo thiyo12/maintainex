@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
       canManage: security.isSuperAdmin,
     }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('CRM provider financial policy GET error:', error)
+    secureConsole.error('CRM provider financial policy GET error:', error)
     return NextResponse.json({ error: 'Failed to load provider financial policies' }, { status: 500 })
   }
 }
@@ -249,7 +250,7 @@ export async function PATCH(request: NextRequest) {
       policy: { ...serializePolicy(policy), inheritedDefault: false },
     }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('CRM provider financial policy PATCH error:', error)
+    secureConsole.error('CRM provider financial policy PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update provider financial policy' }, { status: 500 })
   }
 }

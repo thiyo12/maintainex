@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
@@ -111,7 +112,7 @@ export async function GET() {
       services: serviceCount
     })
   } catch (error) {
-    console.error('Auto-seed error:', error)
+    secureConsole.error('Auto-seed error:', error)
     return NextResponse.json({ error: 'Auto-seed failed' }, { status: 500 })
   }
 }

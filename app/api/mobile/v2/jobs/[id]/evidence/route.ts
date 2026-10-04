@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
@@ -115,7 +116,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, evidenceId: evidence.id }, { status: 201 })
   } catch (error) {
-    console.error('Upload evidence error:', error)
+    secureConsole.error('Upload evidence error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

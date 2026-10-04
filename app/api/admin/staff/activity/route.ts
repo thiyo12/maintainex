@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmRequest } from '@/lib/crm/security'
@@ -177,7 +178,7 @@ export async function GET(request: NextRequest) {
       },
     }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('Staff activity GET error:', error)
+    secureConsole.error('Staff activity GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch staff activity' }, { status: 500 })
   }
 }

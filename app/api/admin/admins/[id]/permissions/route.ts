@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmAction, guardCrmRequest } from '@/lib/crm/security'
@@ -82,7 +83,7 @@ export async function GET(
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM staff permission GET error:', error)
+    secureConsole.error('CRM staff permission GET error:', error)
     return NextResponse.json({ error: 'Failed to load staff permissions' }, { status: 500 })
   }
 }
@@ -235,7 +236,7 @@ export async function PATCH(
       overrides,
     })
   } catch (error) {
-    console.error('CRM staff permission PATCH error:', error)
+    secureConsole.error('CRM staff permission PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update staff permissions' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
-    console.error('Account closure preflight error:', error)
+    secureConsole.error('Account closure preflight error:', error)
     return NextResponse.json(
       { error: 'Unable to check account closure requirements' },
       { status: 500 },
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
       outstandingCommission: result.preflight.outstandingCommission,
     })
   } catch (error) {
-    console.error('Account closure error:', error)
+    secureConsole.error('Account closure error:', error)
     const message = error instanceof Error ? error.message : ''
 
     if (message === 'ACCOUNT_CLOSURE_CHANGED_CONCURRENTLY') {

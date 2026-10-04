@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
@@ -279,7 +280,7 @@ export async function POST(
       revisionNumber: (originalQuote.revisionNumber || 1) + 1,
     }, { status: 201 })
   } catch (error) {
-    console.error('Quote revision error:', error)
+    secureConsole.error('Quote revision error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

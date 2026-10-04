@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { resolveBenchmark, resolveBenchmarkConfig } from '@/lib/pricing/benchmark'
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response)
   } catch (error) {
-    console.error('Price suggest error:', error)
+    secureConsole.error('Price suggest error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

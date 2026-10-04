@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { prisma } from '@/lib/prisma'
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
     })
     return NextResponse.json(vacancies)
   } catch (error) {
-    console.error('Vacancies GET error:', error)
+    secureConsole.error('Vacancies GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch vacancies' }, { status: 500 })
   }
 }
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(vacancy, { status: 201 })
   } catch (error) {
-    console.error('Vacancies POST error:', error)
+    secureConsole.error('Vacancies POST error:', error)
     return NextResponse.json({ error: 'Failed to create vacancy' }, { status: 500 })
   }
 }

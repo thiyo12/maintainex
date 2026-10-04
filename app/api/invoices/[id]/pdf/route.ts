@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
@@ -186,7 +187,7 @@ export async function GET(
       }
     })
   } catch (error) {
-    console.error('Invoice PDF error:', error)
+    secureConsole.error('Invoice PDF error:', error)
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 })
   }
 }

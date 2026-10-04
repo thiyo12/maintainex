@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -723,7 +724,7 @@ export async function GET(
 
     return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   } catch (error) {
-    console.error('CRM Job 360 GET error:', error)
+    secureConsole.error('CRM Job 360 GET error:', error)
     return NextResponse.json({ error: 'Failed to load Job 360' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(bookings)
   } catch (error) {
-    console.error('Bookings fetch error:', error)
+    secureConsole.error('Bookings fetch error:', error)
     return NextResponse.json({ error: 'Failed to fetch bookings' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error: any) {
-    console.error('Error fetching properties:', error)
+    secureConsole.error('Error fetching properties:', error)
     return NextResponse.json({ error: error?.message || 'Failed to fetch properties' }, { status: 500 })
   }
 }
@@ -221,7 +222,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: listing }, { status: 201 })
   } catch (error: any) {
-    console.error('Error creating property:', error)
+    secureConsole.error('Error creating property:', error)
     return NextResponse.json({ error: error?.message || 'Failed to create property' }, { status: 500 })
   }
 }

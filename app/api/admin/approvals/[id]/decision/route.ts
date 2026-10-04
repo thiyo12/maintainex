@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -147,7 +148,7 @@ export async function POST(
     }
 
     const message = error instanceof Error ? error.message : 'Approval decision failed'
-    console.error('CRM approval decision error:', error)
+    secureConsole.error('CRM approval decision error:', error)
 
     if (message.startsWith('APPROVAL_')) {
       return NextResponse.json({ error: message }, { status: 409 })

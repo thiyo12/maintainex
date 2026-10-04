@@ -1,5 +1,6 @@
 'use server'
 
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmRequest } from '@/lib/crm/security'
@@ -21,7 +22,7 @@ export async function GET() {
     })
     return NextResponse.json(industries)
   } catch (error) {
-    console.error('Error fetching industries:', error)
+    secureConsole.error('Error fetching industries:', error)
     return NextResponse.json({ error: 'Failed to fetch industries' }, { status: 500 })
   }
 }
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(industry)
   } catch (error) {
-    console.error('Error creating industry:', error)
+    secureConsole.error('Error creating industry:', error)
     return NextResponse.json({ error: 'Failed to create industry' }, { status: 500 })
   }
 }
@@ -91,7 +92,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(industry)
   } catch (error) {
-    console.error('Error updating industry:', error)
+    secureConsole.error('Error updating industry:', error)
     return NextResponse.json({ error: 'Failed to update industry' }, { status: 500 })
   }
 }
@@ -118,7 +119,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting industry:', error)
+    secureConsole.error('Error deleting industry:', error)
     return NextResponse.json({ error: 'Failed to delete industry' }, { status: 500 })
   }
 }

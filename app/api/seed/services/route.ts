@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
@@ -213,7 +214,7 @@ export async function POST(request: NextRequest) {
       message: `Created ${categoriesCreated} categories and ${servicesCreated} services`
     })
   } catch (error) {
-    console.error('Seed error:', error)
+    secureConsole.error('Seed error:', error)
     return NextResponse.json({ error: 'Failed to seed data' }, { status: 500 })
   }
 }

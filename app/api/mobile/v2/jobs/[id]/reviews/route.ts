@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -67,7 +68,7 @@ export async function POST(
           data: { rating: Math.round(avgRating * 10) / 10 },
         })
         // Trigger reputation recalculation (fire-and-forget)
-        recalculateReputation(quote.providerId).catch(err => console.error('Reputation recalc error:', err))
+        recalculateReputation(quote.providerId).catch(err => secureConsole.error('Reputation recalc error:', err))
       } else {
         await prisma.companyProfile.updateMany({
           where: { id: quote.providerId },
@@ -135,7 +136,7 @@ export async function POST(
 
     return NextResponse.json({ error: 'Invalid reviewType' }, { status: 400 })
   } catch (error: any) {
-    console.error('Create review error:', error)
+    secureConsole.error('Create review error:', error)
     if (error?.code === 'P2002') {
       return NextResponse.json({ error: 'Already reviewed' }, { status: 409 })
     }
@@ -188,7 +189,7 @@ export async function GET(
     ])
     return NextResponse.json({ reviews: { customerReviews: customerReview, providerReviews: providerReview } })
   } catch (error) {
-    console.error('Get reviews error:', error)
+    secureConsole.error('Get reviews error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

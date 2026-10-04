@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -125,7 +126,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM catalog GET error:', error)
+    secureConsole.error('CRM catalog GET error:', error)
     return NextResponse.json({ error: 'Failed to load catalog' }, { status: 500 })
   }
 }
@@ -259,7 +260,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ service }, { status: 201 })
   } catch (error) {
-    console.error('CRM catalog POST error:', error)
+    secureConsole.error('CRM catalog POST error:', error)
     return NextResponse.json({ error: 'Failed to create catalog item' }, { status: 500 })
   }
 }
@@ -322,7 +323,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ item: updated })
   } catch (error) {
-    console.error('CRM catalog PATCH error:', error)
+    secureConsole.error('CRM catalog PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update catalog item' }, { status: 500 })
   }
 }

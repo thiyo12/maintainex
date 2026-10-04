@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextResponse } from 'next/server'
 import { unlinkSync, readdirSync, statSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ deleted })
   } catch (error) {
-    console.error('Photo cleanup error:', error)
+    secureConsole.error('Photo cleanup error:', error)
     return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 })
   }
 }

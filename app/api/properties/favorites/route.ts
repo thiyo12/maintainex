@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error: any) {
-    console.error('Error fetching favorites:', error)
+    secureConsole.error('Error fetching favorites:', error)
     return NextResponse.json({ error: error?.message || 'Failed to fetch favorites' }, { status: 500 })
   }
 }

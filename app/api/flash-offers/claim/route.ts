@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.error('Error claiming offer:', error)
+    secureConsole.error('Error claiming offer:', error)
     return NextResponse.json({ error: 'Failed to claim offer' }, { status: 500 })
   }
 }

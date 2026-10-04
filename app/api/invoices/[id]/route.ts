@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { prisma } from '@/lib/prisma'
@@ -55,7 +56,7 @@ export async function GET(
     if (!access.ok) return access.response
     return NextResponse.json(access.invoice)
   } catch (error) {
-    console.error('Invoice fetch error:', error)
+    secureConsole.error('Invoice fetch error:', error)
     return NextResponse.json({ error: 'Failed to fetch invoice' }, { status: 500 })
   }
 }
@@ -148,7 +149,7 @@ export async function PATCH(
 
     return NextResponse.json(invoice)
   } catch (error) {
-    console.error('Invoice update error:', error)
+    secureConsole.error('Invoice update error:', error)
     return NextResponse.json({ error: 'Failed to update invoice' }, { status: 500 })
   }
 }
@@ -169,7 +170,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Invoice delete error:', error)
+    secureConsole.error('Invoice delete error:', error)
     return NextResponse.json({ error: 'Failed to delete invoice' }, { status: 500 })
   }
 }

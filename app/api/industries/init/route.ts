@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       count: Number(result[0]?.count || 0)
     })
   } catch (error) {
-    console.error('Industry init error:', error)
+    secureConsole.error('Industry init error:', error)
     return NextResponse.json({ error: 'Failed to setup' }, { status: 500 })
   }
 }

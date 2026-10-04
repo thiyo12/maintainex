@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
@@ -61,7 +62,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Team member delete error:', error)
+    secureConsole.error('Team member delete error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -107,7 +108,7 @@ export async function GET(
       joinedAt: memberDetail.joinedAt.toISOString(),
     })
   } catch (error) {
-    console.error('Team member get error:', error)
+    secureConsole.error('Team member get error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

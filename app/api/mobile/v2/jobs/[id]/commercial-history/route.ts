@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
@@ -85,7 +86,7 @@ export async function GET(
       })),
     })
   } catch (error) {
-    console.error('Get commercial history error:', error)
+    secureConsole.error('Get commercial history error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

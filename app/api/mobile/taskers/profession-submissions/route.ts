@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ submission }, { status: 201 })
   } catch (error) {
-    console.error('Profession submission error:', error)
+    secureConsole.error('Profession submission error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

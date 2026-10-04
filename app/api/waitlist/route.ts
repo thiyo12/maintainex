@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     if (error?.code === 'P2002') {
       return NextResponse.json({ success: true, message: "You're on the waitlist!" })
     }
-    console.error('Waitlist error:', error)
+    secureConsole.error('Waitlist error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

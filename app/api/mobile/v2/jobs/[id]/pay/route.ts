@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
@@ -49,7 +50,7 @@ export async function POST(
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
-    console.error('Payment creation error:', error)
+    secureConsole.error('Payment creation error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { prisma } from '@/lib/prisma'
@@ -54,7 +55,7 @@ export async function GET(
     if (!access.ok) return access.response
     return NextResponse.json(access.application)
   } catch (error) {
-    console.error('Error fetching application:', error)
+    secureConsole.error('Error fetching application:', error)
     return NextResponse.json({ error: 'Failed to fetch application' }, { status: 500 })
   }
 }
@@ -93,7 +94,7 @@ export async function PATCH(
 
     return NextResponse.json(application)
   } catch (error) {
-    console.error('Error updating application:', error)
+    secureConsole.error('Error updating application:', error)
     return NextResponse.json({ error: 'Failed to update application' }, { status: 500 })
   }
 }
@@ -123,7 +124,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Application deleted successfully' })
   } catch (error) {
-    console.error('Error deleting application:', error)
+    secureConsole.error('Error deleting application:', error)
     return NextResponse.json({ error: 'Failed to delete application' }, { status: 500 })
   }
 }

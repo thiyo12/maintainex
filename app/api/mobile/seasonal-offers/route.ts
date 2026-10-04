@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
       headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
     })
   } catch (error) {
-    console.error('Error fetching mobile seasonal offers:', error)
+    secureConsole.error('Error fetching mobile seasonal offers:', error)
     return NextResponse.json({ error: 'Failed to fetch offers' }, { status: 500 })
   }
 }

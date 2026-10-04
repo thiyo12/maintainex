@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
 import { prisma } from '@/lib/prisma'
@@ -40,7 +41,7 @@ export async function DELETE(
     await prisma.service.delete({ where: { id } })
     return NextResponse.json({ success: true, message: 'Service deleted successfully' })
   } catch (error) {
-    console.error('Delete service error:', error)
+    secureConsole.error('Delete service error:', error)
     return NextResponse.json({ error: 'Failed to delete service' }, { status: 500 })
   }
 }
@@ -161,7 +162,7 @@ export async function PATCH(
       price: service.price ? Number(service.price) : null,
     })
   } catch (error) {
-    console.error('Update service error:', error)
+    secureConsole.error('Update service error:', error)
     return NextResponse.json({ error: 'Failed to update service' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ request: req }, { status: 201 })
   } catch (error) {
-    console.error('Custom job request error:', error)
+    secureConsole.error('Custom job request error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ requests })
   } catch (error) {
-    console.error('List custom jobs error:', error)
+    secureConsole.error('List custom jobs error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

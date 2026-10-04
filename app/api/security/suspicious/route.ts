@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { prisma } from '@/lib/prisma'
@@ -151,7 +152,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Failed to fetch suspicious activity:', error)
+    secureConsole.error('Failed to fetch suspicious activity:', error)
     return NextResponse.json({ error: 'Failed to fetch suspicious activity' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
@@ -380,7 +381,7 @@ export async function POST() {
 
     return NextResponse.json({ message: `Seeded ${created} listings`, total: existing + created, locations: locationsSeeded })
   } catch (error: any) {
-    console.error('Seed error:', error)
+    secureConsole.error('Seed error:', error)
     return NextResponse.json({ error: error?.message || 'Seed failed' }, { status: 500 })
   }
 }

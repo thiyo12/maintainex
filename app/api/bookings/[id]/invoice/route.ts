@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
@@ -82,7 +83,7 @@ export async function POST(
 
     return NextResponse.json(invoice, { status: 201 })
   } catch (error) {
-    console.error('Create invoice from booking error:', error)
+    secureConsole.error('Create invoice from booking error:', error)
     return NextResponse.json({ error: 'Failed to create invoice' }, { status: 500 })
   }
 }

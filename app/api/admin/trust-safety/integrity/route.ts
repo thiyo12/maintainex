@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -176,7 +177,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
-    console.error('CRM provider integrity GET error:', error)
+    secureConsole.error('CRM provider integrity GET error:', error)
     return NextResponse.json({ error: 'Failed to load provider integrity signals' }, { status: 500 })
   }
 }
@@ -318,7 +319,7 @@ export async function PATCH(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('CRM provider integrity PATCH error:', error)
+    secureConsole.error('CRM provider integrity PATCH error:', error)
     return NextResponse.json({ error: 'Failed to review provider integrity signal' }, { status: 500 })
   }
 }

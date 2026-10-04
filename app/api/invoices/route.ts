@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardCrmRequest } from '@/lib/crm/security'
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(invoices)
   } catch (error) {
-    console.error('Invoices fetch error:', error)
+    secureConsole.error('Invoices fetch error:', error)
     return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 })
   }
 }
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(invoice, { status: 201 })
   } catch (error) {
-    console.error('Invoice create error:', error)
+    secureConsole.error('Invoice create error:', error)
     return NextResponse.json({ error: 'Failed to create invoice' }, { status: 500 })
   }
 }

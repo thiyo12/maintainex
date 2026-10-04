@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { prisma } from '@/lib/prisma'
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Failed to fetch audit logs:', error)
+    secureConsole.error('Failed to fetch audit logs:', error)
     return NextResponse.json({ error: 'Failed to fetch audit logs' }, { status: 500 })
   }
 }

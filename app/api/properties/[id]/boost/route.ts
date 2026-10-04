@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
@@ -145,7 +146,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (error: any) {
     if (error?.message === 'INSUFFICIENT_FUNDS') return NextResponse.json({ error: 'Insufficient wallet balance' }, { status: 400 })
     if (error?.message === 'IDEMPOTENCY_CONFLICT') return NextResponse.json({ error: 'Idempotency key conflict' }, { status: 409 })
-    console.error('Error boosting property:', error)
+    secureConsole.error('Error boosting property:', error)
     return NextResponse.json({ error: error?.message || 'Failed to boost property' }, { status: 500 })
   }
 }

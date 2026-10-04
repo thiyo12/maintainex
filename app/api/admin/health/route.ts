@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
@@ -113,7 +114,7 @@ export async function GET(request: NextRequest) {
       cron: { configured: cronConfigured },
     }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('CRM health GET error:', error)
+    secureConsole.error('CRM health GET error:', error)
     return NextResponse.json({ error: 'System health unavailable' }, { status: 503 })
   }
 }

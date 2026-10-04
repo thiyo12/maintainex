@@ -1,5 +1,6 @@
 'use server'
 
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmRequest } from '@/lib/crm/security'
@@ -79,11 +80,11 @@ export async function POST(request: NextRequest) {
           data: { image: localUrl }
         })
 
-        console.log('[migrate] updated ' + ind.id + ' -> ' + localUrl)
+        secureConsole.log('[migrate] updated ' + ind.id + ' -> ' + localUrl)
         updated++
       } catch (e) {
         const errMsg = '[migrate] failed for ' + ind.id + ': ' + (e instanceof Error ? e.message : String(e))
-        console.error(errMsg)
+        secureConsole.error(errMsg)
         errors.push(errMsg)
       }
     }
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
       errors: errors.length > 0 ? errors : undefined
     })
   } catch (error) {
-    console.error('Migration error:', error)
+    secureConsole.error('Migration error:', error)
     return NextResponse.json({ error: 'Migration failed' }, { status: 500 })
   }
 }

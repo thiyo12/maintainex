@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { prisma } from '@/lib/prisma'
@@ -50,7 +51,7 @@ export async function DELETE(
     await prisma.jobVacancy.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Vacancy DELETE error:', error)
+    secureConsole.error('Vacancy DELETE error:', error)
     return NextResponse.json({ error: 'Failed to delete vacancy' }, { status: 500 })
   }
 }
@@ -95,7 +96,7 @@ export async function PATCH(
 
     return NextResponse.json(vacancy)
   } catch (error) {
-    console.error('Vacancy PATCH error:', error)
+    secureConsole.error('Vacancy PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update vacancy' }, { status: 500 })
   }
 }

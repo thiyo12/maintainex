@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
 import { prisma } from '@/lib/prisma'
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(districtData)
   } catch (error) {
-    console.error('Error fetching districts:', error)
+    secureConsole.error('Error fetching districts:', error)
     return NextResponse.json({ error: 'Failed to fetch districts' }, { status: 500 })
   }
 }

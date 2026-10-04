@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { createBookNowJob } from '@/lib/domain/book-now'
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
       message: 'BOOK_NOW job created. Accept the quote to proceed.',
     }, { status: 201 })
   } catch (error: any) {
-    console.error('BOOK_NOW error:', error)
+    secureConsole.error('BOOK_NOW error:', error)
     const message = error?.message || 'Server error'
     if (message.includes('not found')) return NextResponse.json({ error: message }, { status: 404 })
     if (

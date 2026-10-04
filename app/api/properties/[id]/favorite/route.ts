@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json({ success: true, favorited: result })
   } catch (error: any) {
-    console.error('Error toggling favorite:', error)
+    secureConsole.error('Error toggling favorite:', error)
     return NextResponse.json({ error: error?.message || 'Failed to toggle favorite' }, { status: 500 })
   }
 }

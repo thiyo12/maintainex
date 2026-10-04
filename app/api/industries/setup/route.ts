@@ -1,5 +1,6 @@
 'use server'
 
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 
   } catch (error) {
-    console.error('Error in setup:', error)
+    secureConsole.error('Error in setup:', error)
     return NextResponse.json({ error: 'Setup failed' }, { status: 500 })
   }
 }
