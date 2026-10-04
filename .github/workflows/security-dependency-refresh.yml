@@ -1,0 +1,58 @@
+name: Security Dependency Lock Refresh
+
+on:
+  push:
+    branches:
+      - security/production-hardening
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Resolve production dependency security updates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm pkg set dependencies.axios=1.20.0
+          npm pkg set dependencies.nodemailer=10.0.14
+          npm pkg delete dependencies.next-sitemap
+          npm pkg set devDependencies.next-sitemap=4.2.3
+          npm pkg set overrides.postcss=8.5.28
+          npm install --package-lock-only --ignore-scripts
+          npm audit fix --package-lock-only --omit=dev || true
+
+      - name: Audit resolved production dependencies
+        shell: bash
+        run: |
+          set +e
+          npm audit --omit=dev --audit-level=high > dependency-audit.txt 2>&1
+          status=$?
+          cat dependency-audit.txt
+          exit "$status"
+
+      - name: Upload resolved dependency files
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: security-dependency-refresh
+          path: |
+            package.json
+            package-lock.json
+            dependency-audit.txt
+          if-no-files-found: error
+          retention-days: 1
