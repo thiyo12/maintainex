@@ -6,6 +6,7 @@ import path from 'path'
 import { validateFileUpload, generateSecureFilename } from '@/lib/security/file-upload'
 import { checkRateLimit } from '@/lib/shared/rate-limit/middleware'
 import { getTrustedClientIp } from '@/lib/security/client-ip'
+import { logger } from '@/lib/shared/observability/logger'
 const ALLOWED_MIMES = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'image/gif',
   'application/pdf',
@@ -86,7 +87,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url, filename })
   } catch (error) {
-    console.error('Upload error:', error)
+    logger.error('Mobile upload failed', {
+      err: error,
+      route: '/api/mobile/upload',
+      method: 'POST',
+    })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
