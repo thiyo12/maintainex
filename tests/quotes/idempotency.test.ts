@@ -26,7 +26,12 @@ function mockPrisma(opts: {
     baseQuoteId: 'quote-1',
     createdBy: 'provider-1',
     revisionNumber: 1,
-    job: { customerId: job.customerId, finalAuthorizedAmountCents: job.finalAuthorizedAmountCents },
+    job: {
+      customerId: job.customerId,
+      finalAuthorizedAmountCents: job.finalAuthorizedAmountCents,
+      countryCode: job.countryCode ?? 'LK',
+      status: job.status ?? 'QUOTE_ACCEPTED',
+    },
   }
 
   const co = opts.changeOrder !== undefined
@@ -44,7 +49,9 @@ function mockPrisma(opts: {
   const txMocks = {
     jobChangeOrder: {
       update: vi.fn().mockResolvedValue({ id: 'co-1', status: 'APPROVED', customerDecisionAt: new Date(), approvedByCustomerId: 'customer-1' }),
-      findMany: vi.fn().mockResolvedValue([]),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findUnique: vi.fn().mockResolvedValue({ id: 'co-1', status: 'APPROVED', amountDeltaCents: 5000n }),
+      findMany: vi.fn().mockResolvedValue([{ id: 'co-1', status: 'APPROVED', amountDeltaCents: 5000n }]),
     },
     marketplaceJob: {
       update: vi.fn().mockResolvedValue({}),
@@ -52,6 +59,26 @@ function mockPrisma(opts: {
     },
     jobQuote: {
       findUnique: vi.fn().mockResolvedValue(opts.quote ?? quoteDefault),
+    },
+    jobEscrow: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'escrow-1',
+        jobId: 'job-1',
+        status: 'PENDING_PAYMENT',
+        paymentMethod: 'ONLINE',
+        currency: 'LKR',
+        amount: 10000n,
+        serviceFee: 1000n,
+        totalAmount: 11000n,
+        createdAt: new Date(),
+      }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    paymentIntent: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    marketConfig: {
+      findUnique: vi.fn().mockResolvedValue(null),
     },
     idempotencyRecord: {
       findFirst: vi.fn().mockResolvedValue(null),
@@ -156,15 +183,33 @@ describe('Change order idempotency', () => {
         const txMocks = {
           jobChangeOrder: {
             update: vi.fn().mockResolvedValue({ id: 'co-1', status: 'APPROVED', customerDecisionAt: new Date(), approvedByCustomerId: 'customer-1' }),
-            findMany: vi.fn().mockResolvedValue([]),
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+            findUnique: vi.fn().mockResolvedValue({ id: 'co-1', status: 'APPROVED', amountDeltaCents: 5000n }),
+            findMany: vi.fn().mockResolvedValue([{ id: 'co-1', status: 'APPROVED', amountDeltaCents: 5000n }]),
           },
           marketplaceJob: {
             update: vi.fn().mockResolvedValue({}),
-            findUnique: vi.fn().mockResolvedValue({ id: 'job-1', customerId: 'customer-1', approvedQuoteId: 'quote-1', finalAuthorizedAmountCents: null }),
+            findUnique: vi.fn().mockResolvedValue({ id: 'job-1', customerId: 'customer-1', approvedQuoteId: 'quote-1', finalAuthorizedAmountCents: null, countryCode: 'LK', status: 'QUOTE_ACCEPTED' }),
           },
           jobQuote: {
-            findUnique: vi.fn().mockResolvedValue({ id: 'quote-1', price: 10000n, status: 'ACCEPTED' }),
+            findUnique: vi.fn().mockResolvedValue({ id: 'quote-1', price: 10000n, totalCents: 10000n, status: 'ACCEPTED' }),
           },
+          jobEscrow: {
+            findFirst: vi.fn().mockResolvedValue({
+              id: 'escrow-1',
+              jobId: 'job-1',
+              status: 'PENDING_PAYMENT',
+              paymentMethod: 'ONLINE',
+              currency: 'LKR',
+              amount: 10000n,
+              serviceFee: 1000n,
+              totalAmount: 11000n,
+              createdAt: new Date(),
+            }),
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          },
+          paymentIntent: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+          marketConfig: { findUnique: vi.fn().mockResolvedValue(null) },
           idempotencyRecord: {
             findFirst: vi.fn().mockResolvedValue(null),
             create: vi.fn().mockResolvedValue({}),
@@ -190,15 +235,33 @@ describe('Change order idempotency', () => {
         const txMocks = {
           jobChangeOrder: {
             update: vi.fn().mockResolvedValue({ id: 'co-1', status: 'APPROVED', customerDecisionAt: new Date(), approvedByCustomerId: 'customer-1' }),
-            findMany: vi.fn().mockResolvedValue([]),
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+            findUnique: vi.fn().mockResolvedValue({ id: 'co-1', status: 'APPROVED', amountDeltaCents: 5000n }),
+            findMany: vi.fn().mockResolvedValue([{ id: 'co-1', status: 'APPROVED', amountDeltaCents: 5000n }]),
           },
           marketplaceJob: {
             update: vi.fn().mockResolvedValue({}),
-            findUnique: vi.fn().mockResolvedValue({ id: 'job-1', customerId: 'customer-1', approvedQuoteId: 'quote-1', finalAuthorizedAmountCents: null }),
+            findUnique: vi.fn().mockResolvedValue({ id: 'job-1', customerId: 'customer-1', approvedQuoteId: 'quote-1', finalAuthorizedAmountCents: null, countryCode: 'LK', status: 'QUOTE_ACCEPTED' }),
           },
           jobQuote: {
-            findUnique: vi.fn().mockResolvedValue({ id: 'quote-1', price: 10000n, status: 'ACCEPTED' }),
+            findUnique: vi.fn().mockResolvedValue({ id: 'quote-1', price: 10000n, totalCents: 10000n, status: 'ACCEPTED' }),
           },
+          jobEscrow: {
+            findFirst: vi.fn().mockResolvedValue({
+              id: 'escrow-1',
+              jobId: 'job-1',
+              status: 'PENDING_PAYMENT',
+              paymentMethod: 'ONLINE',
+              currency: 'LKR',
+              amount: 10000n,
+              serviceFee: 1000n,
+              totalAmount: 11000n,
+              createdAt: new Date(),
+            }),
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          },
+          paymentIntent: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+          marketConfig: { findUnique: vi.fn().mockResolvedValue(null) },
           idempotencyRecord: {
             findFirst: vi.fn().mockResolvedValue(null),
             create: vi.fn().mockResolvedValue({}),
