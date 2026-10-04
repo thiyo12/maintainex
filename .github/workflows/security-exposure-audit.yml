@@ -76,12 +76,54 @@ jobs:
               \b
               """
           )
+          sensitive_env_assignment = re.compile(
+              r"""(?ix)
+              \b(
+                JWT_SECRET|JWT_REFRESH_SECRET|MARKETPLACE_JWT_SECRET|STAFF_JWT_SECRET|
+                NEXTAUTH_SECRET|PASSWORD_PEPPER|IDENTITY_CLAIM_PEPPER|
+                INTERNAL_SYNC_SECRET|CRON_SECRET|PAYPAL_CLIENT_SECRET|
+                PAYHERE_MERCHANT_SECRET|PAYHERE_APP_SECRET|CLOUDINARY_API_SECRET|
+                SMTP_APP_PASSWORD|DATABASE_URL
+              )\b
+              \s*[:=]\s*
+              ["'`]?
+              ([^"'\`\s#]+)
+              """
+          )
+
+          SAFE_SECRET_MARKERS = (
+              "${",
+              "process.env",
+              "<",
+              "your-",
+              "your_",
+              "generate-",
+              "generate_",
+              "example",
+              "test",
+              "phase07-ci-",
+              "ci-only",
+              "maintainex_dev_",
+              "postgresql://user:password@host",
+              "maintainex_ci@",
+          )
 
           def classify(line):
               hits = [name for name, rx in patterns if rx.search(line)]
               literal_match = literal_secret.search(line)
               markdown_match = markdown_secret.search(line)
               random_match = unquoted_random_secret.search(line)
+              env_match = sensitive_env_assignment.search(line)
+              if env_match:
+                  env_name = env_match.group(1).upper()
+                  candidate = env_match.group(2)
+                  lowered = candidate.lower()
+                  safe = any(marker.lower() in lowered for marker in SAFE_SECRET_MARKERS)
+                  if not safe:
+                      if env_name == "DATABASE_URL" and re.search(r"://[^/:\s]+:[^@/\s]+@", candidate):
+                          hits.append("database-credential")
+                      elif len(candidate) >= 16:
+                          hits.append("sensitive-env-assignment")
               if literal_match:
                   candidate = literal_match.group(0)
                   generated = any(marker in candidate for marker in (
@@ -161,6 +203,8 @@ jobs:
               "stripe-live-key",
               "slack-token",
               "possible-hardcoded-secret",
+              "sensitive-env-assignment",
+              "database-credential",
           }
           current_blocking = [
               item for item in current if item["category"] in blocking
