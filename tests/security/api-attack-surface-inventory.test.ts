@@ -29,6 +29,10 @@ const PUBLIC_MUTATION_ROUTES = new Set([
   'app/api/admin/auth/logout/route.ts',
 ])
 
+const RETIRED_MUTATION_ROUTES = new Set([
+  'app/api/mobile/quick-bookings/route.ts',
+])
+
 const PUBLIC_MARKETPLACE_AUTH_ROUTES = [
   '/auth/',
   '/register/',
@@ -47,6 +51,7 @@ const SECURITY_BOUNDARY_MARKERS = [
   'CRON_SECRET',
   'verifyPayPalWebhook',
   'verifyPayHere',
+  'verifyNotificationSignature',
   'signatureVerified',
   "process.env.NODE_ENV === 'production'",
 ] as const
@@ -93,12 +98,22 @@ describe('API attack-surface inventory', () => {
 
       if (hasBoundary(code)) continue
       if (PUBLIC_MUTATION_ROUTES.has(path)) continue
+      if (RETIRED_MUTATION_ROUTES.has(path)) continue
       if (isAuthBootstrapRoute(path)) continue
 
       unclassified.push({ path, methods })
     }
 
     expect(unclassified).toEqual([])
+  })
+
+  it('keeps retired mutation routes as no-op 410 boundaries', () => {
+    for (const path of RETIRED_MUTATION_ROUTES) {
+      const code = readFileSync(resolve(process.cwd(), path), 'utf8')
+      expect(code).toContain('status: 410')
+      expect(code).not.toContain("from '@/lib/prisma'")
+      expect(code).not.toContain('prisma.')
+    }
   })
 
   it('keeps explicitly public mutation routes abuse-limited or security-gated', () => {
