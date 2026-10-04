@@ -112,6 +112,20 @@ This file is the running security release gate for `security/production-hardenin
 - Residual risk: repository-wide raw console/error sink review is still in progress under Phase 24; this finding closes the central structured path.
 - Status: FIXED — full branch CI pending.
 
+### SG-0006 — High-severity production dependency vulnerabilities blocked release validation
+
+- ID: SG-0006
+- Severity: HIGH
+- Attack path: vulnerable production dependencies expose the application to known request-manipulation, XSS, denial-of-service, SMTP parsing, and CSS/source-map attack classes depending on the reachable package path.
+- Affected component: web production dependency graph / release CI.
+- Reproduction/evidence: `npm audit --omit=dev --audit-level=high` failed with 7 HIGH findings, including Axios, Nodemailer, PostCSS/Next and a next-sitemap dependency chain.
+- Root cause: stale direct/transitive versions plus build-only `next-sitemap` being classified as a production dependency.
+- Fix: resolved and locked Axios 1.20.0, DOMPurify 3.4.16, fflate 0.8.3, Nodemailer 10.0.14 and PostCSS 8.5.28; moved next-sitemap to devDependencies; retained Next 15.5.24; regenerated the lockfile through isolated CI.
+- Test/verification: the isolated resolver completed `npm audit --omit=dev --audit-level=high` with `found 0 vulnerabilities`; the normal release workflow still independently re-runs the production audit.
+- Commit SHA: `2d2763fb` (audited dependency resolution).
+- Residual risk: normal full release validation must still prove TypeScript, regression, build and Docker compatibility with the refreshed lockfile.
+- Status: FIXED — full release CI pending.
+
 ## Phase 0 report
 
 PHASE: 0 — Security baseline / feature freeze
@@ -306,3 +320,33 @@ NEW FINDING:
 REMAINING:
 - continue repository-wide review for direct `console.*` sinks and unsafe raw exception logging
 - verify external log aggregation retention/access controls in the real production environment
+
+
+## Phase 29 partial report
+
+PHASE: 29 — Dependency / supply-chain security
+STATUS: PARTIAL
+
+CODE/CI EVIDENCE:
+- pinned GitHub Actions commits
+- least-privilege normal workflow permissions
+- Dependabot coverage for web, mobile and Actions
+- deterministic `npm ci` installs
+- production dependency audit blocks HIGH/CRITICAL vulnerabilities
+- production dependency graph refreshed to zero known npm-audit vulnerabilities in the isolated resolver
+
+NEW FINDING:
+- SG-0006 fixed: release validation exposed 7 HIGH production dependency findings.
+
+CURRENT LOCKED SECURITY UPDATES:
+- Axios 1.20.0
+- DOMPurify 3.4.16
+- fflate 0.8.3
+- Nodemailer 10.0.14
+- PostCSS 8.5.28
+- next-sitemap retained only as build/dev tooling
+- Next remains 15.5.24; no major-framework upgrade was required
+
+REMAINING:
+- normal release validation must pass with the refreshed graph
+- continue Dependabot/npm audit review for new advisories
