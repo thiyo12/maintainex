@@ -65,6 +65,22 @@ export function validateRequiredSecrets(): { valid: boolean; errors: string[] } 
       errors.push('[CRITICAL] ALLOW_TEST_OTP must not be enabled in production')
     }
 
+    const mobileCorsOrigin = process.env.MOBILE_CORS_ORIGIN?.trim()
+    if (mobileCorsOrigin) {
+      if (mobileCorsOrigin === '*') {
+        errors.push('[CRITICAL] MOBILE_CORS_ORIGIN must not be wildcard in production')
+      } else {
+        try {
+          const parsed = new URL(mobileCorsOrigin)
+          if (parsed.protocol !== 'https:' || parsed.origin !== mobileCorsOrigin) {
+            errors.push('[CRITICAL] MOBILE_CORS_ORIGIN must be a single HTTPS origin in production')
+          }
+        } catch {
+          errors.push('[CRITICAL] MOBILE_CORS_ORIGIN must be a valid HTTPS origin in production')
+        }
+      }
+    }
+
     const releaseSha = process.env.APP_RELEASE_SHA
     if (!releaseSha) {
       errors.push('[CRITICAL] APP_RELEASE_SHA is required in production')
