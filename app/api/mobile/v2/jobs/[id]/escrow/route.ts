@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -63,7 +64,7 @@ export async function POST(
     }
     return NextResponse.json({ success: true }, { status: 201 })
   } catch (error: any) {
-    console.error('Escrow error:', error)
+    logger.error('Escrow funding failed unexpectedly', { err: error, route: '/api/mobile/v2/jobs/[id]/escrow', method: 'POST' })
     const message = error?.message || 'Server error'
     if (message.includes('Only the customer')) return NextResponse.json({ error: message }, { status: 403 })
     if (message.includes('not found')) return NextResponse.json({ error: message }, { status: 404 })
@@ -125,7 +126,7 @@ export async function GET(
       } : null,
     })
   } catch (error) {
-    console.error('Get escrow error:', error)
+    logger.error('Escrow read failed unexpectedly', { err: error, route: '/api/mobile/v2/jobs/[id]/escrow', method: 'GET' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
