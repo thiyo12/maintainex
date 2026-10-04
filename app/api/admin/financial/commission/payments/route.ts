@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -88,7 +89,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM commission payment GET error:', error)
+    logger.error('CRM commission payment read failed unexpectedly', { err: error, route: '/api/admin/financial/commission/payments', method: 'GET' })
     return NextResponse.json({ error: 'Failed to fetch commission payments' }, { status: 500 })
   }
 }
@@ -344,7 +345,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Settlement not found' }, { status: 404 })
     }
 
-    console.error('CRM commission payment PATCH error:', error)
+    logger.error('CRM commission payment update failed unexpectedly', { err: error, route: '/api/admin/financial/commission/payments', method: 'PATCH' })
     return NextResponse.json({ error: 'Failed to confirm commission payment' }, { status: 500 })
   }
 }
