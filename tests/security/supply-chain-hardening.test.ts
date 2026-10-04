@@ -84,6 +84,15 @@ describe('dependency and CI supply-chain hardening', () => {
     expect(workflow).not.toContain('npx expo export --platform all')
   })
 
+  it('serializes the write-capable mobile dependency resolver', () => {
+    const workflow = source('.github/workflows/security-mobile-dependency-review.yml')
+
+    expect(workflow).toContain('concurrency:')
+    expect(workflow).toContain('group: ${{ github.workflow }}-${{ github.ref }}')
+    expect(workflow).toContain('cancel-in-progress: true')
+    expect(workflow).toContain('persist-credentials: false')
+  })
+
   it('keeps workflow permissions least-privilege by default', () => {
     for (const path of [
       '.github/workflows/phase0-7-validation.yml',
