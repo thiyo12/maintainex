@@ -232,6 +232,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
           },
         },
       })
+      input.job.serviceTemplateId = 'service-1'
       const result = await evaluateEligibility(input)
       expect(result.gates.find(g => g.gate === 'PROFESSION_MATCH')?.passed).toBe(true)
       expect(input.client.taskerProfession.findMany).toHaveBeenCalledWith(
@@ -511,6 +512,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
           },
         },
       })
+      input.job.serviceTemplateId = 'service-1'
       const result = await evaluateEligibility(input)
       expect(result.eligible).toBe(false)
       expect(result.gates.find(g => g.gate === 'JURISDICTION_CREDENTIAL')?.passed).toBe(false)
@@ -542,6 +544,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
           },
         },
       })
+      input.job.serviceTemplateId = 'service-1'
       const result = await evaluateEligibility(input)
       expect(result.gates.find(g => g.gate === 'JURISDICTION_CREDENTIAL')?.passed).toBe(true)
     })
