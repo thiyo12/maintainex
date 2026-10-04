@@ -5,6 +5,79 @@ import crypto from 'crypto'
 const TEST_DB_URL = process.env.DATABASE_URL
 const isVPS = TEST_DB_URL && TEST_DB_URL.includes('maintainex_test')
 
+async function ensureEligibleTaskerFixture(prisma: PrismaClient, providerId: string, categoryId: string) {
+  await prisma.user.update({
+    where: { id: providerId },
+    data: {
+      identityStatus: 'VERIFIED',
+      isActive: true,
+      isSuspended: false,
+      isBanned: false,
+      countryCode: 'LK',
+    },
+  })
+
+  const profile = await prisma.taskerProfile.upsert({
+    where: { userId: providerId },
+    update: {
+      verificationStatus: 'VERIFIED',
+      isVerified: true,
+      countryCode: 'LK',
+    },
+    create: {
+      userId: providerId,
+      skills: '[]',
+      verificationStatus: 'VERIFIED',
+      isVerified: true,
+      countryCode: 'LK',
+    },
+  })
+
+  await prisma.jobCategory.upsert({
+    where: { id: categoryId },
+    update: { isActive: true, countries: '["LK"]' },
+    create: {
+      id: categoryId,
+      name: `DB Eligibility ${categoryId}`,
+      slug: `db-eligibility-${categoryId}`,
+      iconName: 'wrench',
+      colorHex: '#3B82F6',
+      countries: '["LK"]',
+      isActive: true,
+    },
+  })
+
+  const templateJobId = `eligibility-${providerId}-${categoryId}`
+  await prisma.templateJob.upsert({
+    where: { id: templateJobId },
+    update: { categoryId, isActive: true },
+    create: {
+      id: templateJobId,
+      categoryId,
+      name: `Eligibility service ${providerId}`,
+      description: 'Quote concurrency eligibility fixture',
+      whatIsIncluded: 'Test capability',
+      typicalDurationMinutes: 60,
+      priceMin: 1,
+      priceMax: 100000,
+      currency: 'LKR',
+      countries: '["LK"]',
+      isActive: true,
+    },
+  })
+
+  await prisma.taskerSkill.upsert({
+    where: { taskerId_jobId: { taskerId: profile.id, jobId: templateJobId } },
+    update: { countryCode: 'LK', currency: 'LKR' },
+    create: {
+      taskerId: profile.id,
+      jobId: templateJobId,
+      countryCode: 'LK',
+      currency: 'LKR',
+    },
+  })
+}
+
 describe.skipIf(!isVPS)('4D.1 — Real PostgreSQL 2-Way Quote Concurrency', () => {
   let prisma: PrismaClient
   const PREFIX = `4d1-${Date.now()}`
@@ -26,6 +99,9 @@ describe.skipIf(!isVPS)('4D.1 — Real PostgreSQL 2-Way Quote Concurrency', () =
         { id: providerB, email: `${PREFIX}-b@test.com`, passwordHash: 'hash', name: 'Provider B', role: 'TASKER', isActive: true, updatedAt: new Date() },
       ],
     })
+
+    await ensureEligibleTaskerFixture(prisma, providerA, 'test-category')
+    await ensureEligibleTaskerFixture(prisma, providerB, 'test-category')
 
     await prisma.marketplaceJob.create({
       data: {
@@ -114,6 +190,10 @@ describe.skipIf(!isVPS)('4D.2 — Real PostgreSQL 5-Way Quote Concurrency', () =
         })),
       ],
     })
+
+    for (const providerId of providers) {
+      await ensureEligibleTaskerFixture(prisma, providerId, 'test-category')
+    }
 
     await prisma.marketplaceJob.create({
       data: {
@@ -234,6 +314,8 @@ describe.skipIf(!isVPS)('4D.3 — Same-Quote Retry', () => {
       ],
     })
 
+    await ensureEligibleTaskerFixture(prisma, providerId, 'test')
+
     await prisma.marketplaceJob.create({
       data: {
         id: jobId,
@@ -327,6 +409,9 @@ describe.skipIf(!isVPS)('4D.4 — Accept vs Cancel DB Race', () => {
       ],
     })
 
+    await ensureEligibleTaskerFixture(prisma, providerA, 'test')
+    await ensureEligibleTaskerFixture(prisma, providerB, 'test')
+
     await prisma.marketplaceJob.createMany({
       data: [
         {
@@ -417,6 +502,8 @@ describe.skipIf(!isVPS)('4D.5 — Cancellation Policy + Final State', () => {
         { id: providerId, email: `${PREFIX}-p@test.com`, passwordHash: 'hash', name: 'Provider', role: 'TASKER', isActive: true, updatedAt: new Date() },
       ],
     })
+
+    await ensureEligibleTaskerFixture(prisma, providerId, 'test')
 
     await prisma.marketplaceJob.create({
       data: {
@@ -810,6 +897,8 @@ describe.skipIf(!isVPS)('4D.9 — Authorization Regression', () => {
         { id: providerB, email: `${PREFIX}-b@test.com`, passwordHash: 'hash', name: 'Provider B', role: 'TASKER', isActive: true, updatedAt: new Date() },
       ],
     })
+
+    await ensureEligibleTaskerFixture(prisma, providerA, 'test')
 
     await prisma.marketplaceJob.create({
       data: {
