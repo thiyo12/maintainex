@@ -93,6 +93,18 @@ describe('dependency and CI supply-chain hardening', () => {
     expect(workflow).toContain('persist-credentials: false')
   })
 
+  it('locks the main branch protection contract', () => {
+    const contract = source('docs/security/BRANCH-PROTECTION.md')
+
+    expect(contract).toContain('`required_status_checks.strict` | `true`')
+    expect(contract).toContain('exactly `validate`, `audit`')
+    expect(contract).toContain('`enforce_admins.enabled` | `true`')
+    expect(contract).toContain('`allow_force_pushes.enabled` | `false`')
+    expect(contract).toContain('`allow_deletions.enabled` | `false`')
+    expect(contract).toContain('`required_conversation_resolution.enabled` | `true`')
+    expect(contract).toContain('dismiss_stale_reviews` | `true`')
+  })
+
   it('keeps workflow permissions least-privilege by default', () => {
     for (const path of [
       '.github/workflows/phase0-7-validation.yml',
