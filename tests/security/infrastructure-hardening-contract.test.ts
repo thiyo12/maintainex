@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 function source(path: string) {
@@ -7,6 +8,19 @@ function source(path: string) {
 }
 
 describe('production infrastructure source hardening', () => {
+  it('keeps production deployment shell scripts syntactically valid', () => {
+    for (const script of [
+      'deploy-rsync.sh',
+      'scripts/crm-v2-production-preflight.sh',
+    ]) {
+      expect(() =>
+        execFileSync('bash', ['-n', resolve(process.cwd(), script)], {
+          stdio: 'pipe',
+        })
+      ).not.toThrow()
+    }
+  })
+
   it('does not publish the development PostgreSQL port on every host interface', () => {
     const compose = source('docker-compose.yml')
     expect(compose).toContain("'127.0.0.1:5432:5432'")
