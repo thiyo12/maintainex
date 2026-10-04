@@ -7,6 +7,8 @@ const REQUIRED_SECRETS = [
   'CRON_SECRET',
 ] as const
 
+const INDEPENDENT_PRODUCTION_SECRETS = REQUIRED_SECRETS
+
 function validateSecretLength(name: string, value: string, minBytes: number): string | null {
   const bytes = Buffer.byteLength(value, 'utf8')
   if (bytes < minBytes) {
@@ -45,20 +47,24 @@ export function validateRequiredSecrets(): { valid: boolean; errors: string[] } 
     const marketplace = process.env.MARKETPLACE_JWT_SECRET
     const staff = process.env.STAFF_JWT_SECRET
     const legacy = process.env.JWT_SECRET
-    const passwordPepper = process.env.PASSWORD_PEPPER
-    const identityPepper = process.env.IDENTITY_CLAIM_PEPPER
-
     if (marketplace && legacy && marketplace === legacy) {
       errors.push('[CRITICAL] MARKETPLACE_JWT_SECRET must not equal legacy JWT_SECRET')
     }
     if (staff && legacy && staff === legacy) {
       errors.push('[CRITICAL] STAFF_JWT_SECRET must not equal legacy JWT_SECRET')
     }
-    if (marketplace && staff && marketplace === staff) {
-      errors.push('[CRITICAL] MARKETPLACE_JWT_SECRET and STAFF_JWT_SECRET must be independent')
-    }
-    if (passwordPepper && identityPepper && passwordPepper === identityPepper) {
-      errors.push('[CRITICAL] PASSWORD_PEPPER and IDENTITY_CLAIM_PEPPER must be independent')
+    for (let i = 0; i < INDEPENDENT_PRODUCTION_SECRETS.length; i++) {
+      const leftName = INDEPENDENT_PRODUCTION_SECRETS[i]
+      const leftValue = process.env[leftName]
+      if (!leftValue) continue
+
+      for (let j = i + 1; j < INDEPENDENT_PRODUCTION_SECRETS.length; j++) {
+        const rightName = INDEPENDENT_PRODUCTION_SECRETS[j]
+        const rightValue = process.env[rightName]
+        if (rightValue && leftValue === rightValue) {
+          errors.push(`[CRITICAL] ${leftName} and ${rightName} must be independent`)
+        }
+      }
     }
 
     if (process.env.ALLOW_TEST_OTP === 'true') {
