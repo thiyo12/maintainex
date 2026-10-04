@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readFile } from 'fs/promises'
 import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
+import { resolveLocalKycFileReference } from '@/lib/security/kyc-storage'
+import { validateFileUpload } from '@/lib/security/file-upload'
 
 const MAX_KYC_FILE_BYTES = 15 * 1024 * 1024
 const ALLOWED_TYPES = new Set([
@@ -72,41 +75,69 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const url = sourceUrl(document.imageUrl, request)
-    if (!url) {
-      return NextResponse.json(
-        { error: 'Document storage source is not approved for CRM access.' },
-        { status: 503 }
+    let bytes: ArrayBuffer
+    let contentType: string
+
+    const localReference = resolveLocalKycFileReference(
+      document.imageUrl,
+      document.userId,
+      request.nextUrl.origin,
+    )
+
+    if (localReference) {
+      const localBuffer = await readFile(localReference.filePath)
+      if (localBuffer.byteLength > MAX_KYC_FILE_BYTES) {
+        return NextResponse.json({ error: 'Document is too large' }, { status: 413 })
+      }
+
+      const validation = validateFileUpload(
+        localBuffer,
+        localReference.contentType,
+        localReference.filename,
       )
-    }
+      if (!validation.valid) {
+        return NextResponse.json({ error: 'Stored document failed content validation' }, { status: 415 })
+      }
 
-    const upstream = await fetch(url, {
-      redirect: 'error',
-      cache: 'no-store',
-      headers: { Accept: 'image/*,application/pdf' },
-    })
+      contentType = localReference.contentType
+      bytes = Uint8Array.from(localBuffer).buffer
+    } else {
+      const url = sourceUrl(document.imageUrl, request)
+      if (!url) {
+        return NextResponse.json(
+          { error: 'Document storage source is not approved for CRM access.' },
+          { status: 503 }
+        )
+      }
 
-    if (!upstream.ok) {
-      return NextResponse.json({ error: 'Document storage unavailable' }, { status: 502 })
-    }
+      const upstream = await fetch(url, {
+        redirect: 'error',
+        cache: 'no-store',
+        headers: { Accept: 'image/*,application/pdf' },
+      })
 
-    const contentType = (upstream.headers.get('content-type') || '')
-      .split(';')[0]
-      .trim()
-      .toLowerCase()
+      if (!upstream.ok) {
+        return NextResponse.json({ error: 'Document storage unavailable' }, { status: 502 })
+      }
 
-    if (!ALLOWED_TYPES.has(contentType)) {
-      return NextResponse.json({ error: 'Unsupported document content type' }, { status: 415 })
-    }
+      contentType = (upstream.headers.get('content-type') || '')
+        .split(';')[0]
+        .trim()
+        .toLowerCase()
 
-    const declaredSize = Number(upstream.headers.get('content-length') || 0)
-    if (declaredSize > MAX_KYC_FILE_BYTES) {
-      return NextResponse.json({ error: 'Document is too large' }, { status: 413 })
-    }
+      if (!ALLOWED_TYPES.has(contentType)) {
+        return NextResponse.json({ error: 'Unsupported document content type' }, { status: 415 })
+      }
 
-    const bytes = await upstream.arrayBuffer()
-    if (bytes.byteLength > MAX_KYC_FILE_BYTES) {
-      return NextResponse.json({ error: 'Document is too large' }, { status: 413 })
+      const declaredSize = Number(upstream.headers.get('content-length') || 0)
+      if (declaredSize > MAX_KYC_FILE_BYTES) {
+        return NextResponse.json({ error: 'Document is too large' }, { status: 413 })
+      }
+
+      bytes = await upstream.arrayBuffer()
+      if (bytes.byteLength > MAX_KYC_FILE_BYTES) {
+        return NextResponse.json({ error: 'Document is too large' }, { status: 413 })
+      }
     }
 
     // Sensitive file access is fail-closed on audit.
