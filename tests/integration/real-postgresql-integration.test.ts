@@ -764,6 +764,7 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
       timeSlot: 'morning',
       address: '123 Test Street',
       district: 'Colombo',
+      countryCode: 'LK',
     })
 
     expect(result.job).toBeTruthy()
@@ -825,8 +826,13 @@ describe.skipIf(!isVPS)('4D.7 — FK/Orphan Audit', () => {
   it('JobQuote.providerId orphans = 0', async () => {
     const result = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `SELECT COUNT(*) as count FROM "JobQuote" jq
-       LEFT JOIN "User" u ON jq."providerId" = u.id
-       WHERE u.id IS NULL`
+       LEFT JOIN "User" u
+         ON jq."providerType" = 'INDIVIDUAL' AND jq."providerId" = u.id
+       LEFT JOIN "CompanyProfile" cp
+         ON jq."providerType" = 'COMPANY' AND jq."providerId" = cp.id
+       WHERE (jq."providerType" = 'INDIVIDUAL' AND u.id IS NULL)
+          OR (jq."providerType" = 'COMPANY' AND cp.id IS NULL)
+          OR jq."providerType" NOT IN ('INDIVIDUAL', 'COMPANY')`
     )
     expect(Number(result[0].count)).toBe(0)
   })
