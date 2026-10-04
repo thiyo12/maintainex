@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 
 function read(path: string) {
@@ -7,74 +7,76 @@ function read(path: string) {
 }
 
 describe('CRM UI/API permission contract', () => {
-  const cases = [
-    {
-      page: 'app/(admin)/admin/financial/commission/page.tsx',
-      api: 'app/api/admin/financial/commission/route.ts',
-      permission: 'commission:manage',
-      clientGuard: 'canManageCommission',
-    },
-    {
-      page: 'app/(admin)/admin/financial/wallets/page.tsx',
-      api: 'app/api/admin/financial/wallets/route.ts',
-      permission: 'wallets:manage',
-      clientGuard: 'canManageWallets',
-    },
-    {
-      page: 'app/(admin)/admin/jobs/disputes/page.tsx',
-      api: 'app/api/admin/disputes/route.ts',
-      permission: 'disputes:resolve',
-      clientGuard: 'canResolveDisputes',
-    },
-    {
-      page: 'app/(admin)/admin/trust-safety/credentials/page.tsx',
-      api: 'app/api/admin/credentials/[id]/review/route.ts',
-      permission: 'credentials:write',
-      clientGuard: 'canReviewCredentials',
-    },
-    {
-      page: 'app/(admin)/admin/pricing/market-config/page.tsx',
-      api: 'app/api/admin/market-config/route.ts',
-      permission: 'market_config:write',
-      clientGuard: 'canWriteMarketConfig',
-    },
-    {
-      page: 'app/(admin)/admin/wishlist/page.tsx',
-      api: 'app/api/admin/wishlist/route.ts',
-      permission: 'wishlist:manage',
-      clientGuard: 'canManageWishlist',
-    },
-  ] as const
+  it('commission enforcement uses the same governed action in UI and API', () => {
+    const page = read('app/(admin)/admin/financial/commission/page.tsx')
+    const api = read('app/api/admin/financial/commission/route.ts')
+    const registry = read('lib/crm/governance/action-registry.ts')
 
-  for (const item of cases) {
-    it(`${item.page} gates mutations with the same permission as its API`, () => {
-      const page = read(item.page)
-      const api = read(item.api)
+    expect(page).toContain('finance.commission.enforce')
+    expect(api).toContain("guardCrmAction(request, 'finance.commission.enforce')")
+    expect(registry).toContain("'finance.commission.enforce':")
+    expect(registry).toContain("initiatePermission: 'finance:commission:enforce'")
+  })
 
-      expect(api).toContain(`permission: '${item.permission}'`)
-      expect(page).toContain('ROLE_PERMISSIONS')
-      expect(page).toContain(`.includes('${item.permission}')`)
-      expect(page).toContain(item.clientGuard)
-    })
-  }
+  it('wallet freeze controls use the same governed action in UI and API', () => {
+    const page = read('app/(admin)/admin/financial/wallets/page.tsx')
+    const api = read('app/api/admin/financial/wallets/route.ts')
+    const registry = read('lib/crm/governance/action-registry.ts')
 
-  it('security monitor uses security:audit capability rather than a hard-coded admin role', () => {
+    expect(page).toContain('finance.wallet.freeze')
+    expect(api).toContain("guardCrmAction(request, 'finance.wallet.freeze')")
+    expect(registry).toContain("'finance.wallet.freeze':")
+    expect(registry).toContain("initiatePermission: 'finance:wallets:freeze'")
+  })
+
+  it('dispute resolution UI and API both require disputes:resolve', () => {
+    const page = read('app/(admin)/admin/jobs/disputes/page.tsx')
+    const api = read('app/api/admin/disputes/route.ts')
+
+    expect(page).toContain("permissions?.includes('disputes:resolve')")
+    expect(api).toContain("permission: 'disputes:resolve'")
+  })
+
+  it('credential review UI and API both use the canonical credentials:manage permission', () => {
+    const page = read('app/(admin)/admin/trust-safety/credentials/page.tsx')
+    const api = read('app/api/admin/credentials/[id]/review/route.ts')
+    const aliases = read('lib/crm/governance/permissions.ts')
+
+    expect(page).toContain("permissions?.includes('credentials:manage')")
+    expect(api).toContain("permission: 'credentials:manage'")
+    expect(aliases).toContain("'credentials:manage': ['credentials:write']")
+  })
+
+  it('market configuration uses canonical market/pricing permissions on both surfaces', () => {
+    const page = read('app/(admin)/admin/pricing/market-config/page.tsx')
+    const api = read('app/api/admin/market-config/route.ts')
+
+    expect(page).toContain("permissions?.includes('markets:manage')")
+    expect(page).toContain("permissions?.includes('pricing:manage')")
+    expect(api).toContain("permission: 'markets:manage'")
+  })
+
+  it('retired wishlist admin surface stays removed rather than reviving legacy permissions', () => {
+    expect(existsSync(resolve(process.cwd(), 'app/(admin)/admin/wishlist/page.tsx'))).toBe(false)
+    expect(existsSync(resolve(process.cwd(), 'app/api/admin/wishlist/route.ts'))).toBe(false)
+  })
+
+  it('security monitor uses security:audit for block/unblock mutations', () => {
     const page = read('app/(admin)/admin/analytics/security-monitor/page.tsx')
     const api = read('app/api/admin/security/blocked-ips/route.ts')
 
+    expect(page).toContain("permissions?.includes('security:audit')")
     expect(api).toContain("permission: 'security:audit'")
-    expect(page).toContain(".includes('security:audit')")
     expect(page).not.toContain("canManageBlocks = user?.role === 'SUPER_ADMIN'")
   })
 
-  it('trust and safety tables are horizontally contained on narrow screens', () => {
-    for (const path of [
-      'app/(admin)/admin/trust-safety/credentials/page.tsx',
-      'app/(admin)/admin/trust-safety/risk-events/page.tsx',
-    ]) {
-      const page = read(path)
-      expect(page).toContain('overflow-x-auto')
-      expect(page).toMatch(/min-w-\[\d+px\]/)
-    }
+  it('trust and safety tables use the shared horizontally scrollable CRM table frame', () => {
+    const credentials = read('app/(admin)/admin/trust-safety/credentials/page.tsx')
+    const riskEvents = read('app/(admin)/admin/trust-safety/risk-events/page.tsx')
+    const primitives = read('components/crm/v2/CrmPrimitives.tsx')
+
+    expect(credentials).toContain('CrmTableFrame')
+    expect(riskEvents).toContain('CrmTableFrame')
+    expect(primitives).toContain('overflow-x-auto')
   })
 })
