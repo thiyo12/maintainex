@@ -45,4 +45,16 @@ describe('commission CRM currency isolation', () => {
     expect(taskerUi).not.toContain('>LKR {')
     expect(companyUi).not.toContain('>LKR {')
   })
+
+  it('feeds tasker transaction history from the canonical wallet ledger', () => {
+    const taskerApi = read('app/api/mobile/earnings/route.ts')
+    const taskerUi = read('apps/mobile/features/tasker/screens/tabs/earnings.tsx')
+    const companyUi = read('apps/mobile/features/company/screens/tabs/earnings-list.tsx')
+
+    expect(taskerApi).toContain("accountType: 'PROVIDER_WALLET'")
+    expect(taskerApi).toContain('transactions: walletLedgerEntries.map')
+    expect(taskerUi).toContain("tx.direction === 'DEBIT' ? '-' : '+'")
+    expect(taskerUi).toContain("router.push('/(tasker)/wallet/withdraw'")
+    expect(companyUi).toContain("['PAID', 'SUCCEEDED', 'CLEARED', 'COMPLETED'].includes(status)")
+  })
 })
