@@ -19,117 +19,176 @@ jobs:
     env:
       PRIMARY_ORIGIN: https://maintainex.lk
       ADMIN_ORIGIN: https://admin.maintainex.lk
+      SECURITY_UA: Mozilla/5.0 MaintainEX-Security-Evidence/1.0
     steps:
       - name: Verify public production security boundary
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
 
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
+          failures=0
+          passes=0
+
+          pass() {
+            echo "PASS: $1"
+            passes=$((passes + 1))
+          }
 
           fail() {
             echo "::error::$1"
-            exit 1
+            failures=$((failures + 1))
           }
 
-          https_get() {
-            curl --silent --show-error --fail-with-body               --connect-timeout 10 --max-time 20               --proto '=https' --tlsv1.2 "$@"
+          request() {
+            headers="$1"
+            body="$2"
+            url="$3"
+            shift 3
+            curl --silent --show-error               --connect-timeout 10 --max-time 20               -A "$SECURITY_UA"               -D "$headers" -o "$body" -w '%{http_code}'               "$@" "$url" || printf '000'
+          }
+
+          is_cloudflare() {
+            headers="$1"
+            grep -qi '^cf-ray:' "$headers" || grep -qi '^server: cloudflare' "$headers"
           }
 
           echo "== HTTPS and release identity =="
-          https_get -D "$tmp/health.headers" -o "$tmp/health.json" "$PRIMARY_ORIGIN/api/health"
-
-          node - "$tmp/health.json" <<'NODE'
+          health_status="$(request "$tmp/health.headers" "$tmp/health.json" "$PRIMARY_ORIGIN/api/health")"
+          if [ "$health_status" = "200" ]; then
+            if node - "$tmp/health.json" <<'NODE'
           const fs = require('fs')
-          const path = process.argv[2]
-          const body = JSON.parse(fs.readFileSync(path, 'utf8'))
-          if (body.status !== 'healthy') throw new Error('Production health is not healthy')
-          if (!/^[0-9a-f]{40}$/.test(String(body.release || ''))) {
-            throw new Error('Production release SHA is missing or invalid')
-          }
-          if (body.testOtpMode !== 'disabled') {
-            throw new Error('Production test OTP mode is not disabled')
-          }
+          const body = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
+          if (body.status !== 'healthy') process.exit(2)
+          if (!/^[0-9a-f]{40}$/.test(String(body.release || ''))) process.exit(3)
+          if (body.testOtpMode !== 'disabled') process.exit(4)
           console.log('release=' + body.release)
-          console.log('health=healthy')
-          console.log('testOtpMode=disabled')
           NODE
+            then
+              pass "Production health/release identity and test OTP state"
+            else
+              fail "Production health JSON did not prove healthy + 40-char release SHA + test OTP disabled"
+            fi
+          elif [ "$health_status" = "403" ] && is_cloudflare "$tmp/health.headers"; then
+            fail "Cloudflare blocked /api/health from the external runner; release identity is not externally provable from this vantage point"
+          else
+            fail "Unexpected /api/health status: $health_status"
+          fi
 
           echo "== HTTPS security headers =="
-          https_get -D "$tmp/home.headers" -o /dev/null "$PRIMARY_ORIGIN/"
+          home_status="$(request "$tmp/home.headers" "$tmp/home.body" "$PRIMARY_ORIGIN/")"
+          case "$home_status" in
+            2??|3??) pass "Public homepage reachable over HTTPS" ;;
+            *) fail "Public homepage HTTPS status was $home_status" ;;
+          esac
           for header in             strict-transport-security             x-content-type-options             content-security-policy             referrer-policy             permissions-policy
           do
-            grep -qi "^$header:" "$tmp/home.headers" || fail "Missing public security header: $header"
+            if grep -qi "^$header:" "$tmp/home.headers"; then
+              pass "Public security header $header"
+            else
+              fail "Missing public security header: $header"
+            fi
           done
-
-          if ! grep -qi '^cf-ray:' "$tmp/home.headers" && ! grep -qi '^server: cloudflare' "$tmp/home.headers"; then
-            fail "Public origin is not visibly traversing Cloudflare"
+          if is_cloudflare "$tmp/home.headers"; then
+            pass "Public host visibly traverses Cloudflare"
+          else
+            fail "Public host is not visibly traversing Cloudflare"
           fi
 
           echo "== HTTP to HTTPS redirect =="
-          curl --silent --show-error --connect-timeout 10 --max-time 20             -D "$tmp/http.headers" -o /dev/null "http://maintainex.lk/"
+          curl --silent --show-error --connect-timeout 10 --max-time 20             -A "$SECURITY_UA" -D "$tmp/http.headers" -o /dev/null "http://maintainex.lk/" || true
           http_status="$(awk 'toupper($1) ~ /^HTTP\// { code=$2 } END { print code }' "$tmp/http.headers")"
           case "$http_status" in
-            301|302|307|308) ;;
-            *) fail "HTTP origin did not redirect to HTTPS (status=$http_status)" ;;
+            301|302|307|308)
+              if grep -qi '^location: https://maintainex\.lk' "$tmp/http.headers"; then
+                pass "HTTP redirects to HTTPS"
+              else
+                fail "HTTP redirect did not target maintainex.lk HTTPS"
+              fi
+              ;;
+            *) fail "HTTP origin did not redirect to HTTPS (status=${http_status:-none})" ;;
           esac
-          grep -qi '^location: https://maintainex\.lk' "$tmp/http.headers" ||             fail "HTTP redirect did not target maintainex.lk HTTPS"
 
           echo "== Protected internal readiness =="
-          readiness_status="$(curl --silent --show-error --connect-timeout 10 --max-time 20             -o /dev/null -w '%{http_code}' "$PRIMARY_ORIGIN/api/internal/readiness")"
-          [ "$readiness_status" = "403" ] || fail "Unauthenticated readiness status was $readiness_status, expected 403"
+          readiness_status="$(request "$tmp/readiness.headers" "$tmp/readiness.body" "$PRIMARY_ORIGIN/api/internal/readiness")"
+          if [ "$readiness_status" = "403" ] && grep -Eq '"error"[[:space:]]*:[[:space:]]*"Forbidden"' "$tmp/readiness.body"; then
+            pass "Application readiness endpoint denies unauthenticated access"
+          elif [ "$readiness_status" = "403" ] && is_cloudflare "$tmp/readiness.headers"; then
+            fail "Cloudflare blocked readiness before the application auth boundary could be proven"
+          else
+            fail "Readiness endpoint did not return the expected application 403 boundary (status=$readiness_status)"
+          fi
 
           echo "== CORS hostile-origin reflection =="
-          https_get -H 'Origin: https://evil.example' -D "$tmp/cors.headers" -o /dev/null "$PRIMARY_ORIGIN/api/health"
-          acao="$(awk -F': ' 'tolower($1)=="access-control-allow-origin" {gsub(/\r/,"",$2); print $2}' "$tmp/cors.headers" | tail -1)"
-          [ "$acao" != "*" ] || fail "CORS wildcard exposed on health endpoint"
-          [ "$acao" != "https://evil.example" ] || fail "Hostile Origin was reflected by CORS"
+          cors_status="$(request "$tmp/cors.headers" "$tmp/cors.body" "$PRIMARY_ORIGIN/api/health" -H 'Origin: https://evil.example')"
+          if [ "$cors_status" = "200" ]; then
+            acao="$(awk -F': ' 'tolower($1)=="access-control-allow-origin" {gsub(/\r/,"",$2); print $2}' "$tmp/cors.headers" | tail -1)"
+            if [ "$acao" = "*" ] || [ "$acao" = "https://evil.example" ]; then
+              fail "Hostile/wildcard CORS origin accepted"
+            else
+              pass "Hostile CORS origin not reflected"
+            fi
+          else
+            fail "CORS application boundary could not be observed because /api/health returned $cors_status"
+          fi
 
           echo "== Unsafe HTTP method rejection =="
-          trace_status="$(curl --silent --show-error --connect-timeout 10 --max-time 20             -X TRACE -o /dev/null -w '%{http_code}' "$PRIMARY_ORIGIN/")"
-          [ "$trace_status" != "200" ] || fail "TRACE unexpectedly returned HTTP 200"
+          trace_status="$(request "$tmp/trace.headers" "$tmp/trace.body" "$PRIMARY_ORIGIN/" -X TRACE)"
+          if [ "$trace_status" = "200" ]; then
+            fail "TRACE unexpectedly returned HTTP 200"
+          else
+            pass "TRACE rejected (status=$trace_status)"
+          fi
 
           echo "== Common accidental secret/file exposure =="
           for path in '/.env' '/.git/config' '/backup.sql' '/docker-compose.yml' '/server.env'; do
-            code="$(curl --silent --show-error --connect-timeout 10 --max-time 20               -o /dev/null -w '%{http_code}' "$PRIMARY_ORIGIN$path")"
-            case "$code" in
-              200) fail "Sensitive path unexpectedly returned HTTP 200: $path" ;;
-              *) echo "$path=$code" ;;
-            esac
+            code="$(request "$tmp/file.headers" "$tmp/file.body" "$PRIMARY_ORIGIN$path")"
+            if [ "$code" = "200" ]; then
+              fail "Sensitive path unexpectedly returned HTTP 200: $path"
+            else
+              pass "Sensitive path not exposed: $path ($code)"
+            fi
           done
 
           echo "== Admin host HTTPS boundary =="
-          admin_status="$(curl --silent --show-error --connect-timeout 10 --max-time 20             -o /dev/null -w '%{http_code}' "$ADMIN_ORIGIN/admin/login")"
+          admin_status="$(request "$tmp/admin.headers" "$tmp/admin.body" "$ADMIN_ORIGIN/admin/login")"
           case "$admin_status" in
-            2??|3??) ;;
+            2??|3??) pass "Admin login host reachable over HTTPS" ;;
             *) fail "Admin login host unavailable or unsafe status: $admin_status" ;;
           esac
-
-          https_get -D "$tmp/admin.headers" -o /dev/null "$ADMIN_ORIGIN/admin/login"
-          grep -qi '^strict-transport-security:' "$tmp/admin.headers" || fail "Admin host missing HSTS"
-          if ! grep -qi '^cf-ray:' "$tmp/admin.headers" && ! grep -qi '^server: cloudflare' "$tmp/admin.headers"; then
+          if grep -qi '^strict-transport-security:' "$tmp/admin.headers"; then
+            pass "Admin host HSTS"
+          else
+            fail "Admin host missing HSTS"
+          fi
+          if is_cloudflare "$tmp/admin.headers"; then
+            pass "Admin host visibly traverses Cloudflare"
+          else
             fail "Admin host is not visibly traversing Cloudflare"
           fi
 
           echo "== TLS validity =="
           for host in maintainex.lk admin.maintainex.lk; do
-            echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null               | openssl x509 -noout -checkend 2592000               || fail "TLS certificate for $host expires within 30 days or is invalid"
+            if echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null               | openssl x509 -noout -checkend 2592000 >/dev/null
+            then
+              pass "TLS certificate valid for >30 days: $host"
+            else
+              fail "TLS certificate expires within 30 days or is invalid: $host"
+            fi
           done
 
           {
             echo "## MaintainEX public black-box evidence"
             echo
-            echo "- Production health: PASS"
-            echo "- Public release SHA format: PASS"
-            echo "- Test OTP mode disabled: PASS"
-            echo "- HTTPS security headers: PASS"
-            echo "- HTTP→HTTPS redirect: PASS"
-            echo "- Internal readiness unauthenticated denial: PASS"
-            echo "- Hostile CORS reflection: PASS"
-            echo "- TRACE rejection: PASS"
-            echo "- Common secret-file exposure: PASS"
-            echo "- Admin host HTTPS boundary: PASS"
-            echo "- Cloudflare edge visibility: PASS"
-            echo "- TLS >30 days: PASS"
+            echo "- Pass checks: $passes"
+            echo "- Failed/blocked checks: $failures"
+            echo "- Health status observed: $health_status"
+            echo "- Readiness status observed: $readiness_status"
+            echo "- Admin login status observed: $admin_status"
           } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$failures" -ne 0 ]; then
+            echo "::error::Public black-box evidence has $failures failed or blocked checks"
+            exit 1
+          fi
