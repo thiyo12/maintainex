@@ -98,6 +98,20 @@ This file is the running security release gate for `security/production-hardenin
 - Residual risk: dynamically generated route exports are intentionally unsupported and should not be used for security-sensitive route handlers.
 - Status: FIXED — full branch CI pending.
 
+### SG-0005 — Structured error logging could serialize raw production error details
+
+- ID: SG-0005
+- Severity: MEDIUM
+- Attack path: a database/provider/runtime error containing connection details, credentials, tokens, user-controlled values, or sensitive stack context reaches the central logger and is serialized into production logs.
+- Affected component: shared observability logger and CRM audit failure path.
+- Reproduction/evidence: the logger redacted ordinary context but passed raw `Error` objects through Pino's error serializer; CRM audit failures also used raw `console.error`.
+- Root cause: error objects followed a different serialization path from the normal redacted context.
+- Fix: production logging now retains safe error name/code while replacing raw message content; non-production error strings are scrubbed for Bearer and PostgreSQL credentials; CRM audit failures now use the safe structured logger.
+- Test added: redaction regression covers Bearer/database credentials and asserts raw Error objects are not handed to the production logger path.
+- Commit SHA: `a616caf0`, `61fb063b`, `3bdf85be`, `cb88428c`.
+- Residual risk: repository-wide raw console/error sink review is still in progress under Phase 24; this finding closes the central structured path.
+- Status: FIXED — full branch CI pending.
+
 ## Phase 0 report
 
 PHASE: 0 — Security baseline / feature freeze
@@ -271,3 +285,24 @@ REMAINING:
 - run the widened detector through the complete blocking suite
 - investigate any newly surfaced unclassified mutation routes
 - perform deeper ownership/tenant semantics in Phases 7 and 8 rather than treating authentication alone as authorization
+
+
+## Phase 24 partial report
+
+PHASE: 24 — Logging / audit safety
+STATUS: PARTIAL
+
+CODE/CI EVIDENCE:
+- recursive structured-context redaction
+- credential/token/OTP/password key redaction
+- embedded Bearer and PostgreSQL credential string scrubbing
+- production Error message suppression in the shared logger
+- CRM audit old/new value redaction
+- security/financial audit event coverage
+
+NEW FINDING:
+- SG-0005 fixed: raw Error serialization bypassed normal production context redaction.
+
+REMAINING:
+- continue repository-wide review for direct `console.*` sinks and unsafe raw exception logging
+- verify external log aggregation retention/access controls in the real production environment
