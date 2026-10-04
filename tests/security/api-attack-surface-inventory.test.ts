@@ -78,6 +78,25 @@ function isAuthBootstrapRoute(path: string): boolean {
     PUBLIC_MARKETPLACE_AUTH_ROUTES.some(segment => path.includes(segment))
 }
 
+function isOperationalOrTestSurface(path: string): boolean {
+  return /\/(?:debug|test|tests|test-data|seed|setup|init|migrate|migration|internal|cleanup(?:-[^/]+)?)(?:\/|$)/.test(path)
+}
+
+function hasExplicitProductionDenial(code: string): boolean {
+  return code.includes("process.env.NODE_ENV === 'production'") &&
+    /status:\s*(?:403|404|410)/.test(code)
+}
+
+const ROUTE_LOCAL_PRIVILEGED_MARKERS = [
+  'guardCrmRequest(',
+  'guardCrmAction(',
+  'authenticateMarketplaceUser(',
+  'authenticateRequest(',
+  'requireInternal',
+  'INTERNAL_SYNC_SECRET',
+  'CRON_SECRET',
+] as const
+
 describe('API attack-surface inventory', () => {
   const root = resolve(process.cwd(), 'app/api')
   const routes = walk(root)
@@ -126,6 +145,35 @@ describe('API attack-surface inventory', () => {
       const protectedByBoundary = hasBoundary(code)
       const abuseLimited = PUBLIC_ABUSE_MARKERS.some(marker => code.includes(marker))
       if (!protectedByBoundary && !abuseLimited) weak.push(path)
+    }
+
+    expect(weak).toEqual([])
+  })
+
+  it('independently closes test/debug/setup/seed/migration/internal/cleanup mutation surfaces', () => {
+    const weak: Array<{ path: string; reason: string }> = []
+
+    for (const path of routes) {
+      if (!isOperationalOrTestSurface(path)) continue
+
+      const code = readFileSync(resolve(process.cwd(), path), 'utf8')
+      const methods = exportedMethods(code)
+      if (!methods.some(method => method !== 'GET')) continue
+
+      const requiresProductionDenial =
+        /\/(?:debug|test|tests|test-data|seed|setup|init|migrate|migration)(?:\/|$)/.test(path)
+
+      if (requiresProductionDenial) {
+        if (!hasExplicitProductionDenial(code) && !code.includes('status: 410')) {
+          weak.push({ path, reason: 'missing explicit route-local production denial' })
+        }
+        continue
+      }
+
+      const protectedLocally = ROUTE_LOCAL_PRIVILEGED_MARKERS.some(marker => code.includes(marker))
+      if (!protectedLocally) {
+        weak.push({ path, reason: 'missing route-local privileged caller authentication' })
+      }
     }
 
     expect(weak).toEqual([])
