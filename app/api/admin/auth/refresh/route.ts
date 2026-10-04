@@ -42,6 +42,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account not active' }, { status: 401 })
     }
 
+    if (
+      adminUser.role === 'SUPER_ADMIN' &&
+      (!adminUser.totpEnabled || !adminUser.totpSecret)
+    ) {
+      await prisma.adminSession.updateMany({
+        where: { id: session.id, isRevoked: false },
+        data: { isRevoked: true, revokedAt: new Date() },
+      })
+      return NextResponse.json(
+        {
+          error: 'Super-admin MFA enrollment is required.',
+          code: 'MFA_ENROLLMENT_REQUIRED',
+        },
+        { status: 401 }
+      )
+    }
+
     const newRefreshToken = signRefreshToken(adminUser.id, session.id)
     const newRefreshTokenHash = hashRefreshToken(newRefreshToken)
 
