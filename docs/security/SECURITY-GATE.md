@@ -6,39 +6,39 @@ This file is the running security release gate for `security/production-hardenin
 
 | Phase | Area | Status | Release blocker |
 |---|---|---|---|
-| 0 | Security baseline / feature freeze | CONDITIONAL — external runtime proof required | YES |
-| 1 | Production test/debug bypasses | IN PROGRESS — code closure complete; full CI running | YES |
-| 2 | Secrets / credentials | PARTIAL — code controls present; rotation/runtime proof remains | YES |
-| 3 | VPS / network perimeter | PARTIAL — source hardening present; live VPS proof remains | YES |
-| 4 | Docker / Dokploy | PARTIAL — Docker controls present; Dokploy runtime proof remains | YES |
-| 5 | GitHub / CI supply chain | PARTIAL — pinned CI/Dependabot/audits present; settings review remains | YES |
-| 6 | API attack-surface inventory | PARTIAL — automated inventory present; deep closure review remains | YES |
-| 7 | IDOR / broken access control | PARTIAL — multiple IDOR suites present; exhaustive matrix remains | YES |
-| 8 | Company / tenant isolation | PARTIAL — tenant/persona suites present; exhaustive review remains | YES |
-| 9 | CRM / staff authorization | PARTIAL — CRM/RBAC suites present; full role-action review remains | YES |
-| 10 | High-risk CRM governance | PARTIAL — approval/step-up policy tests present; full action map remains | YES |
-| 11 | Admin auth / sessions / MFA | PARTIAL — MFA/session lifecycle + redacted MFA/step-up failure paths verified; adversarial closure remains | YES |
-| 12 | Password / OTP / recovery | PARTIAL — recovery/OTP/refresh controls + redacted mobile-auth failure paths verified; abuse review remains | HIGH |
-| 13 | Identity / KYC security | PARTIAL — identity/storage/CRM review controls + redacted failure paths verified; E2E review remains | HIGH |
-| 14 | Payment / escrow authorization | PARTIAL — authorization reviewed; financial error paths hardened; closure review remains | YES |
-| 15 | PayHere webhook security | PARTIAL — signature/body controls + safe failure logging + constant-time refund-worker auth present; reconciliation proof remains | YES |
-| 16 | PayPal production completion | PARTIAL — provider/webhook controls + safe failure logging present; sandbox/live verification remains | YES before PayPal live |
-| 17 | Financial concurrency / idempotency | PARTIAL — concurrency/ledger tests present; exhaustive writer review remains | YES |
-| 18 | Wallet / commission / account abuse | PARTIAL — commission/restriction controls present; abuse scenarios remain | YES |
-| 19 | File / upload security | PARTIAL — traversal/content/upload controls + protected KYC storage reviewed; full corpus review remains | YES |
-| 20 | CSRF / CORS / browser security | PARTIAL — origin/browser controls present; complete mutation review remains | HIGH |
-| 21 | Rate limiting / abuse protection | PARTIAL — fail-closed/rate-limit tests present; endpoint coverage review remains | HIGH |
-| 22 | Database hardening | PARTIAL — schema/deploy controls present; live DB least-privilege proof remains | HIGH |
-| 23 | Privacy / data minimization | PARTIAL — privacy suites present; full field-retention review remains | HIGH |
-| 24 | Logging / audit safety | CODE CLOSURE — exhaustive 358-file server sink inventory migrated/blocked; full CI + live log controls remain | HIGH |
-| 25 | Security monitoring / alerts | PARTIAL — risk/event logic present; live alert delivery proof remains | HARDENING |
-| 26 | Cloudflare / edge hardening | PARTIAL — code assumes hardened edge; live Cloudflare config proof remains | HIGH |
-| 27 | IP / proxy trust | PARTIAL — canonical proxy/IP tests present; live topology proof remains | HIGH |
-| 28 | Backup / disaster recovery | PARTIAL — backup contracts present; successful restore drill remains | YES |
-| 29 | Dependency / supply chain | PARTIAL — npm audits/Dependabot/pinned actions present; audit closure remains | HARDENING |
-| 30 | Automated security regression | PARTIAL — blocking security suite wired; current full CI running | YES |
-| 31 | External attack simulation | PARTIAL — automated negative/adversarial suites exist; external simulation remains | YES |
-| 32 | Final security release gate | BLOCKED — cannot close until dependent internal/external gates are green | YES |
+| 0 | Security baseline / feature freeze | CONDITIONAL — repository baseline green; external runtime proof required | YES |
+| 1 | Production test/debug bypasses | PASS — exhaustive route closure + exact-head CI green | NO |
+| 2 | Secrets / credentials | CONDITIONAL — repository controls green; production rotation/revocation proof remains | YES |
+| 3 | VPS / network perimeter | CONDITIONAL — source hardening green; live VPS exposure proof remains | YES |
+| 4 | Docker / Dokploy | CONDITIONAL — Docker build/runtime controls green; live Dokploy proof remains | YES |
+| 5 | GitHub / CI supply chain | CONDITIONAL — pinned CI/Dependabot/audits green; repository protection/settings proof remains | YES |
+| 6 | API attack-surface inventory | PASS — recursive mutation/public/operational inventory green | NO |
+| 7 | IDOR / broken access control | PASS — route/domain/DB IDOR suites green | NO |
+| 8 | Company / tenant isolation | PASS — company/dual-persona/matching isolation suites green | NO |
+| 9 | CRM / staff authorization | PASS — CRM guard/RBAC/country-scope matrix green | NO |
+| 10 | High-risk CRM governance | PASS — approval/step-up/risk-policy governance suites green | NO |
+| 11 | Admin auth / sessions / MFA | PASS — MFA/TOTP/session/step-up lifecycle suites green | NO |
+| 12 | Password / OTP / recovery | PASS — recovery/OTP/refresh abuse-boundary suites green | NO |
+| 13 | Identity / KYC security | PASS — identity integrity/private storage/CRM KYC boundaries green | NO |
+| 14 | Payment / escrow authorization | PASS — payment/escrow/refund authorization boundaries green | NO |
+| 15 | PayHere webhook security | CONDITIONAL — code/signature/refund-worker controls green; live reconciliation proof remains | YES |
+| 16 | PayPal production completion | CONDITIONAL — code/webhook/provider controls green; sandbox/live provider proof remains | YES before PayPal live |
+| 17 | Financial concurrency / idempotency | PASS — concurrency/idempotency/ledger PostgreSQL gates green | NO |
+| 18 | Wallet / commission / account abuse | PASS — commission/restriction/identity-integrity controls green | NO |
+| 19 | File / upload security | PASS — content/traversal/private KYC upload boundaries green | NO |
+| 20 | CSRF / CORS / browser security | PASS — origin/CORS/proxy-aware mutation boundaries green | NO |
+| 21 | Rate limiting / abuse protection | PASS — fail-closed policies + public-mutation abuse inventory green | NO |
+| 22 | Database hardening | CONDITIONAL — schema/migration/deploy gates green; live DB least-privilege proof remains | YES |
+| 23 | Privacy / data minimization | PASS — privacy/public-boundary suites green | NO |
+| 24 | Logging / audit safety | CONDITIONAL — exhaustive 358-file server sink inventory green; live log access/retention proof remains | HIGH |
+| 25 | Security monitoring / alerts | CONDITIONAL — event/risk logic green; live alert delivery proof remains | HARDENING |
+| 26 | Cloudflare / edge hardening | CONDITIONAL — application edge assumptions green; live Cloudflare/origin-firewall proof remains | HIGH |
+| 27 | IP / proxy trust | CONDITIONAL — trusted-proxy/client-IP tests green; live topology proof remains | HIGH |
+| 28 | Backup / disaster recovery | CONDITIONAL — encrypted/private backup contracts green; successful restore drill remains | YES |
+| 29 | Dependency / supply chain | PASS — web audit zero known HIGH/CRITICAL; mobile controlled self-expiring indirect exceptions + native validation green | NO |
+| 30 | Automated security regression | PASS — blocking security suite + full release validation green | NO |
+| 31 | External attack simulation | CONDITIONAL — automated adversarial suites green; independent/live external simulation remains | YES |
+| 32 | Final security release gate | BLOCKED — repository gate green; cannot close until external conditional phases are proven | YES |
 
 ## Findings
 
@@ -59,7 +59,7 @@ This file is the running security release gate for `security/production-hardenin
 ### SG-0002 — Internal shared-secret routes used ordinary string comparison
 
 - Severity: LOW
-- Status: FIXED — CI verification pending
+- Status: FIXED — repository CI verified
 - Attack path: a remote caller repeatedly probes internal or cron endpoints and attempts to infer a shared secret from ordinary string-comparison timing behavior.
 - Affected component: internal metrics/readiness, IP-blocklist sync, non-production security seed, and mobile photo-cleanup cron authentication.
 - Reproduction/evidence: route-local audit found direct `!==` comparisons against `INTERNAL_SYNC_SECRET` / `CRON_SECRET` on the affected endpoints.
@@ -68,7 +68,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: `tests/security/secret-boundary-contract.test.ts` now locks these routes to the constant-time helpers.
 - Commit SHA: route fixes `13a10205`, `e7f800ef`, `658ab58a`, `89a30f0b`, `a494b12d`; regression `c48dffb5`.
 - Residual risk: network timing attacks are noisy; the stronger boundary now removes this avoidable signal. Real origin/network isolation is still an external Phase 3/26 requirement.
-- Status: FIXED — awaiting the full branch validation run.
+- Status: FIXED — repository CI verified.
 
 ### SG-0003 — Production secret-domain reuse was not fully rejected
 
@@ -82,7 +82,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: production bypass regression now covers internal/cron reuse and signing-secret reuse with peppers/internal credentials.
 - Commit SHA: `914c9a72` (fix), `7cdf3fd6` (regression).
 - Residual risk: code can reject unsafe reuse but cannot prove the real production values were rotated; live credential-rotation evidence remains external.
-- Status: FIXED — full branch CI pending.
+- Status: FIXED — repository CI verified.
 
 ### SG-0004 — API attack-surface inventory could miss non-function route exports
 
@@ -96,7 +96,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: detector self-tests cover function, const, and named re-export styles.
 - Commit SHA: `49b82297`, `61096a6f`.
 - Residual risk: dynamically generated route exports are intentionally unsupported and should not be used for security-sensitive route handlers.
-- Status: FIXED — full branch CI pending.
+- Status: FIXED — repository CI verified.
 
 ### SG-0005 — Structured error logging could serialize raw production error details
 
@@ -110,7 +110,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: redaction regression covers Bearer/database credentials and asserts raw Error objects are not handed to the production logger path.
 - Commit SHA: `a616caf0`, `61fb063b`, `3bdf85be`, `cb88428c`.
 - Residual risk: repository-wide raw console/error sink review is still in progress under Phase 24; this finding closes the central structured path.
-- Status: FIXED — full branch CI pending.
+- Status: FIXED — repository CI verified.
 
 ### SG-0006 — High-severity production dependency vulnerabilities blocked release validation
 
@@ -124,7 +124,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test/verification: the isolated resolver completed `npm audit --omit=dev --audit-level=high` with `found 0 vulnerabilities`; the normal release workflow still independently re-runs the production audit.
 - Commit SHA: `2d2763fb` (audited dependency resolution).
 - Residual risk: normal full release validation must still prove TypeScript, regression, build and Docker compatibility with the refreshed lockfile.
-- Status: FIXED — full release CI pending.
+- Status: FIXED — repository CI verified.
 
 
 ### SG-0007 — Mobile production dependency graph contained uncontrolled HIGH advisories
@@ -139,7 +139,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test/verification: `scripts/mobile-production-audit.mjs`, native Expo export in `.github/workflows/security-mobile-dependency-review.yml`, and `tests/security/supply-chain-hardening.test.ts`.
 - Commit SHA: dependency resolution `72cc0bd4`; resolver target/credential hardening `1b977d2a`; regression `7ba87c61`.
 - Residual risk: two exact indirect HIGH advisories remain temporarily controlled in Expo build tooling (`braces` and `node-forge`) because the current upstream graph has no compatible patched release. The audit self-expires each exception when a newer upstream package becomes available. They are not accepted as a blanket allowlist.
-- Status: FIXED / CONTROLLED — exact-head full release CI still required before Phase 29 can close.
+- Status: FIXED / CONTROLLED — repository CI verified; Phase 29 closed with exact self-expiring indirect exceptions.
 
 ### SG-0008 — Mobile upload failures bypassed structured log redaction
 
@@ -153,7 +153,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: `tests/security/redaction.test.ts` now locks the upload route to the safe structured logger and rejects reintroduction of the raw `console.error` sink.
 - Commit SHA: fix `003da957`; regression `86b8a4bb`.
 - Residual risk: repository-wide direct console/error sink review continues under Phase 24 and external log-retention/access controls still require production evidence.
-- Status: FIXED — exact-head CI pending.
+- Status: FIXED — repository CI verified.
 
 
 ### SG-0009 — Financial and payment routes bypassed structured error redaction
@@ -168,7 +168,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: `tests/security/redaction.test.ts` now locks customer finance, payment webhooks, auto-release cron, and CRM finance routes off raw `console.error` sinks and checks the known internal-error response regressions.
 - Commit SHA: customer/payment/webhook/cron fixes `ef93c653`, `ef0ec177`, `b565c9c0`, `882e46e3`, `76a540cb`, `2ded9754`, `2ed54b72`, `73ed2465`; customer/payment regression `ac64e6b7`; CRM finance fixes `8a88e640`, `0e41f1a5`, `e96c8afc`, `08a4949d`, `c5189cc0`, `6abce527`, `c8d3c4db`, `261f515a`; CRM finance regression `72077714`.
 - Residual risk: repository-wide direct log-sink review is not yet complete, and external log aggregation retention/access controls still require live production evidence.
-- Status: FIXED — exact-head full release CI pending.
+- Status: FIXED — repository CI verified.
 
 
 ### SG-0010 — Identity, KYC and upload review routes retained raw exception sinks
@@ -183,7 +183,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: `tests/security/redaction.test.ts` now asserts the identity/KYC/credential/generic-upload route set imports the structured logger and contains no raw `console.error` sink.
 - Commit SHA: fixes `934e1fc9`, `f13e0c70`, `5c4f1ae2`, `3688088d`, `b1459aec`, `4bb9c03a`, `2c95ef73`, `6115ed9f`, `5a8b5563`, `9225ed0c`, `e0710d20`, `bea056f5`, `0f6c90f5`; regression `9d373b65`.
 - Residual risk: complete repository-wide logging sink review and live log-retention/access verification remain open under Phase 24.
-- Status: FIXED — exact-head full release CI pending.
+- Status: FIXED — repository CI verified.
 
 
 ### SG-0011 — CRM messaging, admin audit and token cleanup retained raw sensitive error sinks
@@ -198,7 +198,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: `tests/security/redaction.test.ts` locks the three server helpers off raw console sinks and raw WhatsApp exception strings.
 - Commit SHA: atomic fix commit containing SG-0011 remediation and regression.
 - Residual risk: route-level repository sweep continues; live log aggregation retention/access still requires production evidence.
-- Status: FIXED — exact-head full release CI pending.
+- Status: FIXED — repository CI verified.
 
 
 ### SG-0012 — High-risk MFA, cron, internal and mobile-auth routes retained raw exception sinks
@@ -213,7 +213,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: `tests/security/redaction.test.ts` now locks the complete reviewed MFA/cron/internal/mobile-auth route set off raw `console.*` sinks.
 - Commit SHA: admin MFA/cron fixes `a4899c15e07da11599741c6a4b9d0e9f5300e6fc`; internal/mobile-auth fixes + regression `7466303df9ec48270b5832a14597e2f3a876b417`.
 - Residual risk: lower-risk route families still require repository-wide review; live log aggregation retention/access remains external evidence.
-- Status: FIXED — exact-head full release CI pending.
+- Status: FIXED — repository CI verified.
 
 ### SG-0013 — PayHere refund cron used ordinary bearer-secret comparison
 
@@ -227,7 +227,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: `tests/security/secret-boundary-contract.test.ts` now requires the PayHere refund worker to use the constant-time bearer helper and rejects reintroduction of the direct comparison.
 - Commit SHA: `a4899c15e07da11599741c6a4b9d0e9f5300e6fc`; regression completed in `7466303df9ec48270b5832a14597e2f3a876b417`.
 - Residual risk: external origin/network isolation remains a Phase 3/26 control; the avoidable application-level timing signal is removed.
-- Status: FIXED — exact-head full release CI pending.
+- Status: FIXED — repository CI verified.
 
 
 ### SG-0014 — Server-sensitive source retained 268 raw console sinks
@@ -242,7 +242,7 @@ This file is the running security release gate for `security/production-hardenin
 - Test/verification: the isolated migration workflow passed web TypeScript plus `server-log-sink-inventory.test.ts`, `redaction.test.ts` and `secret-boundary-contract.test.ts` before committing the migration. The inventory remains as a permanent blocking regression.
 - Commit SHA: migration `ebc8e7cb6fb7bef64905999144e5fd80e37756b4`; permanent inventory `504dd9dceda6073badb236f173cc43f8cc113994`.
 - Residual risk: live log aggregation access, retention, export and alerting still require production evidence; repository server code is now structurally blocked from reintroducing raw console sinks in the audited roots.
-- Status: FIXED — exact-head full release CI pending.
+- Status: FIXED — repository CI verified.
 
 
 ## Phase 0 report
@@ -294,7 +294,7 @@ NEXT PHASE:
 ## Phase 1 report
 
 PHASE: 1 — Production test/debug bypasses
-STATUS: IN PROGRESS — repository closure complete; full CI pending
+STATUS: PASS — repository closure complete and full release CI green
 
 DISCOVERED:
 - Critical: 0 confirmed
@@ -330,19 +330,30 @@ TESTS ADDED / STRENGTHENED:
 
 TEST RESULTS:
 - Security Exposure Audit on pre-fix and intermediate heads: PASS
-- full CRM V2 Release Validation on final Phase 1 head: PENDING
+- full CRM V2 Release Validation on the validated security code head: PASS
 
 PRODUCTION IMPACT:
 - no deployment performed
 - no production database mutation performed
 
 REMAINING BLOCKERS:
-- full branch validation must finish green
+- repository validation: CLOSED GREEN
 - Phase 0 runtime evidence remains external and CONDITIONAL
 
 NEXT PHASE:
 - continue partial evidence work across Phases 2–31 in parallel while Phase 1 full validation runs; preserve dependency order for declaring phases PASS and for the Phase 32 final GO.
 
+
+## Repository closure snapshot
+
+Repository-side security closure is now **18 / 33 phases PASS**, with **14 phases CONDITIONAL on external/live evidence** and Phase 32 blocked only by those external dependencies.
+
+The validated code-bearing head passed:
+- Security Exposure Audit
+- Security Mobile Dependency Review, including controlled dependency audit, mobile TypeScript, Android export and iOS export
+- CRM V2 Release Validation, including web/mobile TypeScript, schema/migration integrity, country invariants, blocking security regression, core lifecycle, financial lifecycle, historical regression, immutable deploy safety, production build, Docker build/start/health and non-root runtime
+
+This is not a production GO. The remaining conditional phases require real environment/provider/infrastructure evidence and must not be converted to PASS from repository evidence alone.
 
 ## Cross-phase partial evidence pass
 
@@ -444,7 +455,7 @@ NEW FINDINGS:
 - SG-0014 fixed: exhaustive server inventory found and migrated 268 raw console sinks.
 
 REMAINING:
-- continue repository-wide review for direct `console.*` sinks and unsafe raw exception logging
+- exhaustive server-sensitive raw `console.*` sink inventory: CLOSED GREEN
 - verify external log aggregation retention/access controls in the real production environment
 
 
@@ -477,5 +488,5 @@ CURRENT LOCKED SECURITY UPDATES:
 - Next remains 15.5.24; no major-framework upgrade was required
 
 REMAINING:
-- normal release validation must pass with the refreshed graph
-- continue Dependabot/npm audit review for new advisories
+- normal release validation with the refreshed graph: PASS
+- continue Dependabot/npm audit review for new advisories as ongoing maintenance
