@@ -84,7 +84,7 @@ function makeIndivInput(overrides: Record<string, any> = {}) {
     job: {
       jobId: 'job-1',
       categoryId: 'cat-1',
-      serviceTemplateId: undefined,
+      serviceTemplateId: undefined as string | undefined,
       jobMode: 'QUOTE' as const,
       urgency: 'NORMAL' as const,
       countryCode: 'US',
