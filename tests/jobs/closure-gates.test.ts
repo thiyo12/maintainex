@@ -104,6 +104,16 @@ beforeAll(async () => {
   })
   dataIds.catId = cat.id
 
+  // Assignment gates are capability-aware. Positive worker fixtures must
+  // explicitly declare the category used by the company job.
+  await prisma.teamMember.updateMany({
+    where: {
+      companyId: dataIds.companyAId,
+      userId: { in: [ids.workerA, ids.workerB, ids.workerC] },
+    },
+    data: { skills: JSON.stringify([dataIds.catId, 'plumbing']) },
+  })
+
   const jobA = await prisma.marketplaceJob.create({
     data: {
       customerId: ids.customer, title: 'Closure Test Job A', description: 'Test',
