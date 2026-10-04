@@ -56,6 +56,7 @@ jobs:
       IDENTITY_CLAIM_PEPPER: phase07-ci-identity-claim-pepper-0123456789012345
       CRON_SECRET: phase07-ci-cron-secret-012345678901234567
       INTERNAL_SYNC_SECRET: phase07-ci-sync-secret-01234567890123456
+      APP_RELEASE_SHA: ${{ github.sha }}
       ALLOW_TEST_OTP: "true"
       VPS_INTEGRATION: "true"
       CLOUDINARY_CLOUD_NAME: test
