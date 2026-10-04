@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -47,10 +49,15 @@ jobs:
 
       - name: Mobile Expo export
         working-directory: apps/mobile
-        run: npx expo export --platform all --output-dir /tmp/maintainex-mobile-export
+        run: |
+          set -euo pipefail
+          npx expo export --platform android --output-dir /tmp/maintainex-mobile-export-android
+          npx expo export --platform ios --output-dir /tmp/maintainex-mobile-export-ios
 
       - name: Commit validated mobile dependency resolution
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           unexpected="$(git status --porcelain | awk '{print $2}' | grep -vE '^(apps/mobile/package.json|apps/mobile/package-lock.json)$' || true)"
@@ -66,5 +73,8 @@ jobs:
           fi
           git config user.name "MaintainEX Security CI"
           git config user.email "security-ci@maintainex.invalid"
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git config --local http.https://github.com/.extraheader "AUTHORIZATION: basic $auth"
+          trap 'git config --local --unset-all http.https://github.com/.extraheader || true' EXIT
           git commit -m "security(mobile-deps): resolve fixable production advisories"
           git push origin HEAD:security/production-hardening
