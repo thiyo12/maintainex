@@ -68,7 +68,7 @@ describe('Redaction', () => {
     for (const path of sensitiveRoutes) {
       const route = readFileSync(resolve(process.cwd(), path), 'utf8')
       expect(route).toContain("logger.error(")
-      expect(route).not.toMatch(/\\bconsole\\.error\\s*\\(/)
+      expect(route).not.toMatch(/\bconsole\.error\s*\(/)
     }
   })
 
