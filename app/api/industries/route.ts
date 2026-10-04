@@ -2,12 +2,22 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { guardCrmRequest } from '@/lib/crm/security'
 
 export async function GET() {
   try {
     const industries = await prisma.industry.findMany({
-      orderBy: { displayOrder: 'asc' }
+      where: { isActive: true },
+      orderBy: { displayOrder: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        icon: true,
+        image: true,
+        displayOrder: true,
+        isPartner: true,
+        partnerName: true,
+      },
     })
     return NextResponse.json(industries)
   } catch (error) {
@@ -18,10 +28,12 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession(request)
-    if (!session || session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'catalog:edit',
+      allowedRoles: ['SUPER_ADMIN'],
+      level: 'mutation',
+    })
+    if (!guard.ok) return guard.response
 
     const body = await request.json()
     const { name, icon, image, displayOrder, isPartner, partnerName } = body
@@ -50,10 +62,12 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getSession(request)
-    if (!session || session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'catalog:edit',
+      allowedRoles: ['SUPER_ADMIN'],
+      level: 'mutation',
+    })
+    if (!guard.ok) return guard.response
 
     const body = await request.json()
     const { id, name, icon, image, displayOrder, isPartner, partnerName, isActive } = body
@@ -84,10 +98,12 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getSession(request)
-    if (!session || session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'catalog:edit',
+      allowedRoles: ['SUPER_ADMIN'],
+      level: 'mutation',
+    })
+    if (!guard.ok) return guard.response
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
