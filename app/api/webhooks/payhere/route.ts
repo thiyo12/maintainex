@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
       const result = await processPaymentFailure(notification)
       if (!result.success) {
         logger.error('PayHere failure webhook processing failed', { route: '/api/webhooks/payhere', method: 'POST' })
-        return NextResponse.json({ error: result.error }, { status: 409 })
+        return NextResponse.json({ error: 'Payment processing conflict' }, { status: 409 })
       }
     }
 
