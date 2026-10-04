@@ -27,6 +27,10 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
   let caQuoteId: string
   let lkEscrowId: string
   let caEscrowId: string
+  const lkCategoryId = `${PREFIX}-lk-category`
+  const caCategoryId = `${PREFIX}-ca-category`
+  const lkTemplateJobId = `${PREFIX}-lk-template`
+  const caTemplateJobId = `${PREFIX}-ca-template`
 
   beforeAll(async () => {
     prisma = new PrismaClient()
@@ -36,15 +40,40 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       data: [
         { id: lkCustomerId, email: `${PREFIX}-lk-c@test.com`, passwordHash: 'h', name: 'LK Cust', role: 'CUSTOMER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
         { id: caCustomerId, email: `${PREFIX}-ca-c@test.com`, passwordHash: 'h', name: 'CA Cust', role: 'CUSTOMER', countryCode: 'CA', isActive: true, updatedAt: new Date() },
-        { id: lkProviderId, email: `${PREFIX}-lk-p@test.com`, passwordHash: 'h', name: 'LK Prov', role: 'TASKER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
-        { id: caProviderId, email: `${PREFIX}-ca-p@test.com`, passwordHash: 'h', name: 'CA Prov', role: 'TASKER', countryCode: 'CA', isActive: true, updatedAt: new Date() },
+        { id: lkProviderId, email: `${PREFIX}-lk-p@test.com`, passwordHash: 'h', name: 'LK Prov', role: 'TASKER', countryCode: 'LK', identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
+        { id: caProviderId, email: `${PREFIX}-ca-p@test.com`, passwordHash: 'h', name: 'CA Prov', role: 'TASKER', countryCode: 'CA', identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
       ],
     })
 
     await prisma.taskerProfile.createMany({
       data: [
-        { userId: lkProviderId, isOnline: true, isVerified: true, countryCode: 'LK' },
-        { userId: caProviderId, isOnline: true, isVerified: true, countryCode: 'CA' },
+        { userId: lkProviderId, isOnline: true, isVerified: true, verificationStatus: 'VERIFIED', countryCode: 'LK' },
+        { userId: caProviderId, isOnline: true, isVerified: true, verificationStatus: 'VERIFIED', countryCode: 'CA' },
+      ],
+    })
+
+    await prisma.jobCategory.createMany({
+      data: [
+        { id: lkCategoryId, name: `${PREFIX} LK Plumbing`, slug: `${PREFIX}-lk-plumbing`, iconName: 'wrench', colorHex: '#3B82F6', countries: '["LK"]', isActive: true },
+        { id: caCategoryId, name: `${PREFIX} CA Electrical`, slug: `${PREFIX}-ca-electrical`, iconName: 'bolt', colorHex: '#3B82F6', countries: '["CA"]', isActive: true },
+      ],
+    })
+    await prisma.templateJob.createMany({
+      data: [
+        { id: lkTemplateJobId, categoryId: lkCategoryId, name: `${PREFIX} LK Service`, description: 'Finance integration LK', whatIsIncluded: 'Test', typicalDurationMinutes: 60, priceMin: 10, priceMax: 1000, currency: 'LKR', countries: '["LK"]' },
+        { id: caTemplateJobId, categoryId: caCategoryId, name: `${PREFIX} CA Service`, description: 'Finance integration CA', whatIsIncluded: 'Test', typicalDurationMinutes: 60, priceMin: 10, priceMax: 1000, currency: 'CAD', countries: '["CA"]' },
+      ],
+    })
+    const providerProfiles = await prisma.taskerProfile.findMany({
+      where: { userId: { in: [lkProviderId, caProviderId] } },
+      select: { id: true, userId: true },
+    })
+    const lkProfile = providerProfiles.find(profile => profile.userId === lkProviderId)!
+    const caProfile = providerProfiles.find(profile => profile.userId === caProviderId)!
+    await prisma.taskerSkill.createMany({
+      data: [
+        { taskerId: lkProfile.id, jobId: lkTemplateJobId, countryCode: 'LK', currency: 'LKR' },
+        { taskerId: caProfile.id, jobId: caTemplateJobId, countryCode: 'CA', currency: 'CAD' },
       ],
     })
 
@@ -76,7 +105,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
     const lkJob = await prisma.marketplaceJob.create({
       data: {
         id: `${PREFIX}-lk-job`, customerId: lkCustomerId, title: 'LK Plumber', description: 'Fix leak',
-        categoryId: 'plumbing', photos: '[]', budgetType: 'FIXED', budgetAmount: 500000n,
+        categoryId: lkCategoryId, photos: '[]', budgetType: 'FIXED', budgetAmount: 500000n,
         status: 'OPEN', urgency: 'normal', workersCount: 1,
         materialHandling: 'tasker_brings', countryCode: 'LK',
       },
@@ -86,7 +115,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
     const caJob = await prisma.marketplaceJob.create({
       data: {
         id: `${PREFIX}-ca-job`, customerId: caCustomerId, title: 'CA Electrician', description: 'Wiring',
-        categoryId: 'electrical', photos: '[]', budgetType: 'FIXED', budgetAmount: 200000n,
+        categoryId: caCategoryId, photos: '[]', budgetType: 'FIXED', budgetAmount: 200000n,
         status: 'OPEN', urgency: 'normal', workersCount: 1,
         materialHandling: 'tasker_brings', countryCode: 'CA',
       },
@@ -94,12 +123,12 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
     caJobId = caJob.id
 
     const lkQuote = await prisma.jobQuote.create({
-      data: { id: `${PREFIX}-lk-quote`, jobId: lkJobId, providerId: lkProviderId, providerType: 'INDIVIDUAL', price: 500000n, message: 'I can fix', estimatedCompletionTime: '2h', attachments: '[]', status: 'PENDING' },
+      data: { id: `${PREFIX}-lk-quote`, jobId: lkJobId, providerId: lkProviderId, providerType: 'INDIVIDUAL', price: 500000n, currency: 'LKR', message: 'I can fix', estimatedCompletionTime: '2h', attachments: '[]', status: 'PENDING' },
     })
     lkQuoteId = lkQuote.id
 
     const caQuote = await prisma.jobQuote.create({
-      data: { id: `${PREFIX}-ca-quote`, jobId: caJobId, providerId: caProviderId, providerType: 'INDIVIDUAL', price: 200000n, message: 'I can wire', estimatedCompletionTime: '3h', attachments: '[]', status: 'PENDING' },
+      data: { id: `${PREFIX}-ca-quote`, jobId: caJobId, providerId: caProviderId, providerType: 'INDIVIDUAL', price: 200000n, currency: 'CAD', message: 'I can wire', estimatedCompletionTime: '3h', attachments: '[]', status: 'PENDING' },
     })
     caQuoteId = caQuote.id
   })
@@ -118,7 +147,10 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
     await prisma.walletBalance.deleteMany({ where: { walletId: { in: [lkCustomerWalletId, caCustomerWalletId, lkProviderWalletId, caProviderWalletId] } } }).catch(() => {})
     await prisma.customerWallet.deleteMany({ where: { id: { in: [lkCustomerWalletId, caCustomerWalletId] } } }).catch(() => {})
     await prisma.providerWallet.deleteMany({ where: { id: { in: [lkProviderWalletId, caProviderWalletId] } } }).catch(() => {})
+    await prisma.taskerSkill.deleteMany({ where: { jobId: { in: [lkTemplateJobId, caTemplateJobId] } } }).catch(() => {})
     await prisma.taskerProfile.deleteMany({ where: { userId: { in: [lkProviderId, caProviderId] } } }).catch(() => {})
+    await prisma.templateJob.deleteMany({ where: { id: { in: [lkTemplateJobId, caTemplateJobId] } } }).catch(() => {})
+    await prisma.jobCategory.deleteMany({ where: { id: { in: [lkCategoryId, caCategoryId] } } }).catch(() => {})
     await prisma.user.deleteMany({ where: { id: { in: [lkCustomerId, caCustomerId, lkProviderId, caProviderId] } } }).catch(() => {})
     await prisma.$disconnect()
   })
@@ -210,21 +242,22 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       await prisma.user.createMany({
         data: [
           { id: custId, email: `${newPrefix}@test.com`, passwordHash: 'h', name: 'No Wallet', role: 'CUSTOMER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
-          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'No Wallet P', role: 'TASKER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
+          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'No Wallet P', role: 'TASKER', countryCode: 'LK', identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
         ],
       })
-      await prisma.taskerProfile.create({ data: { userId: provId, isOnline: true, isVerified: true, countryCode: 'LK' } })
+      const noWalletProfile = await prisma.taskerProfile.create({ data: { userId: provId, isOnline: true, isVerified: true, verificationStatus: 'VERIFIED', countryCode: 'LK' } })
+      await prisma.taskerSkill.create({ data: { taskerId: noWalletProfile.id, jobId: lkTemplateJobId, countryCode: 'LK', currency: 'LKR' } })
       await prisma.customerWallet.create({ data: { id: `${newPrefix}-cw`, userId: custId } })
 
       const job = await prisma.marketplaceJob.create({
         data: {
           id: jobId, customerId: custId, title: 'No Wallet Job', description: 'x',
-          categoryId: 'test', photos: '[]', budgetType: 'FIXED', budgetAmount: 10000n,
+          categoryId: lkCategoryId, photos: '[]', budgetType: 'FIXED', budgetAmount: 10000n,
           status: 'OPEN', urgency: 'normal', workersCount: 1, materialHandling: 'tasker_brings', countryCode: 'LK',
         },
       })
       const quote = await prisma.jobQuote.create({
-        data: { id: `${newPrefix}-q`, jobId, providerId: provId, providerType: 'INDIVIDUAL', price: 10000n, message: 'x', estimatedCompletionTime: '1h', attachments: '[]', status: 'PENDING' },
+        data: { id: `${newPrefix}-q`, jobId, providerId: provId, providerType: 'INDIVIDUAL', price: 10000n, currency: 'LKR', message: 'x', estimatedCompletionTime: '1h', attachments: '[]', status: 'PENDING' },
       })
 
       const ctx = { jobId, actorId: custId, actorType: 'CUSTOMER' as const }
@@ -330,7 +363,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       await prisma.user.createMany({
         data: [
           { id: custId, email: `${newPrefix}@test.com`, passwordHash: 'h', name: 'Zero Comm Cust', role: 'CUSTOMER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
-          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Zero Comm Prov', role: 'TASKER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
+          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Zero Comm Prov', role: 'TASKER', countryCode: 'LK', identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
         ],
       })
       await prisma.taskerProfile.create({ data: { userId: provId, isOnline: true, isVerified: true, countryCode: 'LK' } })
@@ -396,7 +429,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       await prisma.user.createMany({
         data: [
           { id: custId, email: `${newPrefix}@test.com`, passwordHash: 'h', name: 'Double Cust', role: 'CUSTOMER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
-          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Double Prov', role: 'TASKER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
+          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Double Prov', role: 'TASKER', countryCode: 'LK', identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
         ],
       })
       await prisma.taskerProfile.create({ data: { userId: provId, isOnline: true, isVerified: true, countryCode: 'LK' } })
@@ -447,7 +480,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       await prisma.user.createMany({
         data: [
           { id: custId, email: `${newPrefix}@test.com`, passwordHash: 'h', name: 'Unfunded Cust', role: 'CUSTOMER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
-          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Unfunded Prov', role: 'TASKER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
+          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Unfunded Prov', role: 'TASKER', countryCode: 'LK', identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
         ],
       })
       await prisma.taskerProfile.create({ data: { userId: provId, isOnline: true, isVerified: true, countryCode: 'LK' } })
@@ -547,7 +580,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       await prisma.user.createMany({
         data: [
           { id: custId, email: `${newPrefix}@test.com`, passwordHash: 'h', name: 'Refund Cust', role: 'CUSTOMER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
-          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Refund Prov', role: 'TASKER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
+          { id: provId, email: `${newPrefix}-p@test.com`, passwordHash: 'h', name: 'Refund Prov', role: 'TASKER', countryCode: 'LK', identityStatus: 'VERIFIED', isActive: true, updatedAt: new Date() },
         ],
       })
       await prisma.taskerProfile.create({ data: { userId: provId, isOnline: true, isVerified: true, countryCode: 'LK' } })
