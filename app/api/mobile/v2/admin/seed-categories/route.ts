@@ -4,6 +4,10 @@ import { guardCrmRequest } from '@/lib/crm/security'
 import { seedJobCategories } from '@/lib/v2-job-categories'
 
 export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   try {
     const guard = await guardCrmRequest(request, {
       permission: 'settings:edit',
