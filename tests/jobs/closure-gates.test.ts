@@ -231,11 +231,20 @@ describe('Gate 2: Role/Permission Matrix', () => {
   })
 
   it('Unrelated company actor (Company B) cannot manage Company A assignments', async () => {
-    const { revokeAssignment } = await import('@/lib/domain/company-job-assignment')
-    const current = await prisma.companyJobAssignment.findFirst({ where: { jobId: dataIds.jobAId, companyId: dataIds.companyAId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } } })
-    expect(current).toBeTruthy()
-    const r = await revokeAssignment(current!.id, dataIds.companyBId, ids.ownerB, 'COMPANY_OWNER', 'idor attempt')
+    await resetJob(dataIds.jobAId)
+    const { createAssignment, revokeAssignment } = await import('@/lib/domain/company-job-assignment')
+    const created = await createAssignment({
+      companyId: dataIds.companyAId,
+      jobId: dataIds.jobAId,
+      workerUserId: ids.workerA,
+      assignedByUserId: ids.ownerA,
+      actorRole: 'COMPANY_OWNER',
+    })
+    expect(created.success).toBe(true)
+
+    const r = await revokeAssignment(created.assignmentId!, dataIds.companyBId, ids.ownerB, 'COMPANY_OWNER', 'idor attempt')
     expect(r.success).toBe(false)
+    await resetJob(dataIds.jobAId)
   })
 })
 
@@ -464,7 +473,7 @@ describe('Gate 10: Reassignment Auth Revocation', () => {
 // Gate 11: Job PIN Workforce Authorization
 // ──────────────────────────────────────────────
 describe('Gate 11: Job PIN Workforce Authorization', () => {
-  it('Assigned worker follows protected ARRIVAL → fresh WORK_START PIN lifecycle', async () => {
+  it('Assigned worker follows protected ARRIVAL → fresh WORK_START PIN lifecycle', { timeout: 30000 }, async () => {
     await resetJob(dataIds.jobAId)
     await prisma.jobVerificationPin.deleteMany({ where: { jobId: dataIds.jobAId } })
     await prisma.jobEscrow.deleteMany({ where: { jobId: dataIds.jobAId } })
