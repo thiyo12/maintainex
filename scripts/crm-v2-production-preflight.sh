@@ -182,7 +182,9 @@ echo
 echo "=== 3/5 Create validated production database backup ==="
 BACKUP_INFO=$("${SSH[@]}" "$VPS" "SERVICE='$SERVICE' BACKUP_DIR='$REMOTE_BACKUPS' sh -s" <<'REMOTE'
 set -eu
+umask 077
 mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
 
 APP_CONTAINER=$(docker ps --filter "name=$SERVICE" --format '{{.ID}}' | head -1)
 if [ -z "$APP_CONTAINER" ]; then
@@ -234,6 +236,7 @@ fi
 stamp=$(date +%Y%m%d-%H%M%S)
 backup="$BACKUP_DIR/maintainex-db-pre-merge-$stamp.sql.gz"
 docker exec "$DB_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" --clean --if-exists | gzip -c > "$backup"
+chmod 600 "$backup"
 test -s "$backup"
 gzip -t "$backup"
 gzip -dc "$backup" | grep -q '_prisma_migrations'
