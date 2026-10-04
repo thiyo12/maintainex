@@ -1,5 +1,5 @@
 import { v2Request } from './v2-client'
-import { V2PaymentStatus } from './v2-types'
+import { V2PaymentOptions, V2PaymentStatus } from './v2-types'
 
 export const v2Payments = {
   start: (jobId: string) =>
@@ -12,5 +12,5 @@ export const v2Payments = {
     }>(`/api/mobile/v2/jobs/${jobId}/payment`, { method: 'POST' }),
 
   status: (jobId: string) =>
-    v2Request<{ payment: V2PaymentStatus | null }>(`/api/mobile/v2/jobs/${jobId}/payment`),
+    v2Request<{ payment: V2PaymentStatus | null; options: V2PaymentOptions }>(`/api/mobile/v2/jobs/${jobId}/payment`),
 }
