@@ -1,0 +1,135 @@
+name: Security Public Black-Box Evidence
+
+on:
+  push:
+    branches:
+      - security/production-hardening
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  public-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PRIMARY_ORIGIN: https://maintainex.lk
+      ADMIN_ORIGIN: https://admin.maintainex.lk
+    steps:
+      - name: Verify public production security boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          https_get() {
+            curl --silent --show-error --fail-with-body               --connect-timeout 10 --max-time 20               --proto '=https' --tlsv1.2 "$@"
+          }
+
+          echo "== HTTPS and release identity =="
+          https_get -D "$tmp/health.headers" -o "$tmp/health.json" "$PRIMARY_ORIGIN/api/health"
+
+          node - "$tmp/health.json" <<'NODE'
+          const fs = require('fs')
+          const path = process.argv[2]
+          const body = JSON.parse(fs.readFileSync(path, 'utf8'))
+          if (body.status !== 'healthy') throw new Error('Production health is not healthy')
+          if (!/^[0-9a-f]{40}$/.test(String(body.release || ''))) {
+            throw new Error('Production release SHA is missing or invalid')
+          }
+          if (body.testOtpMode !== 'disabled') {
+            throw new Error('Production test OTP mode is not disabled')
+          }
+          console.log('release=' + body.release)
+          console.log('health=healthy')
+          console.log('testOtpMode=disabled')
+          NODE
+
+          echo "== HTTPS security headers =="
+          https_get -D "$tmp/home.headers" -o /dev/null "$PRIMARY_ORIGIN/"
+          for header in             strict-transport-security             x-content-type-options             content-security-policy             referrer-policy             permissions-policy
+          do
+            grep -qi "^$header:" "$tmp/home.headers" || fail "Missing public security header: $header"
+          done
+
+          if ! grep -qi '^cf-ray:' "$tmp/home.headers" && ! grep -qi '^server: cloudflare' "$tmp/home.headers"; then
+            fail "Public origin is not visibly traversing Cloudflare"
+          fi
+
+          echo "== HTTP to HTTPS redirect =="
+          curl --silent --show-error --connect-timeout 10 --max-time 20             -D "$tmp/http.headers" -o /dev/null "http://maintainex.lk/"
+          http_status="$(awk 'toupper($1) ~ /^HTTP\// { code=$2 } END { print code }' "$tmp/http.headers")"
+          case "$http_status" in
+            301|302|307|308) ;;
+            *) fail "HTTP origin did not redirect to HTTPS (status=$http_status)" ;;
+          esac
+          grep -qi '^location: https://maintainex\.lk' "$tmp/http.headers" ||             fail "HTTP redirect did not target maintainex.lk HTTPS"
+
+          echo "== Protected internal readiness =="
+          readiness_status="$(curl --silent --show-error --connect-timeout 10 --max-time 20             -o /dev/null -w '%{http_code}' "$PRIMARY_ORIGIN/api/internal/readiness")"
+          [ "$readiness_status" = "403" ] || fail "Unauthenticated readiness status was $readiness_status, expected 403"
+
+          echo "== CORS hostile-origin reflection =="
+          https_get -H 'Origin: https://evil.example' -D "$tmp/cors.headers" -o /dev/null "$PRIMARY_ORIGIN/api/health"
+          acao="$(awk -F': ' 'tolower($1)=="access-control-allow-origin" {gsub(/\r/,"",$2); print $2}' "$tmp/cors.headers" | tail -1)"
+          [ "$acao" != "*" ] || fail "CORS wildcard exposed on health endpoint"
+          [ "$acao" != "https://evil.example" ] || fail "Hostile Origin was reflected by CORS"
+
+          echo "== Unsafe HTTP method rejection =="
+          trace_status="$(curl --silent --show-error --connect-timeout 10 --max-time 20             -X TRACE -o /dev/null -w '%{http_code}' "$PRIMARY_ORIGIN/")"
+          [ "$trace_status" != "200" ] || fail "TRACE unexpectedly returned HTTP 200"
+
+          echo "== Common accidental secret/file exposure =="
+          for path in '/.env' '/.git/config' '/backup.sql' '/docker-compose.yml' '/server.env'; do
+            code="$(curl --silent --show-error --connect-timeout 10 --max-time 20               -o /dev/null -w '%{http_code}' "$PRIMARY_ORIGIN$path")"
+            case "$code" in
+              200) fail "Sensitive path unexpectedly returned HTTP 200: $path" ;;
+              *) echo "$path=$code" ;;
+            esac
+          done
+
+          echo "== Admin host HTTPS boundary =="
+          admin_status="$(curl --silent --show-error --connect-timeout 10 --max-time 20             -o /dev/null -w '%{http_code}' "$ADMIN_ORIGIN/admin/login")"
+          case "$admin_status" in
+            2??|3??) ;;
+            *) fail "Admin login host unavailable or unsafe status: $admin_status" ;;
+          esac
+
+          https_get -D "$tmp/admin.headers" -o /dev/null "$ADMIN_ORIGIN/admin/login"
+          grep -qi '^strict-transport-security:' "$tmp/admin.headers" || fail "Admin host missing HSTS"
+          if ! grep -qi '^cf-ray:' "$tmp/admin.headers" && ! grep -qi '^server: cloudflare' "$tmp/admin.headers"; then
+            fail "Admin host is not visibly traversing Cloudflare"
+          fi
+
+          echo "== TLS validity =="
+          for host in maintainex.lk admin.maintainex.lk; do
+            echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null               | openssl x509 -noout -checkend 2592000               || fail "TLS certificate for $host expires within 30 days or is invalid"
+          done
+
+          {
+            echo "## MaintainEX public black-box evidence"
+            echo
+            echo "- Production health: PASS"
+            echo "- Public release SHA format: PASS"
+            echo "- Test OTP mode disabled: PASS"
+            echo "- HTTPS security headers: PASS"
+            echo "- HTTP→HTTPS redirect: PASS"
+            echo "- Internal readiness unauthenticated denial: PASS"
+            echo "- Hostile CORS reflection: PASS"
+            echo "- TRACE rejection: PASS"
+            echo "- Common secret-file exposure: PASS"
+            echo "- Admin host HTTPS boundary: PASS"
+            echo "- Cloudflare edge visibility: PASS"
+            echo "- TLS >30 days: PASS"
+          } >> "$GITHUB_STEP_SUMMARY"
