@@ -2,19 +2,20 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { signAccessToken } from '@/lib/auth/authentication/admin-jwt'
 import { getAdminSession, verifySimpleToken } from '@/lib/auth/authentication/admin-auth'
 
-const ORIGINAL_JWT_SECRET = process.env.JWT_SECRET
-const ORIGINAL_NODE_ENV = process.env.NODE_ENV
+const mutableEnv = process.env as Record<string, string | undefined>
+const ORIGINAL_JWT_SECRET = mutableEnv.JWT_SECRET
+const ORIGINAL_NODE_ENV = mutableEnv.NODE_ENV
 
 afterEach(() => {
-  if (ORIGINAL_JWT_SECRET === undefined) delete process.env.JWT_SECRET
-  else process.env.JWT_SECRET = ORIGINAL_JWT_SECRET
-  if (ORIGINAL_NODE_ENV === undefined) delete process.env.NODE_ENV
-  else process.env.NODE_ENV = ORIGINAL_NODE_ENV
+  if (ORIGINAL_JWT_SECRET === undefined) delete mutableEnv.JWT_SECRET
+  else mutableEnv.JWT_SECRET = ORIGINAL_JWT_SECRET
+  if (ORIGINAL_NODE_ENV === undefined) delete mutableEnv.NODE_ENV
+  else mutableEnv.NODE_ENV = ORIGINAL_NODE_ENV
 })
 
 describe('admin JWT country scope preservation', () => {
   it('preserves assignedCountries and staff identity when decoding the access token', () => {
-    process.env.JWT_SECRET = 'crm-country-scope-test-secret-0123456789'
+    mutableEnv.JWT_SECRET = 'crm-country-scope-test-secret-0123456789'
 
     const token = signAccessToken({
       id: 'admin-country-test',
@@ -41,8 +42,8 @@ describe('admin JWT country scope preservation', () => {
   })
 
   it('preserves assignedCountries through non-production legacy cookie compatibility', async () => {
-    process.env.NODE_ENV = 'test'
-    process.env.JWT_SECRET = 'crm-country-scope-test-secret-0123456789'
+    mutableEnv.NODE_ENV = 'test'
+    mutableEnv.JWT_SECRET = 'crm-country-scope-test-secret-0123456789'
 
     const token = signAccessToken({
       id: 'admin-cookie-test',
@@ -75,8 +76,8 @@ describe('admin JWT country scope preservation', () => {
   })
 
   it('rejects legacy admin cookie tokens in production', async () => {
-    process.env.NODE_ENV = 'production'
-    process.env.JWT_SECRET = 'crm-country-scope-test-secret-0123456789'
+    mutableEnv.NODE_ENV = 'production'
+    mutableEnv.JWT_SECRET = 'crm-country-scope-test-secret-0123456789'
 
     const token = signAccessToken({
       id: 'admin-production-legacy',
@@ -99,7 +100,7 @@ describe('admin JWT country scope preservation', () => {
   })
 
   it('does not invent a country scope when the token has none', () => {
-    process.env.JWT_SECRET = 'crm-country-scope-test-secret-0123456789'
+    mutableEnv.JWT_SECRET = 'crm-country-scope-test-secret-0123456789'
 
     const token = signAccessToken({
       id: 'admin-empty-scope',
