@@ -93,7 +93,8 @@ describe('production infrastructure source hardening', () => {
     expect(deployment).toContain('Do not manually patch a running container')
     expect(deployment).not.toContain('docker cp /tmp/maintainex-build.tar.gz')
     expect(deployment).not.toContain('docker commit $CONTAINER')
-    expect(deployment).not.toContain('prod-latest')
+    expect(deployment).toContain('mutable `prod-latest` release')
+    expect(deployment).not.toMatch(/(?:docker build|docker service update|RELEASE_IMAGE=).*prod-latest/)
 
     expect(backup).toContain('.tar.gz.enc')
     expect(backup).toContain('AES-256-CBC + PBKDF2')

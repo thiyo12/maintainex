@@ -4,6 +4,7 @@ import { verifyAccessToken } from '../authentication/admin-jwt'
 import { verifySimpleToken } from '../authentication/admin-auth'
 import type { AdminRole, AuditAction, AdminSession } from '../../admin-types'
 import { getTrustedClientIp } from '@/lib/security/client-ip'
+import { logger } from '@/lib/shared/observability/logger'
 
 
 export function getCountryFilter(session: AdminSession): Record<string, any> {
@@ -40,7 +41,7 @@ export async function createAuditLog(params: {
       },
     })
   } catch (e) {
-    console.error('Audit log error:', e)
+    logger.error('Admin audit log write failed', { err: e })
   }
 }
 

@@ -30,7 +30,7 @@ This file is the running security release gate for `security/production-hardenin
 | 21 | Rate limiting / abuse protection | PARTIAL — fail-closed/rate-limit tests present; endpoint coverage review remains | HIGH |
 | 22 | Database hardening | PARTIAL — schema/deploy controls present; live DB least-privilege proof remains | HIGH |
 | 23 | Privacy / data minimization | PARTIAL — privacy suites present; full field-retention review remains | HIGH |
-| 24 | Logging / audit safety | PARTIAL — auth/booking/finance/KYC critical sinks hardened; complete repository sink review remains | HIGH |
+| 24 | Logging / audit safety | PARTIAL — auth/booking/finance/KYC/reports/helper-library sinks hardened; complete route sweep + live log controls remain | HIGH |
 | 25 | Security monitoring / alerts | PARTIAL — risk/event logic present; live alert delivery proof remains | HARDENING |
 | 26 | Cloudflare / edge hardening | PARTIAL — code assumes hardened edge; live Cloudflare config proof remains | HIGH |
 | 27 | IP / proxy trust | PARTIAL — canonical proxy/IP tests present; live topology proof remains | HIGH |
@@ -183,6 +183,21 @@ This file is the running security release gate for `security/production-hardenin
 - Test added: `tests/security/redaction.test.ts` now asserts the identity/KYC/credential/generic-upload route set imports the structured logger and contains no raw `console.error` sink.
 - Commit SHA: fixes `934e1fc9`, `f13e0c70`, `5c4f1ae2`, `3688088d`, `b1459aec`, `4bb9c03a`, `2c95ef73`, `6115ed9f`, `5a8b5563`, `9225ed0c`, `e0710d20`, `bea056f5`, `0f6c90f5`; regression `9d373b65`.
 - Residual risk: complete repository-wide logging sink review and live log-retention/access verification remain open under Phase 24.
+- Status: FIXED — exact-head full release CI pending.
+
+
+### SG-0011 — CRM messaging, admin audit and token cleanup retained raw sensitive error sinks
+
+- ID: SG-0011
+- Severity: MEDIUM
+- Attack path: a CRM communication failure, admin audit persistence failure, or password-reset cleanup failure emits raw exception/message content or message payload data outside the centralized redaction path.
+- Affected component: `lib/crm/whatsapp.ts`, `lib/auth/authorization/admin-rbac.ts`, and `lib/security/tokens.ts`.
+- Reproduction/evidence: exhaustive auth/CRM/payment/security library review found a raw audit `console.error`, raw token-cleanup `console.error`, WhatsApp payload `console.log`, and raw `error.message` persistence/return paths.
+- Root cause: these helper-layer paths were outside the route-focused redaction migrations.
+- Fix: migrated exception paths to the centralized structured logger, removed WhatsApp phone/message payload logging, replaced raw WhatsApp exception persistence/return values with a generic failure, and preserved existing operational behavior.
+- Test added: `tests/security/redaction.test.ts` locks the three server helpers off raw console sinks and raw WhatsApp exception strings.
+- Commit SHA: atomic fix commit containing SG-0011 remediation and regression.
+- Residual risk: route-level repository sweep continues; live log aggregation retention/access still requires production evidence.
 - Status: FIXED — exact-head full release CI pending.
 
 
@@ -379,6 +394,7 @@ NEW FINDINGS:
 - SG-0008 fixed: mobile upload failures bypassed structured log redaction.
 - SG-0009 fixed: critical financial/payment routes used raw error sinks and selected internal error responses.
 - SG-0010 fixed: identity/KYC/admin review routes retained raw exception sinks.
+- SG-0011 fixed: CRM messaging/admin audit/token cleanup retained raw sensitive sinks.
 
 REMAINING:
 - continue repository-wide review for direct `console.*` sinks and unsafe raw exception logging

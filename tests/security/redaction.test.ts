@@ -177,6 +177,24 @@ describe('Redaction', () => {
     }
   })
 
+  it('keeps server auth/token and CRM messaging helpers off raw sensitive logging', () => {
+    const adminRbac = readFileSync(resolve(process.cwd(), 'lib/auth/authorization/admin-rbac.ts'), 'utf8')
+    const tokens = readFileSync(resolve(process.cwd(), 'lib/security/tokens.ts'), 'utf8')
+    const whatsapp = readFileSync(resolve(process.cwd(), 'lib/crm/whatsapp.ts'), 'utf8')
+
+    expect(adminRbac).toContain("logger.error('Admin audit log write failed', { err: e })")
+    expect(adminRbac).not.toMatch(/\bconsole\.error\s*\(/)
+
+    expect(tokens).toContain("logger.error('Password reset token cleanup failed', { err: e })")
+    expect(tokens).not.toMatch(/\bconsole\.error\s*\(/)
+
+    expect(whatsapp).toContain("logger.error('WhatsApp delivery failed'")
+    expect(whatsapp).not.toMatch(/\bconsole\.(?:log|error|warn)\s*\(/)
+    expect(whatsapp).not.toContain('errorMessage: error.message')
+    expect(whatsapp).not.toContain('error: error.message')
+    expect(whatsapp).not.toContain('${error.message}')
+  })
+
   it('preserves safe values', () => {
     const input = { name: 'John', age: 30, active: true }
     const result = redactObject(input)
