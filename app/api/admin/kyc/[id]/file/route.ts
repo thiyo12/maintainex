@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { readFile } from 'fs/promises'
 import { prisma } from '@/lib/prisma'
@@ -176,7 +177,7 @@ export async function GET(
       },
     })
   } catch (error) {
-    console.error('CRM KYC protected file error:', error)
+    logger.error('CRM protected KYC file read failed unexpectedly', { err: error, route: '/api/admin/kyc/[id]/file', method: 'GET' })
     return NextResponse.json({ error: 'Failed to load KYC document' }, { status: 500 })
   }
 }
