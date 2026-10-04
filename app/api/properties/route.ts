@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import {
   PUBLIC_REAL_ESTATE_STATUSES,
   isSafePropertyMediaRef,
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     let includePrivateFields = false
 
     if (myOnly) {
-      const session = await getSession(request)
+      const session = await authenticateMarketplaceUser(request)
       if (!session) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
@@ -129,10 +129,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession(request)
+    const session = await authenticateMarketplaceUser(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(session)
+    if (blocked) return blocked
 
     const body = await request.json().catch(() => ({}))
     const title = typeof body?.title === 'string' ? body.title.trim().slice(0, 180) : ''
