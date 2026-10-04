@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
@@ -256,7 +257,7 @@ export async function POST(request: NextRequest) {
       try {
         await sendOtpSms(phone, otp, countryCode)
       } catch (error) {
-        console.error('Registration SMS error:', error)
+        logger.error('Registration SMS delivery failed', { err: error })
         return NextResponse.json({
           error: 'We could not send the SMS verification code. Please try again shortly.',
           code: 'SMS_DELIVERY_FAILED',
@@ -272,7 +273,7 @@ export async function POST(request: NextRequest) {
       testMode: isCertRegistration,
     })
   } catch (error) {
-    console.error('Register error:', error)
+    logger.error('Mobile registration failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

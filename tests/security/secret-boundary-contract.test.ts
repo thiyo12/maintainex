@@ -98,6 +98,10 @@ describe('server secret boundaries', () => {
     const cleanup = source('app/api/mobile/cleanup-photos/route.ts')
     expect(cleanup).toContain('matchesBearerSecret')
     expect(cleanup).not.toContain("authHeader !== `Bearer ${process.env.CRON_SECRET}`")
+
+    const payHereRefunds = source('app/api/cron/payhere-refunds/route.ts')
+    expect(payHereRefunds).toContain('matchesBearerSecret')
+    expect(payHereRefunds).not.toContain("request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`")
   })
 
   it('keeps sensitive local material outside the Docker build context', () => {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import { matchesSharedSecret } from '@/lib/security/secret-compare'
 
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
       results,
     })
   } catch (error) {
-    console.error('Security seed error:', error)
+    logger.error('Security seed failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Seed failed' }, { status: 500 })
   }
 }

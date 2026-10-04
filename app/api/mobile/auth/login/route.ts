@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { prisma } from '@/lib/prisma'
 import { verifyPasswordWithMigration } from '@/lib/security/password'
@@ -161,7 +162,7 @@ export async function POST(request: NextRequest) {
       token: response.accessToken,
     })
   } catch (error) {
-    console.error('Login error:', error)
+    logger.error('Mobile login failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

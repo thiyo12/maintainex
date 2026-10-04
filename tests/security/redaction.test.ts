@@ -195,6 +195,36 @@ describe('Redaction', () => {
     expect(whatsapp).not.toContain('${error.message}')
   })
 
+  it('keeps high-risk MFA, cron, internal and mobile-auth routes on structured logging', () => {
+    const routes = [
+      'app/api/admin/auth/2fa/confirm/route.ts',
+      'app/api/admin/auth/2fa/setup/route.ts',
+      'app/api/admin/auth/step-up/route.ts',
+      'app/api/cron/daily-maintenance/route.ts',
+      'app/api/cron/job-response-escalation/route.ts',
+      'app/api/cron/matching-waves/route.ts',
+      'app/api/cron/offer-timeouts/route.ts',
+      'app/api/cron/payhere-refunds/route.ts',
+      'app/api/cron/re-engagement/route.ts',
+      'app/api/cron/reputation/route.ts',
+      'app/api/internal/security/seed/route.ts',
+      'app/api/mobile/auth/forgot-password/route.ts',
+      'app/api/mobile/auth/login/route.ts',
+      'app/api/mobile/auth/me/route.ts',
+      'app/api/mobile/auth/profile/route.ts',
+      'app/api/mobile/auth/register/route.ts',
+      'app/api/mobile/auth/reset-password/route.ts',
+      'app/api/mobile/auth/send-otp/route.ts',
+      'app/api/mobile/auth/switch-role/route.ts',
+    ]
+
+    for (const routePath of routes) {
+      const route = readFileSync(resolve(process.cwd(), routePath), 'utf8')
+      expect(route).toContain("from '@/lib/shared/observability/logger'")
+      expect(route).not.toMatch(/\bconsole\.(?:error|warn|log)\s*\(/)
+    }
+  })
+
   it('preserves safe values', () => {
     const input = { name: 'John', age: 30, active: true }
     const result = redactObject(input)
