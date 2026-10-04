@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRateLimitStore } from './index'
 import { getPolicy, buildRateLimitKey, type RateLimitPolicy } from './policies'
 import { getRequestId } from '../observability/request-context'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 
 export interface RateLimitOptions {
   policy?: RateLimitPolicy
@@ -11,9 +12,7 @@ export interface RateLimitOptions {
 }
 
 function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown'
+  return getTrustedClientIp(request.headers)
 }
 
 export async function checkRateLimit(
