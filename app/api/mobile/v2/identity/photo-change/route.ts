@@ -4,6 +4,7 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibilit
 import { ensureProviderIdentity } from '@/lib/finance/commissions/provider-balance-service'
 import { ensureCompanyWorkerIdentity } from '@/lib/identity/job-worker-identity'
 import { createWorkItem } from '@/lib/work-queue'
+import { resolveLocalKycFileReference } from '@/lib/security/kyc-storage'
 
 async function resolvePhotoIdentity(userId: string, requestedCompanyId?: string | null) {
   return prisma.$transaction(async tx => {
@@ -141,6 +142,21 @@ export async function POST(request: NextRequest) {
 
     if (!requestedPhotoUrl) {
       return NextResponse.json({ error: 'requestedPhotoUrl is required' }, { status: 400 })
+    }
+
+    const privatePhoto = resolveLocalKycFileReference(
+      requestedPhotoUrl,
+      user.id,
+      request.nextUrl.origin,
+    )
+    if (!privatePhoto || !privatePhoto.contentType.startsWith('image/')) {
+      return NextResponse.json(
+        {
+          error: 'Verified photo requests must use a protected MaintainEX image upload.',
+          code: 'INVALID_VERIFIED_PHOTO_REFERENCE',
+        },
+        { status: 400 },
+      )
     }
 
     const resolved = await resolvePhotoIdentity(user.id, companyId)
