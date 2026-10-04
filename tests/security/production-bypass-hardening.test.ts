@@ -119,18 +119,29 @@ describe('production security configuration fails closed', () => {
 describe('production seed/setup endpoints are independently disabled', () => {
   const routes = [
     'app/api/internal/security/seed/route.ts',
+    'app/api/industries/init/route.ts',
     'app/api/industries/setup/route.ts',
     'app/api/mobile/v2/admin/seed-categories/route.ts',
+    'app/api/seed/auto/route.ts',
+    'app/api/seed/real-estate/route.ts',
     'app/api/seed/services/route.ts',
+    'app/api/seed/test-data/route.ts',
   ]
 
   for (const route of routes) {
-    it(`${route} has an explicit production 404 guard`, () => {
+    it(`${route} has an explicit production denial in the route itself`, () => {
       const code = source(route)
       expect(code).toContain("process.env.NODE_ENV === 'production'")
-      expect(code).toContain("{ error: 'Not found' }, { status: 404 }")
+      expect(code).toMatch(/status:\s*(?:403|404)/)
     })
   }
+
+  it('runs production secret validation during Node startup', () => {
+    const instrumentation = source('instrumentation.ts')
+    expect(instrumentation).toContain("process.env.NEXT_RUNTIME === 'nodejs'")
+    expect(instrumentation).toContain("import('./lib/config/env-validation')")
+    expect(instrumentation).toContain('ensureSecretsValidated()')
+  })
 
   it('keeps the middleware-level production seed/setup denial as defense in depth', () => {
     const middleware = source('middleware.ts')
