@@ -58,6 +58,7 @@ jobs:
       INTERNAL_SYNC_SECRET: phase07-ci-sync-secret-01234567890123456
       APP_RELEASE_SHA: ${{ github.sha }}
       ALLOW_TEST_OTP: "true"
+      TRUSTED_PROXY_MODE: "cloudflare"
       VPS_INTEGRATION: "true"
       CLOUDINARY_CLOUD_NAME: test
       CLOUDINARY_API_KEY: test
@@ -393,6 +394,7 @@ jobs:
             -e INTERNAL_SYNC_SECRET="phase07-ci-sync-secret-01234567890123456" \
             -e APP_RELEASE_SHA="${GITHUB_SHA}" \
             -e ALLOW_TEST_OTP="false" \
+            -e TRUSTED_PROXY_MODE="cloudflare" \
             -e CLOUDINARY_CLOUD_NAME="test" \
             -e CLOUDINARY_API_KEY="test" \
             -e CLOUDINARY_API_SECRET="test" \
