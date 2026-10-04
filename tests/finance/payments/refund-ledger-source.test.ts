@@ -9,6 +9,13 @@ const mocks = vi.hoisted(() => {
     jobEscrow: {
       updateMany: vi.fn(),
     },
+    marketplaceDispute: {
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+    adminAlert: {
+      updateMany: vi.fn(),
+    },
   }
 
   return {
@@ -69,6 +76,9 @@ describe('external refund ledger source finalization', () => {
     mocks.tx.paymentIntent.updateMany.mockResolvedValue({ count: 1 })
     mocks.tx.paymentIntent.findUnique.mockResolvedValue({ status: 'REFUNDED' })
     mocks.tx.jobEscrow.updateMany.mockResolvedValue({ count: 1 })
+    mocks.tx.marketplaceDispute.findFirst.mockResolvedValue(null)
+    mocks.tx.marketplaceDispute.update.mockResolvedValue({})
+    mocks.tx.adminAlert.updateMany.mockResolvedValue({ count: 0 })
     mocks.postLedgerTransaction.mockResolvedValue(undefined)
     mocks.recordJobLifecycleEvent.mockResolvedValue(undefined)
   })
