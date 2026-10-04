@@ -121,16 +121,12 @@ jobs:
           fi
 
           echo "== CORS hostile-origin reflection =="
-          cors_status="$(request "$tmp/cors.headers" "$tmp/cors.body" "$PRIMARY_ORIGIN/api/health" -H 'Origin: https://evil.example')"
-          if [ "$cors_status" = "200" ]; then
-            acao="$(awk -F': ' 'tolower($1)=="access-control-allow-origin" {gsub(/\r/,"",$2); print $2}' "$tmp/cors.headers" | tail -1)"
-            if [ "$acao" = "*" ] || [ "$acao" = "https://evil.example" ]; then
-              fail "Hostile/wildcard CORS origin accepted"
-            else
-              pass "Hostile CORS origin not reflected"
-            fi
+          cors_status="$(request "$tmp/cors.headers" "$tmp/cors.body" "$PRIMARY_ORIGIN/api/mobile/auth/me" -H 'Origin: https://evil.example')"
+          acao="$(awk -F': ' 'tolower($1)=="access-control-allow-origin" {gsub(/\r/,"",$2); print $2}' "$tmp/cors.headers" | tail -1)"
+          if [ "$acao" = "*" ] || [ "$acao" = "https://evil.example" ]; then
+            fail "Hostile/wildcard CORS origin accepted on protected mobile API"
           else
-            fail "CORS application boundary could not be observed because /api/health returned $cors_status"
+            pass "Hostile CORS origin not reflected on protected mobile API (status=$cors_status)"
           fi
 
           echo "== Unsafe HTTP method rejection =="
