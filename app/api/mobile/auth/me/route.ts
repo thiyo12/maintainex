@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { safeParseJsonArr } from '@/lib/db-utils'
+import {
+  closeAccountPreservingProviderIntegrity,
+  type AccountClosurePreflight,
+} from '@/lib/identity/account-closure'
 
 function computeTier(completedJobs: number, totalSpent: number): string {
   if (completedJobs >= 25 || totalSpent >= 150000) return 'ELITE'
@@ -115,19 +119,43 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (user.role !== 'CUSTOMER') {
-      return NextResponse.json({ error: 'Only customer accounts can be deleted from the mobile app' }, { status: 403 })
+    const result = await prisma.$transaction(tx =>
+      closeAccountPreservingProviderIntegrity(tx, user.id)
+    )
+
+    return NextResponse.json({
+      success: true,
+      closedWithBalance: result.closesWithBalance,
+      outstandingBalances: result.outstandingBalances.map(balance => ({
+        providerIdentityId: balance.providerIdentityId,
+        identityType: balance.identityType,
+        currency: balance.currency,
+        commissionDueMinor: balance.amountMinor,
+      })),
+      message: result.closesWithBalance
+        ? 'Account access closed. Outstanding MaintainEX commission remains attached to the verified provider identity.'
+        : 'Account closed.',
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    if (message === 'ACCOUNT_CLOSURE_BLOCKED') {
+      const preflight = (error as Error & { preflight?: AccountClosurePreflight }).preflight
+
+      return NextResponse.json(
+        {
+          error: 'Resolve the listed account obligations before closing the account.',
+          code: 'ACCOUNT_CLOSURE_BLOCKED',
+          preflight,
+        },
+        { status: 409 },
+      )
+    }
+    if (message === 'USER_NOT_FOUND') {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { isActive: false },
-    })
-    await prisma.userSession.deleteMany({ where: { userId: user.id } })
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
     console.error('Delete account error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
+

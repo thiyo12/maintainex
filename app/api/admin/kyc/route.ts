@@ -90,9 +90,45 @@ export async function GET(request: NextRequest) {
       prisma.identityDocument.count({ where: { status: 'REJECTED', ...countryFilter } }),
     ])
 
+    const documentUserIds = [...new Set(documents.map(document => document.userId))]
+    const integritySignals = documentUserIds.length > 0
+      ? await prisma.providerIntegritySignal.findMany({
+          where: {
+            userId: { in: documentUserIds },
+            signalType: {
+              in: [
+                'STRONG_IDENTITY_MATCH_WITH_FINANCIAL_LIABILITY',
+                'STRONG_IDENTITY_REUSE',
+              ],
+            },
+          },
+          select: {
+            id: true,
+            userId: true,
+            signalType: true,
+            severity: true,
+            status: true,
+            resolution: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      : []
+
+    const integritySignalsByUser = new Map<string, typeof integritySignals>()
+    for (const signal of integritySignals) {
+      if (!signal.userId) continue
+      const current = integritySignalsByUser.get(signal.userId) || []
+      current.push(signal)
+      integritySignalsByUser.set(signal.userId, current)
+    }
+
     return NextResponse.json(
       {
-        documents,
+        documents: documents.map(document => ({
+          ...document,
+          integritySignals: integritySignalsByUser.get(document.userId) || [],
+        })),
         summary: { pending, verified, rejected },
         pagination: {
           page,
@@ -157,6 +193,34 @@ export async function PATCH(request: NextRequest) {
     }
     if (!assertCrmCountryAllowed(security, document.countryCode)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (status === 'APPROVED') {
+      const blockingSignal = await prisma.providerIntegritySignal.findFirst({
+        where: {
+          userId: document.userId,
+          signalType: {
+            in: [
+              'STRONG_IDENTITY_MATCH_WITH_FINANCIAL_LIABILITY',
+              'STRONG_IDENTITY_REUSE',
+            ],
+          },
+          status: { in: ['OPEN', 'REVIEWED', 'CONFIRMED'] },
+          severity: { in: ['HIGH', 'CRITICAL'] },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      if (blockingSignal) {
+        return NextResponse.json(
+          {
+            error: 'Resolve the linked Trust & Safety identity-integrity event before approving KYC.',
+            code: 'IDENTITY_INTEGRITY_REVIEW_REQUIRED',
+            integritySignalId: blockingSignal.id,
+          },
+          { status: 409 },
+        )
+      }
     }
 
     const action = status === 'APPROVED' ? 'APPROVE' : 'REJECT'

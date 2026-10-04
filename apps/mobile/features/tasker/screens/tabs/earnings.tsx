@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
@@ -19,17 +20,67 @@ interface CommissionPayment {
   dueAt: string
 }
 
+interface CommissionRecovery {
+  id: string
+  amount: number
+  currency: string
+  method: string
+  sourceJobId?: string | null
+  originalCashJobId: string
+  createdAt: string
+}
+
+interface BalanceAdjustmentRecovery {
+  id: string
+  amount: number
+  currency: string
+  method: string
+  adjustmentType: string
+  originalJobId: string
+  createdAt: string
+}
+
+interface MaintainEXBalance {
+  commissionDue: number
+  commissionDueMinor: string
+  adjustmentDue: number
+  adjustmentDueMinor: string
+  totalLiability: number
+  totalLiabilityMinor: string
+  status: string
+  cashJobsAllowed: boolean
+  onlineJobsAllowed: boolean
+  manualReviewRequired: boolean
+  oldestCommissionDueAt?: string | null
+  currency: string
+}
+
 interface EarningsData {
+  currency: string
   balance: number
   totalEarned: number
   totalJobs: number
   pendingAmount?: number
-  transactions: { job: string; amount: number; date: string; status: string }[]
+  transactions: {
+    id?: string
+    job: string
+    amount: number
+    currency?: string
+    direction?: 'CREDIT' | 'DEBIT' | string
+    referenceType?: string
+    referenceId?: string
+    date: string
+    status: string
+  }[]
   pendingCommissionPayments?: CommissionPayment[]
+  recentCommissionRecoveries?: CommissionRecovery[]
+  recentBalanceAdjustmentRecoveries?: BalanceAdjustmentRecovery[]
+  maintainexBalance?: MaintainEXBalance
 }
 
 export default function TaskerEarnings() {
   const { t } = useTranslation()
+  const router = useRouter()
   const colors = useColors()
   const styles = makeStyles(colors)
   const [period, setPeriod] = useState<Period>('weekly')
@@ -53,6 +104,8 @@ export default function TaskerEarnings() {
     loadEarnings()
   }, [loadEarnings])
 
+  const displayCurrency = data?.currency || data?.maintainexBalance?.currency || 'LKR'
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
@@ -67,11 +120,131 @@ export default function TaskerEarnings() {
         <>
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>{t('wallet.available')}</Text>
-            <Text style={styles.balanceValue}>LKR {(data?.balance || 0).toLocaleString()}</Text>
-            <TouchableOpacity style={styles.withdrawBtn}>
+            <Text style={styles.balanceValue}>{displayCurrency} {(data?.balance || 0).toLocaleString()}</Text>
+            <TouchableOpacity
+              style={styles.withdrawBtn}
+              onPress={() => router.push('/(tasker)/wallet/withdraw' as any)}
+            >
               <Text style={styles.withdrawBtnText}>{t('wallet.withdraw')}</Text>
             </TouchableOpacity>
           </View>
+
+          {data?.maintainexBalance && (
+            <View style={styles.maintainexCard}>
+              <View style={styles.maintainexHeader}>
+                <View>
+                  <Text style={styles.maintainexTitle}>MaintainEX Balance</Text>
+                  <Text style={styles.maintainexStatus}>
+                    {data.maintainexBalance.status.replaceAll('_', ' ')}
+                  </Text>
+                </View>
+                <Ionicons
+                  name={data.maintainexBalance.totalLiability > 0 ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+                  size={26}
+                  color={data.maintainexBalance.totalLiability > 0 ? colors.amber : colors.success}
+                />
+              </View>
+
+              <Text style={styles.maintainexDueLabel}>Commission due</Text>
+              <Text style={styles.maintainexDueValue}>
+                {data.maintainexBalance.currency} {data.maintainexBalance.commissionDue.toLocaleString()}
+              </Text>
+              {data.maintainexBalance.adjustmentDue > 0 && (
+                <>
+                  <Text style={styles.maintainexDueLabel}>Post-payment adjustment due</Text>
+                  <Text style={[styles.maintainexDueValue, { color: colors.error }]}>
+                    {data.maintainexBalance.currency} {data.maintainexBalance.adjustmentDue.toLocaleString()}
+                  </Text>
+                </>
+              )}
+
+              <View style={styles.maintainexRuleRow}>
+                <Text style={styles.maintainexRuleLabel}>Cash jobs</Text>
+                <Text style={[
+                  styles.maintainexRuleValue,
+                  { color: data.maintainexBalance.cashJobsAllowed ? colors.success : colors.error },
+                ]}>
+                  {data.maintainexBalance.cashJobsAllowed ? 'Allowed' : 'Temporarily blocked'}
+                </Text>
+              </View>
+              <View style={styles.maintainexRuleRow}>
+                <Text style={styles.maintainexRuleLabel}>Online jobs</Text>
+                <Text style={[
+                  styles.maintainexRuleValue,
+                  { color: data.maintainexBalance.onlineJobsAllowed ? colors.success : colors.error },
+                ]}>
+                  {data.maintainexBalance.onlineJobsAllowed ? 'Allowed' : 'Restricted'}
+                </Text>
+              </View>
+
+              {!data.maintainexBalance.cashJobsAllowed && data.maintainexBalance.onlineJobsAllowed && (
+                <Text style={styles.maintainexHelp}>
+                  Online-paid jobs remain available so outstanding commission can be recovered safely from future earnings.
+                </Text>
+              )}
+              {data.maintainexBalance.manualReviewRequired && (
+                <Text style={styles.maintainexWarning}>
+                  Your financial standing requires MaintainEX review.
+                </Text>
+              )}
+            </View>
+          )}
+
+          {(data?.recentCommissionRecoveries || []).length > 0 && (
+            <View style={styles.recoverySection}>
+              <Text style={styles.recoveryTitle}>Recent commission settlements</Text>
+              <Text style={styles.recoveryHelp}>
+                Online offsets and confirmed direct payments reduce older cash-job commission due.
+              </Text>
+              {data?.recentCommissionRecoveries?.slice(0, 5).map((recovery) => (
+                <View key={recovery.id} style={styles.recoveryCard}>
+                  <View style={styles.recoveryIcon}>
+                    <Ionicons name="swap-horizontal-outline" size={18} color={colors.success} />
+                  </View>
+                  <View style={styles.recoveryBody}>
+                    <Text style={styles.recoveryAmount}>
+                      {recovery.currency} {recovery.amount.toLocaleString()} {recovery.method === 'ONLINE_EARNINGS' ? 'recovered from online earnings' : 'direct payment confirmed'}
+                    </Text>
+                    <Text style={styles.recoveryMeta}>
+                      {recovery.method === 'ONLINE_EARNINGS'
+                        ? `Online job ${recovery.sourceJobId?.slice(0, 8) || '—'} → cash job ${recovery.originalCashJobId.slice(0, 8)}`
+                        : `Cash job ${recovery.originalCashJobId.slice(0, 8)}`}
+                    </Text>
+                    <Text style={styles.recoveryMeta}>
+                      {new Date(recovery.createdAt).toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {(data?.recentBalanceAdjustmentRecoveries || []).length > 0 && (
+            <View style={styles.recoverySection}>
+              <Text style={styles.recoveryTitle}>Recent balance adjustments</Text>
+              <Text style={styles.recoveryHelp}>
+                These are recoveries of post-payment losses such as chargebacks, kept separate from commission.
+              </Text>
+              {data?.recentBalanceAdjustmentRecoveries?.slice(0, 5).map((recovery) => (
+                <View key={recovery.id} style={styles.recoveryCard}>
+                  <View style={styles.recoveryIcon}>
+                    <Ionicons name="shield-checkmark-outline" size={18} color={colors.success} />
+                  </View>
+                  <View style={styles.recoveryBody}>
+                    <Text style={styles.recoveryAmount}>
+                      {recovery.currency} {recovery.amount.toLocaleString()} recovered
+                    </Text>
+                    <Text style={styles.recoveryMeta}>
+                      {recovery.adjustmentType.replaceAll('_', ' ')} · job {recovery.originalJobId.slice(0, 8)}
+                    </Text>
+                    <Text style={styles.recoveryMeta}>
+                      {new Date(recovery.createdAt).toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
           {(data?.pendingCommissionPayments || []).length > 0 && (
             <View style={styles.commissionSection}>
@@ -82,7 +255,7 @@ export default function TaskerEarnings() {
                     <Ionicons name="cash-outline" size={20} color={colors.amber} />
                     <Text style={styles.commissionRef}>{cp.referenceNumber}</Text>
                   </View>
-                  <Text style={styles.commissionAmount}>LKR {cp.amountDue.toLocaleString()}</Text>
+                  <Text style={styles.commissionAmount}>{displayCurrency} {cp.amountDue.toLocaleString()}</Text>
                   <Text style={styles.commissionInstruction}>
                     Pay this amount to any MΛINTΛINEX agent using reference: {cp.referenceNumber}
                   </Text>
@@ -97,15 +270,15 @@ export default function TaskerEarnings() {
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>{t('tasker.totalEarned')}</Text>
-              <Text style={styles.statValue}>LKR {(data?.totalEarned || 0).toLocaleString()}</Text>
+              <Text style={styles.statValue}>{displayCurrency} {(data?.totalEarned || 0).toLocaleString()}</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>{t('tasker.pending')}</Text>
-              <Text style={styles.statValue}>LKR {(data?.pendingAmount || 0).toLocaleString()}</Text>
+              <Text style={styles.statValue}>{displayCurrency} {(data?.pendingAmount || 0).toLocaleString()}</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>{t('tasker.totalEarned')}</Text>
-              <Text style={styles.statValue}>LKR {(data?.totalEarned || 0).toLocaleString()}</Text>
+              <Text style={styles.statValue}>{displayCurrency} {(data?.totalEarned || 0).toLocaleString()}</Text>
             </View>
           </View>
 
@@ -139,12 +312,12 @@ export default function TaskerEarnings() {
                     <View style={[styles.txDot, { backgroundColor: tx.status === t('wallet.statusCleared') ? colors.success : colors.amber }]} />
                     <View>
                       <Text style={styles.txJob}>{tx.job}</Text>
-                      <Text style={styles.txDate}>{tx.date} • {tx.status === 'Cleared' ? t('wallet.statusCleared') : tx.status}</Text>
+                      <Text style={styles.txDate}>{new Date(tx.date).toLocaleString()} • {tx.status === 'Cleared' ? t('wallet.statusCleared') : tx.status}</Text>
                     </View>
                   </View>
                   <View style={styles.txRight}>
                     <Text style={[styles.txAmount, { color: tx.status === t('wallet.statusCleared') ? colors.success : colors.amber }]}>
-                      +LKR {tx.amount.toLocaleString()}
+                      {tx.direction === 'DEBIT' ? '-' : '+'}{tx.currency || displayCurrency} {tx.amount.toLocaleString()}
                     </Text>
                   </View>
                 </View>
@@ -241,6 +414,82 @@ const makeStyles = (colors: any) => StyleSheet.create({
   txAmount: { fontSize: 15, fontFamily: fonts.bodyMedium },
   empty: { alignItems: 'center', paddingTop: 40 },
   emptyTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.muted },
+  maintainexCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: 24,
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  maintainexHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  maintainexTitle: { fontSize: 17, fontFamily: fonts.heading, color: colors.ink },
+  maintainexStatus: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.muted, marginTop: 2 },
+  maintainexDueLabel: { fontSize: 12, fontFamily: fonts.body, color: colors.muted },
+  maintainexDueValue: { fontSize: 26, fontFamily: fonts.heading, color: colors.ink, marginTop: 2, marginBottom: 14 },
+  maintainexRuleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 7,
+  },
+  maintainexRuleLabel: { fontSize: 13, fontFamily: fonts.body, color: colors.muted },
+  maintainexRuleValue: { fontSize: 13, fontFamily: fonts.bodyMedium },
+  maintainexHelp: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, lineHeight: 18, marginTop: 10 },
+  maintainexWarning: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.error, lineHeight: 18, marginTop: 8 },
+  recoverySection: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+  },
+  recoveryTitle: {
+    fontSize: 16,
+    fontFamily: fonts.bodyMedium,
+    color: colors.ink,
+    marginBottom: 4,
+  },
+  recoveryHelp: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.muted,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  recoveryCard: {
+    flexDirection: 'row',
+    gap: 10,
+    backgroundColor: colors.white,
+    padding: 12,
+    borderRadius: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  recoveryIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  recoveryBody: { flex: 1 },
+  recoveryAmount: {
+    fontSize: 13,
+    fontFamily: fonts.bodyMedium,
+    color: colors.success,
+  },
+  recoveryMeta: {
+    fontSize: 11,
+    fontFamily: fonts.body,
+    color: colors.muted,
+    marginTop: 2,
+  },
   commissionSection: {
     marginHorizontal: 24,
     marginBottom: 16,

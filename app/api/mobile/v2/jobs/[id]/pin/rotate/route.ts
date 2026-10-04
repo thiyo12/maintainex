@@ -27,7 +27,9 @@ export async function POST(
       error.message.includes('Payment must be protected') ||
       error.message.includes('PIN is only available') ||
       error.message.includes('No active PIN found') ||
-      error.message.includes('Cannot rotate')
+      error.message.includes('Cannot rotate') ||
+      error.message.includes('Start Work PIN') ||
+      error.message.includes('Customer must confirm the verified worker identity')
     ) {
       return NextResponse.json({ error: error.message }, { status: 409 })
     }

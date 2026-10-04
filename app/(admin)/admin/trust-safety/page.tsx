@@ -37,6 +37,8 @@ interface Payload {
     pendingCheating: number
     pendingRisk: number
     highRisk: number
+    pendingIntegrity: number
+    criticalIntegrity: number
     suspiciousLogins: number
   }
   recent: {
@@ -105,6 +107,7 @@ export default function TrustSafetyControlCentrePage() {
     if (!data) return 0
     return (
       data.metrics.highRisk +
+      data.metrics.criticalIntegrity +
       data.metrics.openDisputes +
       data.metrics.pendingCheating +
       data.metrics.suspiciousLogins
@@ -141,6 +144,7 @@ export default function TrustSafetyControlCentrePage() {
     data.permissions.kyc && { href: '/admin/kyc', icon: FiUserCheck, label: 'KYC queue' },
     data.permissions.disputes && { href: '/admin/jobs/disputes', icon: FiFlag, label: 'Dispute queue' },
     data.permissions.risk && { href: '/admin/trust-safety/risk-events', icon: FiShield, label: 'Risk events' },
+    data.permissions.risk && { href: '/admin/trust-safety/integrity', icon: FiShield, label: 'Provider integrity' },
     data.permissions.cheating && { href: '/admin/cheating', icon: FiAlertTriangle, label: 'Off-platform reports' },
     data.permissions.security && { href: '/admin/analytics/security-monitor', icon: FiShield, label: 'Security monitor' },
   ].filter(Boolean) as Array<{ href: string; icon: any; label: string }>
@@ -167,7 +171,7 @@ export default function TrustSafetyControlCentrePage() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         <CrmMetricCard
           label="Urgent signals"
           value={urgent.toLocaleString()}
@@ -188,6 +192,13 @@ export default function TrustSafetyControlCentrePage() {
           helper="Open / under review"
           icon={<FiFlag size={16} />}
           tone={data.metrics.openDisputes > 0 ? 'danger' : 'success'}
+        />
+        <CrmMetricCard
+          label="Provider integrity"
+          value={data.metrics.pendingIntegrity.toLocaleString()}
+          helper={`${data.metrics.criticalIntegrity} critical identity / financial signal${data.metrics.criticalIntegrity === 1 ? '' : 's'}`}
+          icon={<FiShield size={16} />}
+          tone={data.metrics.criticalIntegrity > 0 ? 'danger' : data.metrics.pendingIntegrity > 0 ? 'warning' : 'success'}
         />
         <CrmMetricCard
           label="Pending risk events"

@@ -47,7 +47,24 @@ export async function GET(
       }),
     ])
 
+    const taskerIdentities = taskers.length
+      ? await prisma.providerIdentity.findMany({
+          where: {
+            identityType: 'TASKER',
+            subjectId: { in: taskers.map(profile => profile.id) },
+          },
+          select: {
+            subjectId: true,
+            kycStatus: true,
+            verifiedPhotoUrl: true,
+          },
+        })
+      : []
+
     const taskerByUser = new Map(taskers.map((profile) => [profile.userId, profile]))
+    const taskerIdentityByProfile = new Map(
+      taskerIdentities.map(identity => [identity.subjectId, identity])
+    )
     const companyById = new Map(companies.map((company) => [company.id, company]))
 
     return NextResponse.json({
@@ -71,16 +88,24 @@ export async function GET(
 
         const userId = candidate.userId || candidate.providerId
         const profile = taskerByUser.get(userId)
+        const identity = profile ? taskerIdentityByProfile.get(profile.id) : null
+        const identityVerified =
+          profile?.isVerified === true &&
+          profile?.verificationStatus === 'VERIFIED' &&
+          identity?.kycStatus === 'VERIFIED'
         return {
           id: userId,
           taskerProfileId: profile?.id || candidate.providerId,
           name: profile?.user.name || '',
           rating: profile?.rating || 0,
           completedJobs: profile?.completedJobs || 0,
-          profileImage: profile?.profileImage || '',
+          profileImage: identityVerified ? identity?.verifiedPhotoUrl || '' : '',
+          profilePhotoVerified: identityVerified && Boolean(identity?.verifiedPhotoUrl),
+          identityVerified,
           bio: profile?.bio || '',
           distanceKm: null,
           score: candidate.score,
+          isVerified: profile?.isVerified || false,
           isOnline: profile?.isOnline || false,
           providerType: candidate.providerType,
           components: candidate.components,

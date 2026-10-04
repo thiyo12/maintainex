@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native'
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ShieldCheck, ShieldSlash, ArrowsClockwise, Copy, CheckCircle, WarningCircle } from 'phosphor-react-native'
@@ -29,6 +29,25 @@ export default function JobPinScreen() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [copied, setCopied] = useState(false)
+  const [workerIdentity, setWorkerIdentity] = useState<{
+    required: boolean
+    worker: null | {
+      providerIdentityId: string
+      providerType: 'INDIVIDUAL' | 'COMPANY'
+      userId: string
+      displayName: string
+      verifiedPhotoUrl: string | null
+      identityVerified: boolean
+      companyId: string | null
+      companyName: string | null
+    }
+    confirmation: null | {
+      id: string
+      status: string
+      confirmedAt: string | null
+      mismatchReportedAt: string | null
+    }
+  } | null>(null)
 
   const loadPinState = async () => {
     try {
@@ -42,13 +61,36 @@ export default function JobPinScreen() {
     }
   }
 
+  const loadWorkerIdentity = async () => {
+    try {
+      const state = await v2JobActions.getWorkerIdentity(id)
+      setWorkerIdentity(state)
+    } catch {
+      setWorkerIdentity(null)
+    }
+  }
+
   useEffect(() => {
     loadPinState()
+    loadWorkerIdentity()
     const timer = setInterval(loadPinState, 3000)
     return () => clearInterval(timer)
   }, [id])
 
   const handleGenerate = async () => {
+    const startingWork = Boolean(pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt)
+    if (
+      startingWork &&
+      workerIdentity?.required &&
+      workerIdentity.confirmation?.status !== 'MATCHED'
+    ) {
+      Alert.alert(
+        'Confirm your tasker first',
+        'For your safety, confirm that the person who arrived matches the verified MaintainEX profile before generating the Start Work PIN.'
+      )
+      return
+    }
+
     setActionLoading('generate')
     try {
       const res = await v2JobActions.generatePin(id)
@@ -143,6 +185,55 @@ export default function JobPinScreen() {
     )
   }
 
+  const handleWorkerMatch = async () => {
+    setActionLoading('identity-match')
+    try {
+      const result = await v2JobActions.confirmWorkerIdentity(id, 'MATCH')
+      setWorkerIdentity(prev => prev ? { ...prev, confirmation: result.confirmation } : prev)
+      Alert.alert(
+        'Identity confirmed',
+        'The arriving person matches the verified MaintainEX profile. You can now generate the Start Work PIN when you are ready.'
+      )
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err?.message || 'Could not confirm worker identity.')
+    } finally {
+      setActionLoading('')
+    }
+  }
+
+  const handleWorkerMismatch = () => {
+    Alert.alert(
+      'Different person arrived?',
+      'Do not share the Start Work PIN. MaintainEX will flag this booking for Trust & Safety review.',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: 'Report mismatch',
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoading('identity-mismatch')
+            try {
+              const result = await v2JobActions.confirmWorkerIdentity(
+                id,
+                'MISMATCH',
+                'Customer reported that the arriving person did not match the verified profile.'
+              )
+              setWorkerIdentity(prev => prev ? { ...prev, confirmation: result.confirmation } : prev)
+              Alert.alert(
+                'Mismatch reported',
+                'Work start is blocked. Do not share any PIN until MaintainEX resolves the identity issue.'
+              )
+            } catch (err: any) {
+              Alert.alert(t('common.error'), err?.message || 'Could not report the identity mismatch.')
+            } finally {
+              setActionLoading('')
+            }
+          },
+        },
+      ],
+    )
+  }
+
   const handleCopyPin = async () => {
     if (!generatedPin) return
     await Clipboard.setStringAsync(generatedPin)
@@ -170,13 +261,117 @@ export default function JobPinScreen() {
       ? 'Arrival is confirmed. Generate a fresh one-time PIN only when you are ready for work to start.'
       : 'Work has already started. No additional start PIN is required.'
 
+  const needsWorkerIdentity =
+    Boolean(pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && workerIdentity?.required)
+  const workerMatched = workerIdentity?.confirmation?.status === 'MATCHED'
+  const workerMismatch = workerIdentity?.confirmation?.status === 'MISMATCH_REPORTED'
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>{t('jobPin.title')}</Text>
         <Text style={styles.subtitle}>{t('jobPin.description')}</Text>
 
-        {generatedPin && (
+        {needsWorkerIdentity && (
+          <View style={[
+            styles.identityCard,
+            workerMismatch && { borderColor: colors.error },
+            workerMatched && { borderColor: colors.success },
+          ]}>
+            <View style={styles.identityHeader}>
+              <ShieldCheck
+                size={22}
+                color={workerMatched ? colors.success : workerMismatch ? colors.error : colors.amber}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.identityTitle}>Confirm your arriving tasker</Text>
+                <Text style={styles.identitySubtitle}>
+                  Make sure the person at your location matches this MaintainEX verified profile before work starts.
+                </Text>
+              </View>
+            </View>
+
+            {workerIdentity?.worker ? (
+              <>
+                <View style={styles.workerRow}>
+                  {workerIdentity.worker.verifiedPhotoUrl ? (
+                    <Image
+                      source={{ uri: workerIdentity.worker.verifiedPhotoUrl }}
+                      style={styles.workerPhoto}
+                    />
+                  ) : (
+                    <View style={[styles.workerPhoto, styles.workerPhotoFallback]}>
+                      <ShieldSlash size={28} color={colors.muted} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.workerName}>{workerIdentity.worker.displayName}</Text>
+                    {workerIdentity.worker.companyName && (
+                      <Text style={styles.workerCompany}>{workerIdentity.worker.companyName}</Text>
+                    )}
+                    <Text style={[
+                      styles.workerVerification,
+                      { color: workerIdentity.worker.identityVerified ? colors.success : colors.error },
+                    ]}>
+                      {workerIdentity.worker.identityVerified
+                        ? '✓ Identity verified by MaintainEX'
+                        : 'Identity photo verification pending'}
+                    </Text>
+                  </View>
+                </View>
+
+                {workerMatched ? (
+                  <View style={styles.identitySuccess}>
+                    <CheckCircle size={18} color={colors.success} />
+                    <Text style={styles.identitySuccessText}>Person confirmed. Start Work PIN is available.</Text>
+                  </View>
+                ) : workerMismatch ? (
+                  <View style={styles.identityDanger}>
+                    <WarningCircle size={18} color={colors.error} />
+                    <Text style={styles.identityDangerText}>
+                      Identity mismatch reported. Do not allow work to start.
+                    </Text>
+                  </View>
+                ) : workerIdentity.worker.identityVerified ? (
+                  <View style={styles.identityActions}>
+                    <TouchableOpacity
+                      style={[styles.identityAction, styles.identityMatchBtn]}
+                      onPress={handleWorkerMatch}
+                      disabled={!!actionLoading}
+                    >
+                      {actionLoading === 'identity-match'
+                        ? <ActivityIndicator size="small" color="#000" />
+                        : <Text style={styles.identityMatchText}>Person matches</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.identityAction, styles.identityMismatchBtn]}
+                      onPress={handleWorkerMismatch}
+                      disabled={!!actionLoading}
+                    >
+                      <Text style={styles.identityMismatchText}>Different person arrived</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.identityDanger}>
+                    <WarningCircle size={18} color={colors.error} />
+                    <Text style={styles.identityDangerText}>
+                      Do not share the Start Work PIN until MaintainEX verifies this worker's public identity photo.
+                    </Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={styles.identityDanger}>
+                <WarningCircle size={18} color={colors.error} />
+                <Text style={styles.identityDangerText}>
+                  The assigned worker is not ready for identity confirmation yet.
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {generatedPin && (!needsWorkerIdentity || workerMatched) && (
           <View style={styles.pinReveal}>
             <Text style={styles.pinLabel}>{nextPurpose}</Text>
             <Text style={styles.pinValue}>{generatedPin}</Text>
@@ -236,7 +431,7 @@ export default function JobPinScreen() {
             <TouchableOpacity
               style={[styles.actionBtn, styles.primaryBtn]}
               onPress={handleGenerate}
-              disabled={!!actionLoading}
+              disabled={!!actionLoading || (needsWorkerIdentity && !workerMatched)}
             >
               {actionLoading === 'generate' ? (
                 <ActivityIndicator size="small" color="#000" />
@@ -325,6 +520,33 @@ function makeStyles(colors: any) {
     emptyState: { alignItems: 'center', paddingVertical: 40, marginBottom: 24 },
     emptyTitle: { fontSize: 18, fontFamily: fonts.semibold, color: colors.text, marginTop: 16 },
     emptySubtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, marginTop: 8, textAlign: 'center' },
+    identityCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 18,
+      marginBottom: 20,
+      borderWidth: 1.5,
+      borderColor: colors.amber,
+    },
+    identityHeader: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginBottom: 16 },
+    identityTitle: { fontSize: 16, fontFamily: fonts.semibold, color: colors.text },
+    identitySubtitle: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, lineHeight: 18, marginTop: 3 },
+    workerRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+    workerPhoto: { width: 72, height: 72, borderRadius: 18, backgroundColor: colors.surface },
+    workerPhotoFallback: { alignItems: 'center', justifyContent: 'center' },
+    workerName: { fontSize: 17, fontFamily: fonts.semibold, color: colors.text },
+    workerCompany: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, marginTop: 2 },
+    workerVerification: { fontSize: 12, fontFamily: fonts.medium, marginTop: 5 },
+    identityActions: { gap: 8, marginTop: 16 },
+    identityAction: { minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingHorizontal: 12 },
+    identityMatchBtn: { backgroundColor: colors.amber },
+    identityMatchText: { color: '#000', fontFamily: fonts.semibold, fontSize: 14 },
+    identityMismatchBtn: { borderWidth: 1, borderColor: colors.error, backgroundColor: 'transparent' },
+    identityMismatchText: { color: colors.error, fontFamily: fonts.semibold, fontSize: 14 },
+    identitySuccess: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 16, padding: 12, borderRadius: 10, backgroundColor: colors.surface },
+    identitySuccessText: { flex: 1, color: colors.success, fontFamily: fonts.medium, fontSize: 12, lineHeight: 17 },
+    identityDanger: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 16, padding: 12, borderRadius: 10, backgroundColor: colors.surface },
+    identityDangerText: { flex: 1, color: colors.error, fontFamily: fonts.medium, fontSize: 12, lineHeight: 17 },
     actions: { gap: 12 },
     actionBtn: {
       flexDirection: 'row',

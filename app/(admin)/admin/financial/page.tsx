@@ -165,6 +165,12 @@ export default function FinanceControlCentrePage() {
             Payment providers
           </CrmButton>
         </Link>
+        <Link href="/admin/financial/provider-policies">
+          <CrmButton variant="secondary">
+            <FiShield size={14} />
+            Provider standing policies
+          </CrmButton>
+        </Link>
       </div>
 
       <section className="grid gap-4 xl:grid-cols-2">

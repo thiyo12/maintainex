@@ -31,6 +31,28 @@ export async function GET(request: NextRequest) {
         taskerSkills: { select: { experienceYears: true } },
       },
     })
+    const providerIdentity = await prisma.providerIdentity.findUnique({
+      where: {
+        identityType_subjectId: {
+          identityType: 'TASKER',
+          subjectId: tasker.id,
+        },
+      },
+      select: {
+        id: true,
+        verifiedPhotoUrl: true,
+        photoLocked: true,
+        kycStatus: true,
+      },
+    })
+    const pendingPhotoChange = providerIdentity
+      ? await prisma.providerPhotoChangeRequest.findFirst({
+          where: { providerIdentityId: providerIdentity.id, status: 'PENDING' },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, status: true, createdAt: true },
+        })
+      : null
+
     return NextResponse.json({
       id: tasker.id,
       userId: tasker.userId,
@@ -47,7 +69,16 @@ export async function GET(request: NextRequest) {
       isOnline: tasker.isOnline,
       latitude: tasker.latitude,
       longitude: tasker.longitude,
-      profileImage: tasker.profileImage,
+      profileImage:
+        tasker.user.identityStatus === 'VERIFIED' || tasker.user.identityStatus === 'APPROVED'
+          ? providerIdentity?.verifiedPhotoUrl || null
+          : tasker.profileImage,
+      verifiedProfilePhoto: providerIdentity?.verifiedPhotoUrl || null,
+      profilePhotoLocked:
+        tasker.user.identityStatus === 'VERIFIED' ||
+        tasker.user.identityStatus === 'APPROVED' ||
+        providerIdentity?.photoLocked === true,
+      pendingPhotoChange,
       completionRate: tasker.completionRate,
       avgResponseMin: tasker.avgResponseMin,
       experienceYears: tasker.taskerSkills.reduce((max, skill) => Math.max(max, skill.experienceYears), 0),
@@ -86,6 +117,16 @@ export async function PUT(request: NextRequest) {
         isOnline: false,
         skills: '[]',
       },
+    })
+
+    const profileIdentity = await prisma.providerIdentity.findUnique({
+      where: {
+        identityType_subjectId: {
+          identityType: 'TASKER',
+          subjectId: tasker.id,
+        },
+      },
+      select: { photoLocked: true, verifiedPhotoUrl: true },
     })
 
     const { bio, experienceSummary, dateOfBirth, address, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
@@ -156,7 +197,25 @@ export async function PUT(request: NextRequest) {
       if (profileImage !== null && typeof profileImage !== 'string') {
         return NextResponse.json({ error: 'profileImage must be a URL string' }, { status: 400 })
       }
-      updateData.profileImage = typeof profileImage === 'string' ? profileImage.trim().slice(0, 2000) : null
+      const normalizedProfileImage =
+        typeof profileImage === 'string' ? profileImage.trim().slice(0, 2000) : null
+      const verifiedIdentity =
+        user.identityStatus === 'VERIFIED' || user.identityStatus === 'APPROVED'
+      const photoLocked = verifiedIdentity || profileIdentity?.photoLocked === true
+
+      if (photoLocked && normalizedProfileImage !== tasker.profileImage) {
+        return NextResponse.json(
+          {
+            error: 'Verified profile photo changes require MaintainEX identity review.',
+            code: 'VERIFIED_PHOTO_CHANGE_REQUIRES_REVIEW',
+          },
+          { status: 409 },
+        )
+      }
+
+      if (!photoLocked) {
+        updateData.profileImage = normalizedProfileImage
+      }
     }
 
     const userUpdate: any = {}
@@ -205,6 +264,14 @@ export async function PUT(request: NextRequest) {
       completedJobs: updated.completedJobs,
       isVerified: updated.isVerified,
       isOnline: updated.isOnline,
+      profileImage:
+        user.identityStatus === 'VERIFIED' || user.identityStatus === 'APPROVED'
+          ? profileIdentity?.verifiedPhotoUrl || null
+          : updated.profileImage,
+      profilePhotoLocked:
+        user.identityStatus === 'VERIFIED' ||
+        user.identityStatus === 'APPROVED' ||
+        profileIdentity?.photoLocked === true,
       user: updated.user,
     })
   } catch (error) {

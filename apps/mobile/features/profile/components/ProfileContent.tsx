@@ -123,6 +123,14 @@ export default function ProfileContent() {
             onPress={() => router.push('/settings/edit-profile')} />
           <MenuRow icon={ShieldCheck} label={t('verify.title')} color="#8B5CF6"
             onPress={() => router.push('/(tasker)/identity')} />
+          {(identityStatus === 'APPROVED' || identityStatus === 'VERIFIED') && (
+            <MenuRow
+              icon={ShieldCheck}
+              label="Verified worker photo"
+              color="#16A34A"
+              onPress={() => router.push('/settings/verified-photo' as any)}
+            />
+          )}
           <MenuRow icon={Bell} label={t('profile.notifications')} color="#F5A623" badge={unread}
             onPress={() => router.push('/notifications')} />
           <MenuRow icon={CreditCard} label={t('profile.payment')} color="#22C55E"
@@ -174,6 +182,8 @@ export default function ProfileContent() {
             onPress={() => router.push('/settings/terms')} />
           <MenuRow icon={Info} label={t('profile.about')} color="#EC4899"
             onPress={() => router.push('/settings/about')} />
+          <MenuRow icon={SignOut} label="Close account" color={colors.error}
+            onPress={() => router.push('/settings/account-close' as any)} />
         </View>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>

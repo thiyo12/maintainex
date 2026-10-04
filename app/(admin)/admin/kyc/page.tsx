@@ -1,8 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { FiShield, FiCheck, FiX, FiEye, FiFileText, FiClock, FiUser, FiExternalLink } from 'react-icons/fi'
+import { FiShield, FiCheck, FiX, FiEye, FiFileText, FiClock, FiUser, FiExternalLink, FiCamera } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import {
   CrmBadge,
@@ -24,6 +25,14 @@ interface KYCDocument {
   reviewedBy?: string
   reviewedAt?: string
   createdAt: string
+  integritySignals?: Array<{
+    id: string
+    signalType: string
+    severity: string
+    status: string
+    resolution?: string | null
+    createdAt: string
+  }>
   user: {
     id: string
     mxId?: string
@@ -122,12 +131,15 @@ export default function KYCPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentId: docId, status: 'APPROVED' }),
       })
-      if (!res.ok) throw new Error('Failed')
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error || 'Failed to approve document')
+      }
       toast.success('Document approved')
       setReviewModal(null)
       fetchDocuments()
-    } catch {
-      toast.error('Failed to approve document')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to approve document')
     } finally {
       setActionLoading(false)
     }
@@ -180,6 +192,15 @@ export default function KYCPage() {
           eyebrow="Trust & Safety"
           title="KYC verification"
           description="Review protected identity documents and move eligible users through the governed verification lifecycle."
+          actions={
+            <Link
+              href="/admin/kyc/photos"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+            >
+              <FiCamera size={14} />
+              Verified photo reviews
+            </Link>
+          }
           context={
             <>
               <CrmBadge tone={(canApprove || canReject) ? 'success' : 'neutral'} dot>
@@ -285,6 +306,34 @@ export default function KYCPage() {
                     {doc.reviewNote && (
                       <div className="mt-2 text-sm text-slate-400 italic">
                         Note: {doc.reviewNote}
+                      </div>
+                    )}
+
+                    {doc.integritySignals?.some(signal =>
+                      ['OPEN', 'REVIEWED', 'CONFIRMED'].includes(signal.status) &&
+                      ['HIGH', 'CRITICAL'].includes(signal.severity)
+                    ) && (
+                      <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <CrmBadge tone="danger" dot>Identity integrity review required</CrmBadge>
+                          {doc.integritySignals
+                            .filter(signal => ['OPEN', 'REVIEWED', 'CONFIRMED'].includes(signal.status))
+                            .slice(0, 2)
+                            .map(signal => (
+                              <CrmBadge key={signal.id} tone="warning">
+                                {signal.signalType.replaceAll('_', ' ')}
+                              </CrmBadge>
+                            ))}
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-red-700">
+                          KYC approval is blocked until Trust & Safety resolves the linked strong-identity event.
+                        </p>
+                        <a
+                          href="/admin/trust-safety/risk-events"
+                          className="mt-2 inline-flex text-xs font-semibold text-red-800 underline underline-offset-2"
+                        >
+                          Open Risk Events
+                        </a>
                       </div>
                     )}
                   </div>

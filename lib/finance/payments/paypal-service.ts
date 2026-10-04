@@ -15,6 +15,7 @@ import {
   markProviderEventProcessed,
   recordVerifiedProviderEvent,
 } from '@/lib/finance/payments/provider-events'
+import { accountFinalProviderChargeback } from '@/lib/finance/payments/chargeback-accounting'
 
 type RecordObject = Record<string, unknown>
 
@@ -295,6 +296,21 @@ export function extractPayPalEventReferences(event: RecordObject): {
     captureId = stringValue(relatedIds?.capture_id) || captureId
   }
 
+  const disputedTransactions = Array.isArray(resource?.disputed_transactions)
+    ? resource!.disputed_transactions.filter(
+        (value): value is RecordObject =>
+          Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+      )
+    : []
+  for (const disputed of disputedTransactions) {
+    const sellerTransaction = objectValue(disputed.seller_transaction)
+    const transactionId =
+      stringValue(disputed.seller_transaction_id) ||
+      stringValue(sellerTransaction?.id) ||
+      stringValue(disputed.transaction_id)
+    if (!captureId && transactionId) captureId = transactionId
+  }
+
   const links = Array.isArray(resource?.links)
     ? resource!.links.filter(
         (value): value is RecordObject =>
@@ -547,6 +563,84 @@ async function recordExternalPayPalRefund(
   })
 }
 
+function disputeOutcomeCode(resource: RecordObject | null): string | null {
+  const outcome = objectValue(resource?.dispute_outcome)
+  return stringValue(outcome?.outcome_code)?.toUpperCase() || null
+}
+
+async function resolveProviderDispute(
+  refs: ReturnType<typeof extractPayPalEventReferences>,
+  resolved: NonNullable<Awaited<ReturnType<typeof resolveIntentForPayPalEvent>>>
+) {
+  const outcome = disputeOutcomeCode(refs.resource)
+  const disputeId = stringValue(refs.resource?.dispute_id) || stringValue(refs.resource?.id) || refs.eventId
+  const sellerProtectedOutcome =
+    outcome === 'RESOLVED_SELLER_FAVOUR' ||
+    outcome === 'CANCELED_BY_BUYER' ||
+    outcome === 'RESOLVED_WITH_PAYOUT'
+
+  await prisma.$transaction(async tx => {
+    if (sellerProtectedOutcome) {
+      await tx.jobEscrow.updateMany({
+        where: { id: resolved.intent.escrowId, status: 'ON_HOLD' },
+        data: { status: 'PROTECTED' },
+      })
+    } else if (outcome === 'RESOLVED_BUYER_FAVOUR' || outcome === 'ACCEPTED') {
+      await accountFinalProviderChargeback(tx, {
+        escrowId: resolved.intent.escrowId,
+        paymentIntentId: resolved.intent.id,
+        provider: 'PAYPAL',
+        sourceReference: disputeId || refs.eventId || resolved.intent.id,
+        amountMinor: resolved.intent.amount,
+        currency: resolved.intent.currency,
+        reason: 'PayPal dispute resolved in the buyer’s favor',
+        createdBy: 'system:paypal-webhook',
+        metadata: {
+          eventType: refs.eventType,
+          outcome,
+          providerOrderId: refs.orderId,
+          providerCaptureId: refs.captureId,
+        },
+      })
+
+      await tx.paymentIntent.updateMany({
+        where: { id: resolved.intent.id, status: { not: 'REFUNDED' } },
+        data: { status: 'CHARGEDBACK' },
+      })
+    } else {
+      await tx.marketplaceRiskEvent.create({
+        data: {
+          jobId: resolved.intent.jobId,
+          actorUserId: resolved.intent.customerId,
+          eventType: 'PAYMENT_PROVIDER_DISPUTE_RESOLUTION_REVIEW',
+          severity: 'HIGH',
+          metadata: JSON.stringify({
+            paymentIntentId: resolved.intent.id,
+            provider: 'PAYPAL',
+            eventType: refs.eventType,
+            outcome,
+            disputeId,
+          }),
+        },
+      })
+    }
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: resolved.intent.jobId,
+      actorId: 'system:paypal-webhook',
+      actorType: 'SYSTEM',
+      action: 'PAYMENT_PROVIDER_DISPUTE_RESOLVED',
+      metadata: {
+        paymentIntentId: resolved.intent.id,
+        provider: 'PAYPAL',
+        eventType: refs.eventType,
+        outcome,
+        disputeId,
+      },
+    })
+  })
+}
+
 async function holdEscrowForProviderDispute(
   refs: ReturnType<typeof extractPayPalEventReferences>,
   resolved: NonNullable<Awaited<ReturnType<typeof resolveIntentForPayPalEvent>>>
@@ -664,8 +758,13 @@ export async function processVerifiedPayPalWebhook(input: {
       // is not treated as funded and a reversed approval cannot fulfill a job.
     } else if (refs.eventType === 'PAYMENT.CAPTURE.REFUNDED') {
       await recordExternalPayPalRefund(refs, resolved)
-    } else if (refs.eventType === 'CUSTOMER.DISPUTE.CREATED') {
+    } else if (
+      refs.eventType === 'CUSTOMER.DISPUTE.CREATED' ||
+      refs.eventType === 'CUSTOMER.DISPUTE.UPDATED'
+    ) {
       await holdEscrowForProviderDispute(refs, resolved)
+    } else if (refs.eventType === 'CUSTOMER.DISPUTE.RESOLVED') {
+      await resolveProviderDispute(refs, resolved)
     } else {
       await markProviderEventProcessed(eventRecord.eventId, 'IGNORED')
       return { success: true, ignored: true }

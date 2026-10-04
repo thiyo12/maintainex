@@ -39,6 +39,7 @@ export default function CompanyEarnings() {
   const paidOut = earnings?.paidOut || 0
   const avgPerJob = earnings?.avgPerJob || 0
   const revenueChange = earnings?.revenueChange || 0
+  const displayCurrency = earnings?.currency || earnings?.maintainexBalance?.currency || 'LKR'
 
   if (loading) {
     return (
@@ -58,12 +59,129 @@ export default function CompanyEarnings() {
 
       <View style={styles.revenueCard}>
         <Text style={styles.revenueLabel}>{t('tasker.totalEarned')}</Text>
-        <Text style={styles.revenueValue}>LKR {Number(totalRevenue).toLocaleString()}</Text>
+        <Text style={styles.revenueValue}>{displayCurrency} {Number(totalRevenue).toLocaleString()}</Text>
         <Text style={styles.revenuePeriod}>{t('company.thisPeriod', { period })}</Text>
         <View style={styles.revenueChange}>
           <Text style={styles.changeText}>↑ {revenueChange}% {t('company.fromLast', { period })}</Text>
         </View>
       </View>
+
+      {earnings?.maintainexBalance && (
+        <View style={styles.maintainexCard}>
+          <View style={styles.maintainexHeader}>
+            <View>
+              <Text style={styles.maintainexTitle}>Company MaintainEX Balance</Text>
+              <Text style={styles.maintainexStatus}>
+                {String(earnings.maintainexBalance.status || 'CLEAR').replaceAll('_', ' ')}
+              </Text>
+            </View>
+            <Ionicons
+              name={Number(earnings.maintainexBalance.totalLiability || 0) > 0 ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+              size={26}
+              color={Number(earnings.maintainexBalance.totalLiability || 0) > 0 ? colors.amber : colors.success}
+            />
+          </View>
+
+          <Text style={styles.maintainexDueLabel}>Commission due</Text>
+          <Text style={styles.maintainexDueValue}>
+            {earnings.maintainexBalance.currency || 'LKR'} {Number(earnings.maintainexBalance.commissionDue || 0).toLocaleString()}
+          </Text>
+          {Number(earnings.maintainexBalance.adjustmentDue || 0) > 0 && (
+            <>
+              <Text style={styles.maintainexDueLabel}>Post-payment adjustment due</Text>
+              <Text style={[styles.maintainexDueValue, { color: colors.error }]}>
+                {earnings.maintainexBalance.currency || 'LKR'} {Number(earnings.maintainexBalance.adjustmentDue || 0).toLocaleString()}
+              </Text>
+            </>
+          )}
+
+          <View style={styles.maintainexRuleRow}>
+            <Text style={styles.maintainexRuleLabel}>Cash jobs</Text>
+            <Text style={[
+              styles.maintainexRuleValue,
+              { color: earnings.maintainexBalance.cashJobsAllowed ? colors.success : colors.error },
+            ]}>
+              {earnings.maintainexBalance.cashJobsAllowed ? 'Allowed' : 'Temporarily blocked'}
+            </Text>
+          </View>
+          <View style={styles.maintainexRuleRow}>
+            <Text style={styles.maintainexRuleLabel}>Online jobs</Text>
+            <Text style={[
+              styles.maintainexRuleValue,
+              { color: earnings.maintainexBalance.onlineJobsAllowed ? colors.success : colors.error },
+            ]}>
+              {earnings.maintainexBalance.onlineJobsAllowed ? 'Allowed' : 'Restricted'}
+            </Text>
+          </View>
+
+          {!earnings.maintainexBalance.cashJobsAllowed && earnings.maintainexBalance.onlineJobsAllowed && (
+            <Text style={styles.maintainexHelp}>
+              Online-paid jobs remain available so company commission debt can be recovered from future earnings.
+            </Text>
+          )}
+          {earnings.maintainexBalance.manualReviewRequired && (
+            <Text style={styles.maintainexWarning}>
+              This company account requires MaintainEX finance review.
+            </Text>
+          )}
+        </View>
+      )}
+
+      {(earnings?.recentCommissionRecoveries || []).length > 0 && (
+        <View style={styles.recoverySection}>
+          <Text style={styles.recoveryTitle}>Recent commission settlements</Text>
+          <Text style={styles.recoveryHelp}>
+            Online offsets and confirmed direct payments reduce older company cash-job commission.
+          </Text>
+          {earnings.recentCommissionRecoveries.slice(0, 5).map((recovery: any) => (
+            <View key={recovery.id} style={styles.recoveryCard}>
+              <View style={styles.recoveryIcon}>
+                <Ionicons name="swap-horizontal-outline" size={18} color={colors.success} />
+              </View>
+              <View style={styles.recoveryBody}>
+                <Text style={styles.recoveryAmount}>
+                  {recovery.currency} {Number(recovery.amount || 0).toLocaleString()} {recovery.method === 'ONLINE_EARNINGS' ? 'recovered from online earnings' : 'direct payment confirmed'}
+                </Text>
+                <Text style={styles.recoveryMeta}>
+                  {recovery.method === 'ONLINE_EARNINGS'
+                    ? `Online job ${recovery.sourceJobId?.slice(0, 8) || '—'} → cash job ${String(recovery.originalCashJobId || '').slice(0, 8)}`
+                    : `Cash job ${String(recovery.originalCashJobId || '').slice(0, 8)}`}
+                </Text>
+                <Text style={styles.recoveryMeta}>
+                  {new Date(recovery.createdAt).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {(earnings?.recentBalanceAdjustmentRecoveries || []).length > 0 && (
+        <View style={styles.recoverySection}>
+          <Text style={styles.recoveryTitle}>Recent balance adjustments</Text>
+          <Text style={styles.recoveryHelp}>
+            Post-payment losses such as chargebacks are tracked separately from company commission.
+          </Text>
+          {earnings.recentBalanceAdjustmentRecoveries.slice(0, 5).map((recovery: any) => (
+            <View key={recovery.id} style={styles.recoveryCard}>
+              <View style={styles.recoveryIcon}>
+                <Ionicons name="shield-checkmark-outline" size={18} color={colors.success} />
+              </View>
+              <View style={styles.recoveryBody}>
+                <Text style={styles.recoveryAmount}>
+                  {recovery.currency} {Number(recovery.amount || 0).toLocaleString()} recovered
+                </Text>
+                <Text style={styles.recoveryMeta}>
+                  {String(recovery.adjustmentType || '').replaceAll('_', ' ')} · job {String(recovery.originalJobId || '').slice(0, 8)}
+                </Text>
+                <Text style={styles.recoveryMeta}>
+                  {new Date(recovery.createdAt).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       {(earnings?.pendingCommissionPayments || []).length > 0 && (
         <View style={styles.commissionSection}>
@@ -74,7 +192,7 @@ export default function CompanyEarnings() {
                 <Ionicons name="cash-outline" size={20} color={colors.amber} />
                 <Text style={styles.commissionRef}>{cp.referenceNumber}</Text>
               </View>
-              <Text style={styles.commissionAmount}>LKR {cp.amountDue.toLocaleString()}</Text>
+              <Text style={styles.commissionAmount}>{displayCurrency} {cp.amountDue.toLocaleString()}</Text>
               <Text style={styles.commissionInstruction}>
                 Pay this amount to any MΛINTΛINEX agent using reference: {cp.referenceNumber}
               </Text>
@@ -89,15 +207,15 @@ export default function CompanyEarnings() {
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>{t('wallet.pending')}</Text>
-          <Text style={styles.statValue}>LKR {Number(pendingAmount).toLocaleString()}</Text>
+          <Text style={styles.statValue}>{displayCurrency} {Number(pendingAmount).toLocaleString()}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>{t('wallet.withdraw')}</Text>
-          <Text style={styles.statValue}>LKR {Number(paidOut).toLocaleString()}</Text>
+          <Text style={styles.statValue}>{displayCurrency} {Number(paidOut).toLocaleString()}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>{t('tasker.earnings')}</Text>
-          <Text style={styles.statValue}>LKR {Number(avgPerJob).toLocaleString()}</Text>
+          <Text style={styles.statValue}>{displayCurrency} {Number(avgPerJob).toLocaleString()}</Text>
         </View>
       </View>
 
@@ -121,21 +239,29 @@ export default function CompanyEarnings() {
           <Text style={styles.emptyText}>{t('wallet.noTransactions')}</Text>
         ) : (
           payouts.map((p, i) => {
-            const status = p.status || (p.paid ? 'Paid' : 'Pending')
-            const isPaid = status === 'Paid' || status === 'paid'
+            const status = String(p.status || (p.paid ? 'SUCCEEDED' : 'PENDING')).toUpperCase()
+            const isPaid = ['PAID', 'SUCCEEDED', 'CLEARED', 'COMPLETED'].includes(status)
             const statusLabel = isPaid ? t('common.success') : t('common.pending')
             return (
               <View key={p.id || i} style={styles.payoutCard}>
                 <View style={styles.payoutLeft}>
                   <View style={[styles.payoutDot, { backgroundColor: isPaid ? colors.success : colors.amber }]} />
                   <View style={styles.payoutInfo}>
-                    <Text style={styles.payoutContract} numberOfLines={1}>{p.contract || p.title}</Text>
-                    <Text style={styles.payoutDate}>{p.date || (p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '')}</Text>
+                    <Text style={styles.payoutContract} numberOfLines={1}>
+                      {p.description || p.contract || p.title || 'Provider payout'}
+                    </Text>
+                    <Text style={styles.payoutDate}>
+                      {p.clearedAt
+                        ? new Date(p.clearedAt).toLocaleDateString()
+                        : p.createdAt
+                          ? new Date(p.createdAt).toLocaleDateString()
+                          : p.date || ''}
+                    </Text>
                   </View>
                 </View>
                 <View style={styles.payoutRight}>
                   <Text style={[styles.payoutAmount, { color: isPaid ? colors.success : colors.amber }]}>
-                    LKR {Number(p.amount).toLocaleString()}
+                    {p.currency || displayCurrency} {Number(p.amount).toLocaleString()}
                   </Text>
                   <Text style={styles.payoutStatus}>{statusLabel}</Text>
                 </View>
@@ -170,6 +296,35 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderRadius: 20,
   },
   changeText: { fontSize: 13, fontWeight: '600', color: colors.white },
+  maintainexCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: 24,
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  maintainexHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  maintainexTitle: { fontSize: 17, fontWeight: '800', color: colors.ink },
+  maintainexStatus: { fontSize: 12, fontWeight: '600', color: colors.muted, marginTop: 2 },
+  maintainexDueLabel: { fontSize: 12, color: colors.muted },
+  maintainexDueValue: { fontSize: 26, fontWeight: '800', color: colors.ink, marginTop: 2, marginBottom: 14 },
+  maintainexRuleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 7,
+  },
+  maintainexRuleLabel: { fontSize: 13, color: colors.muted },
+  maintainexRuleValue: { fontSize: 13, fontWeight: '700' },
+  maintainexHelp: { fontSize: 12, color: colors.muted, lineHeight: 18, marginTop: 10 },
+  maintainexWarning: { fontSize: 12, fontWeight: '700', color: colors.error, lineHeight: 18, marginTop: 8 },
   statsRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 10, marginBottom: 16 },
   statCard: {
     flex: 1,
@@ -225,6 +380,51 @@ const makeStyles = (colors: any) => StyleSheet.create({
   payoutAmount: { fontSize: 14, fontWeight: '700' },
   payoutStatus: { fontSize: 11, color: colors.muted, marginTop: 2 },
   emptyText: { textAlign: 'center', color: colors.muted, marginTop: 20, fontSize: 14 },
+  recoverySection: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+  },
+  recoveryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.ink,
+    marginBottom: 4,
+  },
+  recoveryHelp: {
+    fontSize: 12,
+    color: colors.muted,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  recoveryCard: {
+    flexDirection: 'row',
+    gap: 10,
+    backgroundColor: colors.white,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  recoveryIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  recoveryBody: { flex: 1 },
+  recoveryAmount: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.success,
+  },
+  recoveryMeta: {
+    fontSize: 11,
+    color: colors.muted,
+    marginTop: 2,
+  },
   commissionSection: {
     marginHorizontal: 24,
     marginBottom: 16,

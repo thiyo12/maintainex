@@ -3,6 +3,7 @@ import { prisma, type PrismaClientOrTx } from '../prisma'
 import { hashPassword, verifyPassword } from '../security/password'
 import { emitSecurityEvent } from '../security/events'
 import { recordJobLifecycleEvent } from './job-lifecycle-audit'
+import { resolveJobWorkerIdentity } from '@/lib/identity/job-worker-identity'
 
 const PIN_LENGTH = 6
 const MAX_FAILED_ATTEMPTS = 5
@@ -34,6 +35,46 @@ function generatePin(): string {
   const min = Math.pow(10, PIN_LENGTH - 1)
   const max = Math.pow(10, PIN_LENGTH) - 1
   return String(crypto.randomInt(min, max + 1))
+}
+
+async function assertWorkerIdentityConfirmedBeforeWorkStartPin(
+  tx: PrismaClientOrTx,
+  jobId: string,
+): Promise<void> {
+  const job = await tx.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { workerIdentityCheckRequired: true },
+  })
+  if (!job?.workerIdentityCheckRequired) return
+
+  const worker = await resolveJobWorkerIdentity(tx, jobId)
+  if (!worker || !worker.identityVerified) {
+    throw new Error('Worker identity is not ready for Start Work PIN')
+  }
+
+  const identityCheck = await tx.jobWorkerIdentityCheck.findUnique({
+    where: {
+      jobId_providerIdentityId: {
+        jobId,
+        providerIdentityId: worker.providerIdentityId,
+      },
+    },
+    select: {
+      assignedWorkerUserId: true,
+      status: true,
+    },
+  })
+
+  if (identityCheck?.status === 'MISMATCH_REPORTED') {
+    throw new Error('Worker identity mismatch requires Trust & Safety review before Start Work PIN')
+  }
+  if (
+    !identityCheck ||
+    identityCheck.assignedWorkerUserId !== worker.assignedWorkerUserId ||
+    identityCheck.status !== 'MATCHED'
+  ) {
+    throw new Error('Customer must confirm the verified worker identity before Start Work PIN')
+  }
 }
 
 export async function generateJobPin(
@@ -71,6 +112,13 @@ export async function generateJobPin(
     },
   })
   const nextVersion = (lastPin?.version ?? 0) + 1
+
+  // The first PIN verifies arrival. Once arrival is consumed, the next PIN is
+  // the Start Work PIN and must not even be generated until the customer has
+  // confirmed the currently assigned verified worker.
+  if (lastPin?.arrivalVerifiedAt && !lastPin.workStartVerifiedAt) {
+    await assertWorkerIdentityConfirmedBeforeWorkStartPin(prisma, jobId)
+  }
 
   const record = await prisma.jobVerificationPin.create({
     data: {
@@ -121,6 +169,10 @@ export async function rotateJobPin(
   })
 
   const nextVersion = (latestPin?.version ?? 0) + 1
+
+  if (latestPin?.arrivalVerifiedAt && !latestPin.workStartVerifiedAt) {
+    await assertWorkerIdentityConfirmedBeforeWorkStartPin(prisma, jobId)
+  }
 
   const pin = generatePin()
   const pinHash = await hashPassword(pin)
@@ -236,11 +288,49 @@ export async function verifyJobPin(
       return { valid: false, error: 'PIN is temporarily locked', locked: true }
     }
 
-    // 5. Validate lifecycle state for this purpose
+    // 5. Enforce worker identity confirmation before work starts.
+    if (purpose === 'WORK_START' && job.workerIdentityCheckRequired) {
+      const worker = await resolveJobWorkerIdentity(tx, jobId)
+      if (!worker) {
+        return { valid: false, error: 'Worker identity is not ready for work start' }
+      }
+      if (worker.assignedWorkerUserId !== actorId) {
+        return { valid: false, error: 'Worker identity does not match the assigned worker' }
+      }
+      if (!worker.identityVerified) {
+        return { valid: false, error: 'Worker identity photo is not verified by MaintainEX' }
+      }
+
+      const identityCheck = await tx.jobWorkerIdentityCheck.findUnique({
+        where: {
+          jobId_providerIdentityId: {
+            jobId,
+            providerIdentityId: worker.providerIdentityId,
+          },
+        },
+        select: {
+          assignedWorkerUserId: true,
+          status: true,
+        },
+      })
+
+      if (
+        !identityCheck ||
+        identityCheck.assignedWorkerUserId !== actorId ||
+        identityCheck.status !== 'MATCHED'
+      ) {
+        if (identityCheck?.status === 'MISMATCH_REPORTED') {
+          return { valid: false, error: 'Customer reported a worker identity mismatch; work start is blocked' }
+        }
+        return { valid: false, error: 'Customer must confirm the verified worker identity before work start' }
+      }
+    }
+
+    // 6. Validate lifecycle state for this purpose
     const purposeValid = await validatePurposeTx(tx, jobId, purpose)
     if (!purposeValid) return { valid: false, error: `Cannot verify PIN for ${purpose} in current job state` }
 
-    // 6. Check if purpose already consumed (atomic per-purpose guard)
+    // 7. Check if purpose already consumed (atomic per-purpose guard)
     const purposeField =
       purpose === 'ARRIVAL' ? 'arrivalVerifiedAt'
       : purpose === 'WORK_START' ? 'workStartVerifiedAt'
@@ -256,7 +346,7 @@ export async function verifyJobPin(
       return { valid: false, error: `PIN already verified for ${purpose}` }
     }
 
-    // 7. Verify PIN hash
+    // 8. Verify PIN hash
     const pinValid = await verifyPassword(pin, pinRecord.pinHash)
     if (!pinValid) {
       // Atomic increment: read from locked row, increment, write back
@@ -298,7 +388,7 @@ export async function verifyJobPin(
       return { valid: false, error: 'Incorrect PIN', locked: lockUntil !== null }
     }
 
-    // 8. Valid PIN: mark purpose consumed + canonical lifecycle transition (atomic)
+    // 9. Valid PIN: mark purpose consumed + canonical lifecycle transition (atomic)
     const now = new Date()
     const updateData: Record<string, unknown> = {
       failedAttempts: 0,
@@ -315,7 +405,7 @@ export async function verifyJobPin(
       },
     })
 
-    // 9. Execute the single canonical WORK_START transition atomically.
+    // 10. Execute the single canonical WORK_START transition atomically.
     // Payment only protects escrow; work does not begin until this PIN succeeds.
     if (purpose === 'WORK_START') {
       const jobClaimed = await tx.marketplaceJob.updateMany({
@@ -364,7 +454,7 @@ export async function verifyJobPin(
       metadata: { purpose, pinVersion: pinRecord.version },
     })
 
-    // 10. Emit security events
+    // 11. Emit security events
     const eventType = purpose === 'ARRIVAL' ? 'job_pin_arrival_verified'
       : purpose === 'WORK_START' ? 'job_pin_work_start_verified'
       : 'job_pin_completion_verified'

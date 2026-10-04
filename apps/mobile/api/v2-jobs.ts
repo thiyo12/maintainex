@@ -95,6 +95,40 @@ export const v2JobActions = {
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/pin/revoke`, { method: 'POST' }),
   verifyPin: (jobId: string, pin: string, purpose: string) =>
     v2Request<{ success: boolean; purpose: string }>(`/api/mobile/v2/jobs/${jobId}/pin/verify`, { method: 'POST', body: JSON.stringify({ pin, purpose }) }),
+  getWorkerIdentity: (jobId: string) =>
+    v2Request<{
+      required: boolean
+      worker: null | {
+        providerIdentityId: string
+        providerType: 'INDIVIDUAL' | 'COMPANY'
+        userId: string
+        displayName: string
+        verifiedPhotoUrl: string | null
+        identityVerified: boolean
+        companyId: string | null
+        companyName: string | null
+      }
+      confirmation: null | {
+        id: string
+        status: string
+        confirmedAt: string | null
+        mismatchReportedAt: string | null
+      }
+    }>(`/api/mobile/v2/jobs/${jobId}/worker-identity`),
+  confirmWorkerIdentity: (jobId: string, decision: 'MATCH' | 'MISMATCH', reason?: string) =>
+    v2Request<{
+      success: boolean
+      required: boolean
+      confirmation: {
+        id: string
+        status: string
+        confirmedAt: string | null
+        mismatchReportedAt: string | null
+      }
+    }>(`/api/mobile/v2/jobs/${jobId}/worker-identity`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, reason }),
+    }),
   getCustomerStatus: (jobId: string) =>
     v2Request<{ status: any }>(`/api/mobile/v2/jobs/${jobId}/customer-status`),
 }

@@ -58,6 +58,7 @@ export interface V2Quote {
   providerId: string
   providerType: 'INDIVIDUAL' | 'COMPANY'
   price: number
+  currency: string
   estimatedCompletionTime: string
   message?: string | null
   attachments: string[]
@@ -104,6 +105,25 @@ export interface V2Job {
   companyAssignment?: V2CompanyAssignment | null
   acceptedQuote?: (V2Quote & { provider?: V2ProviderSummary | null }) | null
   smartBooking?: any
+}
+
+export interface V2PaymentOptions {
+  countryCode: string
+  currency: string | null
+  cash: {
+    available: boolean
+    marketAvailable: boolean
+    financiallyAllowed: boolean
+    reason: string | null
+  }
+  online: {
+    available: boolean
+    marketAvailable: boolean
+    financiallyAllowed: boolean
+    provider: string | null
+    paymentMethods: string[]
+    reason: string | null
+  }
 }
 
 export interface V2PaymentStatus {

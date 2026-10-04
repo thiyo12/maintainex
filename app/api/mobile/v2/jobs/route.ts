@@ -372,6 +372,7 @@ export async function POST(request: NextRequest) {
         estimatedDuration: estimatedDuration ? Number(estimatedDuration) : null,
         workersCount: workersCount ? Math.max(1, Number(workersCount)) : 1,
         status: 'OPEN',
+        workerIdentityCheckRequired: true,
         aiEstimateJson,
         materialHandling: finalMaterialHandling,
         smartBookingJson: finalSmartBookingJson,
