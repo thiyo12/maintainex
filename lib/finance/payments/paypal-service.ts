@@ -589,7 +589,7 @@ async function resolveProviderDispute(
       await accountFinalProviderChargeback(tx, {
         escrowId: resolved.intent.escrowId,
         paymentIntentId: resolved.intent.id,
-        provider: 'PAYPAL',
+        sourceProvider: 'PAYPAL',
         sourceReference: disputeId || refs.eventId || resolved.intent.id,
         amountMinor: resolved.intent.amount,
         currency: resolved.intent.currency,
