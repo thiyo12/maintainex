@@ -77,7 +77,7 @@ describe('targeted booking provider boundary', () => {
     const detail = read('app/api/mobile/v2/jobs/[id]/route.ts')
     expect(detail).toContain('if (!isOwner && job.targetTaskerId)')
     expect(detail).toContain('getReadableCompanyIds(user.id)')
-    expect(detail).toContain('if (!readableTargetIds.has(job.targetTaskerId))')
+    expect(detail).toContain('!readableTargetIds.has(job.targetTaskerId) && !hasAcceptedCompanyParticipation')
     expect(detail).toContain('This direct booking is reserved for another provider')
   })
 })
