@@ -494,7 +494,13 @@ export async function middleware(request: NextRequest) {
     applySecurityHeaders(response)
     applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt)
     applyRequestId(response, requestId)
-    response.headers.set('Access-Control-Allow-Origin', process.env.MOBILE_CORS_ORIGIN || '*')
+    const configuredMobileOrigin = process.env.MOBILE_CORS_ORIGIN?.trim()
+    if (configuredMobileOrigin) {
+      response.headers.set('Access-Control-Allow-Origin', configuredMobileOrigin)
+      response.headers.set('Vary', 'Origin')
+    } else if (process.env.NODE_ENV !== 'production') {
+      response.headers.set('Access-Control-Allow-Origin', '*')
+    }
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
     if (request.method === 'OPTIONS') {
