@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -231,7 +232,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM financial ledger GET error:', error)
+    logger.error('CRM financial ledger read failed unexpectedly', { err: error, route: '/api/admin/financial/ledger', method: 'GET' })
     return NextResponse.json({ error: 'Failed to load financial ledger' }, { status: 500 })
   }
 }
