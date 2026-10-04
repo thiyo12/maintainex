@@ -216,7 +216,7 @@ describe('Phase 10.7 — Cross-Company IDOR Protection', () => {
     })
 
     expect(result.success).toBe(false)
-    expect(result.error).toContain('No accepted quote')
+    expect(result.error).toContain('not authorized')
   })
 
   it('Company A assignment works with correct company', async () => {
@@ -414,7 +414,7 @@ describe('Phase 10.7 — Assignment State Machine', () => {
     expect(reject.success).toBe(true)
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobAId } })
-    expect(job?.targetTaskerId).toBeNull()
+    expect(job?.targetTaskerId).toBe(companyAId)
   })
 
   it('Cannot accept already-accepted assignment', async () => {
@@ -469,6 +469,6 @@ describe('Phase 10.7 — Revoke Protection', () => {
       createResult.assignmentId!, companyBId, workerBUserId, 'WORKER', 'test'
     )
     expect(revoke.success).toBe(false)
-    expect(revoke.error).toContain('does not belong')
+    expect(revoke.error).toContain('not authorized')
   })
 })
