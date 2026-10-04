@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   getPayPalConfig,
@@ -54,20 +55,17 @@ export async function POST(request: NextRequest) {
     const event = parsed as Record<string, unknown>
     const verified = await verifyPayPalWebhook(request.headers, event)
     if (!verified) {
-      console.error('[SECURITY] PayPal webhook signature verification failed', {
-        eventId: typeof event.id === 'string' ? event.id : null,
-        eventType: typeof event.event_type === 'string' ? event.event_type : null,
-      })
+      logger.warn('PayPal webhook signature verification failed', { route: '/api/webhooks/paypal', method: 'POST', eventType: typeof event.event_type === 'string' ? event.event_type : undefined })
       return NextResponse.json({ error: 'Invalid signature' }, { status: 403 })
     }
 
     const result = await processVerifiedPayPalWebhook({ rawBody, event })
     if (!result.success) {
-      console.error('PayPal webhook processing failed:', result.error)
+      logger.error('PayPal webhook processing failed', { route: '/api/webhooks/paypal', method: 'POST' })
       // Return a retriable server failure only after the signature has been
       // verified and the event has been safely recorded.
       return NextResponse.json(
-        { error: result.error || 'Webhook processing failed' },
+        { error: 'Webhook processing failed' },
         { status: 500, headers: { 'Cache-Control': 'no-store' } }
       )
     }
@@ -81,7 +79,7 @@ export async function POST(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('PayPal webhook error:', error)
+    logger.error('PayPal webhook failed unexpectedly', { err: error, route: '/api/webhooks/paypal', method: 'POST' })
     return NextResponse.json(
       { error: 'Server error' },
       { status: 500, headers: { 'Cache-Control': 'no-store' } }
