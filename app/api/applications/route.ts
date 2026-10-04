@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
 import { getProvinceFromDistrict } from '@/lib/provinces'
+import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
 
 function sanitizeString(str: string): string {
   return str.replace(/<[^>]*>/g, '').trim()
@@ -16,6 +17,20 @@ function isValidEmail(email: string): boolean {
 function isValidPhone(phone: string): boolean {
   const cleaned = phone.replace(/\D/g, '')
   return cleaned.length >= 10 && cleaned.length <= 15
+}
+
+function isSafeCvReference(value: string): boolean {
+  if (!value) return true
+  if (value.length > 2048) return false
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:') return false
+    const host = url.hostname.toLowerCase()
+    if (host !== 'res.cloudinary.com') return false
+    return /\/raw\/upload\/.+\/maintainex\/cvs\//.test(url.pathname)
+  } catch {
+    return false
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -55,6 +70,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimit = await checkRateLimit(request, {
+      policyName: 'PUBLIC_SUBMISSION',
+      keyPrefix: 'public_application_submission',
+      identifier: ipKey(request),
+    })
+    if (!rateLimit.allowed) return rateLimit.response!
+
     const body = await request.json()
     
     let { 
@@ -87,6 +109,13 @@ export async function POST(request: NextRequest) {
     address = sanitizeString(address || '')
     cvUrl = sanitizeString(cvUrl || '')
     resumeUrl = sanitizeString(resumeUrl || '')
+
+    if (!isSafeCvReference(cvUrl) || !isSafeCvReference(resumeUrl)) {
+      return NextResponse.json({ error: 'Invalid CV reference' }, { status: 400 })
+    }
+    if (cvUrl && resumeUrl && cvUrl !== resumeUrl) {
+      return NextResponse.json({ error: 'Conflicting CV references' }, { status: 400 })
+    }
 
     if (name.length < 2 || name.length > 100) {
       return NextResponse.json({ error: 'Name must be between 2 and 100 characters' }, { status: 400 })
