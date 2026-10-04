@@ -25,11 +25,19 @@ describe('all non-auth admin APIs use the CRM security boundary', () => {
     expect(routes.length).toBeGreaterThanOrEqual(56)
   })
 
+  it('guardCrmAction is a governed wrapper around guardCrmRequest', () => {
+    const security = readFileSync(resolve(process.cwd(), 'lib/crm/security.ts'), 'utf-8')
+    expect(security).toContain('export async function guardCrmAction(')
+    expect(security).toContain('const guard = await guardCrmRequest(request')
+  })
+
   for (const route of routes) {
     const rel = relative(process.cwd(), route)
-    it(`${rel} contains guardCrmRequest`, () => {
+    it(`${rel} uses the canonical CRM request/action boundary`, () => {
       const source = readFileSync(route, 'utf-8')
-      expect(source).toContain('guardCrmRequest(')
+      expect(
+        source.includes('guardCrmRequest(') || source.includes('guardCrmAction(')
+      ).toBe(true)
     })
   }
 })
