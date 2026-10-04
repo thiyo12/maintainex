@@ -8,6 +8,7 @@ import type {
 } from './types'
 import { readStoredList } from '@/lib/db-utils'
 import { getLocationName } from '@/lib/locations'
+import { getCurrencyForCountry } from '@/lib/shared/money/money'
 
 export interface ProviderEligibilityInput {
   providerType: ProviderType
@@ -150,6 +151,62 @@ export async function evaluateEligibility(
     matchedSkills = companyProfResult.matchedSkills
     preferredSkillsMatched = companyProfResult.preferredSkillsMatched
   }
+
+  // Gate: A provider with no permitted payment path must not be
+  // offered or allowed to quote on new work. Method-specific restrictions
+  // remain enforced later when the customer chooses cash or online payment.
+  const jobCurrency = getCurrencyForCountry(job.countryCode || 'LK')
+  const providerIdentity = providerType === 'INDIVIDUAL'
+    ? await client.providerIdentity.findFirst({
+        where: {
+          identityType: 'TASKER',
+          OR: [
+            { currentUserId: providerId },
+            { subjectId: providerId },
+          ],
+        },
+        select: { id: true },
+      })
+    : await client.providerIdentity.findUnique({
+        where: {
+          identityType_subjectId: {
+            identityType: 'COMPANY',
+            subjectId: providerId,
+          },
+        },
+        select: { id: true },
+      })
+
+  const financialAccount = providerIdentity
+    ? await client.providerFinancialAccount.findUnique({
+        where: {
+          providerIdentityId_currency: {
+            providerIdentityId: providerIdentity.id,
+            currency: jobCurrency,
+          },
+        },
+        select: {
+          cashJobsAllowed: true,
+          onlineJobsAllowed: true,
+          status: true,
+        },
+      })
+    : null
+
+  if (
+    financialAccount &&
+    !financialAccount.cashJobsAllowed &&
+    !financialAccount.onlineJobsAllowed
+  ) {
+    gates.push({
+      gate: 'FINANCIAL_STANDING',
+      passed: false,
+      reason: 'Provider is financially restricted from new jobs',
+      detail: financialAccount.status,
+    })
+    return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
+  }
+  gates.push({ gate: 'FINANCIAL_STANDING', passed: true })
 
   // Gate: Jurisdiction credential requirement
   if (matchedProfessionId) {
@@ -793,6 +850,7 @@ export function mapEligibilityToExclusionReason(gate: EligibilityGate): MatchExc
   if (gate.gate === 'SERVICE_AREA' && !gate.passed) return 'OUTSIDE_SERVICE_AREA'
   if (gate.gate === 'NO_CONFLICT' && !gate.passed) return 'ASSIGNMENT_CONFLICT'
   if (gate.gate === 'QUALITY_FLOOR' && !gate.passed) return 'QUALITY_FLOOR'
+  if (gate.gate === 'FINANCIAL_STANDING' && !gate.passed) return 'PROVIDER_FINANCIALLY_RESTRICTED'
   if (gate.reason?.includes('No matching') || gate.reason?.includes('No approved')) return 'PROFESSION_MISMATCH'
   if (gate.reason?.includes('suspended')) return 'PROVIDER_SUSPENDED'
   if (gate.reason?.includes('banned')) return 'PROVIDER_BANNED'

@@ -24,6 +24,14 @@ export const PAYPAL_SANDBOX_FIXTURE_COUNTRY = 'CA'
 export const PAYPAL_SANDBOX_FIXTURE_CURRENCY = 'CAD'
 const PAYPAL_LIVE_HARD_BLOCKED_MARKETS = new Set(['LK'])
 
+export function isCashPaymentAvailableForMarket(
+  countryCode: string,
+  currency: string,
+): boolean {
+  return countryCode.trim().toUpperCase() === 'LK' &&
+    currency.trim().toUpperCase() === 'LKR'
+}
+
 export function isProviderSelectableForNewCheckout(provider: string): boolean {
   const normalized = provider.trim().toUpperCase()
   return (NEW_ONLINE_CHECKOUT_PROVIDER_CODES as readonly string[]).includes(normalized)

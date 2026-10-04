@@ -4,6 +4,7 @@ import {
   parsePayPalAmountToMinor,
   parsePayPalCaptureResource,
 } from '@/lib/finance/payments/paypal-adapter'
+import { extractPayPalEventReferences } from '@/lib/finance/payments/paypal-service'
 
 describe('PayPal adapter normalization', () => {
   it('formats and parses provider amounts without floating-point arithmetic', () => {
@@ -42,5 +43,25 @@ describe('PayPal adapter normalization', () => {
       providerFeeValue: '3.20',
       netSettlementValue: '96.80',
     })
+  })
+
+  it('extracts the disputed capture reference from PayPal dispute events', () => {
+    const refs = extractPayPalEventReferences({
+      id: 'WH-DISPUTE-1',
+      event_type: 'CUSTOMER.DISPUTE.CREATED',
+      create_time: '2026-10-04T00:00:00Z',
+      resource: {
+        id: 'PP-D-1',
+        disputed_transactions: [
+          {
+            seller_transaction_id: 'CAPTURE-1',
+          },
+        ],
+      },
+    })
+
+    expect(refs.eventId).toBe('WH-DISPUTE-1')
+    expect(refs.eventType).toBe('CUSTOMER.DISPUTE.CREATED')
+    expect(refs.captureId).toBe('CAPTURE-1')
   })
 })

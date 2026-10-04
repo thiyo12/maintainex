@@ -85,6 +85,15 @@ export async function POST(request: NextRequest) {
     })
 
     if (existingPhone?.phoneVerified) {
+      if (!existingPhone.isActive) {
+        return NextResponse.json(
+          {
+            error: 'This verified account is closed. Contact MaintainEX support if you need the account reviewed or restored.',
+            code: 'ACCOUNT_CLOSED_REVIEW_REQUIRED',
+          },
+          { status: 409 },
+        )
+      }
       return NextResponse.json({ error: 'Mobile number already registered. Sign in with OTP.' }, { status: 409 })
     }
     if (existingPhone && existingPhone.role !== role) {

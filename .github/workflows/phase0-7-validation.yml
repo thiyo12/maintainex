@@ -14,6 +14,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -45,6 +49,7 @@ jobs:
       JWT_SECRET: phase07-ci-jwt-secret-01234567890123456789
       JWT_REFRESH_SECRET: phase07-ci-refresh-secret-0123456789012345
       PASSWORD_PEPPER: phase07-ci-pepper-012345678901234567890
+      IDENTITY_CLAIM_PEPPER: phase07-ci-identity-claim-pepper-0123456789012345
       CRON_SECRET: phase07-ci-cron-secret-012345678901234567
       INTERNAL_SYNC_SECRET: phase07-ci-sync-secret-01234567890123456
       ALLOW_TEST_OTP: "true"
@@ -251,6 +256,7 @@ jobs:
           tests/quotes/quote-acceptance.test.ts
           tests/security/company-assignment-lifecycle-boundary.test.ts
           tests/security/job-booking-mutation-boundary.test.ts
+          tests/security/provider-identity-integrity.test.ts
           tests/auth/work-start-auth.test.ts
           tests/jobs/job-pin.test.ts
           tests/security/chat-delivery-contract.test.ts
@@ -280,6 +286,9 @@ jobs:
           tests/finance/payments/provider-registry.test.ts
           tests/finance/payments/paypal-adapter.test.ts
           tests/finance/payouts/payout-engine.test.ts
+          tests/finance/provider-financial-policy.test.ts
+          tests/finance/provider-receivable-recovery-contract.test.ts
+          tests/finance/provider-balance-adjustment-contract.test.ts
           tests/finance/commission-currency-isolation.test.ts tests/finance/commission-governance.test.ts tests/finance/commission-settlement-actions.test.ts tests/finance/settlement-history-v2.test.ts
           tests/quotes/change-order.test.ts
           --reporter=verbose 2>&1 | tee /tmp/financial-flow-tests.txt
@@ -320,7 +329,9 @@ jobs:
           grep -q 'BACKUP_TABLES' scripts/crm-v2-production-preflight.sh
           grep -q 'gzip -t' scripts/crm-v2-production-preflight.sh
           grep -q 'required environment names' scripts/crm-v2-production-preflight.sh
+          grep -q 'IDENTITY_CLAIM_PEPPER' scripts/crm-v2-production-preflight.sh
           grep -q 'process.env.DATABASE_URL' deploy-rsync.sh
+          grep -q 'IDENTITY_CLAIM_PEPPER' deploy-rsync.sh
           grep -q 'BACKUP_TABLES' deploy-rsync.sh
           grep -q 'process.env.DATABASE_URL' backup.sh
           ! grep -q 'pg_dump -U postgres -d postgres' scripts/crm-v2-production-preflight.sh
@@ -369,6 +380,7 @@ jobs:
             -e JWT_SECRET="phase07-ci-jwt-secret-01234567890123456789" \
             -e JWT_REFRESH_SECRET="phase07-ci-refresh-secret-0123456789012345" \
             -e PASSWORD_PEPPER="phase07-ci-pepper-012345678901234567890" \
+            -e IDENTITY_CLAIM_PEPPER="phase07-ci-identity-claim-pepper-0123456789012345" \
             -e CRON_SECRET="phase07-ci-cron-secret-012345678901234567" \
             -e INTERNAL_SYNC_SECRET="phase07-ci-sync-secret-01234567890123456" \
             -e ALLOW_TEST_OTP="true" \

@@ -3,6 +3,15 @@ import { createPaymentIntent, getPaymentStatus } from '@/lib/payment/payment-ser
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { resolvePaymentPublicOrigin } from '@/lib/finance/payments/public-origin'
+import { prisma } from '@/lib/prisma'
+import {
+  isCashPaymentAvailableForMarket,
+  resolvePaymentProviderForMarket,
+} from '@/lib/finance/payments/provider-registry'
+import {
+  ensureProviderIdentity,
+  evaluateStoredProviderFinancialStanding,
+} from '@/lib/finance/commissions/provider-balance-service'
 
 export async function POST(
   request: NextRequest,
@@ -64,10 +73,98 @@ export async function GET(
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const payment = await getPaymentStatus(id, user.id)
-    if (!payment) return NextResponse.json({ payment: null })
+    const job = await prisma.marketplaceJob.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        customerId: true,
+        countryCode: true,
+      },
+    })
+    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    if (job.customerId !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
-    return NextResponse.json({ payment })
+    const [payment, escrow, acceptedQuote] = await Promise.all([
+      getPaymentStatus(id, user.id),
+      prisma.jobEscrow.findFirst({
+        where: { jobId: id },
+        orderBy: { createdAt: 'desc' },
+        select: { currency: true, status: true },
+      }),
+      prisma.jobQuote.findFirst({
+        where: { jobId: id, status: 'ACCEPTED' },
+        select: { providerId: true, providerType: true },
+      }),
+    ])
+
+    let onlineProvider: Awaited<ReturnType<typeof resolvePaymentProviderForMarket>> = null
+    let cashFinanciallyAllowed = false
+    let onlineFinanciallyAllowed = false
+
+    if (
+      escrow &&
+      acceptedQuote &&
+      (acceptedQuote.providerType === 'INDIVIDUAL' || acceptedQuote.providerType === 'COMPANY')
+    ) {
+      onlineProvider = await resolvePaymentProviderForMarket({
+        countryCode: job.countryCode,
+        currency: escrow.currency,
+      })
+
+      const standing = await prisma.$transaction(async tx => {
+        const identity = await ensureProviderIdentity(tx, {
+          providerId: acceptedQuote.providerId,
+          providerType: acceptedQuote.providerType as 'INDIVIDUAL' | 'COMPANY',
+          countryCode: job.countryCode,
+        })
+        return evaluateStoredProviderFinancialStanding(tx, {
+          providerIdentityId: identity.id,
+          providerType: acceptedQuote.providerType as 'INDIVIDUAL' | 'COMPANY',
+          countryCode: job.countryCode,
+          currency: escrow.currency,
+        })
+      })
+
+      cashFinanciallyAllowed = standing.decision.cashJobsAllowed
+      onlineFinanciallyAllowed = standing.decision.onlineJobsAllowed
+    }
+
+    const cashMarketAvailable = Boolean(
+      escrow &&
+      isCashPaymentAvailableForMarket(job.countryCode, escrow.currency)
+    )
+    const onlineMarketAvailable = Boolean(onlineProvider)
+
+    const options = {
+      countryCode: job.countryCode,
+      currency: escrow?.currency || null,
+      cash: {
+        available: cashMarketAvailable && cashFinanciallyAllowed,
+        marketAvailable: cashMarketAvailable,
+        financiallyAllowed: cashFinanciallyAllowed,
+        reason: !cashMarketAvailable
+          ? 'NOT_AVAILABLE_FOR_MARKET'
+          : !cashFinanciallyAllowed
+            ? 'PROVIDER_CASH_RESTRICTED'
+            : null,
+      },
+      online: {
+        available: onlineMarketAvailable && onlineFinanciallyAllowed,
+        marketAvailable: onlineMarketAvailable,
+        financiallyAllowed: onlineFinanciallyAllowed,
+        provider: onlineProvider?.provider || null,
+        paymentMethods: onlineProvider?.paymentMethods || [],
+        reason: !onlineMarketAvailable
+          ? 'NO_VERIFIED_ONLINE_PROVIDER'
+          : !onlineFinanciallyAllowed
+            ? 'PROVIDER_ONLINE_RESTRICTED'
+            : null,
+      },
+    }
+
+    return NextResponse.json({ payment, options })
   } catch (error) {
     console.error('Payment status error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

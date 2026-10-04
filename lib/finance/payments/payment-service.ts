@@ -26,6 +26,8 @@ import {
   PAYMENT_PROVIDER_NOT_AVAILABLE,
   type ResolvedPaymentProvider,
 } from '@/lib/finance/payments/provider-registry'
+import { assertProviderOnlineEligible } from '@/lib/finance/commissions/provider-balance-service'
+import { accountFinalProviderChargeback } from '@/lib/finance/payments/chargeback-accounting'
 
 export type PaymentStatus =
   | 'CREATED'
@@ -206,6 +208,50 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
           code: 'PAYMENT_CURRENCY_CHANGED',
         },
       }
+    }
+
+    const acceptedQuote = await tx.jobQuote.findFirst({
+      where: { jobId, status: 'ACCEPTED' },
+      select: { providerId: true, providerType: true },
+    })
+    if (
+      !acceptedQuote ||
+      (acceptedQuote.providerType !== 'INDIVIDUAL' && acceptedQuote.providerType !== 'COMPANY')
+    ) {
+      return {
+        intent: null,
+        jobTitle: job.title,
+        failure: {
+          success: false,
+          error: 'Accepted provider is unavailable for payment',
+          code: 'JOB_PROVIDER_NOT_FOUND',
+        },
+      }
+    }
+
+    try {
+      await assertProviderOnlineEligible(tx, {
+        providerId: acceptedQuote.providerId,
+        providerType: acceptedQuote.providerType,
+        countryCode: job.countryCode,
+        currency: escrow.currency,
+      })
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        (error as Error & { code?: string }).code === 'PROVIDER_ONLINE_RESTRICTED'
+      ) {
+        return {
+          intent: null,
+          jobTitle: job.title,
+          failure: {
+            success: false,
+            error: 'Provider is temporarily restricted from new online-paid jobs',
+            code: 'PROVIDER_ONLINE_RESTRICTED',
+          },
+        }
+      }
+      throw error
     }
 
     const expiryCutoff = new Date(Date.now() - 30 * 60 * 1000)
@@ -790,9 +836,19 @@ export async function processPaymentFailure(notification: PayHereNotification): 
 
       if (claimed.count !== 1) return
 
-      await tx.jobEscrow.updateMany({
-        where: { id: paymentIntent.escrowId, status: 'PROTECTED' },
-        data: { status: 'ON_HOLD' },
+      await accountFinalProviderChargeback(tx, {
+        escrowId: paymentIntent.escrowId,
+        paymentIntentId: paymentIntent.id,
+        sourceProvider: 'PAYHERE',
+        sourceReference: notification.payment_id || notification.order_id,
+        amountMinor: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        reason: 'PayHere final chargeback reversed the captured payment',
+        createdBy: 'system:payhere-webhook',
+        metadata: {
+          statusCode: notification.status_code,
+          statusMessage: notification.status_message || null,
+        },
       })
 
       await tx.marketplaceRiskEvent.create({

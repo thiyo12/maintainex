@@ -27,4 +27,34 @@ describe('commission CRM currency isolation', () => {
     expect(page).toContain('money(summary.totalCommissionPaid, summary.currency)')
     expect(page).not.toContain("currency: 'LKR',")
   })
+
+  it('keeps tasker and company MaintainEX balance UI currency-aware', () => {
+    const taskerApi = read('app/api/mobile/earnings/route.ts')
+    const companyApi = read('app/api/mobile/company/earnings/route.ts')
+    const taskerUi = read('apps/mobile/features/tasker/screens/tabs/earnings.tsx')
+    const companyUi = read('apps/mobile/features/company/screens/tabs/earnings-list.tsx')
+
+    expect(taskerApi).toContain('countryCode,')
+    expect(taskerApi).toContain('currency,')
+    expect(companyApi).toContain("countryCode: company.countryCode || 'LK'")
+    expect(companyApi).toContain('currency,')
+    expect(companyApi).toContain('countryCode: company.countryCode || \'LK\',\n        currency,')
+
+    expect(taskerUi).toContain("const displayCurrency = data?.currency")
+    expect(companyUi).toContain("const displayCurrency = earnings?.currency")
+    expect(taskerUi).not.toContain('>LKR {')
+    expect(companyUi).not.toContain('>LKR {')
+  })
+
+  it('feeds tasker transaction history from the canonical wallet ledger', () => {
+    const taskerApi = read('app/api/mobile/earnings/route.ts')
+    const taskerUi = read('apps/mobile/features/tasker/screens/tabs/earnings.tsx')
+    const companyUi = read('apps/mobile/features/company/screens/tabs/earnings-list.tsx')
+
+    expect(taskerApi).toContain("accountType: 'PROVIDER_WALLET'")
+    expect(taskerApi).toContain('transactions: walletLedgerEntries.map')
+    expect(taskerUi).toContain("tx.direction === 'DEBIT' ? '-' : '+'")
+    expect(taskerUi).toContain("router.push('/(tasker)/wallet/withdraw'")
+    expect(companyUi).toContain("['PAID', 'SUCCEEDED', 'CLEARED', 'COMPLETED'].includes(status)")
+  })
 })

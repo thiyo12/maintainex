@@ -39,7 +39,10 @@ describe('CRM V2 commission control boundary', () => {
     expect(payments).toContain("request.headers.get('x-crm-step-up')")
     expect(payments).toContain("status: 'PENDING'")
     expect(payments).toContain('COMMISSION_PAYMENT_CONCURRENTLY_PROCESSED')
-    expect(payments).toContain('amountMatches(payment.amountDue, payment.weeklySettlement.commissionOwed)')
+    expect(payments).toContain('remainingReceivableMinor')
+    expect(payments).toContain('expectedPaymentAmount')
+    expect(payments).toContain('Payment amount does not match the remaining commission due')
+    expect(payments).toContain('settleProviderReceivablesFromDirectPayment')
   })
 
   it('does not allow commission enforcement before the due date', () => {

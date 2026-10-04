@@ -29,6 +29,7 @@ export type MatchExclusionReason =
   | 'NOT_ACTIVE_COMPANY_MEMBER'
   | 'CROSS_COMPANY_DENIED'
   | 'NO_APPROVED_PROFESSION'
+  | 'PROVIDER_FINANCIALLY_RESTRICTED'
 
 export type OpportunityStatus = 'PENDING' | 'SENT' | 'VIEWED' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED' | 'WITHDRAWN' | 'CANCELLED'
 

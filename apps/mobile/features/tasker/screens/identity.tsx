@@ -27,6 +27,7 @@ export default function IdentityVerificationScreen() {
   const [uploadingBack, setUploadingBack] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [fullName, setFullName] = useState('')
+  const [documentNumber, setDocumentNumber] = useState('')
 
   useEffect(() => {
     v2Identity.getStatus().then((data: any) => {
@@ -92,15 +93,39 @@ export default function IdentityVerificationScreen() {
       Alert.alert(t('common.error'), t('verify.enterFullName'))
       return
     }
+    if (!documentNumber.trim()) {
+      Alert.alert(t('common.error'), 'Enter the document number exactly as shown on your ID.')
+      return
+    }
     if (!frontUri) {
       Alert.alert(t('common.error'), t('verify.uploadPhotoFront'))
       return
     }
     setSubmitting(true)
     try {
-      await v2Identity.uploadDocument(docType, 'FRONT', frontUri, fullName.trim())
+      const frontResult = await v2Identity.uploadDocument(
+        docType,
+        'FRONT',
+        frontUri,
+        fullName.trim(),
+        documentNumber.trim(),
+      )
       if (backUri) {
-        await v2Identity.uploadDocument(docType, 'BACK', backUri, fullName.trim())
+        await v2Identity.uploadDocument(
+          docType,
+          'BACK',
+          backUri,
+          fullName.trim(),
+          documentNumber.trim(),
+        )
+      }
+      if (frontResult.integrityReviewRequired) {
+        Alert.alert(
+          'Additional identity review required',
+          'MaintainEX found an identity match that requires Trust & Safety review before verification can be completed.'
+        )
+        router.back()
+        return
       }
       Alert.alert(t('common.success'), t('verify.underReview'))
       router.back()
@@ -144,6 +169,22 @@ export default function IdentityVerificationScreen() {
             autoCorrect={false}
           />
           <Text style={styles.note}>{t('verify.fullNameHint')}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Document number</Text>
+          <TextInput
+            style={styles.nameInput}
+            value={documentNumber}
+            onChangeText={setDocumentNumber}
+            placeholder="NIC / passport / licence number"
+            placeholderTextColor={colors.muted}
+            autoCapitalize="characters"
+            autoCorrect={false}
+          />
+          <Text style={styles.inlineNote}>
+            Used only to create a protected identity-match hash. MaintainEX does not expose this number in provider profiles or duplicate-match APIs.
+          </Text>
         </View>
 
         <View style={styles.section}>
@@ -221,9 +262,9 @@ export default function IdentityVerificationScreen() {
         <Text style={styles.note}>{t('verify.uploadNote')}</Text>
 
         <TouchableOpacity
-          style={[styles.submitBtn, (!docType || !frontUri || submitting) && styles.submitBtnDisabled]}
+          style={[styles.submitBtn, (!docType || !frontUri || !documentNumber.trim() || submitting) && styles.submitBtnDisabled]}
           onPress={handleSubmit}
-          disabled={!docType || !frontUri || submitting}
+          disabled={!docType || !frontUri || !documentNumber.trim() || submitting}
           activeOpacity={0.7}
         >
           {submitting ? (
@@ -271,6 +312,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   uploadingBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, padding: 24, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, gap: 10 },
   uploadingText: { fontSize: 14, color: colors.muted },
   note: { fontSize: 12, color: colors.muted, paddingHorizontal: 20, marginBottom: 16, lineHeight: 18, fontStyle: 'italic' },
+  inlineNote: { fontSize: 12, color: colors.muted, marginTop: 4, lineHeight: 18 },
   submitBtn: { backgroundColor: colors.amber, marginHorizontal: 20, paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
   submitBtnDisabled: { opacity: 0.5 },
   submitBtnText: { fontSize: 16, fontWeight: '700', color: colors.ink },

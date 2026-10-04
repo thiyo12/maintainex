@@ -13,6 +13,7 @@ import { auth } from '@/api/auth'
 import { upload } from '@/api/upload'
 import { resolveImageUri } from '@/api/client'
 import { useAuth } from '@/features/auth/context/auth'
+import { v2Identity } from '@/api/v2-identity'
 
 export default function TaskerEditProfile() {
   const { t } = useTranslation()
@@ -30,6 +31,8 @@ export default function TaskerEditProfile() {
   const [hourlyRate, setHourlyRate] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [photoChangePending, setPhotoChangePending] = useState(false)
+  const [pendingPhotoUrl, setPendingPhotoUrl] = useState<string | null>(null)
   const fadeAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
@@ -49,9 +52,62 @@ export default function TaskerEditProfile() {
       } catch { /* ignore */ }
     }
     loadTaskerProfile()
+
+    if (verified) {
+      v2Identity.getPhotoChangeStatus()
+        .then(status => {
+          if (status.verifiedPhotoUrl) setProfileImage(status.verifiedPhotoUrl)
+          setPhotoChangePending(Boolean(status.pendingRequest))
+          setPendingPhotoUrl(status.pendingRequest?.requestedPhotoUrl || null)
+        })
+        .catch(() => {})
+    }
   }, [user])
 
   const pickImage = async () => {
+    if (verified) {
+      if (photoChangePending) {
+        Alert.alert(
+          'Photo review pending',
+          'Your new verified profile photo is already waiting for MaintainEX review.'
+        )
+        return
+      }
+
+      const { status } = await ImagePicker.requestCameraPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert(t('common.error'), 'Camera permission is required for a verified identity photo')
+        return
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      })
+      if (!result.canceled && result.assets[0]) {
+        setUploading(true)
+        try {
+          const { url } = await upload.file(result.assets[0].uri, 'avatar')
+          await v2Identity.requestPhotoChange(
+            url,
+            'Tasker requested an updated verified public profile photo',
+          )
+          setPhotoChangePending(true)
+          setPendingPhotoUrl(url)
+          Alert.alert(
+            'Photo submitted for verification',
+            'Your current verified photo will stay public until MaintainEX checks and approves the new photo against your identity record.'
+          )
+        } catch {
+          Alert.alert(t('common.error'), 'Failed to submit verified photo request')
+        } finally {
+          setUploading(false)
+        }
+      }
+      return
+    }
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
       Alert.alert(t('common.error'), 'Camera roll permission is required')
@@ -89,9 +145,9 @@ export default function TaskerEditProfile() {
         phone: phone.trim(),
         bio: bio.trim(),
         hourlyRate: hourlyRate.trim() ? Number(hourlyRate) : undefined,
-        profileImage: profileImage || undefined,
+        profileImage: verified ? undefined : (profileImage || undefined),
       })
-      await auth.updateProfile({ name: nameLocked ? undefined : name.trim(), phone: phone.trim(), profileImage: profileImage || undefined })
+      await auth.updateProfile({ name: nameLocked ? undefined : name.trim(), phone: phone.trim() })
       await refreshUser()
       Alert.alert(t('common.success'), t('profile.editProfileHeader'))
       router.back()
@@ -115,14 +171,34 @@ export default function TaskerEditProfile() {
                 <Text style={styles.avatarText}>{(name || 'T')[0]}</Text>
               )}
             </View>
-            <TouchableOpacity onPress={pickImage} disabled={uploading}>
+            <TouchableOpacity onPress={pickImage} disabled={uploading || (verified && photoChangePending)}>
               {uploading ? (
                 <ActivityIndicator size="small" color={colors.muted} />
               ) : (
-                <Text style={styles.changePhoto}>{t('components.addPhoto')}</Text>
+                <Text style={styles.changePhoto}>
+                  {verified
+                    ? (photoChangePending ? 'Photo review pending' : 'Request verified photo update')
+                    : t('components.addPhoto')}
+                </Text>
               )}
             </TouchableOpacity>
-            <Text style={styles.faceHint}>{t('profile.photoFaceHint')}</Text>
+            <Text style={styles.faceHint}>
+              {verified
+                ? 'Your public photo is identity-controlled. A new camera photo must be reviewed by MaintainEX before it replaces the verified photo.'
+                : t('profile.photoFaceHint')}
+            </Text>
+            {verified && pendingPhotoUrl && (
+              <View style={styles.pendingPhotoRow}>
+                <Image
+                  source={{ uri: resolveImageUri(pendingPhotoUrl) || pendingPhotoUrl }}
+                  style={styles.pendingPhoto}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pendingPhotoTitle}>New photo awaiting review</Text>
+                  <Text style={styles.pendingPhotoText}>Customers still see your current approved photo.</Text>
+                </View>
+              </View>
+            )}
           </View>
           <View style={styles.labelRow}>
             <Text style={styles.label}>{t('profile.fullName')}</Text>
@@ -197,6 +273,21 @@ const makeStyles = (colors: any) => StyleSheet.create({
   avatarText: { fontSize: 32, fontFamily: fonts.heading, color: colors.white },
   changePhoto: { fontSize: fontSizes.bodySmall, color: colors.muted, fontFamily: fonts.bodyMedium },
   faceHint: { fontSize: 12, color: colors.muted, fontFamily: fonts.body, marginTop: 8, textAlign: 'center' },
+  pendingPhotoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignSelf: 'stretch',
+  },
+  pendingPhoto: { width: 44, height: 44, borderRadius: 12 },
+  pendingPhotoTitle: { fontSize: 12, color: colors.ink, fontFamily: fonts.bodyMedium },
+  pendingPhotoText: { fontSize: 11, color: colors.muted, fontFamily: fonts.body, marginTop: 2 },
   label: { fontSize: fontSizes.bodySmall, fontFamily: fonts.bodyMedium, color: colors.muted, marginBottom: 6, marginTop: 12 },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: 6 },
   verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.amberBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },

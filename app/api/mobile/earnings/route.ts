@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { readCanonicalProviderBalance } from '@/lib/financial-read'
 import { bigIntToSafeNumber, getCurrencyForCountry } from '@/lib/shared/money/money'
+import { readProviderFinancialAccountForUser } from '@/lib/finance/commissions/provider-balance-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,12 +15,19 @@ export async function GET(request: NextRequest) {
     const countryCode = user.countryCode || 'LK'
     const currency = getCurrencyForCountry(countryCode)
 
-    const [payouts, canonicalBalance] = await Promise.all([
+    const [payouts, canonicalBalance, financialAccount] = await Promise.all([
       prisma.payout.findMany({
         where: { userId: user.id, countryCode, currency },
         orderBy: { createdAt: 'desc' },
       }),
       readCanonicalProviderBalance(user.id, currency),
+      prisma.$transaction(tx =>
+        readProviderFinancialAccountForUser(tx, {
+          userId: user.id,
+          providerType: 'TASKER',
+          currency,
+        })
+      ),
     ])
 
     const walletId = canonicalBalance?.walletId ?? null
@@ -35,6 +43,28 @@ export async function GET(request: NextRequest) {
           _sum: { amount: true },
         })
       : null
+
+    const walletLedgerEntries = walletId
+      ? await prisma.financialLedger.findMany({
+          where: {
+            accountId: walletId,
+            accountType: 'PROVIDER_WALLET',
+            currency,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+          select: {
+            id: true,
+            entryType: true,
+            amount: true,
+            currency: true,
+            referenceType: true,
+            referenceId: true,
+            description: true,
+            createdAt: true,
+          },
+        })
+      : []
 
     const totalEarnedMinor = earnedAggregate?._sum.amount ?? 0n
     const pendingPayoutMinor = payouts
@@ -87,17 +117,139 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
+    const taskerIdentity = await prisma.providerIdentity.findFirst({
+      where: {
+        currentUserId: user.id,
+        identityType: 'TASKER',
+      },
+      select: { id: true },
+    })
+    const recentCommissionRecoveries = taskerIdentity
+      ? await prisma.providerCommissionRecovery.findMany({
+          where: {
+            providerIdentityId: taskerIdentity.id,
+            currency,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            sourceJobId: true,
+            sourceEscrowId: true,
+            amount: true,
+            currency: true,
+            method: true,
+            createdAt: true,
+            receivable: {
+              select: {
+                jobId: true,
+                escrowId: true,
+              },
+            },
+          },
+        })
+      : []
+
+    const recentBalanceAdjustmentRecoveries = taskerIdentity
+      ? await prisma.providerBalanceAdjustmentRecovery.findMany({
+          where: {
+            providerIdentityId: taskerIdentity.id,
+            currency,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            sourceJobId: true,
+            sourceEscrowId: true,
+            amount: true,
+            currency: true,
+            method: true,
+            createdAt: true,
+            adjustment: {
+              select: {
+                id: true,
+                adjustmentType: true,
+                jobId: true,
+                sourceProvider: true,
+                sourceReference: true,
+              },
+            },
+          },
+        })
+      : []
+
     return NextResponse.json({
       countryCode,
       currency,
       totalEarned,
       pendingAmount,
+      balance: availableBalance,
       availableBalance,
       pendingBalance,
+      maintainexBalance: {
+        commissionDueMinor: (financialAccount?.commissionDue ?? 0n).toString(),
+        commissionDue: bigIntToSafeNumber(financialAccount?.commissionDue ?? 0n) / 100,
+        adjustmentDueMinor: (financialAccount?.adjustmentDue ?? 0n).toString(),
+        adjustmentDue: bigIntToSafeNumber(financialAccount?.adjustmentDue ?? 0n) / 100,
+        totalLiabilityMinor: ((financialAccount?.commissionDue ?? 0n) + (financialAccount?.adjustmentDue ?? 0n)).toString(),
+        totalLiability: bigIntToSafeNumber(
+          (financialAccount?.commissionDue ?? 0n) + (financialAccount?.adjustmentDue ?? 0n)
+        ) / 100,
+        availableEarningsMinor: (canonicalBalance?.availableBalance ?? 0n).toString(),
+        pendingEarningsMinor: (canonicalBalance?.pendingBalance ?? 0n).toString(),
+        status: financialAccount?.status ?? 'CLEAR',
+        cashJobsAllowed: financialAccount?.cashJobsAllowed ?? true,
+        onlineJobsAllowed: financialAccount?.onlineJobsAllowed ?? true,
+        manualReviewRequired: financialAccount?.manualReviewRequired ?? false,
+        oldestCommissionDueAt: financialAccount?.oldestCommissionDueAt?.toISOString() ?? null,
+        currency,
+      },
       completedJobs,
+      totalJobs: completedJobs,
+      transactions: walletLedgerEntries.map(entry => ({
+        id: entry.id,
+        title: entry.description || entry.referenceType.replaceAll('_', ' '),
+        job: entry.description || entry.referenceType.replaceAll('_', ' '),
+        amount: bigIntToSafeNumber(entry.amount) / 100,
+        amountMinor: entry.amount.toString(),
+        currency: entry.currency,
+        direction: entry.entryType,
+        referenceType: entry.referenceType,
+        referenceId: entry.referenceId,
+        date: entry.createdAt.toISOString(),
+        status: 'Cleared',
+      })),
+      recentCommissionRecoveries: recentCommissionRecoveries.map(recovery => ({
+        id: recovery.id,
+        amountMinor: recovery.amount.toString(),
+        amount: bigIntToSafeNumber(recovery.amount) / 100,
+        currency: recovery.currency,
+        method: recovery.method,
+        sourceJobId: recovery.sourceJobId,
+        sourceEscrowId: recovery.sourceEscrowId,
+        originalCashJobId: recovery.receivable.jobId,
+        createdAt: recovery.createdAt.toISOString(),
+      })),
+      recentBalanceAdjustmentRecoveries: recentBalanceAdjustmentRecoveries.map(recovery => ({
+        id: recovery.id,
+        amountMinor: recovery.amount.toString(),
+        amount: bigIntToSafeNumber(recovery.amount) / 100,
+        currency: recovery.currency,
+        method: recovery.method,
+        sourceJobId: recovery.sourceJobId,
+        sourceEscrowId: recovery.sourceEscrowId,
+        adjustmentId: recovery.adjustment.id,
+        adjustmentType: recovery.adjustment.adjustmentType,
+        originalJobId: recovery.adjustment.jobId,
+        sourceProvider: recovery.adjustment.sourceProvider,
+        sourceReference: recovery.adjustment.sourceReference,
+        createdAt: recovery.createdAt.toISOString(),
+      })),
       recentPayouts: payouts.slice(0, 20).map(p => ({
         id: p.id,
         amount: bigIntToSafeNumber(p.amount) / 100,
+        currency: p.currency,
         description: p.description,
         status: p.status,
         source: p.source,

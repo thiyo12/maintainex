@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
@@ -18,6 +18,9 @@ interface TeamMember {
   isOnline: boolean
   rating: number
   completedJobs: number
+  identityVerified: boolean
+  profilePhotoVerified: boolean
+  verifiedPhotoUrl: string | null
 }
 
 interface Job {
@@ -25,6 +28,7 @@ interface Job {
   title: string
   status: string
   preferredDate: string | null
+  workerIdentityCheckRequired: boolean
 }
 
 export default function AssignWorkerScreen() {
@@ -75,6 +79,7 @@ export default function AssignWorkerScreen() {
           title: job.title,
           status: job.status,
           preferredDate: job.preferredDate,
+          workerIdentityCheckRequired: Boolean(job.workerIdentityCheckRequired),
         }))
       setAvailableJobs(eligibleJobs)
 
@@ -135,28 +140,59 @@ export default function AssignWorkerScreen() {
         {workers.length === 0 ? (
           <Text style={styles.emptyText}>No workers available. Invite workers first.</Text>
         ) : (
-          workers.map((w) => (
-            <TouchableOpacity
-              key={w.id}
-              style={[styles.optionCard, selectedWorker === w.userId && styles.optionCardActive]}
-              onPress={() => setSelectedWorker(w.userId)}
-            >
-              <View style={styles.optionLeft}>
-                <View style={[styles.avatar, { backgroundColor: w.isOnline ? colors.success : colors.muted }]}>
-                  <Text style={styles.avatarText}>{w.name?.[0] || '?'}</Text>
+          workers.map((w) => {
+            const selectedJobRecord = availableJobs.find(job => job.id === selectedJob)
+            const identityRequired = selectedJobRecord?.workerIdentityCheckRequired === true
+            const blockedByIdentity = identityRequired && !w.identityVerified
+
+            return (
+              <TouchableOpacity
+                key={w.id}
+                style={[
+                  styles.optionCard,
+                  selectedWorker === w.userId && styles.optionCardActive,
+                  blockedByIdentity && styles.optionCardDisabled,
+                ]}
+                onPress={() => {
+                  if (blockedByIdentity) {
+                    Alert.alert(
+                      'Worker identity photo required',
+                      'This booking requires a MaintainEX-approved worker photo. Ask this worker to complete identity verification/photo review before assignment.'
+                    )
+                    return
+                  }
+                  setSelectedWorker(w.userId)
+                }}
+              >
+                <View style={styles.optionLeft}>
+                  {w.verifiedPhotoUrl ? (
+                    <Image source={{ uri: w.verifiedPhotoUrl }} style={styles.workerPhoto} />
+                  ) : (
+                    <View style={[styles.avatar, { backgroundColor: w.isOnline ? colors.success : colors.muted }]}>
+                      <Text style={styles.avatarText}>{w.name?.[0] || '?'}</Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.optionName}>{w.name}</Text>
+                    <Text style={styles.optionMeta}>
+                      {w.completedJobs} jobs · {w.rating > 0 ? `${w.rating}★` : 'No rating'}
+                    </Text>
+                    <Text style={[
+                      styles.identityMeta,
+                      { color: w.identityVerified ? colors.success : colors.error },
+                    ]}>
+                      {w.identityVerified
+                        ? '✓ Identity photo verified'
+                        : 'Identity photo not approved'}
+                    </Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={styles.optionName}>{w.name}</Text>
-                  <Text style={styles.optionMeta}>
-                    {w.completedJobs} jobs · {w.rating > 0 ? `${w.rating}★` : 'No rating'}
-                  </Text>
-                </View>
-              </View>
-              {selectedWorker === w.userId && (
-                <Ionicons name="checkmark-circle" size={22} color={colors.amber} />
-              )}
-            </TouchableOpacity>
-          ))
+                {selectedWorker === w.userId && !blockedByIdentity && (
+                  <Ionicons name="checkmark-circle" size={22} color={colors.amber} />
+                )}
+              </TouchableOpacity>
+            )
+          })
         )}
 
         <Text style={styles.label}>Accepted Job</Text>
@@ -167,7 +203,15 @@ export default function AssignWorkerScreen() {
             <TouchableOpacity
               key={job.id}
               style={[styles.optionCard, selectedJob === job.id && styles.optionCardActive]}
-              onPress={() => setSelectedJob(job.id)}
+              onPress={() => {
+                setSelectedJob(job.id)
+                if (job.workerIdentityCheckRequired) {
+                  const currentWorker = workers.find(worker => worker.userId === selectedWorker)
+                  if (currentWorker && !currentWorker.identityVerified) {
+                    setSelectedWorker(null)
+                  }
+                }
+              }}
             >
               <View style={styles.optionLeft}>
                 <View style={[styles.avatar, { backgroundColor: colors.companyAccent || colors.amber }]}>
@@ -220,6 +264,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderColor: 'transparent',
   },
   optionCardActive: { borderColor: colors.amber },
+  optionCardDisabled: { opacity: 0.55 },
   optionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: {
     width: 40,
@@ -229,8 +274,10 @@ const makeStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: { fontSize: 16, fontWeight: '700', color: colors.white },
+  workerPhoto: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.lightGray },
   optionName: { fontSize: 15, fontWeight: '700', color: colors.ink },
   optionMeta: { fontSize: 12, color: colors.muted },
+  identityMeta: { fontSize: 11, fontWeight: '600', marginTop: 3 },
   assignBtn: {
     backgroundColor: colors.amber,
     paddingVertical: 14,

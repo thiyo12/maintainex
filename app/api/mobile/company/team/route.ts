@@ -20,6 +20,13 @@ export async function GET(request: NextRequest) {
     const [members, invites] = await Promise.all([
       prisma.teamMember.findMany({
         where: { companyId: context!.companyId },
+        include: {
+          user: {
+            select: {
+              identityStatus: true,
+            },
+          },
+        },
         orderBy: [{ isOnline: 'desc' }, { rating: 'desc' }],
       }),
       prisma.teamInvite.findMany({
@@ -28,8 +35,42 @@ export async function GET(request: NextRequest) {
       }),
     ])
 
+    const memberUserIds = members
+      .map(member => member.userId)
+      .filter((value): value is string => Boolean(value))
+    const personIdentities = memberUserIds.length
+      ? await prisma.providerIdentity.findMany({
+          where: {
+            currentUserId: { in: memberUserIds },
+            identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
+            kycStatus: 'VERIFIED',
+            verifiedPhotoUrl: { not: null },
+          },
+          orderBy: { updatedAt: 'desc' },
+          select: {
+            currentUserId: true,
+            verifiedPhotoUrl: true,
+            kycStatus: true,
+          },
+        })
+      : []
+
+    const identityByUser = new Map<string, (typeof personIdentities)[number]>()
+    for (const identity of personIdentities) {
+      if (identity.currentUserId && !identityByUser.has(identity.currentUserId)) {
+        identityByUser.set(identity.currentUserId, identity)
+      }
+    }
+
     return NextResponse.json({
-      members: members.map(m => ({
+      members: members.map(m => {
+        const identity = m.userId ? identityByUser.get(m.userId) : null
+        const identityVerified =
+          m.user?.identityStatus === 'VERIFIED' &&
+          identity?.kycStatus === 'VERIFIED' &&
+          Boolean(identity?.verifiedPhotoUrl)
+
+        return {
         id: m.id,
         userId: m.userId,
         name: m.name,
@@ -37,9 +78,13 @@ export async function GET(request: NextRequest) {
         skills: safeParseJsonArr(m.skills),
         isOnline: m.isOnline,
         rating: m.rating,
-        completedJobs: m.completedJobs,
-        joinedAt: m.joinedAt.toISOString(),
-      })),
+          completedJobs: m.completedJobs,
+          identityVerified,
+          profilePhotoVerified: identityVerified,
+          verifiedPhotoUrl: identityVerified ? identity?.verifiedPhotoUrl || null : null,
+          joinedAt: m.joinedAt.toISOString(),
+        }
+      }),
       pendingInvites: invites.map(i => ({
         id: i.id,
         name: i.name,
