@@ -342,7 +342,8 @@ jobs:
           grep -q 'pg_dump' deploy-rsync.sh
           grep -q 'gzip -t' deploy-rsync.sh
           grep -q 'PREVIOUS_IMAGE' deploy-rsync.sh
-          grep -q 'docker service update --force --image' deploy-rsync.sh
+          grep -Eq 'docker service update --force .*--image' deploy-rsync.sh
+          grep -q 'APP_RELEASE_SHA' deploy-rsync.sh
           ! grep -q 'sed -i.*provider' deploy-rsync.sh
           ! grep -q 'docker cp.*CONTAINER:/app' deploy-rsync.sh
 
@@ -386,6 +387,7 @@ jobs:
             -e IDENTITY_CLAIM_PEPPER="phase07-ci-identity-claim-pepper-0123456789012345" \
             -e CRON_SECRET="phase07-ci-cron-secret-012345678901234567" \
             -e INTERNAL_SYNC_SECRET="phase07-ci-sync-secret-01234567890123456" \
+            -e APP_RELEASE_SHA="${GITHUB_SHA}" \
             -e ALLOW_TEST_OTP="false" \
             -e CLOUDINARY_CLOUD_NAME="test" \
             -e CLOUDINARY_API_KEY="test" \
@@ -418,6 +420,7 @@ jobs:
             HTTP_CODE=$(curl -s -o /tmp/health-response.json -w "%{http_code}" http://localhost:3199/api/health 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
               echo "Health check PASSED (HTTP $HTTP_CODE)"
+              node -e 'const fs=require("fs"); const h=JSON.parse(fs.readFileSync("/tmp/health-response.json","utf8")); if(h.release !== process.env.GITHUB_SHA){console.error("release SHA mismatch"); process.exit(1)}; if(h.testOtpMode !== "disabled"){console.error("test OTP unexpectedly enabled"); process.exit(1)}'
               cat /tmp/health-response.json
               exit 0
             fi
