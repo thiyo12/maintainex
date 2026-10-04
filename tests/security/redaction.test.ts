@@ -120,6 +120,26 @@ describe('Redaction', () => {
     expect(payPal).not.toContain("result.error || 'Webhook processing failed'")
   })
 
+  it('keeps admin finance routes on structured redacted logging', () => {
+    const adminFinanceRoutes = [
+      'app/api/admin/financial/commission/payments/route.ts',
+      'app/api/admin/financial/commission/route.ts',
+      'app/api/admin/financial/escrow/route.ts',
+      'app/api/admin/financial/ledger/route.ts',
+      'app/api/admin/financial/payments/[id]/route.ts',
+      'app/api/admin/financial/payouts/[id]/route.ts',
+      'app/api/admin/financial/refunds/route.ts',
+      'app/api/admin/financial/wallets/route.ts',
+    ]
+
+    for (const routePath of adminFinanceRoutes) {
+      const route = readFileSync(resolve(process.cwd(), routePath), 'utf8')
+      expect(route).toContain("from '@/lib/shared/observability/logger'")
+      expect(route).toContain('logger.error(')
+      expect(route).not.toMatch(/\bconsole\.error\s*\(/)
+    }
+  })
+
   it('preserves safe values', () => {
     const input = { name: 'John', age: 30, active: true }
     const result = redactObject(input)
