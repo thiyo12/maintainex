@@ -81,8 +81,29 @@ export async function rotateStaffRefreshToken(
 
   const adminUser = await prisma.adminUser.findUnique({
     where: { id: session.adminUserId },
+    select: {
+      id: true,
+      role: true,
+      isActive: true,
+      deletedAt: true,
+      lockedUntil: true,
+      totpEnabled: true,
+      totpSecret: true,
+    },
   })
-  if (!adminUser || !adminUser.isActive || adminUser.deletedAt) return null
+  if (
+    !adminUser ||
+    !adminUser.isActive ||
+    adminUser.deletedAt ||
+    (adminUser.lockedUntil && adminUser.lockedUntil > new Date()) ||
+    (adminUser.role === 'SUPER_ADMIN' && (!adminUser.totpEnabled || !adminUser.totpSecret))
+  ) {
+    await prisma.adminSession.updateMany({
+      where: { id: session.id, isRevoked: false },
+      data: { isRevoked: true, revokedAt: new Date() },
+    })
+    return null
+  }
 
   const newRefresh = generateStaffRefreshToken()
   const familyId = session.tokenFamilyId || session.id
