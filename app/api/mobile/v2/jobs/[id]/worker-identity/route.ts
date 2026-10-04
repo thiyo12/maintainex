@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -76,7 +77,7 @@ export async function GET(
         : null,
     })
   } catch (error) {
-    console.error('Worker identity GET error:', error)
+    logger.error('Worker identity read failed unexpectedly', { err: error, route: '/api/mobile/v2/jobs/[id]/worker-identity', method: 'GET' })
     return NextResponse.json({ error: 'Failed to load worker identity' }, { status: 500 })
   }
 }
@@ -245,7 +246,7 @@ export async function POST(
       },
     })
   } catch (error) {
-    console.error('Worker identity confirmation error:', error)
+    logger.error('Worker identity confirmation failed unexpectedly', { err: error, route: '/api/mobile/v2/jobs/[id]/worker-identity', method: 'POST' })
     const message = error instanceof Error ? error.message : ''
 
     if (message === 'JOB_NOT_FOUND') {
