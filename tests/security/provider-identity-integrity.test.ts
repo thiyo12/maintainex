@@ -76,6 +76,15 @@ describe('provider identity integrity lifecycle', () => {
     expect(closure).not.toContain('providerFinancialAccount.delete')
   })
 
+  it('treats chargeback and other post-payment adjustments as durable identity liability', () => {
+    const claims = source('lib/identity/identity-claims.ts')
+
+    expect(claims).toContain('adjustmentDue: true')
+    expect(claims).toContain('account.commissionDue > 0n || account.adjustmentDue > 0n')
+    expect(claims).toContain('adjustmentDueMinor: account.adjustmentDue.toString()')
+    expect(claims).toContain('totalLiabilityMinor: (account.commissionDue + account.adjustmentDue).toString()')
+  })
+
   it('prevents a closed verified account from silently re-registering', () => {
     const registration = source('app/api/mobile/auth/register/route.ts')
     expect(registration).toContain('ACCOUNT_CLOSED_REVIEW_REQUIRED')
