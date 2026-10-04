@@ -15,7 +15,7 @@ import {
   markProviderEventProcessed,
   recordVerifiedProviderEvent,
 } from '@/lib/finance/payments/provider-events'
-import { recordPostPayoutProviderAdjustmentForEscrow } from '@/lib/finance/commissions/provider-balance-service'
+import { accountFinalProviderChargeback } from '@/lib/finance/payments/chargeback-accounting'
 
 type RecordObject = Record<string, unknown>
 
@@ -586,36 +586,22 @@ async function resolveProviderDispute(
         data: { status: 'PROTECTED' },
       })
     } else if (outcome === 'RESOLVED_BUYER_FAVOUR' || outcome === 'ACCEPTED') {
-      const escrow = await tx.jobEscrow.findUnique({
-        where: { id: resolved.intent.escrowId },
-        select: { status: true },
+      await accountFinalProviderChargeback(tx, {
+        escrowId: resolved.intent.escrowId,
+        paymentIntentId: resolved.intent.id,
+        provider: 'PAYPAL',
+        sourceReference: disputeId || refs.eventId || resolved.intent.id,
+        amountMinor: resolved.intent.amount,
+        currency: resolved.intent.currency,
+        reason: 'PayPal dispute resolved in the buyer’s favor',
+        createdBy: 'system:paypal-webhook',
+        metadata: {
+          eventType: refs.eventType,
+          outcome,
+          providerOrderId: refs.orderId,
+          providerCaptureId: refs.captureId,
+        },
       })
-
-      if (escrow?.status === 'RELEASED') {
-        await recordPostPayoutProviderAdjustmentForEscrow(tx, {
-          escrowId: resolved.intent.escrowId,
-          paymentIntentId: resolved.intent.id,
-          sourceProvider: 'PAYPAL',
-          sourceReference: disputeId || refs.eventId || resolved.intent.id,
-          adjustmentType: 'PAYMENT_CHARGEBACK',
-          reason: 'PayPal dispute resolved in the buyer’s favor after provider earnings were released',
-          createdBy: 'system:paypal-webhook',
-          metadata: {
-            eventType: refs.eventType,
-            outcome,
-            providerOrderId: refs.orderId,
-            providerCaptureId: refs.captureId,
-          },
-        })
-      } else {
-        await tx.jobEscrow.updateMany({
-          where: {
-            id: resolved.intent.escrowId,
-            status: { in: ['PROTECTED', 'ON_HOLD'] },
-          },
-          data: { status: 'ON_HOLD' },
-        })
-      }
 
       await tx.paymentIntent.updateMany({
         where: { id: resolved.intent.id, status: { not: 'REFUNDED' } },
