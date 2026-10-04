@@ -89,6 +89,24 @@ describe('production security configuration fails closed', () => {
     expect(result.errors).toContain('[CRITICAL] PASSWORD_PEPPER and IDENTITY_CLAIM_PEPPER must be independent')
   })
 
+  it('rejects reuse across production secret domains', async () => {
+    process.env.CRON_SECRET = process.env.INTERNAL_SYNC_SECRET
+    const { validateRequiredSecrets } = await import('@/lib/config/env-validation')
+    const result = validateRequiredSecrets()
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain('[CRITICAL] INTERNAL_SYNC_SECRET and CRON_SECRET must be independent')
+  })
+
+  it('rejects reuse between signing secrets and peppers/internal credentials', async () => {
+    process.env.PASSWORD_PEPPER = process.env.MARKETPLACE_JWT_SECRET
+    process.env.CRON_SECRET = process.env.STAFF_JWT_SECRET
+    const { validateRequiredSecrets } = await import('@/lib/config/env-validation')
+    const result = validateRequiredSecrets()
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain('[CRITICAL] MARKETPLACE_JWT_SECRET and PASSWORD_PEPPER must be independent')
+    expect(result.errors).toContain('[CRITICAL] STAFF_JWT_SECRET and CRON_SECRET must be independent')
+  })
+
   it('rejects production PayPal credentials unless sandbox is explicitly false and complete', async () => {
     process.env.PAYPAL_CLIENT_ID = 'client'
     process.env.PAYPAL_CLIENT_SECRET = 'secret'
