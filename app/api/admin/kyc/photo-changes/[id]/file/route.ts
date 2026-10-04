@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { readFile } from 'fs/promises'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -104,7 +105,7 @@ export async function GET(
     if (error?.code === 'ENOENT') {
       return NextResponse.json({ error: 'Photo not found' }, { status: 404 })
     }
-    console.error('CRM verified photo protected file error:', error)
+    logger.error('CRM protected verified-photo read failed unexpectedly', { err: error, route: '/api/admin/kyc/photo-changes/[id]/file', method: 'GET' })
     return NextResponse.json({ error: 'Failed to load protected photo' }, { status: 500 })
   }
 }
