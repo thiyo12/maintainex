@@ -87,6 +87,13 @@ export const RATE_LIMIT_POLICIES: Record<string, RateLimitPolicy> = {
     failureMode: 'fail-closed',
     riskLevel: 'high',
   },
+  PRICING_QUERY: {
+    name: 'pricing_query',
+    limit: 30,
+    windowMs: 60 * 1000,
+    failureMode: 'fail-closed',
+    riskLevel: 'medium',
+  },
   FINANCIAL_MUTATION: {
     name: 'financial_mutation',
     limit: 20,
