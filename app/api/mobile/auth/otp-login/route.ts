@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { randomInt } from 'crypto'
@@ -218,7 +219,7 @@ function accountBlocked(user: any): NextResponse | null {
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown'
+    const ip = getTrustedClientIp(request.headers)
     const userAgent = request.headers.get('user-agent') ?? ''
     const body = await request.json()
     const emailId = typeof body.email === 'string' ? body.email.trim() : ''
