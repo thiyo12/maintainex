@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { guardCrmRequest } from '@/lib/crm/security'
+import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
 import { prisma } from '@/lib/prisma'
 
 function generateInvoiceNumber(): string {
@@ -12,14 +13,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    if (!session.canEditServices && session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'commission:manage',
+      permissionClass: 'SENSITIVE',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
 
     const { id } = await params
     const body = await request.json()
@@ -32,6 +31,13 @@ export async function POST(
 
     if (!booking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
+    }
+    if (!booking.branchId) {
+      return NextResponse.json({ error: 'Booking branch is required' }, { status: 409 })
+    }
+    const scope = await resolveReportBranchScope(guard.context, booking.branchId)
+    if (!scope.ok) {
+      return NextResponse.json({ error: scope.error }, { status: scope.status })
     }
 
     const invoiceNumber = generateInvoiceNumber()
@@ -54,7 +60,7 @@ export async function POST(
         total,
         dueDate: dueDate ? new Date(dueDate) : null,
         notes: notes || `Created from booking on ${new Date(booking.date).toLocaleDateString()}`,
-        createdBy: session.id,
+        createdBy: guard.context.adminId,
         items: items?.length > 0 
           ? {
               create: items.map((item: any) => ({
