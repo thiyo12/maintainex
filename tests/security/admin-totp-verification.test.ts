@@ -12,8 +12,14 @@ describe('Admin TOTP verification safety', () => {
     expect(source).toContain('await verifyTotp(totpCode, adminUser.totpSecret)')
     expect(source).not.toContain('if (!verifyTotp(totpCode, adminUser.totpSecret))')
     expect(source.indexOf('await verifyTotp')).toBeLessThan(
-      source.indexOf('prisma.adminSession.create')
+      source.indexOf('createStaffSession')
     )
+
+    const sessions = readFileSync(
+      resolve(process.cwd(), 'lib/auth/staff-sessions.ts'),
+      'utf8'
+    )
+    expect(sessions).toContain('prisma.adminSession.create')
   })
 
   it('requires password reauthentication before generating a new TOTP secret', () => {
