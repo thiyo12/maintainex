@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createPasswordResetToken } from '@/lib/security/tokens'
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
       message: 'If an account exists with that email, a reset link has been sent.',
     })
   } catch (error) {
-    console.error('Forgot password error:', error)
+    logger.error('Forgot password request failed', { err: error, route: '/api/auth/forgot-password', method: 'POST' })
     return NextResponse.json({
       success: true,
       message: 'If an account exists with that email, a reset link has been sent.',

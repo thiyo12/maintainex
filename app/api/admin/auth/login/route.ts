@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import jwt from 'jsonwebtoken'
@@ -31,7 +32,7 @@ async function recordLoginAttempt(params: {
   try {
     await prisma.adminLoginAttempt.create({ data: params })
   } catch (e) {
-    console.error('Failed to record login attempt:', e)
+    logger.error('Failed to record admin login attempt', { err: e, route: '/api/admin/auth/login', method: 'POST' })
   }
 }
 
@@ -241,7 +242,7 @@ export async function POST(request: NextRequest) {
 
     return response
   } catch (error) {
-    console.error('Admin login error:', error)
+    logger.error('Admin login failed unexpectedly', { err: error, route: '/api/admin/auth/login', method: 'POST' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

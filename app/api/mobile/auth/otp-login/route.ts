@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { prisma } from '@/lib/prisma'
@@ -299,7 +300,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'No verified delivery destination is available.' }, { status: 400 })
           }
         } catch (error) {
-          console.error('OTP delivery failed:', error)
+          logger.error('OTP delivery failed', { err: error, route: '/api/mobile/auth/otp-login', method: 'POST' })
           await prisma.oTP.updateMany({
             where: { userId: user.id, purpose: 'LOGIN', isUsed: false },
             data: { isUsed: true },
@@ -409,7 +410,7 @@ export async function POST(request: NextRequest) {
       token: response.accessToken,
     })
   } catch (error) {
-    console.error('OTP login error:', error)
+    logger.error('OTP login failed unexpectedly', { err: error, route: '/api/mobile/auth/otp-login', method: 'POST' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

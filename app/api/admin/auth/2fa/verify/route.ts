@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import jwt from 'jsonwebtoken'
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     return response
   } catch (error) {
-    console.error('2FA verify error:', error)
+    logger.error('Admin 2FA verification failed unexpectedly', { err: error, route: '/api/admin/auth/2fa/verify', method: 'POST' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

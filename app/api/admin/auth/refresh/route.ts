@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { rotateStaffRefreshToken } from '@/lib/auth/staff-rotation'
 import { getIp } from '@/lib/auth/authorization/admin-rbac'
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     return response
   } catch (error) {
-    console.error('Refresh error:', error)
+    logger.error('Admin token refresh failed unexpectedly', { err: error, route: '/api/admin/auth/refresh', method: 'POST' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

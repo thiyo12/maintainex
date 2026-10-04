@@ -53,6 +53,25 @@ describe('Redaction', () => {
     expect(mobileUpload).not.toContain("console.error('Upload error:'")
   })
 
+  it('keeps sensitive authentication routes off raw console error sinks', () => {
+    const sensitiveRoutes = [
+      'app/api/auth/forgot-password/route.ts',
+      'app/api/auth/reset-password/route.ts',
+      'app/api/mobile/auth/otp-login/route.ts',
+      'app/api/mobile/auth/verify-otp/route.ts',
+      'app/api/admin/auth/login/route.ts',
+      'app/api/admin/auth/refresh/route.ts',
+      'app/api/admin/auth/2fa/verify/route.ts',
+      'app/api/admin/auth/logout/route.ts',
+    ]
+
+    for (const path of sensitiveRoutes) {
+      const route = readFileSync(resolve(process.cwd(), path), 'utf8')
+      expect(route).toContain("logger.error(")
+      expect(route).not.toMatch(/\\bconsole\\.error\\s*\\(/)
+    }
+  })
+
   it('preserves safe values', () => {
     const input = { name: 'John', age: 30, active: true }
     const result = redactObject(input)

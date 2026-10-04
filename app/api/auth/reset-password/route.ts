@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyPasswordResetToken } from '@/lib/security/tokens'
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
       message: 'Password updated successfully.',
     })
   } catch (error) {
-    console.error('Reset password error:', error)
+    logger.error('Password reset failed', { err: error, route: '/api/auth/reset-password', method: 'POST' })
     return NextResponse.json({ error: 'Failed to reset password' }, { status: 500 })
   }
 }

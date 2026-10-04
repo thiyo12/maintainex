@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { parseStaffRefreshToken } from '@/lib/auth/staff-rotation'
 import { revokeStaffSession } from '@/lib/auth/staff-sessions'
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     revokeFailed = true
-    console.error('Logout session revocation error:', error)
+    logger.error('Admin logout session revocation failed', { err: error, route: '/api/admin/auth/logout', method: 'POST' })
   }
 
   const response = NextResponse.json({
