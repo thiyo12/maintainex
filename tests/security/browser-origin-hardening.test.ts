@@ -85,6 +85,18 @@ describe('browser and CORS production boundaries', () => {
     expect(validateRequiredSecrets()).toEqual({ valid: true, errors: [] })
   })
 
+  it('keeps security headers on early middleware denial paths', () => {
+    const middleware = source('middleware.ts')
+
+    expect(middleware).toContain("return applySecurityHeaders(applyRequestId(new NextResponse(\n      JSON.stringify({ error: 'Access denied', code: 'IP_BLOCKED' })")
+    expect(
+      (middleware.match(/applySecurityHeaders\(applyRequestId\(new NextResponse\([\s\S]*?Rate limit exceeded\. Try again later\./g) || []).length,
+    ).toBeGreaterThanOrEqual(2)
+    expect(
+      (middleware.match(/applySecurityHeaders\(applyRequestId\(new NextResponse\([\s\S]*?Not available in production/g) || []).length,
+    ).toBeGreaterThanOrEqual(2)
+  })
+
   it('keeps CRM state-changing requests behind origin-aware guardCrmRequest', () => {
     const crm = source('lib/crm/security.ts')
     expect(crm).toContain('trustedRequestOrigins')
