@@ -7,12 +7,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -33,23 +33,35 @@ jobs:
           npm pkg set devDependencies.@expo/ngrok=^4.1.3
           npm audit fix --package-lock-only --omit=dev || true
 
-      - name: Capture remaining production audit
-        shell: bash
-        working-directory: apps/mobile
-        run: |
-          set +e
-          npm audit --omit=dev --audit-level=high --json > mobile-audit.json
-          npm audit --omit=dev --audit-level=high > mobile-audit.txt 2>&1
-          true
+      - name: Verify controlled mobile production audit
+        run: node scripts/mobile-production-audit.mjs
 
-      - name: Upload mobile dependency review
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: security-mobile-dependency-review
-          path: |
-            apps/mobile/package.json
-            apps/mobile/package-lock.json
-            apps/mobile/mobile-audit.json
-            apps/mobile/mobile-audit.txt
-          if-no-files-found: error
-          retention-days: 1
+      - name: Install resolved mobile graph
+        run: npm ci --prefix apps/mobile
+
+      - name: Mobile TypeScript
+        run: npm exec --prefix apps/mobile tsc -- --noEmit
+
+      - name: Mobile Expo export
+        working-directory: apps/mobile
+        run: npx expo export --platform all --output-dir /tmp/maintainex-mobile-export
+
+      - name: Commit validated mobile dependency resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          unexpected="$(git status --porcelain | awk '{print $2}' | grep -vE '^(apps/mobile/package.json|apps/mobile/package-lock.json)$' || true)"
+          if [ -n "$unexpected" ]; then
+            echo "Unexpected generated files:"
+            echo "$unexpected"
+            exit 1
+          fi
+          git add apps/mobile/package.json apps/mobile/package-lock.json
+          if git diff --cached --quiet; then
+            echo "Mobile dependency files already resolved"
+            exit 0
+          fi
+          git config user.name "MaintainEX Security CI"
+          git config user.email "security-ci@maintainex.invalid"
+          git commit -m "security(mobile-deps): resolve fixable production advisories"
+          git push origin HEAD:security/production-hardening
