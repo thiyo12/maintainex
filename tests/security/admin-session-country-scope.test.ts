@@ -3,10 +3,13 @@ import { signAccessToken } from '@/lib/auth/authentication/admin-jwt'
 import { getAdminSession, verifySimpleToken } from '@/lib/auth/authentication/admin-auth'
 
 const ORIGINAL_JWT_SECRET = process.env.JWT_SECRET
+const ORIGINAL_NODE_ENV = process.env.NODE_ENV
 
 afterEach(() => {
   if (ORIGINAL_JWT_SECRET === undefined) delete process.env.JWT_SECRET
   else process.env.JWT_SECRET = ORIGINAL_JWT_SECRET
+  if (ORIGINAL_NODE_ENV === undefined) delete process.env.NODE_ENV
+  else process.env.NODE_ENV = ORIGINAL_NODE_ENV
 })
 
 describe('admin JWT country scope preservation', () => {
@@ -37,7 +40,8 @@ describe('admin JWT country scope preservation', () => {
     })
   })
 
-  it('preserves assignedCountries through cookie-based getAdminSession', async () => {
+  it('preserves assignedCountries through non-production legacy cookie compatibility', async () => {
+    process.env.NODE_ENV = 'test'
     process.env.JWT_SECRET = 'crm-country-scope-test-secret-0123456789'
 
     const token = signAccessToken({
@@ -58,8 +62,9 @@ describe('admin JWT country scope preservation', () => {
     })
 
     expect(session).toMatchObject({
-      sub: 'admin-cookie-test',
+      id: 'admin-cookie-test',
       sid: 'session-cookie-test',
+      sessionId: 'session-cookie-test',
       email: 'finance@example.com',
       role: 'FINANCE',
       firstName: 'Finance',
@@ -67,6 +72,30 @@ describe('admin JWT country scope preservation', () => {
       assignedCountries: ['LK'],
       type: 'access',
     })
+  })
+
+  it('rejects legacy admin cookie tokens in production', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.JWT_SECRET = 'crm-country-scope-test-secret-0123456789'
+
+    const token = signAccessToken({
+      id: 'admin-production-legacy',
+      email: 'ops@example.com',
+      role: 'MANAGER',
+      firstName: 'Ops',
+      lastName: 'Manager',
+      assignedCountries: ['LK'],
+      sessionId: 'session-production-legacy',
+    })
+
+    const session = await getAdminSession({
+      headers: { get: () => null },
+      cookies: {
+        get: (name: string) => name === 'admin_token' ? { value: token } : undefined,
+      },
+    })
+
+    expect(session).toBeNull()
   })
 
   it('does not invent a country scope when the token has none', () => {
