@@ -77,9 +77,10 @@ describe('payment webhook hardening', () => {
   it('verified provider events are replay-protected and payload mismatch is treated as an integrity error', () => {
     const events = source('lib/finance/payments/provider-events.ts')
 
-    expect(events).toContain('providerEventId')
+    expect(events).toContain('externalEventId')
     expect(events).toContain('payloadHash')
     expect(events).toContain('Provider event replay payload mismatch')
-    expect(events).toContain('duplicate')
+    expect(events).toContain("error.code === 'P2002'")
+    expect(events).toContain('created: false')
   })
 })
