@@ -33,6 +33,10 @@ const RETIRED_MUTATION_ROUTES = new Set([
   'app/api/mobile/quick-bookings/route.ts',
 ])
 
+const LEGITIMATE_PRIVILEGED_SETUP_ROUTES = new Set([
+  'app/api/admin/auth/2fa/setup/route.ts',
+])
+
 const PUBLIC_MARKETPLACE_AUTH_ROUTES = [
   '/auth/',
   '/register/',
@@ -176,6 +180,7 @@ describe('API attack-surface inventory', () => {
       if (!methods.some(method => method !== 'GET')) continue
 
       const requiresProductionDenial =
+        !LEGITIMATE_PRIVILEGED_SETUP_ROUTES.has(path) &&
         /\/(?:debug|test|tests|test-data|seed|setup|init|migrate|migration)(?:\/|$)/.test(path)
 
       if (requiresProductionDenial) {
