@@ -81,6 +81,25 @@ describe('server secret boundaries', () => {
     expect(leaks).toEqual([])
   })
 
+  it('uses constant-time comparison for internal and cron shared-secret boundaries', () => {
+    const sharedSecretRoutes = [
+      'app/api/internal/metrics/route.ts',
+      'app/api/internal/readiness/route.ts',
+      'app/api/internal/security/ip-blocklist/route.ts',
+      'app/api/internal/security/seed/route.ts',
+    ]
+
+    for (const path of sharedSecretRoutes) {
+      const code = source(path)
+      expect(code).toContain('matchesSharedSecret')
+      expect(code).not.toMatch(/(?:authHeader|syncHeader)\s*!==\s*(?:expectedSecret|getInternalSyncSecret\(\))/)
+    }
+
+    const cleanup = source('app/api/mobile/cleanup-photos/route.ts')
+    expect(cleanup).toContain('matchesBearerSecret')
+    expect(cleanup).not.toContain("authHeader !== `Bearer ${process.env.CRON_SECRET}`")
+  })
+
   it('keeps sensitive local material outside the Docker build context', () => {
     const dockerignore = source('.dockerignore')
     for (const required of [
