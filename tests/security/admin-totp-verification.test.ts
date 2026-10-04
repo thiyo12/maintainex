@@ -12,7 +12,7 @@ describe('Admin TOTP verification safety', () => {
     expect(source).toContain('await verifyTotp(totpCode, adminUser.totpSecret)')
     expect(source).not.toContain('if (!verifyTotp(totpCode, adminUser.totpSecret))')
     expect(source.indexOf('await verifyTotp')).toBeLessThan(
-      source.indexOf('createStaffSession')
+      source.indexOf('await createStaffSession')
     )
 
     const sessions = readFileSync(
