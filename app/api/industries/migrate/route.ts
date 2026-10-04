@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { guardCrmRequest } from '@/lib/crm/security'
 import { writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
@@ -27,11 +27,17 @@ async function downloadImage(url: string, dest: string): Promise<void> {
 }
 
 export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   try {
-    const session = await getSession(request)
-    if (!session || session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'catalog:edit',
+      allowedRoles: ['SUPER_ADMIN'],
+      level: 'sensitive',
+    })
+    if (!guard.ok) return guard.response
 
     const industries = await prisma.industry.findMany({})
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'industries')
@@ -47,11 +53,21 @@ export async function POST(request: NextRequest) {
       const img = ind.image
       if (!img || typeof img !== 'string') continue
       if (img.startsWith('/uploads/')) continue
-      if (!img.includes('cloudinary.com')) continue
+      let parsedUrl: URL
+      try {
+        parsedUrl = new URL(img)
+      } catch {
+        continue
+      }
+      if (
+        parsedUrl.protocol !== 'https:' ||
+        (parsedUrl.hostname !== 'res.cloudinary.com' && !parsedUrl.hostname.endsWith('.res.cloudinary.com'))
+      ) continue
 
       try {
         const slug = (ind.id || ind.name || 'industry').toString().toLowerCase().replace(/\s+/g, '-')
-        const ext = path.extname(new URL(img).pathname) || '.jpg'
+        const rawExt = path.extname(parsedUrl.pathname).toLowerCase()
+        const ext = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(rawExt) ? rawExt : '.jpg'
         const filename = slug + '-' + Date.now() + ext
         const dest = path.join(uploadsDir, filename)
 
