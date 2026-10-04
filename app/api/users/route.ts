@@ -1,33 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    if (!['SUPER_ADMIN', 'MANAGER'].includes(session.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'users:view',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
 
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role') || 'CUSTOMER'
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const page = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1)
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '20', 10) || 20, 1), 100)
     const search = searchParams.get('search') || ''
 
     const where: any = {
-      role: role
+      ...getCrmCountryFilter(guard.context),
+      role,
     }
 
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search } }
+        { phone: { contains: search } },
       ]
     }
 
@@ -39,27 +38,27 @@ export async function GET(request: NextRequest) {
         take: limit,
         include: {
           _count: {
-            select: { bookings: true }
-          }
-        }
+            select: { bookings: true },
+          },
+        },
       }),
-      prisma.user.count({ where })
+      prisma.user.count({ where }),
     ])
 
     return NextResponse.json({
-      users: users.map(u => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        phone: u.phone,
-        role: u.role,
-        isActive: u.isActive,
-        createdAt: u.createdAt,
-        _count: u._count
+      users: users.map(user => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        _count: user._count,
       })),
       total,
       page,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     })
   } catch (error) {
     console.error('Users API error:', error)
