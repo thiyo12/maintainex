@@ -115,6 +115,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
+    if (
+      adminUser.role === 'SUPER_ADMIN' &&
+      (!adminUser.totpEnabled || !adminUser.totpSecret)
+    ) {
+      await recordLoginAttempt({
+        adminUserId: adminUser.id,
+        email,
+        ipAddress: ip,
+        userAgent,
+        success: false,
+        failureReason: 'MFA_ENROLLMENT_REQUIRED',
+      })
+      return NextResponse.json(
+        {
+          error: 'Two-factor authentication must be enabled for super-admin accounts before sign-in.',
+          code: 'MFA_ENROLLMENT_REQUIRED',
+        },
+        { status: 403 }
+      )
+    }
+
     await prisma.adminUser.update({
       where: { id: adminUser.id },
       data: { failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: new Date(), lastLoginIp: ip },
