@@ -201,6 +201,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+      - name: CRM catalog and mobile taxonomy security gates
+        run: >-
+          npx vitest run
+          tests/security/crm-catalog-v2.test.ts
+          tests/security/mobile-taxonomy-source-v2.test.ts
+          --reporter=verbose
+        if: always()
+
       - name: Migration preservation tests
         run: npx vitest run tests/structural/migration-preservation.test.ts --reporter=verbose 2>&1 | tee /tmp/migration-tests.txt
         if: always()
