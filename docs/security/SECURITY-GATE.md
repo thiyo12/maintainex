@@ -70,6 +70,34 @@ This file is the running security release gate for `security/production-hardenin
 - Residual risk: network timing attacks are noisy; the stronger boundary now removes this avoidable signal. Real origin/network isolation is still an external Phase 3/26 requirement.
 - Status: FIXED — awaiting the full branch validation run.
 
+### SG-0003 — Production secret-domain reuse was not fully rejected
+
+- ID: SG-0003
+- Severity: MEDIUM
+- Attack path: if an operator accidentally reused one critical production secret across authentication, password/KYC pepper, internal-sync, or cron domains, compromise of one domain could expand into another.
+- Affected component: production environment validation.
+- Reproduction/evidence: startup validation rejected selected secret-equality pairs but did not enforce pairwise independence across all six required production secret domains.
+- Root cause: independent-secret validation was implemented as a small set of hand-written comparisons rather than a complete domain set.
+- Fix: all required production secrets are now pairwise checked for independent values; legacy JWT equality checks remain separately enforced.
+- Test added: production bypass regression now covers internal/cron reuse and signing-secret reuse with peppers/internal credentials.
+- Commit SHA: `914c9a72` (fix), `7cdf3fd6` (regression).
+- Residual risk: code can reject unsafe reuse but cannot prove the real production values were rotated; live credential-rotation evidence remains external.
+- Status: FIXED — full branch CI pending.
+
+### SG-0004 — API attack-surface inventory could miss non-function route exports
+
+- ID: SG-0004
+- Severity: MEDIUM
+- Attack path: a mutation route implemented as a const-style or named re-export could evade the automated mutation inventory and therefore evade the inventory's boundary classification check.
+- Affected component: `tests/security/api-attack-surface-inventory.test.ts`.
+- Reproduction/evidence: the detector originally recognized only `export async function METHOD` route handlers.
+- Root cause: incomplete recognition of valid Next.js route export syntax.
+- Fix: the inventory now detects async/non-async function exports, const exports, and named HTTP-method re-exports.
+- Test added: detector self-tests cover function, const, and named re-export styles.
+- Commit SHA: `49b82297`, `61096a6f`.
+- Residual risk: dynamically generated route exports are intentionally unsupported and should not be used for security-sensitive route handlers.
+- Status: FIXED — full branch CI pending.
+
 ## Phase 0 report
 
 PHASE: 0 — Security baseline / feature freeze
@@ -195,3 +223,51 @@ External-only or external-final-verification work remains specifically for:
 - external attacker simulation.
 
 No production deployment is authorized by this partial pass.
+
+
+## Phase 2 partial report
+
+PHASE: 2 — Secrets / credentials
+STATUS: PARTIAL
+
+CODE/CI EVIDENCE:
+- production-required secret length checks
+- pairwise independence across marketplace JWT, staff JWT, password pepper, identity pepper, internal sync secret, and cron secret
+- explicit legacy JWT separation
+- secret-scanning CI for current tree and Git history
+- server-secret boundary tests for mobile/client code
+- Docker build-context secret exclusions
+- credential-rotation runbook
+
+NEW FINDING:
+- SG-0003 fixed: incomplete cross-domain secret reuse validation.
+
+EXTERNAL REMAINDER:
+- prove actual production credentials have been rotated where required
+- prove known previously exposed credentials are revoked
+- collect non-secret rotation receipts
+
+Phase 2 must not be marked PASS solely from repository evidence.
+
+
+## Phase 6 partial report
+
+PHASE: 6 — Complete API attack-surface inventory
+STATUS: PARTIAL
+
+CODE/CI EVIDENCE:
+- recursive inventory of `app/api/**/route.ts`
+- mutation boundary classification
+- explicit public mutation allowlist plus abuse-control checks
+- internal/cron/webhook caller-source authentication checks
+- retired mutation-route no-op checks
+- operational/test/debug/setup/seed/migration route-local closure checks
+- HTTP method detector now recognizes function, const, and named re-export route syntax
+
+NEW FINDING:
+- SG-0004 fixed: valid Next.js route export styles could previously escape mutation detection.
+
+REMAINING:
+- run the widened detector through the complete blocking suite
+- investigate any newly surfaced unclassified mutation routes
+- perform deeper ownership/tenant semantics in Phases 7 and 8 rather than treating authentication alone as authorization
