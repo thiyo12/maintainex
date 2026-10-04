@@ -132,7 +132,10 @@ release_sha=$(env_value APP_RELEASE_SHA)
 if [ -z "$release_sha" ]; then
   echo "ERROR|APP_RELEASE_SHA is required"
   exit 1
-elif [ ${#release_sha} -ne 40 ] || ! printf '%s' "$release_sha" | grep -Eq '^[0-9a-f]{40}
+elif [ ${#release_sha} -ne 40 ] || ! printf '%s' "$release_sha" | grep -Eq '^[0-9a-f]{40}$'; then
+  echo "ERROR|APP_RELEASE_SHA must be a lowercase 40-character git SHA"
+  exit 1
+else
   short_release=$(printf '%s' "$release_sha" | cut -c1-12)
   case "$image" in
     *"release-$short_release"*) ;;
@@ -142,7 +145,6 @@ elif [ ${#release_sha} -ne 40 ] || ! printf '%s' "$release_sha" | grep -Eq '^[0-
       ;;
   esac
 fi
-
 echo "IMAGE|$image"
 echo "RELEASE|$release_sha"
 echo "HEALTH|$health"
