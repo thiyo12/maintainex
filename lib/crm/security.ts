@@ -390,7 +390,7 @@ export async function guardCrmRequest(
   const role = liveAdmin.role as AdminRole
   if (
     role === 'SUPER_ADMIN' &&
-    (!liveAdmin.totpEnabled || !liveAdmin.totpSecret)
+    (liveAdmin.totpEnabled === false || liveAdmin.totpSecret === null)
   ) {
     return deny(
       401,
