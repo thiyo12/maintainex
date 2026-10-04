@@ -67,7 +67,7 @@ describe('security phase evidence matrix', () => {
 
   it('does not confuse partial repository evidence with a final GO decision', () => {
     const gate = readFileSync(resolve(process.cwd(), 'docs/security/SECURITY-GATE.md'), 'utf8')
-    expect(gate).toContain('Phase 0 cannot be marked PASS')
+    expect(gate).toContain('| 0 | Security baseline / feature freeze | CONDITIONAL | YES |')
     expect(gate).not.toContain('FINAL SECURITY GO: YES')
   })
 })
