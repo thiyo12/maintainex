@@ -11,6 +11,7 @@ describe('dependency and CI supply-chain hardening', () => {
     for (const path of [
       '.github/workflows/phase0-7-validation.yml',
       '.github/workflows/security-exposure-audit.yml',
+      '.github/workflows/security-mobile-dependency-review.yml',
     ]) {
       const workflow = source(path)
       const uses = workflow
@@ -68,6 +69,19 @@ describe('dependency and CI supply-chain hardening', () => {
     expect((mobileAudit.match(/github\.com\/advisories\/GHSA-/g) || []).length).toBe(4)
     expect(mobileAudit).not.toContain('audit || true')
     expect(mobileAudit).not.toContain('--audit-level=critical')
+  })
+
+  it('isolates the write-capable mobile resolver credential from dependency execution', () => {
+    const workflow = source('.github/workflows/security-mobile-dependency-review.yml')
+
+    expect(workflow).toContain('contents: write')
+    expect(workflow).toContain('persist-credentials: false')
+    expect(workflow).toContain('GH_TOKEN: ${{ github.token }}')
+    expect(workflow).toContain('git config --local http.https://github.com/.extraheader')
+    expect(workflow).toContain("trap 'git config --local --unset-all http.https://github.com/.extraheader || true' EXIT")
+    expect(workflow).toContain('npx expo export --platform android')
+    expect(workflow).toContain('npx expo export --platform ios')
+    expect(workflow).not.toContain('npx expo export --platform all')
   })
 
   it('keeps workflow permissions least-privilege by default', () => {
