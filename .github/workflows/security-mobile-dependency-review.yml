@@ -41,7 +41,8 @@ jobs:
         run: npm ci --prefix apps/mobile
 
       - name: Mobile TypeScript
-        run: npm exec --prefix apps/mobile tsc -- --noEmit
+        working-directory: apps/mobile
+        run: npx tsc --noEmit
 
       - name: Mobile Expo export
         working-directory: apps/mobile
