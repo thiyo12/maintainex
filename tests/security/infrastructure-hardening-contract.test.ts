@@ -12,6 +12,7 @@ describe('production infrastructure source hardening', () => {
     for (const script of [
       'deploy-rsync.sh',
       'scripts/crm-v2-production-preflight.sh',
+      'scripts/start-production.sh',
     ]) {
       expect(() =>
         execFileSync('bash', ['-n', resolve(process.cwd(), script)], {
@@ -67,6 +68,24 @@ describe('production infrastructure source hardening', () => {
     expect(readiness).toContain("process.env.APP_RELEASE_SHA || 'unknown'")
     expect(health).toContain("release: process.env.APP_RELEASE_SHA || 'unknown'")
     expect(health).not.toContain('company-marketplace-qa-20260924')
+  })
+
+  it('bakes the build SHA into the image so a stale ambient SHA cannot mislabel code', () => {
+    const dockerfile = source('Dockerfile')
+    const starter = source('scripts/start-production.sh')
+
+    expect(dockerfile).toContain('ARG GIT_SHA=unknown')
+    expect(dockerfile).toContain('/app/.release-sha')
+    expect(dockerfile).toContain('COPY --from=builder /app/.release-sha ./.release-sha')
+    expect(dockerfile).toContain('COPY --from=builder /app/scripts/start-production.sh')
+    expect(dockerfile).toContain('CMD ["sh", "/app/scripts/start-production.sh"]')
+    expect(dockerfile).not.toContain('CMD npx prisma migrate deploy && node scripts/bootstrap-payment-providers.cjs && npm start')
+
+    expect(starter).toContain('/app/.release-sha')
+    expect(starter).toContain('APP_RELEASE_SHA="$BAKED_SHA"')
+    expect(starter).toContain('npx prisma migrate deploy')
+    expect(starter).toContain('bootstrap-payment-providers.cjs')
+    expect(starter).toContain('exec npm start')
   })
 
   it('preflight rejects unsafe production test/payment modes without printing secrets', () => {

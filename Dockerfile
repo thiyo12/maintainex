@@ -6,9 +6,13 @@ RUN npm ci --ignore-scripts
 
 FROM node:20-slim AS builder
 WORKDIR /app
+# Release provenance: Dokploy/build pipeline MUST pass --build-arg GIT_SHA=<full commit>.
+# The baked SHA becomes the container's release identity (see scripts/start-production.sh).
+ARG GIT_SHA=unknown
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY --from=installer /app/node_modules ./node_modules
 COPY . .
+RUN printf '%s' "$GIT_SHA" | tr -d ' \t\r\n' > /app/.release-sha
 RUN npx prisma generate && mkdir -p public/uploads/services && chmod 755 public/uploads/services
 RUN npm run build
 
@@ -24,10 +28,12 @@ COPY --from=builder /app/scripts/bootstrap-payment-providers.cjs ./scripts/boots
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.js ./next.config.js
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-RUN chown -R appuser:appgroup /app
+COPY --from=builder /app/.release-sha ./.release-sha
+COPY --from=builder /app/scripts/start-production.sh ./scripts/start-production.sh
+RUN chown -R appuser:appgroup /app && chmod +x /app/scripts/start-production.sh
 USER appuser
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
-CMD npx prisma migrate deploy && node scripts/bootstrap-payment-providers.cjs && npm start
+CMD ["sh", "/app/scripts/start-production.sh"]
