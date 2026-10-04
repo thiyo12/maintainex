@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { verifyAccessToken } from '../authentication/admin-jwt'
 import { verifySimpleToken } from '../authentication/admin-auth'
 import type { AdminRole, AuditAction, AdminSession } from '../../admin-types'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 
 
 export function getCountryFilter(session: AdminSession): Record<string, any> {
