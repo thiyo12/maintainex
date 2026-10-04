@@ -1,47 +1,52 @@
-const REQUIRED_PRODUCTION_SECRETS = [
-  'MARKETPLACE_JWT_SECRET',
-  'STAFF_JWT_SECRET',
-] as const
-
 const REQUIRED_SECRETS = [
   'MARKETPLACE_JWT_SECRET',
   'STAFF_JWT_SECRET',
   'PASSWORD_PEPPER',
+  'IDENTITY_CLAIM_PEPPER',
   'INTERNAL_SYNC_SECRET',
   'CRON_SECRET',
 ] as const
 
-function validateSecretLength(name: string, value: string, minBytes: number) {
-  const hexLength = minBytes * 2
-  if (value.length < hexLength) {
-    console.error(
-      `[SECURITY] ${name} is too short. Minimum ${minBytes} bytes (${hexLength} hex chars). Got ${value.length} chars.`
-    )
-    return false
+function validateSecretLength(name: string, value: string, minBytes: number): string | null {
+  const bytes = Buffer.byteLength(value, 'utf8')
+  if (bytes < minBytes) {
+    return `[CRITICAL] ${name} is too short. Minimum ${minBytes} bytes; got ${bytes}.`
   }
-  return true
+  return null
+}
+
+function anyConfigured(names: readonly string[]): boolean {
+  return names.some(name => Boolean(process.env[name]))
 }
 
 export function validateRequiredSecrets(): { valid: boolean; errors: string[] } {
   const errors: string[] = []
+  const production = process.env.NODE_ENV === 'production'
 
   for (const name of REQUIRED_SECRETS) {
     const value = process.env[name]
     if (!value) {
-      if (process.env.NODE_ENV === 'production') {
+      if (production) {
         errors.push(`[CRITICAL] ${name} is missing in production environment`)
       } else {
         console.warn(`[WARN] ${name} is not set (non-production)`)
       }
-    } else {
-      validateSecretLength(name, value, 32)
+      continue
+    }
+
+    const lengthError = validateSecretLength(name, value, 32)
+    if (lengthError) {
+      if (production) errors.push(lengthError)
+      else console.warn(lengthError.replace('[CRITICAL]', '[WARN]'))
     }
   }
 
-  if (process.env.NODE_ENV === 'production') {
+  if (production) {
     const marketplace = process.env.MARKETPLACE_JWT_SECRET
     const staff = process.env.STAFF_JWT_SECRET
     const legacy = process.env.JWT_SECRET
+    const passwordPepper = process.env.PASSWORD_PEPPER
+    const identityPepper = process.env.IDENTITY_CLAIM_PEPPER
 
     if (marketplace && legacy && marketplace === legacy) {
       errors.push('[CRITICAL] MARKETPLACE_JWT_SECRET must not equal legacy JWT_SECRET')
@@ -52,15 +57,39 @@ export function validateRequiredSecrets(): { valid: boolean; errors: string[] } 
     if (marketplace && staff && marketplace === staff) {
       errors.push('[CRITICAL] MARKETPLACE_JWT_SECRET and STAFF_JWT_SECRET must be independent')
     }
+    if (passwordPepper && identityPepper && passwordPepper === identityPepper) {
+      errors.push('[CRITICAL] PASSWORD_PEPPER and IDENTITY_CLAIM_PEPPER must be independent')
+    }
+
     if (process.env.ALLOW_TEST_OTP === 'true') {
       errors.push('[CRITICAL] ALLOW_TEST_OTP must not be enabled in production')
+    }
+
+    const paypalVars = ['PAYPAL_CLIENT_ID', 'PAYPAL_CLIENT_SECRET', 'PAYPAL_WEBHOOK_ID'] as const
+    if (anyConfigured(paypalVars)) {
+      for (const name of paypalVars) {
+        if (!process.env[name]) {
+          errors.push(`[CRITICAL] ${name} is required when PayPal is configured in production`)
+        }
+      }
+      if (process.env.PAYPAL_SANDBOX !== 'false') {
+        errors.push('[CRITICAL] PAYPAL_SANDBOX must be explicitly false when PayPal is configured in production')
+      }
+    }
+
+    const payHereVars = [
+      'PAYHERE_MERCHANT_ID',
+      'PAYHERE_MERCHANT_SECRET',
+      'PAYHERE_APP_ID',
+      'PAYHERE_APP_SECRET',
+    ] as const
+    if (anyConfigured(payHereVars) && process.env.PAYHERE_SANDBOX !== 'false') {
+      errors.push('[CRITICAL] PAYHERE_SANDBOX must be explicitly false when PayHere production reconciliation/refund credentials are configured')
     }
   }
 
   if (errors.length > 0) {
-    for (const err of errors) {
-      console.error(err)
-    }
+    for (const err of errors) console.error(err)
     return { valid: false, errors }
   }
 
@@ -78,10 +107,11 @@ let validated = false
 
 export function ensureSecretsValidated() {
   if (validated) return
-  validated = true
 
   const result = validateRequiredSecrets()
   if (!result.valid && process.env.NODE_ENV === 'production') {
-    console.error('[SECURITY] Startup validation FAILED. Auth endpoints may be unavailable.')
+    throw new Error('[SECURITY] Production startup validation failed')
   }
+
+  validated = true
 }
