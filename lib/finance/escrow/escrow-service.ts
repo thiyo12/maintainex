@@ -13,6 +13,7 @@ import {
 } from '@/lib/finance/commissions/provider-balance-service'
 import type { TransitionContext } from '@/lib/domain/job-lifecycle'
 import { resolveEscrowFundingSource } from '@/lib/finance/payments/funding-source'
+import { isCashPaymentAvailableForMarket } from '@/lib/finance/payments/provider-registry'
 
 export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
@@ -151,6 +152,10 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
     quote.currency !== escrow.currency
   ) {
     throw new Error('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
+  }
+
+  if (!isCashPaymentAvailableForMarket(job.countryCode || 'LK', escrow.currency)) {
+    throw new Error('CASH_PAYMENT_NOT_AVAILABLE_FOR_MARKET')
   }
 
   if (escrow.paymentMethod === 'CASH' && escrow.status === 'CASH_CONFIRMED') {
