@@ -12,7 +12,7 @@ async function ensureWalletBalance(walletId: string, walletType: 'CUSTOMER' | 'P
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
      VALUES ($1, $2, $3, $4, $4, 0, 1, now(), now())
-     ON CONFLICT ("walletType", "walletId")
+     ON CONFLICT ("walletType", "walletId", "currency")
      DO UPDATE SET "balance" = $4, "availableBalance" = $4, "pendingBalance" = 0, "updatedAt" = now()`,
     `wb-${walletId}`, walletId, walletType, minorBalance
   )
