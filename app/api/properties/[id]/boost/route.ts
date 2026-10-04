@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
 
 const BOOST_TIERS = {
@@ -11,8 +11,10 @@ const BOOST_TIERS = {
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getSession(request)
+    const session = await authenticateMarketplaceUser(request)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(session)
+    if (blocked) return blocked
 
     const { id } = await params
     const body = await request.json()
