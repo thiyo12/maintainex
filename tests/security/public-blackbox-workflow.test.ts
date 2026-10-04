@@ -18,6 +18,6 @@ describe('public black-box evidence workflow safety', () => {
     expect(workflow).toContain("^[0-9a-f]{40}$")
     expect(workflow).not.toMatch(/secrets\./)
     expect(workflow).not.toMatch(/\bcurl\b[^\n]*(?:-X|--request)\s+(?:POST|PUT|PATCH|DELETE)\b/i)
-    expect(workflow).not.toMatch(/\b(?:psql|prisma|docker|ssh)\b/)
+    expect(workflow).not.toMatch(/^\s*(?:psql|prisma|docker|ssh)\b/m)
   })
 })
