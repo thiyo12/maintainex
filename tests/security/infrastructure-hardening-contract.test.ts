@@ -84,6 +84,23 @@ describe('production infrastructure source hardening', () => {
     expect(preflight).toContain('release SHA does not match immutable image tag')
   })
 
+  it('keeps operations runbooks on private backups and immutable releases', () => {
+    const deployment = source('docs/PRODUCTION-DEPLOYMENT-RUNBOOK.md')
+    const backup = source('docs/operations/backup-restore.md')
+
+    expect(deployment).toContain('scripts/crm-v2-production-preflight.sh')
+    expect(deployment).toContain('deploy-rsync.sh')
+    expect(deployment).toContain('Do not manually patch a running container')
+    expect(deployment).not.toContain('docker cp /tmp/maintainex-build.tar.gz')
+    expect(deployment).not.toContain('docker commit $CONTAINER')
+    expect(deployment).not.toContain('prod-latest')
+
+    expect(backup).toContain('.tar.gz.enc')
+    expect(backup).toContain('AES-256-CBC + PBKDF2')
+    expect(backup).toContain('intentionally excludes production environment secret values')
+    expect(backup).not.toContain('**Environment files** | `.env.example`, `mobile/.env`')
+  })
+
   it('CI production container proves release identity and test OTP shutdown', () => {
     const workflow = source('.github/workflows/phase0-7-validation.yml')
     expect(workflow).toContain('-e APP_RELEASE_SHA="${GITHUB_SHA}"')
