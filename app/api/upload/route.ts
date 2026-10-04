@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
 import { writeFile, mkdir } from 'fs/promises'
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
       success: true 
     })
   } catch (error) {
-    console.error('Error uploading file:', error)
+    logger.error('Generic authenticated upload failed unexpectedly', { err: error, route: '/api/upload', method: 'POST' })
     return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 })
   }
 }
