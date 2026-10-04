@@ -71,6 +71,15 @@ export async function POST(
     console.error('Cash payment selection error:', error)
     const message = error instanceof Error ? error.message : 'Cash payment selection failed'
 
+    if (message === 'CASH_PAYMENT_NOT_AVAILABLE_FOR_MARKET') {
+      return NextResponse.json(
+        {
+          error: 'Cash payment is not available for this market.',
+          code: 'CASH_PAYMENT_NOT_AVAILABLE_FOR_MARKET',
+        },
+        { status: 409 },
+      )
+    }
     if (message === 'PROVIDER_CASH_RESTRICTED') {
       return NextResponse.json(
         {
