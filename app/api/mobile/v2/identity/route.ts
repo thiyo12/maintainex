@@ -9,6 +9,7 @@ import {
   claimTypeForDocument,
   recordStrongIdentityClaim,
 } from '@/lib/identity/identity-claims'
+import { resolveLocalKycFileReference } from '@/lib/security/kyc-storage'
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,6 +55,21 @@ export async function POST(request: NextRequest) {
 
     if (!docType || !side || !imageUrl) {
       return NextResponse.json({ error: 'Missing required fields: docType, side, imageUrl' }, { status: 400 })
+    }
+
+    const privateFile = resolveLocalKycFileReference(
+      String(imageUrl),
+      user.id,
+      request.nextUrl.origin,
+    )
+    if (!privateFile) {
+      return NextResponse.json(
+        {
+          error: 'Identity evidence must be uploaded through the protected MaintainEX file channel.',
+          code: 'INVALID_KYC_FILE_REFERENCE',
+        },
+        { status: 400 },
+      )
     }
 
     if (user.role === 'TASKER' && !fullName?.trim()) {
