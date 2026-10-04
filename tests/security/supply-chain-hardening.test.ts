@@ -46,6 +46,30 @@ describe('dependency and CI supply-chain hardening', () => {
     expect((config.match(/interval: weekly/g) || []).length).toBeGreaterThanOrEqual(3)
   })
 
+  it('keeps mobile HIGH exceptions exact, indirect and self-expiring', () => {
+    const release = source('.github/workflows/phase0-7-validation.yml')
+    const mobileAudit = source('scripts/mobile-production-audit.mjs')
+
+    expect(release).toContain('node scripts/mobile-production-audit.mjs')
+    expect(mobileAudit).toContain("'--omit=dev'")
+    expect(mobileAudit).toContain("'--audit-level=high'")
+    expect(mobileAudit).toContain('Critical vulnerabilities are never exception-eligible')
+    expect(mobileAudit).toContain('Unapproved HIGH vulnerability advisory detected')
+    expect(mobileAudit).toContain('Temporary exception expired because a newer upstream version now exists')
+    expect(mobileAudit).toContain('vulnerability.isDirect')
+
+    const exceptionUrls = [
+      'GHSA-vfj7-8cjw-p6xm',
+      'GHSA-5p2g-fcmc-qvqq',
+      'GHSA-w3rx-r6r6-pgpr',
+      'GHSA-86w9-cpqp-85rv',
+    ]
+    for (const advisory of exceptionUrls) expect(mobileAudit).toContain(advisory)
+    expect((mobileAudit.match(/github\.com\/advisories\/GHSA-/g) || []).length).toBe(4)
+    expect(mobileAudit).not.toContain('audit || true')
+    expect(mobileAudit).not.toContain('--audit-level=critical')
+  })
+
   it('keeps workflow permissions least-privilege by default', () => {
     for (const path of [
       '.github/workflows/phase0-7-validation.yml',
