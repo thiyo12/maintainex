@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { getCrmSectionAccess } from '@/lib/crm/section-access'
 
 describe('CRM section access', () => {
-  it('keeps support focused on operations and trust, not finance', () => {
+  it('keeps support focused on dispute/support queues and trust, not Job 360 or finance', () => {
     expect(getCrmSectionAccess('SUPPORT')).toMatchObject({
-      work: true,
+      work: false,
       finance: false,
       trust: true,
       audit: true,
