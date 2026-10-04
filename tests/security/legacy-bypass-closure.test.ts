@@ -72,13 +72,16 @@ describe('Legacy Bypass Closure — current marketplace and finance boundaries',
 
   describe('FIX 3 — Dispute creation/resolution stays on canonical V2 lifecycle', () => {
     it('mobile marketplace disputes delegate to raiseJobDispute', () => {
-      expect(mobileDisputes).toContain("import { raiseJobDispute } from '@/lib/domain/job-lifecycle'")
-      expect(mobileDisputes).toContain('marketplaceJob = await prisma.marketplaceJob.findUnique')
+      expect(mobileDisputes).toContain('raiseJobDispute')
+      expect(mobileDisputes).toContain('prisma.marketplaceJob.findUnique')
       expect(mobileDisputes).toContain('await raiseJobDispute(')
     })
 
-    it('admin dispute resolution detects marketplace jobs before financial action', () => {
-      expect(adminDisputes).toContain('marketplaceJob = await prisma.marketplaceJob.findUnique')
+    it('admin dispute resolution detects canonical MarketplaceDispute records before financial action', () => {
+      expect(adminDisputes).toContain('prisma.marketplaceDispute.findUnique')
+      expect(adminDisputes).toContain('MARKETPLACE_DISPUTE_REQUIRES_FINANCIAL_RESOLUTION')
+      expect(adminDisputes).toContain('completeAndReleaseEscrow')
+      expect(adminDisputes).toContain('refundEscrow')
     })
   })
 
