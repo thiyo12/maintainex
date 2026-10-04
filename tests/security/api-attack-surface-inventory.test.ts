@@ -69,8 +69,12 @@ function exportedMethods(code: string): string[] {
     .map(match => match[1])
   const constExports = [...code.matchAll(/export\s+const\s+(GET|POST|PUT|PATCH|DELETE)\s*=/g)]
     .map(match => match[1])
+  const namedExports = [...code.matchAll(/export\s*\{([^}]+)\}/g)]
+    .flatMap(match => match[1].split(','))
+    .map(item => item.trim().split(/\s+as\s+/i).pop() || '')
+    .filter(method => /^(GET|POST|PUT|PATCH|DELETE)$/.test(method))
 
-  return [...new Set([...functionExports, ...constExports])]
+  return [...new Set([...functionExports, ...constExports, ...namedExports])]
 }
 
 function hasBoundary(code: string): boolean {
@@ -115,6 +119,7 @@ describe('API attack-surface inventory', () => {
     expect(exportedMethods('export async function POST() {}')).toEqual(['POST'])
     expect(exportedMethods('export function DELETE() {}')).toEqual(['DELETE'])
     expect(exportedMethods('export const PATCH = async () => {}')).toEqual(['PATCH'])
+    expect(exportedMethods("export { handler as PUT } from './handler'")).toEqual(['PUT'])
   })
 
   it('classifies every mutation-capable API route behind a security boundary or explicit public contract', () => {
