@@ -26,10 +26,8 @@ import {
   PAYMENT_PROVIDER_NOT_AVAILABLE,
   type ResolvedPaymentProvider,
 } from '@/lib/finance/payments/provider-registry'
-import {
-  assertProviderOnlineEligible,
-  recordPostPayoutProviderAdjustmentForEscrow,
-} from '@/lib/finance/commissions/provider-balance-service'
+import { assertProviderOnlineEligible } from '@/lib/finance/commissions/provider-balance-service'
+import { accountFinalProviderChargeback } from '@/lib/finance/payments/chargeback-accounting'
 
 export type PaymentStatus =
   | 'CREATED'
@@ -838,30 +836,20 @@ export async function processPaymentFailure(notification: PayHereNotification): 
 
       if (claimed.count !== 1) return
 
-      const chargebackEscrow = await tx.jobEscrow.findUnique({
-        where: { id: paymentIntent.escrowId },
-        select: { status: true },
+      await accountFinalProviderChargeback(tx, {
+        escrowId: paymentIntent.escrowId,
+        paymentIntentId: paymentIntent.id,
+        provider: 'PAYHERE',
+        sourceReference: notification.payment_id || notification.order_id,
+        amountMinor: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        reason: 'PayHere final chargeback reversed the captured payment',
+        createdBy: 'system:payhere-webhook',
+        metadata: {
+          statusCode: notification.status_code,
+          statusMessage: notification.status_message || null,
+        },
       })
-      if (chargebackEscrow?.status === 'RELEASED') {
-        await recordPostPayoutProviderAdjustmentForEscrow(tx, {
-          escrowId: paymentIntent.escrowId,
-          paymentIntentId: paymentIntent.id,
-          sourceProvider: 'PAYHERE',
-          sourceReference: notification.payment_id || notification.order_id,
-          adjustmentType: 'PAYMENT_CHARGEBACK',
-          reason: 'PayHere chargeback arrived after provider earnings were released',
-          createdBy: 'system:payhere-webhook',
-          metadata: {
-            statusCode: notification.status_code,
-            statusMessage: notification.status_message || null,
-          },
-        })
-      } else {
-        await tx.jobEscrow.updateMany({
-          where: { id: paymentIntent.escrowId, status: 'PROTECTED' },
-          data: { status: 'ON_HOLD' },
-        })
-      }
 
       await tx.marketplaceRiskEvent.create({
         data: {
