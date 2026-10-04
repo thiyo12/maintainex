@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
       documents: docs,
     })
   } catch (error) {
-    console.error('Get identity error:', error)
+    logger.error('Identity read failed unexpectedly', { err: error, route: '/api/mobile/v2/identity', method: 'GET' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -191,7 +192,7 @@ export async function POST(request: NextRequest) {
       highRiskIdentityMatch: result.claimAssessment?.highRisk || false,
     }, { status: 201 })
   } catch (error) {
-    console.error('Upload identity error:', error)
+    logger.error('Identity submission failed unexpectedly', { err: error, route: '/api/mobile/v2/identity', method: 'POST' })
     const message = error instanceof Error ? error.message : ''
 
     if (message === 'DOCUMENT_NUMBER_REQUIRED') {
