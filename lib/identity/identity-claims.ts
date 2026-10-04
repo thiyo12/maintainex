@@ -77,6 +77,7 @@ export async function recordStrongIdentityClaim(
             select: {
               currency: true,
               commissionDue: true,
+              adjustmentDue: true,
               status: true,
             },
           },
@@ -109,7 +110,9 @@ export async function recordStrongIdentityClaim(
   })
 
   const debtMatches = matches.filter(match =>
-    match.providerIdentity.financialAccounts.some(account => account.commissionDue > 0n)
+    match.providerIdentity.financialAccounts.some(
+      account => account.commissionDue > 0n || account.adjustmentDue > 0n
+    )
   )
   const closedWithBalance = matches.filter(
     match => match.providerIdentity.standingStatus === 'CLOSED_WITH_BALANCE'
@@ -127,10 +130,12 @@ export async function recordStrongIdentityClaim(
       financialLiabilityMatches: debtMatches.map(match => ({
         providerIdentityId: match.providerIdentityId,
         balances: match.providerIdentity.financialAccounts
-          .filter(account => account.commissionDue > 0n)
+          .filter(account => account.commissionDue > 0n || account.adjustmentDue > 0n)
           .map(account => ({
             currency: account.currency,
             commissionDueMinor: account.commissionDue.toString(),
+            adjustmentDueMinor: account.adjustmentDue.toString(),
+            totalLiabilityMinor: (account.commissionDue + account.adjustmentDue).toString(),
             status: account.status,
           })),
       })),
