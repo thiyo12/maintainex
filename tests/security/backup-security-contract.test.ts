@@ -42,6 +42,18 @@ describe('backup security contract', () => {
     expect(backup).toContain('openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000')
   })
 
+  it('keeps programmatic database backups shell-safe and private', () => {
+    const backupModule = source('lib/backup/index.ts')
+
+    expect(backupModule).toContain("spawn('pg_dump', [databaseUrl]")
+    expect(backupModule).not.toContain('execSync(')
+    expect(backupModule).not.toContain('pg_dump "${config.databaseUrl}"')
+    expect(backupModule).toContain('mode: 0o600')
+    expect(backupModule).toContain('chmodSync(config.backupDir, 0o700)')
+    expect(backupModule).toContain('fs.unlink(filepath)')
+    expect(backupModule).toContain("error: 'Database backup failed'")
+  })
+
   it('does not copy plaintext environment secret files into backup payloads', () => {
     const backup = source('backup.sh')
     expect(backup).not.toContain('cp "$BACKUP_DIR/envs/"')
