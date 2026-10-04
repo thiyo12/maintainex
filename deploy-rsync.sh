@@ -59,6 +59,26 @@ rsync -av --delete --partial --compress --compress-level=6 --timeout=60 --stats 
   --exclude='.next/' \
   --exclude='node_modules/' \
   --exclude='.git/' \
+  --exclude='.env' \
+  --exclude='.env.*' \
+  --exclude='.npmrc' \
+  --exclude='.netrc' \
+  --exclude='.pypirc' \
+  --exclude='secrets/' \
+  --exclude='credentials/' \
+  --exclude='id_rsa*' \
+  --exclude='id_ed25519*' \
+  --exclude='*.key' \
+  --exclude='*.p8' \
+  --exclude='*.p12' \
+  --exclude='*.pfx' \
+  --exclude='*.ppk' \
+  --exclude='backups/' \
+  --exclude='backup/' \
+  --exclude='envs/' \
+  --exclude='.terraform/' \
+  --exclude='*.tfstate' \
+  --exclude='*.tfstate.*' \
   --exclude='apps/' \
   --exclude='tests/' \
   --exclude='docs/' \
@@ -155,18 +175,28 @@ echo "Size:     $BACKUP_SIZE bytes"
 
 echo "=== 4/7 Record rollback image and build new immutable image ==="
 PREVIOUS_IMAGE=$("${SSH[@]}" "$VPS" "docker service inspect '$SERVICE' --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}'")
+PREVIOUS_RELEASE_SHA=$("${SSH[@]}" "$VPS" "docker service inspect '$SERVICE' --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}' | sed -n 's/^APP_RELEASE_SHA=//p' | head -1")
 echo "Rollback image: $PREVIOUS_IMAGE"
+echo "Previous release SHA: ${PREVIOUS_RELEASE_SHA:-unknown}"
+
+rollback_release() {
+  if [ -n "$PREVIOUS_RELEASE_SHA" ]; then
+    "${SSH[@]}" "$VPS" "docker service update --force --env-add APP_RELEASE_SHA='$PREVIOUS_RELEASE_SHA' --image '$PREVIOUS_IMAGE' '$SERVICE'" || true
+  else
+    "${SSH[@]}" "$VPS" "docker service update --force --env-rm APP_RELEASE_SHA --image '$PREVIOUS_IMAGE' '$SERVICE'" || true
+  fi
+}
 "${SSH[@]}" "$VPS" "cd '$REMOTE_STAGING' && docker build --pull -t '$RELEASE_IMAGE' ."
 
 echo
 echo "=== 5/7 Switch Swarm service to release image ==="
 set +e
-"${SSH[@]}" "$VPS" "docker service update --force --image '$RELEASE_IMAGE' '$SERVICE'"
+"${SSH[@]}" "$VPS" "docker service update --force --env-add APP_RELEASE_SHA='$RELEASE_SHA' --image '$RELEASE_IMAGE' '$SERVICE'"
 UPDATE_EXIT=$?
 set -e
 if [ "$UPDATE_EXIT" -ne 0 ]; then
   echo "ERROR: Swarm update failed. Rolling back application image." >&2
-  "${SSH[@]}" "$VPS" "docker service update --force --image '$PREVIOUS_IMAGE' '$SERVICE'" || true
+  rollback_release
   exit "$UPDATE_EXIT"
 fi
 
@@ -205,19 +235,20 @@ set -e
 
 if [ "$VERIFY_EXIT" -ne 0 ] || [ "$PUBLIC_EXIT" -ne 0 ]; then
   echo "ERROR: release health verification failed. Rolling back application image." >&2
-  "${SSH[@]}" "$VPS" "docker service update --force --image '$PREVIOUS_IMAGE' '$SERVICE'" || true
+  rollback_release
   echo "Database backup retained at: $BACKUP_PATH" >&2
   exit 1
 fi
 
 echo
-echo "=== 7/7 Verify migrations/readiness from the new container ==="
-"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' sh -s" <<'REMOTE'
+echo "=== 7/7 Verify migrations/readiness and release identity from the new container ==="
+"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' EXPECTED_RELEASE_SHA='$RELEASE_SHA' sh -s" <<'REMOTE'
 set -eu
 container=$(docker ps --filter "name=$SERVICE" --format '{{.ID}}' | head -1)
 test -n "$container"
 docker exec "$container" npx prisma migrate status
 docker exec "$container" sh -c 'test "$(id -u)" != "0"'
+test "$(docker exec "$container" sh -c 'printf %s "$APP_RELEASE_SHA"')" = "$EXPECTED_RELEASE_SHA"
 REMOTE
 
 echo
