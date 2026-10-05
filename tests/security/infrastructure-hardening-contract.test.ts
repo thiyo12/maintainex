@@ -162,6 +162,70 @@ describe('production infrastructure source hardening', () => {
     expect(starter).toContain('exec npm start')
   })
 
+  it('runs Prisma migrations with the migration credential, never the bare runtime URL', () => {
+    const starter = source('scripts/start-production.sh')
+
+    // The schema datasource reads only env("DATABASE_URL"), so the migration
+    // command must explicitly override it with DIRECT_URL for that command.
+    expect(starter).toContain('DATABASE_URL="$DIRECT_URL" npx prisma migrate deploy')
+
+    // No line may invoke migrate deploy with the ambient (runtime) DATABASE_URL.
+    const bareMigrateLines = starter
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line === 'npx prisma migrate deploy' || line.startsWith('npx prisma migrate deploy '))
+    expect(bareMigrateLines).toEqual([])
+
+    // Migration credential must be removed before bootstrap and app start.
+    const lines = starter.split('\n')
+    const unsetIndex = lines.findIndex(line => line.trim() === 'unset DIRECT_URL')
+    const bootstrapIndex = lines.findIndex(line => line.includes('bootstrap-payment-providers.cjs'))
+    const startIndex = lines.findIndex(line => line.includes('exec npm start'))
+    expect(unsetIndex).toBeGreaterThan(-1)
+    expect(bootstrapIndex).toBeGreaterThan(unsetIndex)
+    expect(startIndex).toBeGreaterThan(unsetIndex)
+  })
+
+  it('routes DIRECT_URL only to the migration command, never to bootstrap or app start', () => {
+    const { mkdtempSync, writeFileSync, readFileSync, chmodSync } = require('node:fs') as typeof import('node:fs')
+    const { tmpdir } = require('node:os') as typeof import('node:os')
+    const { execFileSync } = require('node:child_process') as typeof import('node:child_process')
+    const dir = mkdtempSync(`${tmpdir()}/startup-creds-`)
+    const shaFile = `${dir}/release-sha`
+    writeFileSync(shaFile, 'e280515e44d9ee15c35a3b35aa334d212f2a643d')
+
+    const stub = (name: string) =>
+      writeFileSync(
+        `${dir}/${name}`,
+        `#!/bin/sh\nprintf '%s|%s' "${name}" "DATABASE_URL=\${DATABASE_URL:-EMPTY} DIRECT_URL=\${DIRECT_URL:-EMPTY}" > "${dir}/${name}.env"\n`,
+      )
+    for (const name of ['npx', 'node', 'npm']) {
+      stub(name)
+      chmodSync(`${dir}/${name}`, 0o755)
+    }
+
+    execFileSync('sh', [resolve(process.cwd(), 'scripts/start-production.sh')], {
+      env: {
+        ...process.env,
+        PATH: `${dir}:${process.env.PATH}`,
+        RELEASE_SHA_FILE: shaFile,
+        DATABASE_URL: 'postgresql://app_runtime@db:5432/maintainex',
+        DIRECT_URL: 'postgresql://app_user@db:5432/maintainex',
+        APP_RELEASE_SHA: 'stale-ambient-value',
+      },
+      stdio: 'pipe',
+    })
+
+    const seen = (name: string) => readFileSync(`${dir}/${name}.env`, 'utf8')
+    // Migration ran with the migration credential.
+    expect(seen('npx')).toContain('DATABASE_URL=postgresql://app_user@db:5432/maintainex')
+    // Bootstrap and app start ran with the runtime credential and no DIRECT_URL.
+    expect(seen('node')).toContain('DATABASE_URL=postgresql://app_runtime@db:5432/maintainex')
+    expect(seen('node')).toContain('DIRECT_URL=EMPTY')
+    expect(seen('npm')).toContain('DATABASE_URL=postgresql://app_runtime@db:5432/maintainex')
+    expect(seen('npm')).toContain('DIRECT_URL=EMPTY')
+  })
+
   it('preflight rejects unsafe production test/payment modes without printing secrets', () => {
     const preflight = source('scripts/crm-v2-production-preflight.sh')
     const deploy = source('deploy-rsync.sh')

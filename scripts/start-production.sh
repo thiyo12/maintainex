@@ -22,7 +22,10 @@ if [ -z "${DIRECT_URL:-}" ]; then
   exit 1
 fi
 
-npx prisma migrate deploy
+# Prisma reads only env("DATABASE_URL"), so the migration credential must be
+# supplied through that exact variable for this command only. It is unset
+# immediately afterwards and never reaches the long-running application.
+DATABASE_URL="$DIRECT_URL" npx prisma migrate deploy
 
 unset DIRECT_URL
 
