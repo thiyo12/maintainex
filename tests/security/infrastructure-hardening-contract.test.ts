@@ -150,6 +150,7 @@ describe('production infrastructure source hardening', () => {
     expect(dockerfile).toContain('/app/.release-sha')
     expect(dockerfile).toContain('COPY --from=builder /app/.release-sha ./.release-sha')
     expect(dockerfile).toContain('COPY --from=builder /app/scripts/start-production.sh')
+    expect(dockerfile).toContain('COPY --from=builder /app/scripts/require-release-sha.sh')
     expect(dockerfile).toContain('CMD ["sh", "/app/scripts/start-production.sh"]')
     expect(dockerfile).not.toContain('CMD npx prisma migrate deploy && node scripts/bootstrap-payment-providers.cjs && npm start')
 

@@ -33,6 +33,7 @@ COPY --from=builder /app/next.config.js ./next.config.js
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/.release-sha ./.release-sha
 COPY --from=builder /app/scripts/start-production.sh ./scripts/start-production.sh
+COPY --from=builder /app/scripts/require-release-sha.sh ./scripts/require-release-sha.sh
 RUN chown -R appuser:appgroup /app && chmod +x /app/scripts/start-production.sh
 USER appuser
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
