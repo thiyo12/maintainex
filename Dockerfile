@@ -6,13 +6,16 @@ RUN npm ci --ignore-scripts
 
 FROM node:20-slim AS builder
 WORKDIR /app
-# Release provenance: Dokploy/build pipeline MUST pass --build-arg GIT_SHA=<full commit>.
-# The baked SHA becomes the container's release identity (see scripts/start-production.sh).
-ARG GIT_SHA=unknown
+# Release provenance (fail closed): the build pipeline MUST pass
+# --build-arg GIT_SHA=<full 40-char commit>. Anything else aborts the build,
+# so an image can never ship without a valid baked release identity
+# (see scripts/require-release-sha.sh and scripts/start-production.sh).
+ARG GIT_SHA
+RUN if ! printf '%s' "${GIT_SHA:-}" | grep -Eq '^[0-9a-f]{40}$'; then echo "ERROR: GIT_SHA build arg must be exactly 40 lowercase hex characters (full commit SHA)" >&2; exit 1; fi
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY --from=installer /app/node_modules ./node_modules
 COPY . .
-RUN printf '%s' "$GIT_SHA" | tr -d ' \t\r\n' > /app/.release-sha
+RUN printf '%s' "$GIT_SHA" > /app/.release-sha
 RUN npx prisma generate && mkdir -p public/uploads/services && chmod 755 public/uploads/services
 RUN npm run build
 

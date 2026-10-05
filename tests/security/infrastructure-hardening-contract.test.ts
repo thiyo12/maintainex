@@ -70,19 +70,92 @@ describe('production infrastructure source hardening', () => {
     expect(health).not.toContain('company-marketplace-qa-20260924')
   })
 
+  it('rejects Docker builds without exactly 40 lowercase hex GIT_SHA characters', () => {
+    const dockerfile = source('Dockerfile')
+
+    expect(dockerfile).not.toContain('ARG GIT_SHA=unknown')
+    expect(dockerfile).toContain('ARG GIT_SHA')
+    expect(dockerfile).toContain("GIT_SHA build arg must be exactly 40 lowercase hex characters")
+    expect(dockerfile).toContain("grep -Eq '^[0-9a-f]{40}$'")
+  })
+
+  it('fails container startup closed when the baked release SHA is missing or malformed', () => {
+    const { mkdtempSync, writeFileSync } = require('node:fs') as typeof import('node:fs')
+    const { tmpdir } = require('node:os') as typeof import('node:os')
+    const dir = mkdtempSync(`${tmpdir()}/release-sha-`)
+    const gate = resolve(process.cwd(), 'scripts/require-release-sha.sh')
+
+    const runGate = (env: Record<string, string>) => {
+      try {
+        return {
+          ok: true as const,
+          output: execFileSync(
+            'sh',
+            ['-c', `set -e; . "${gate}"; printf '%s' "$APP_RELEASE_SHA"`],
+            { env: { ...process.env, ...env }, stdio: 'pipe', encoding: 'utf8' as const },
+          ).trim(),
+        }
+      } catch (error) {
+        return { ok: false as const, output: '' }
+      }
+    }
+
+    const missing = `${dir}/absent`
+    expect(runGate({ RELEASE_SHA_FILE: missing }).ok).toBe(false)
+
+    const shortFile = `${dir}/short`
+    writeFileSync(shortFile, 'abc123')
+    expect(runGate({ RELEASE_SHA_FILE: shortFile }).ok).toBe(false)
+
+    const upperFile = `${dir}/upper`
+    writeFileSync(upperFile, 'A'.repeat(40))
+    expect(runGate({ RELEASE_SHA_FILE: upperFile }).ok).toBe(false)
+
+    const valid = 'e280515e44d9ee15c35a3b35aa334d212f2a643d'
+    const validFile = `${dir}/valid`
+    writeFileSync(validFile, `${valid}\n`)
+    expect(runGate({ RELEASE_SHA_FILE: validFile })).toEqual({ ok: true, output: valid })
+  })
+
+  it('prefers the valid baked SHA over a stale ambient APP_RELEASE_SHA', () => {
+    const gate = resolve(process.cwd(), 'scripts/require-release-sha.sh')
+    const { mkdtempSync, writeFileSync } = require('node:fs') as typeof import('node:fs')
+    const { tmpdir } = require('node:os') as typeof import('node:os')
+    const valid = 'e280515e44d9ee15c35a3b35aa334d212f2a643d'
+    const file = `${mkdtempSync(`${tmpdir()}/release-sha-`)}/valid`
+    writeFileSync(file, valid)
+
+    const output = execFileSync(
+      'sh',
+      ['-c', `. "${gate}"; printf '%s' "$APP_RELEASE_SHA"`],
+      {
+        env: {
+          ...process.env,
+          RELEASE_SHA_FILE: file,
+          APP_RELEASE_SHA: '7c526b9401cc46b2c115006992e35735038719da',
+        },
+        stdio: 'pipe',
+        encoding: 'utf8' as const,
+      },
+    ).trim()
+
+    expect(output).toBe(valid)
+  })
+
   it('bakes the build SHA into the image so a stale ambient SHA cannot mislabel code', () => {
     const dockerfile = source('Dockerfile')
     const starter = source('scripts/start-production.sh')
 
-    expect(dockerfile).toContain('ARG GIT_SHA=unknown')
+    expect(dockerfile).not.toContain('ARG GIT_SHA=unknown')
     expect(dockerfile).toContain('/app/.release-sha')
     expect(dockerfile).toContain('COPY --from=builder /app/.release-sha ./.release-sha')
     expect(dockerfile).toContain('COPY --from=builder /app/scripts/start-production.sh')
     expect(dockerfile).toContain('CMD ["sh", "/app/scripts/start-production.sh"]')
     expect(dockerfile).not.toContain('CMD npx prisma migrate deploy && node scripts/bootstrap-payment-providers.cjs && npm start')
 
-    expect(starter).toContain('/app/.release-sha')
-    expect(starter).toContain('APP_RELEASE_SHA="$BAKED_SHA"')
+    expect(starter).toContain('require-release-sha.sh')
+    expect(starter).toContain('DIRECT_URL')
+    expect(starter).toContain('unset DIRECT_URL')
     expect(starter).toContain('npx prisma migrate deploy')
     expect(starter).toContain('bootstrap-payment-providers.cjs')
     expect(starter).toContain('exec npm start')

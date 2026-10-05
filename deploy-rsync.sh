@@ -311,7 +311,7 @@ rollback_release() {
   fi
 }
 
-"${SSH[@]}" "$VPS" "cd '$REMOTE_STAGING' && docker build --pull -t '$RELEASE_IMAGE' ."
+"${SSH[@]}" "$VPS" "cd '$REMOTE_STAGING' && docker build --pull --build-arg GIT_SHA='$RELEASE_SHA' -t '$RELEASE_IMAGE' ."
 
 echo
 echo "=== 5/7 Switch Swarm service to release image ==="

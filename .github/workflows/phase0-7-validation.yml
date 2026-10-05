@@ -390,6 +390,7 @@ jobs:
       - name: Docker build
         run: |
           docker build \
+            --build-arg GIT_SHA=${GITHUB_SHA} \
             -t maintainex:phase9-ci-${GITHUB_SHA} \
             .
         if: always()
@@ -401,6 +402,7 @@ jobs:
             --add-host=host.docker.internal:host-gateway \
             -p 3199:3000 \
             -e DATABASE_URL="postgresql://maintainex:maintainex_ci@host.docker.internal:5432/maintainex_test_phase07_ci" \
+            -e DIRECT_URL="postgresql://maintainex:maintainex_ci@host.docker.internal:5432/maintainex_test_phase07_ci" \
             -e NEXTAUTH_URL="http://localhost:3199" \
             -e NEXTAUTH_SECRET="phase07-ci-nextauth-secret-0123456789" \
             -e MARKETPLACE_JWT_SECRET="phase07-ci-marketplace-jwt-secret-01234567890123456789" \
