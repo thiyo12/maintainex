@@ -209,8 +209,8 @@ describe('production infrastructure source hardening', () => {
         ...process.env,
         PATH: `${dir}:${process.env.PATH}`,
         RELEASE_SHA_FILE: shaFile,
-        DATABASE_URL: 'postgresql://app_runtime@db:5432/maintainex',
-        DIRECT_URL: 'postgresql://app_user@db:5432/maintainex',
+        DATABASE_URL: 'postgresql://app_runtime@test-db:5432/maintainex',
+        DIRECT_URL: 'postgresql://app_user@test-db:5432/maintainex',
         APP_RELEASE_SHA: 'stale-ambient-value',
       },
       stdio: 'pipe',
@@ -218,11 +218,11 @@ describe('production infrastructure source hardening', () => {
 
     const seen = (name: string) => readFileSync(`${dir}/${name}.env`, 'utf8')
     // Migration ran with the migration credential.
-    expect(seen('npx')).toContain('DATABASE_URL=postgresql://app_user@db:5432/maintainex')
+    expect(seen('npx')).toContain('DATABASE_URL=postgresql://app_user@test-db:5432/maintainex')
     // Bootstrap and app start ran with the runtime credential and no DIRECT_URL.
-    expect(seen('node')).toContain('DATABASE_URL=postgresql://app_runtime@db:5432/maintainex')
+    expect(seen('node')).toContain('DATABASE_URL=postgresql://app_runtime@test-db:5432/maintainex')
     expect(seen('node')).toContain('DIRECT_URL=EMPTY')
-    expect(seen('npm')).toContain('DATABASE_URL=postgresql://app_runtime@db:5432/maintainex')
+    expect(seen('npm')).toContain('DATABASE_URL=postgresql://app_runtime@test-db:5432/maintainex')
     expect(seen('npm')).toContain('DIRECT_URL=EMPTY')
   })
 
