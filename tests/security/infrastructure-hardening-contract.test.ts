@@ -239,6 +239,8 @@ describe('production infrastructure source hardening', () => {
     }
     expect(preflight).toContain('APP_RELEASE_SHA')
     expect(preflight).toContain('release SHA does not match immutable image tag')
+    expect(preflight).toContain('/app/.release-sha')
+    expect(preflight).toContain('service APP_RELEASE_SHA does not match baked image SHA')
   })
 
   it('keeps operations runbooks on private backups and immutable releases', () => {

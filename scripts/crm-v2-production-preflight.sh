@@ -145,6 +145,17 @@ else
       ;;
   esac
 fi
+baked_sha=$(docker exec "$container" cat /app/.release-sha 2>/dev/null | tr -d ' \t\r\n' || true)
+if [ -n "$baked_sha" ]; then
+  if ! printf '%s' "$baked_sha" | grep -Eq '^[0-9a-f]{40}$'; then
+    echo "ERROR|baked release SHA is malformed"
+    exit 1
+  fi
+  if [ "$release_sha" != "$baked_sha" ]; then
+    echo "ERROR|service APP_RELEASE_SHA does not match baked image SHA"
+    exit 1
+  fi
+fi
 echo "IMAGE|$image"
 echo "RELEASE|$release_sha"
 echo "HEALTH|$health"
