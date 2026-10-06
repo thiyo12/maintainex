@@ -1,126 +1,105 @@
 import { useState } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
-} from 'react-native'
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native'
+import { CaretRight } from 'phosphor-react-native'
 import { useRouter } from 'expo-router'
-import { EnvelopeSimple, ArrowRight, CaretLeft } from 'phosphor-react-native'
+
 import { auth } from '@/api/auth'
-import { useColors } from '@/lib/ThemeContext'
-import { useTranslation } from 'react-i18next'
-import { fonts } from '@/lib/fonts'
-import { fontSizes } from '@/lib/tokens'
-import { spacing, borderRadius } from '@/lib/tokens'
+import { v3 } from '@/theme/v3/tokens'
+import AuthShell from '@/components/v3/AuthShell'
+import V3NavBar from '@/components/v3/V3NavBar'
+import V3Button from '@/components/v3/V3Button'
 
 export default function ForgotPasswordScreen() {
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const { t } = useTranslation()
-
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
 
   const handleSend = async () => {
-    if (!email.trim()) {
-      Alert.alert(t('common.error'), t('errors.fillAllFields'))
+    const normalized = email.trim().toLowerCase()
+    if (!normalized || !normalized.includes('@')) {
+      Alert.alert('Check your email', 'Enter the email address on your MaintainEX account.')
       return
     }
 
     setLoading(true)
     try {
-      await auth.forgotPassword({ email: email.trim().toLowerCase() })
-      setSent(true)
+      await auth.forgotPassword({ email: normalized })
+      router.push({
+        pathname: '/(auth)/otp',
+        params: {
+          purpose: 'reset',
+          email: normalized,
+          maskedPhone: normalized.replace(/^(.{2}).*(@.*)$/, '$1••••$2'),
+        },
+      } as any)
     } catch (err: any) {
-      Alert.alert(t('common.error'), err.message || t('errors.generic'))
+      let message = err?.message || 'Could not send a reset code.'
+      try { message = JSON.parse(message).error || message } catch {}
+      Alert.alert('Unable to continue', message)
     } finally {
       setLoading(false)
     }
   }
 
-  if (sent) {
-    return (
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={styles.centerContent}>
-          <Text style={[styles.title, { color: colors.ink }]}>{t('auth.forgotPassword.checkEmail')}</Text>
-          <Text style={[styles.subtitle, { color: colors.inkLight }]}>
-            {t('auth.forgotPassword.codeSentTo')} {email}
-          </Text>
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary }]}
-            onPress={() => router.push({ pathname: '/(auth)/reset-password', params: { email } })}
-          >
-            <Text style={styles.buttonText}>{t('auth.forgotPassword.enterCode')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSent(false)} style={styles.linkButton}>
-            <Text style={[styles.linkText, { color: colors.primary }]}>{t('auth.forgotPassword.tryDifferentEmail')}</Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    )
-  }
-
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <CaretLeft size={20} color={colors.ink} weight="bold" />
-      </TouchableOpacity>
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <AuthShell bg={v3.colors.canvas}>
+        <V3NavBar title="Reset access" onBack={() => router.back()} />
 
-      <Text style={[styles.title, { color: colors.ink }]}>{t('auth.forgotPassword.title')}</Text>
-      <Text style={[styles.subtitle, { color: colors.inkLight }]}>
-        {t('auth.forgotPassword.description')}
-      </Text>
+        <View style={styles.content}>
+          <Text style={styles.title}>Forgot your password?</Text>
+          <Text style={styles.subtitle}>Enter the email address on your MaintainEX account.</Text>
 
-      <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <EnvelopeSimple size={18} color={colors.muted} weight="regular" style={styles.inputIcon} />
-        <TextInput
-          style={[styles.input, { color: colors.ink }]}
-          value={email}
-          onChangeText={setEmail}
-          placeholder={t('auth.register.emailPlaceholder')}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          placeholderTextColor={colors.muted}
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: colors.primary }, (!email || loading) && { opacity: 0.5 }]}
-        onPress={handleSend}
-        disabled={!email || loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <View style={styles.buttonInner}>
-            <Text style={styles.buttonText}>{t('auth.forgotPassword.sendCode')}</Text>
-            <ArrowRight size={18} color="#FFFFFF" weight="bold" />
+          <View style={styles.row}>
+            <View style={styles.number}><Text style={styles.numberText}>1</Text></View>
+            <View style={styles.rowCopy}>
+              <Text style={styles.rowTitle}>Account email</Text>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="name@example.com"
+                placeholderTextColor={v3.colors.textMuted}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
+                style={styles.input}
+              />
+            </View>
+            <CaretRight size={16} color={v3.colors.ink} />
           </View>
-        )}
-      </TouchableOpacity>
+
+          <View style={styles.row}>
+            <View style={styles.number}><Text style={styles.numberText}>2</Text></View>
+            <View style={styles.rowCopy}>
+              <Text style={styles.rowTitle}>Verification</Text>
+              <Text style={styles.rowSubtitle}>We will send a one-time reset code</Text>
+            </View>
+            <CaretRight size={16} color={v3.colors.ink} />
+          </View>
+
+          <Text style={styles.backendNote}>Password reset currently uses the verified account email.</Text>
+
+          <View style={styles.bottom}>
+            <V3Button label="Send verification code" onPress={handleSend} loading={loading} disabled={!email.trim()} />
+          </View>
+        </View>
+      </AuthShell>
     </KeyboardAvoidingView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, padding: spacing.xxxl, paddingTop: 60 },
-  backButton: { marginBottom: spacing.xxxl, width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  title: { fontSize: fontSizes.h1, fontFamily: fonts.headingBold, marginBottom: spacing.sm },
-  subtitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body, marginBottom: spacing.xxxxl, lineHeight: 24 },
-  centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: borderRadius.md, borderWidth: 1.5, marginBottom: spacing.xl, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  inputIcon: { paddingLeft: 16 },
-  input: { flex: 1, padding: 15, fontSize: fontSizes.body, fontFamily: fonts.body },
-  button: { paddingVertical: spacing.lg, borderRadius: borderRadius.lg, alignItems: 'center' },
-  buttonInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  buttonText: { fontSize: fontSizes.h3, fontFamily: fonts.button, color: '#FFFFFF' },
-  linkButton: { marginTop: spacing.lg },
-  linkText: { fontSize: fontSizes.bodySmall, fontFamily: fonts.label },
+const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: v3.colors.canvas },
+  content: { flex: 1, paddingHorizontal: 18, paddingTop: 8 },
+  title: { fontSize: 25, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  subtitle: { marginTop: 8, marginBottom: 20, fontSize: 10.2, lineHeight: 15, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  row: { minHeight: 66, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, marginBottom: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  number: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
+  numberText: { fontSize: 10, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  rowCopy: { flex: 1 },
+  rowTitle: { fontSize: 11.2, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  rowSubtitle: { marginTop: 3, fontSize: 8.8, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  input: { marginTop: 1, paddingVertical: 1, fontSize: 9.5, fontFamily: 'Outfit_600SemiBold', color: v3.colors.ink },
+  backendNote: { marginTop: 4, fontSize: 8.7, lineHeight: 13, fontFamily: 'Outfit_500Medium', color: v3.colors.textMuted },
+  bottom: { flex: 1, justifyContent: 'flex-end', paddingBottom: 16 },
 })

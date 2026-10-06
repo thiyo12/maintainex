@@ -1,26 +1,33 @@
 import { Stack } from 'expo-router'
-import { useTranslation } from 'react-i18next'
-import { useColors } from '../../lib/ThemeContext'
+import { v3 } from '../../theme/v3/tokens'
 
 export default function TaskerLayout() {
-  const colors = useColors()
-  const { t } = useTranslation()
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.cream },
+        contentStyle: { backgroundColor: v3.colors.canvas },
+        animation: 'slide_from_right',
       }}
     >
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="readiness" options={{ headerShown: true, headerTitle: t('readiness.title'), headerBackTitle: t('common.back'), headerTintColor: colors.amberDark, headerStyle: { backgroundColor: colors.white } }} />
-      <Stack.Screen name="settings/edit-profile" options={{ headerShown: true, headerTitle: t('tasker.editProfile'), headerBackTitle: t('common.back'), headerTintColor: colors.amberDark, headerStyle: { backgroundColor: colors.white } }} />
-      <Stack.Screen name="settings/service-area" options={{ headerShown: true, headerTitle: t('serviceArea.title'), headerBackTitle: t('common.back'), headerTintColor: colors.amberDark, headerStyle: { backgroundColor: colors.white } }} />
-      <Stack.Screen name="settings/availability" options={{ headerShown: true, headerTitle: t('availabilitySettings.title'), headerBackTitle: t('common.back'), headerTintColor: colors.amberDark, headerStyle: { backgroundColor: colors.white } }} />
-      <Stack.Screen name="jobs/v2/browse" options={{ headerShown: true, headerTitle: t('tasker.browse'), headerBackTitle: t('common.back'), headerTintColor: colors.amberDark, headerStyle: { backgroundColor: colors.white } }} />
-      <Stack.Screen name="jobs/v2/quote/[id]" options={{ headerShown: true, headerTitle: t('tasker.submitQuote'), headerBackTitle: t('common.back'), headerTintColor: colors.amberDark, headerStyle: { backgroundColor: colors.white } }} />
-      <Stack.Screen name="jobs/v2/my-jobs" options={{ headerShown: true, headerTitle: t('tasker.myJobs'), headerBackTitle: t('common.back'), headerTintColor: colors.amberDark, headerStyle: { backgroundColor: colors.white } }} />
-      <Stack.Screen name="jobs/v2/manage/[id]" options={{ headerShown: true, headerTitle: t('tasker.manage'), headerBackTitle: t('common.back'), headerTintColor: colors.amberDark, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="readiness" />
+      <Stack.Screen name="identity" />
+      <Stack.Screen name="settings/edit-profile" />
+      <Stack.Screen name="settings/job-selection" />
+      <Stack.Screen name="settings/service-area" />
+      <Stack.Screen name="settings/availability" />
+      <Stack.Screen name="wallet/withdraw" />
+      <Stack.Screen name="jobs/v2/browse" />
+      <Stack.Screen name="jobs/v2/quote/[id]" />
+      <Stack.Screen name="jobs/v2/my-jobs" />
+      <Stack.Screen name="jobs/v2/manage/[id]" />
+      <Stack.Screen name="jobs/v2/manage/[id]/verify-pin" />
+      <Stack.Screen name="jobs/v2/manage/[id]/evidence" />
+      <Stack.Screen name="jobs/v2/manage/[id]/inspection" />
+      <Stack.Screen name="jobs/v2/manage/[id]/change-order" />
+      <Stack.Screen name="jobs/v2/manage/[id]/cancel" />
+      <Stack.Screen name="company-assignments" />
     </Stack>
   )
 }

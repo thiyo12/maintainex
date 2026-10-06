@@ -87,14 +87,6 @@ export default function CustomerWalletScreen() {
               <Ionicons name="add-circle-outline" size={16} color="#111827" />
               <Text style={styles.addTxt}>Add Money</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.withdrawBtn]}
-              onPress={() => router.push('/(tasker)/wallet/withdraw' as any)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="arrow-up-circle-outline" size={16} color="#FFFFFF" />
-              <Text style={styles.withdrawTxt}>Withdraw</Text>
-            </TouchableOpacity>
           </View>
         </Animated.View>
 
