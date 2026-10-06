@@ -22,10 +22,12 @@ interface EarningsTransaction {
   amount: number
   date: string
   status: string
+  direction?: 'DEBIT' | 'CREDIT'
   createdAt?: string
 }
 
 interface EarningsData {
+  currency?: string
   balance?: number
   availableBalance?: number
   totalEarned?: number
@@ -77,6 +79,7 @@ export default function TaskerEarnings() {
 
   const transactions = data?.transactions || []
   const availableBalance = Number(data?.balance ?? data?.availableBalance ?? 0)
+  const displayCurrency = data?.currency || 'LKR'
 
   const weekly = useMemo(() => {
     const now = new Date()
@@ -93,7 +96,7 @@ export default function TaskerEarnings() {
 
     if (inWeek.length > 0) {
       return {
-        amount: inWeek.reduce((sum, tx) => sum + Number(tx.amount || 0), 0),
+        amount: inWeek.reduce((sum, tx) => sum + (tx.direction === 'DEBIT' ? -Number(tx.amount || 0) : Number(tx.amount || 0)), 0),
         count: inWeek.length,
       }
     }
@@ -130,7 +133,7 @@ export default function TaskerEarnings() {
         >
           <View style={styles.balanceRow}>
             <View style={styles.balanceCopy}>
-              <Text style={styles.balanceValue}>LKR {availableBalance.toLocaleString()}</Text>
+              <Text style={styles.balanceValue}>{displayCurrency} {availableBalance.toLocaleString()}</Text>
               <Text style={styles.balanceLabel}>Available balance</Text>
             </View>
             <TouchableOpacity
@@ -144,7 +147,7 @@ export default function TaskerEarnings() {
 
           <View style={styles.weekCard}>
             <Text style={styles.weekLabel}>THIS WEEK</Text>
-            <Text style={styles.weekValue}>LKR {weekly.amount.toLocaleString()}</Text>
+            <Text style={styles.weekValue}>{displayCurrency} {weekly.amount.toLocaleString()}</Text>
             <Text style={styles.weekMeta}>{weekly.count} {weekly.count === 1 ? 'job' : 'jobs'} · current week</Text>
           </View>
 
@@ -163,7 +166,7 @@ export default function TaskerEarnings() {
                     <Text style={styles.txTitle} numberOfLines={1}>{tx.job || 'MaintainEX job'}</Text>
                     <Text style={styles.txDate}>{relativeLabel(tx)}</Text>
                   </View>
-                  <Text style={styles.txAmount}>+ LKR {Number(tx.amount || 0).toLocaleString()}</Text>
+                  <Text style={styles.txAmount}>{tx.direction === 'DEBIT' ? '-' : '+'} {displayCurrency} {Number(tx.amount || 0).toLocaleString()}</Text>
                 </View>
               ))}
             </View>
@@ -178,7 +181,7 @@ export default function TaskerEarnings() {
                     <Text style={styles.txTitle}>{payment.referenceNumber}</Text>
                     <Text style={styles.txDate}>Payment reference · {payment.method}</Text>
                   </View>
-                  <Text style={styles.commissionAmount}>LKR {Number(payment.amountDue || 0).toLocaleString()}</Text>
+                  <Text style={styles.commissionAmount}>{displayCurrency} {Number(payment.amountDue || 0).toLocaleString()}</Text>
                 </View>
               ))}
             </View>
