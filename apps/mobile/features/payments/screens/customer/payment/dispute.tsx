@@ -33,7 +33,10 @@ export default function DisputeScreen() {
     }
     setLoading(true)
     try {
-      await v2JobActions.complete(bookingId!, 'DISPUTE')
+      await v2JobActions.dispute(
+        bookingId!,
+        `${reason}: ${description.trim()}`,
+      )
       Alert.alert(
         'Dispute Raised',
         'Our team will review your dispute within 3 business days. The payment is frozen until resolved.',

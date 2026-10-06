@@ -128,13 +128,13 @@ export default function CompanySetupOnboarding() {
       const token = await getAuthToken()
 
       const profileRes = await fetch(`${API_URL}/api/mobile/company/profile`, {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           companyName,
           registrationNo: registrationNo || undefined,
           description: description || undefined,
-          serviceJobIds: Array.from(selectedIds),
+          services: Array.from(selectedIds),
           serviceAreas: [],
         }),
       })

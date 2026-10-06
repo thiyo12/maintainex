@@ -7,8 +7,8 @@ import StarRating from '@/components/ui/StarRating'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { useTranslation } from 'react-i18next'
-import { jobs } from '@/api/jobs'
-import { JobPosting } from '@/lib/types'
+import { v2JobActions, v2Jobs } from '@/api/v2-jobs'
+import type { V2Job } from '@/api/v2-types'
 
 export default function ReviewScreen() {
   const { t } = useTranslation()
@@ -16,12 +16,15 @@ export default function ReviewScreen() {
   const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams()
-  const [job, setJob] = useState<JobPosting | null>(null)
+  const [job, setJob] = useState<V2Job | null>(null)
+  const [alreadyReviewed, setAlreadyReviewed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [axisRatings, setAxisRatings] = useState<Record<string, number>>({})
   const slideAnim = useRef(new Animated.Value(0)).current
   const charCount = comment.length
 
@@ -32,23 +35,54 @@ export default function ReviewScreen() {
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    jobs.get(id as string)
-      .then(setJob)
+    v2Jobs.get(id as string)
+      .then((res) => {
+        setJob(res.job)
+        setAlreadyReviewed((res.job.reviews?.customerReviews || []).length > 0)
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [id])
 
-  const handleSubmit = () => {
+  // Backend review axes: quality, timeliness, communication. The overall
+  // rating acts as the fallback for any axis the customer leaves unset.
+  const axisForCategory = (cat: string): 'quality' | 'timeliness' | 'communication' | null => {
+    if (cat === t('receipt.rateQuality')) return 'quality'
+    if (cat === t('receipt.ratePunctuality')) return 'timeliness'
+    if (cat === t('receipt.rateCommunication')) return 'communication'
+    return null
+  }
+
+  const handleSubmit = async () => {
     if (rating === 0) {
       Alert.alert(t('common.error'), t('errors.ratingRequired'))
       return
     }
-    setSubmitted(true)
+    if (typeof id !== 'string') return
+    setSubmitting(true)
+    try {
+      await v2JobActions.createReview(id, {
+        reviewType: 'CUSTOMER_REVIEWS_PROVIDER',
+        quality: axisRatings[t('receipt.rateQuality')] ?? rating,
+        communication: axisRatings[t('receipt.rateCommunication')] ?? rating,
+        timeliness: axisRatings[t('receipt.ratePunctuality')] ?? rating,
+        comment: comment.trim(),
+      })
+      setSubmitted(true)
+    } catch (e: any) {
+      if ((e?.message || '').toLowerCase().includes('already reviewed')) {
+        setSubmitted(true)
+      } else {
+        Alert.alert(t('common.error'), e?.message || 'Could not submit your review.')
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const categories = [t('receipt.rateQuality'), t('receipt.ratePunctuality'), t('receipt.rateCommunication'), t('receipt.rateValue')]
 
-  const taskerName = job?.assignedTasker?.user?.name || t('customer.tasker')
+  const taskerName = job?.acceptedQuote?.provider?.name || t('customer.tasker')
   const avatarLetter = taskerName.charAt(0)
 
   if (loading) {
@@ -69,7 +103,7 @@ export default function ReviewScreen() {
     )
   }
 
-  if (submitted) {
+  if (submitted || alreadyReviewed) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.successContainer}>
@@ -116,7 +150,12 @@ export default function ReviewScreen() {
           {categories.map((cat) => (
             <View key={cat} style={styles.catRow}>
               <Text style={styles.catLabel}>{cat}</Text>
-              <StarRating stars={0} size={24} readonly={false} />
+              <StarRating
+                stars={axisRatings[cat] ?? 0}
+                size={24}
+                readonly={false}
+                onRate={(value: number) => setAxisRatings(prev => ({ ...prev, [cat]: value }))}
+              />
             </View>
           ))}
         </View>
@@ -145,9 +184,9 @@ export default function ReviewScreen() {
         </View>
       </ScrollView>
 
-      <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-        <Text style={styles.submitBtnText}>{t('receipt.submitReview')}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={[styles.submitBtn, submitting && { opacity: 0.6 }]} onPress={handleSubmit} disabled={submitting}>
+          <Text style={styles.submitBtnText}>{t('receipt.submitReview')}</Text>
+        </TouchableOpacity>
     </SafeAreaView>
   )
 }

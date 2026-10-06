@@ -5,6 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { CaretRight } from 'phosphor-react-native'
 import { taskers } from '@/api/taskers'
 import { earnings } from '@/api/payments'
+import { conversations } from '@/api/messaging'
+import { notifications } from '@/api/notifications'
 import { v2Identity } from '@/api/v2-identity'
 import { useAuth } from '@/features/auth/context/auth'
 import { fonts } from '@/lib/fonts'
@@ -16,15 +18,21 @@ type ProfileRowProps = {
   title: string
   subtitle: string
   onPress?: () => void
+  badgeCount?: number
 }
 
-function ProfileRow({ title, subtitle, onPress }: ProfileRowProps) {
+function ProfileRow({ title, subtitle, onPress, badgeCount }: ProfileRowProps) {
   const body = (
     <>
       <View style={styles.rowCopy}>
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowSubtitle} numberOfLines={1}>{subtitle}</Text>
       </View>
+      {badgeCount != null && badgeCount > 0 ? (
+        <View style={styles.countBadge}>
+          <Text style={styles.countBadgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+        </View>
+      ) : null}
       <CaretRight size={16} color={v3.colors.textSecondary} weight="bold" />
     </>
   )
@@ -45,6 +53,8 @@ export default function TaskerProfile() {
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [identityStatus, setIdentityStatus] = useState('NOT_SUBMITTED')
   const [balance, setBalance] = useState(0)
+  const [unreadMsgs, setUnreadMsgs] = useState(0)
+  const [unreadNotifs, setUnreadNotifs] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -71,6 +81,24 @@ export default function TaskerProfile() {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null
+    const loadCounts = async () => {
+      try {
+        const [convos, notifs] = await Promise.all([
+          conversations.list(),
+          notifications.list(),
+        ])
+        const msgs = (convos || []).reduce((n: number, c: any) => n + (c.unreadCount || 0), 0)
+        setUnreadMsgs(msgs)
+        setUnreadNotifs((notifs || []).filter((n: any) => !n.read).length)
+      } catch {}
+    }
+    loadCounts()
+    interval = setInterval(loadCounts, 30000)
+    return () => { if (interval) clearInterval(interval) }
+  }, [])
 
   const handleLogout = () => {
     Alert.alert('Log out', 'Do you want to log out of MaintainEX?', [
@@ -213,8 +241,8 @@ export default function TaskerProfile() {
           <Text style={styles.accountLabel}>Account</Text>
           <ProfileRow title="Edit tasker profile" subtitle="Personal details, bio and profile media" onPress={() => router.push('/(tasker)/settings/edit-profile' as any)} />
           <ProfileRow title="Switch profile" subtitle="Customer, Individual or Company workspace" onPress={() => router.push('/(auth)/role-switch' as any)} />
-          <ProfileRow title="Messages" subtitle="Customer and job conversations" onPress={() => router.push('/(chat)' as any)} />
-          <ProfileRow title="Notifications" subtitle="Job alerts and account updates" onPress={() => router.push('/notifications' as any)} />
+          <ProfileRow title="Messages" subtitle="Customer and job conversations" badgeCount={unreadMsgs} onPress={() => router.push('/(chat)' as any)} />
+          <ProfileRow title="Notifications" subtitle="Job alerts and account updates" badgeCount={unreadNotifs} onPress={() => router.push('/notifications' as any)} />
           <TouchableOpacity style={styles.logoutRow} activeOpacity={0.72} onPress={handleLogout}>
             <Text style={styles.logoutText}>Log out</Text>
           </TouchableOpacity>
@@ -226,6 +254,8 @@ export default function TaskerProfile() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: v3.colors.canvas },
+  countBadge: { minWidth: 22, height: 22, borderRadius: 11, backgroundColor: v3.colors.error, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, marginLeft: 8 },
+  countBadgeText: { fontSize: 11, fontFamily: fonts.headingBold, color: '#FFFFFF' },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: {
     paddingHorizontal: 18,

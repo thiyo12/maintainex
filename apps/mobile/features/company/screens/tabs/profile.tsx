@@ -6,6 +6,7 @@ import {
   Bell,
   Briefcase,
   CaretRight,
+  ChatCircleDots,
   Check,
   CreditCard,
   IdentificationCard,
@@ -16,6 +17,7 @@ import {
   Wrench,
 } from 'phosphor-react-native'
 import { company } from '@/api/companies'
+import { conversations } from '@/api/messaging'
 import { notifications } from '@/api/notifications'
 import { v2Identity } from '@/api/v2-identity'
 import { v3 } from '@/theme/v3/tokens'
@@ -25,23 +27,42 @@ export default function CompanyProfile() {
   const [profile, setProfile] = useState<any>(null)
   const [identityStatus, setIdentityStatus] = useState('NOT_SUBMITTED')
   const [unread, setUnread] = useState(0)
+  const [unreadMsgs, setUnreadMsgs] = useState(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
   const load = useCallback(async () => {
-    const [profileRes, identityRes, unreadRes] = await Promise.allSettled([
+    const [profileRes, identityRes, unreadRes, convosRes] = await Promise.allSettled([
       company.profile.get(),
       v2Identity.getStatus(),
       notifications.unreadCount(),
+      conversations.list(),
     ])
     if (profileRes.status === 'fulfilled') setProfile(profileRes.value)
     if (identityRes.status === 'fulfilled') setIdentityStatus((identityRes.value as any)?.identityStatus || 'NOT_SUBMITTED')
     if (unreadRes.status === 'fulfilled') setUnread(Number((unreadRes.value as any)?.count || 0))
+    if (convosRes.status === 'fulfilled') setUnreadMsgs(((convosRes.value as any[]) || []).reduce((n: number, c: any) => n + (c.unreadCount || 0), 0))
     setLoading(false)
     setRefreshing(false)
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null
+    const refreshUnread = async () => {
+      try {
+        const [notifsRes, convosRes] = await Promise.all([
+          notifications.unreadCount().catch(() => null),
+          conversations.list().catch(() => null),
+        ])
+        if (notifsRes) setUnread(Number((notifsRes as any)?.count || 0))
+        if (convosRes) setUnreadMsgs(((convosRes as any[]) || []).reduce((n: number, c: any) => n + (c.unreadCount || 0), 0))
+      } catch {}
+    }
+    interval = setInterval(refreshUnread, 30000)
+    return () => { if (interval) clearInterval(interval) }
+  }, [])
 
   const checklist = useMemo(() => [
     { label: 'Business details', done: Boolean(profile?.companyName && profile?.description) },
@@ -114,6 +135,7 @@ export default function CompanyProfile() {
         <Text style={styles.sectionTitle}>Operations</Text>
         <Section>
           <Row icon={<Briefcase size={18} color={v3.colors.ink} />} title="Jobs & quotes" subtitle="Browse requests, quotes and accepted work" onPress={() => router.push('/(company)/jobs/v2/browse' as any)} />
+          <Row icon={<ChatCircleDots size={18} color={v3.colors.ink} />} title="Messages" subtitle="Customer and job conversations" badgeCount={unreadMsgs} onPress={() => router.push('/(chat)' as any)} />
           <Row icon={<UsersThree size={18} color={v3.colors.ink} />} title="Team" subtitle={`${profile?.teamMembers?.length || 0} team members`} onPress={() => router.push('/(company)/(tabs)/team' as any)} />
           <Row icon={<IdentificationCard size={18} color={v3.colors.ink} />} title="Verification" subtitle={identityStatus === 'VERIFIED' || profile?.isVerified ? 'Verified' : 'Complete identity & business checks'} onPress={() => router.push('/(company)/identity' as any)} last />
         </Section>
@@ -132,11 +154,16 @@ export default function CompanyProfile() {
 function Section({ children }: { children: React.ReactNode }) {
   return <View style={styles.section}>{children}</View>
 }
-function Row({ icon, title, subtitle, onPress, last = false }: { icon: React.ReactNode; title: string; subtitle: string; onPress: () => void; last?: boolean }) {
+function Row({ icon, title, subtitle, onPress, last = false, badgeCount }: { icon: React.ReactNode; title: string; subtitle: string; onPress: () => void; last?: boolean; badgeCount?: number }) {
   return (
     <TouchableOpacity style={[styles.row, !last && styles.rowBorder]} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.rowIcon}>{icon}</View>
       <View style={styles.rowCopy}><Text style={styles.rowTitle}>{title}</Text><Text style={styles.rowSubtitle} numberOfLines={1}>{subtitle}</Text></View>
+      {badgeCount != null && badgeCount > 0 ? (
+        <View style={styles.countBadge}>
+          <Text style={styles.countBadgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+        </View>
+      ) : null}
       <CaretRight size={16} color={v3.colors.textMuted} weight="bold" />
     </TouchableOpacity>
   )
@@ -183,4 +210,6 @@ const styles = StyleSheet.create({
   rowCopy: { flex: 1, marginLeft: 11 },
   rowTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
   rowSubtitle: { ...v3.typography.caption, color: v3.colors.textMuted, marginTop: 2 },
+  countBadge: { minWidth: 22, height: 22, borderRadius: 11, backgroundColor: v3.colors.error, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, marginLeft: 8 },
+  countBadgeText: { ...v3.typography.caption, color: '#FFFFFF', fontWeight: '700' },
 })

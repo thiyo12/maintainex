@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router'
 import { Briefcase, CaretLeft, MagnifyingGlass } from 'phosphor-react-native'
 import { v2Jobs } from '@/api/v2-jobs'
 import type { V2Job } from '@/api/v2-types'
+import { getActiveCompanyId } from '@/api/companies'
 import { v3 } from '@/theme/v3/tokens'
 
 type Filter = 'all' | 'open' | 'active' | 'done'
@@ -26,7 +27,11 @@ export default function CompanyMyQuotesScreen() {
 
   const load = useCallback(async () => {
     try {
-      const response = await v2Jobs.list('myQuotes=true')
+      const companyId = await getActiveCompanyId()
+      const params = companyId
+        ? `myQuotes=true&context=company&companyId=${encodeURIComponent(companyId)}`
+        : 'myQuotes=true'
+      const response = await v2Jobs.list(params)
       setJobs(response.jobs || [])
     } catch {
       setJobs([])

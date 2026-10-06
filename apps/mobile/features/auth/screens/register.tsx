@@ -212,8 +212,8 @@ export default function RegisterScreen() {
     setOtpError('')
     try {
       const user = await verifyRegisterOtp(fullPhone, candidate, 'PHONE_VERIFICATION')
-      if (user?.role === 'TASKER') router.replace('/(tasker)' as any)
-      else if (user?.role === 'COMPANY') router.replace('/(company)' as any)
+      if (user?.role === 'TASKER') router.replace('/(auth)/onboarding/tasker-services' as any)
+      else if (user?.role === 'COMPANY') router.replace('/(auth)/onboarding/company-setup' as any)
       else router.replace('/(customer)' as any)
     } catch (err: any) {
       let message = err?.message || 'Invalid code'

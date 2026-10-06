@@ -51,7 +51,9 @@ export default function OtpScreen() {
     setOtpError('')
     try {
       const user = await otpLogin(phone, candidate)
-      if (user.role === 'TASKER') router.replace('/(tasker)' as any)
+      if (user.role === 'TASKER' && (user as any).needsOnboarding) router.replace('/(auth)/onboarding/tasker-services' as any)
+      else if (user.role === 'COMPANY' && (user as any).needsOnboarding) router.replace('/(auth)/onboarding/company-setup' as any)
+      else if (user.role === 'TASKER') router.replace('/(tasker)' as any)
       else if (user.role === 'COMPANY') router.replace('/(company)' as any)
       else router.replace('/(customer)' as any)
     } catch (err: any) {

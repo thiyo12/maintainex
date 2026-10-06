@@ -32,7 +32,7 @@ export default function CompanySubmitQuoteScreen() {
   useEffect(() => {
     ;(async () => {
       try {
-        const [jobRes, activeCompanyId] = await Promise.all([v2Jobs.get(id), getActiveCompanyId()])
+        const [jobRes, activeCompanyId] = await Promise.all([v2Jobs.get(id, 'company'), getActiveCompanyId()])
         setJob(jobRes.job)
         setCompanyId(activeCompanyId)
 

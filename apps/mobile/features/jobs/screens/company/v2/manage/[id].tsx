@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -32,18 +33,25 @@ export default function CompanyManageJobScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const [job, setJob] = useState<any>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
+  const [pinState, setPinState] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [chatVisible, setChatVisible] = useState(false)
+  const [reviewCoop, setReviewCoop] = useState('5')
+  const [reviewComm, setReviewComm] = useState('5')
+  const [reviewExp, setReviewExp] = useState('5')
+  const [reviewComment, setReviewComment] = useState('')
 
   const load = async () => {
     try {
-      const [jobRes, activeCompanyId] = await Promise.all([
-        v2Jobs.get(id),
+      const [jobRes, activeCompanyId, pinRes] = await Promise.all([
+        v2Jobs.get(id, 'company'),
         getActiveCompanyId(),
+        v2JobActions.getPinState(id).catch(() => ({ pinState: null })),
       ])
       setJob(jobRes.job)
       setCompanyId(activeCompanyId)
+      setPinState(pinRes.pinState)
     } catch (error: any) {
       Alert.alert('Unable to load job', error?.message || 'Please try again.')
     } finally {
@@ -69,7 +77,7 @@ export default function CompanyManageJobScreen() {
   )
 
   const accepted = myQuote?.status === 'ACCEPTED'
-  const protectedPayment = job?.escrow?.status === 'PROTECTED'
+  const protectedPayment = ['PROTECTED', 'CASH_CONFIRMED'].includes(job?.escrow?.status)
   const isReadyToTravel = accepted && protectedPayment && progress === 'ACCEPTED'
   const isInProgress = progress === 'IN_PROGRESS'
   const isWaitingCustomer = progress === 'COMPLETION_REQUESTED'
@@ -77,6 +85,30 @@ export default function CompanyManageJobScreen() {
   const canOtpCancel = accepted && progress === 'ACCEPTED' && ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job?.status)
   const customerName = job?.customer?.name || 'Customer'
   const customerInitial = customerName.charAt(0).toUpperCase() || 'C'
+
+  const handleSubmitReview = async () => {
+    const ratings = [reviewCoop, reviewComm, reviewExp].map((value) => Number.parseInt(value, 10))
+    if (ratings.some((value) => !Number.isInteger(value) || value < 1 || value > 5)) {
+      Alert.alert('Invalid rating', 'Ratings must be whole numbers from 1 to 5.')
+      return
+    }
+    setActionLoading('review')
+    try {
+      await v2JobActions.createReview(id, {
+        reviewType: 'PROVIDER_REVIEWS_CUSTOMER',
+        cooperation: ratings[0],
+        communication: ratings[1],
+        overallExperience: ratings[2],
+        comment: reviewComment.trim() || undefined,
+      })
+      Alert.alert('Review submitted', 'Thanks for sharing your feedback.')
+      await load()
+    } catch (error: any) {
+      Alert.alert('Could not submit review', error?.message || 'Please try again.')
+    } finally {
+      setActionLoading('')
+    }
+  }
 
   const markComplete = async () => {
     setActionLoading('complete')
@@ -171,7 +203,7 @@ export default function CompanyManageJobScreen() {
             title="Selected · waiting for protected payment"
             text="Do not travel to the job until the customer funds escrow. The address and work-start controls unlock after payment."
           />
-        ) : isReadyToTravel ? (
+        ) : isReadyToTravel && pinState?.hasActivePin && !pinState?.arrivalVerifiedAt ? (
           <StepCard
             icon={<MapPin size={21} color={v3.colors.info} weight="fill" />}
             title="Travel to the customer"
@@ -182,11 +214,30 @@ export default function CompanyManageJobScreen() {
               outline
               onPress={() => router.push((`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`) as any)}
             />
+          </StepCard>
+        ) : isReadyToTravel && pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt ? (
+          <StepCard
+            icon={<ShieldCheck size={21} color={v3.colors.info} weight="fill" />}
+            title="Arrival verified"
+            text="Ask the customer for the one-time Start Work PIN before beginning the job."
+          >
             <Action
               label="Start work with PIN"
-              onPress={() => router.push((`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`) as any)}
+              onPress={() => router.push(`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START` as any)}
             />
           </StepCard>
+        ) : isReadyToTravel && !pinState?.hasActivePin && !pinState?.arrivalVerifiedAt ? (
+          <StepCard
+            icon={<Clock size={21} color={v3.colors.amberDark} weight="fill" />}
+            title="Waiting for the customer"
+            text="Waiting for the customer to generate the one-time arrival PIN."
+          />
+        ) : isReadyToTravel && !pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt ? (
+          <StepCard
+            icon={<Clock size={21} color={v3.colors.amberDark} weight="fill" />}
+            title="Waiting for the customer"
+            text="Arrival is confirmed. Waiting for the customer to generate a fresh Start Work PIN."
+          />
         ) : isInProgress ? (
           <StepCard
             icon={<Play size={21} color={v3.colors.success} weight="fill" />}
@@ -197,6 +248,22 @@ export default function CompanyManageJobScreen() {
               label={actionLoading === 'complete' ? 'Submitting…' : 'Mark work complete'}
               disabled={!!actionLoading}
               onPress={markComplete}
+            />
+          </StepCard>
+        ) : isReadyToTravel ? (
+          <StepCard
+            icon={<MapPin size={21} color={v3.colors.info} weight="fill" />}
+            title="Travel to the customer"
+            text="When your team arrives, verify the customer's arrival PIN. Work cannot begin before arrival is verified."
+          >
+            <Action
+              label="Verify arrival PIN"
+              outline
+              onPress={() => router.push(`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL` as any)}
+            />
+            <Action
+              label="Start work with PIN"
+              onPress={() => router.push(`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START` as any)}
             />
           </StepCard>
         ) : isWaitingCustomer ? (
@@ -218,6 +285,56 @@ export default function CompanyManageJobScreen() {
             text="Refresh the job if the next action is not visible yet."
           />
         )}
+
+        {job?.status === 'COMPLETED' && (job?.reviews?.providerReviews || []).length === 0 ? (
+          <View>
+            <Text style={styles.sectionTitle}>Review Customer</Text>
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewLabel}>Cooperation (1–5)</Text>
+              <TextInput
+                style={styles.reviewInput}
+                value={reviewCoop}
+                onChangeText={setReviewCoop}
+                keyboardType="number-pad"
+                maxLength={1}
+              />
+              <Text style={styles.reviewLabel}>Communication (1–5)</Text>
+              <TextInput
+                style={styles.reviewInput}
+                value={reviewComm}
+                onChangeText={setReviewComm}
+                keyboardType="number-pad"
+                maxLength={1}
+              />
+              <Text style={styles.reviewLabel}>Overall experience (1–5)</Text>
+              <TextInput
+                style={styles.reviewInput}
+                value={reviewExp}
+                onChangeText={setReviewExp}
+                keyboardType="number-pad"
+                maxLength={1}
+              />
+              <Text style={styles.reviewLabel}>Comment</Text>
+              <TextInput
+                style={[styles.reviewInput, styles.reviewTextArea]}
+                value={reviewComment}
+                onChangeText={setReviewComment}
+                multiline
+                maxLength={1000}
+                textAlignVertical="top"
+              />
+              <TouchableOpacity
+                style={[styles.reviewBtn, actionLoading !== '' && { opacity: 0.55 }]}
+                onPress={handleSubmitReview}
+                disabled={actionLoading !== ''}
+              >
+                {actionLoading === 'review'
+                  ? <ActivityIndicator color="#111827" />
+                  : <Text style={styles.reviewBtnText}>Submit Review</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
 
         <Text style={styles.sectionTitle}>Job details</Text>
         <View style={styles.detailCard}>
@@ -319,6 +436,12 @@ const styles = StyleSheet.create({
   customerMeta: { ...v3.typography.caption, color: v3.colors.textMuted, marginTop: 2 },
   messageBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: v3.colors.amberSoft, alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 20, marginBottom: 9 },
+  reviewCard: { backgroundColor: v3.colors.paper, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: v3.colors.line, marginTop: 8 },
+  reviewLabel: { ...v3.typography.caption, color: v3.colors.textSecondary, marginTop: 10, marginBottom: 4 },
+  reviewInput: { borderWidth: 1, borderColor: v3.colors.line, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: v3.colors.ink, backgroundColor: v3.colors.canvas },
+  reviewTextArea: { minHeight: 90, textAlignVertical: 'top' },
+  reviewBtn: { marginTop: 16, backgroundColor: v3.colors.ink, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  reviewBtnText: { color: v3.colors.paper, fontSize: 14, fontWeight: '700' },
   stepCard: { backgroundColor: v3.colors.paper, borderRadius: 20, borderWidth: 1, borderColor: v3.colors.line, padding: 16 },
   stepIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
   stepTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 12 },

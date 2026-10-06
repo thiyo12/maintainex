@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native'
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { CaretLeft, ShieldCheck, ShieldSlash, ArrowsClockwise, Copy, CheckCircle, WarningCircle } from 'phosphor-react-native'
+import { ShieldCheck, ShieldSlash, ArrowsClockwise, Copy, CheckCircle, WarningCircle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
@@ -16,16 +16,44 @@ export default function JobPinScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
 
-  const [pinState, setPinState] = useState<{ hasActivePin: boolean; version: number | null; locked: boolean; lastSuccessfulUseAt: string | null } | null>(null)
+  const [pinState, setPinState] = useState<{
+    hasActivePin: boolean
+    version: number | null
+    locked: boolean
+    lastSuccessfulUseAt: string | null
+    arrivalVerifiedAt: string | null
+    workStartVerifiedAt: string | null
+    completionVerifiedAt: string | null
+  } | null>(null)
   const [generatedPin, setGeneratedPin] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [copied, setCopied] = useState(false)
+  const [workerIdentity, setWorkerIdentity] = useState<{
+    required: boolean
+    worker: null | {
+      providerIdentityId: string
+      providerType: 'INDIVIDUAL' | 'COMPANY'
+      userId: string
+      displayName: string
+      verifiedPhotoUrl: string | null
+      identityVerified: boolean
+      companyId: string | null
+      companyName: string | null
+    }
+    confirmation: null | {
+      id: string
+      status: string
+      confirmedAt: string | null
+      mismatchReportedAt: string | null
+    }
+  } | null>(null)
 
   const loadPinState = async () => {
     try {
       const res = await v2JobActions.getPinState(id)
       setPinState(res.pinState)
+      if (!res.pinState.hasActivePin) setGeneratedPin(null)
     } catch {
       setPinState(null)
     } finally {
@@ -33,14 +61,49 @@ export default function JobPinScreen() {
     }
   }
 
-  useEffect(() => { loadPinState() }, [id])
+  const loadWorkerIdentity = async () => {
+    try {
+      const state = await v2JobActions.getWorkerIdentity(id)
+      setWorkerIdentity(state)
+    } catch {
+      setWorkerIdentity(null)
+    }
+  }
+
+  useEffect(() => {
+    loadPinState()
+    loadWorkerIdentity()
+    const timer = setInterval(loadPinState, 3000)
+    return () => clearInterval(timer)
+  }, [id])
 
   const handleGenerate = async () => {
+    const startingWork = Boolean(pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt)
+    if (
+      startingWork &&
+      workerIdentity?.required &&
+      workerIdentity.confirmation?.status !== 'MATCHED'
+    ) {
+      Alert.alert(
+        'Confirm your tasker first',
+        'For your safety, confirm that the person who arrived matches the verified MaintainEX profile before generating the Start Work PIN.'
+      )
+      return
+    }
+
     setActionLoading('generate')
     try {
       const res = await v2JobActions.generatePin(id)
       setGeneratedPin(res.pin)
-      setPinState({ hasActivePin: true, version: res.version, locked: false, lastSuccessfulUseAt: null })
+      setPinState((prev) => ({
+        hasActivePin: true,
+        version: res.version,
+        locked: false,
+        lastSuccessfulUseAt: null,
+        arrivalVerifiedAt: prev?.arrivalVerifiedAt ?? null,
+        workStartVerifiedAt: prev?.workStartVerifiedAt ?? null,
+        completionVerifiedAt: prev?.completionVerifiedAt ?? null,
+      }))
     } catch (err: any) {
       const msg = err?.message || t('common.error')
       if (msg.includes('already exists')) {
@@ -67,7 +130,15 @@ export default function JobPinScreen() {
             try {
               const res = await v2JobActions.rotatePin(id)
               setGeneratedPin(res.pin)
-              setPinState({ hasActivePin: true, version: res.version, locked: false, lastSuccessfulUseAt: null })
+              setPinState((prev) => ({
+                hasActivePin: true,
+                version: res.version,
+                locked: false,
+                lastSuccessfulUseAt: null,
+                arrivalVerifiedAt: prev?.arrivalVerifiedAt ?? null,
+                workStartVerifiedAt: prev?.workStartVerifiedAt ?? null,
+                completionVerifiedAt: prev?.completionVerifiedAt ?? null,
+              }))
             } catch (err: any) {
               Alert.alert(t('common.error'), err?.message || t('common.error'))
             } finally {
@@ -93,7 +164,15 @@ export default function JobPinScreen() {
             try {
               await v2JobActions.revokePin(id)
               setGeneratedPin(null)
-              setPinState({ hasActivePin: false, version: null, locked: false, lastSuccessfulUseAt: null })
+              setPinState((prev) => ({
+                hasActivePin: false,
+                version: prev?.version ?? null,
+                locked: false,
+                lastSuccessfulUseAt: prev?.lastSuccessfulUseAt ?? null,
+                arrivalVerifiedAt: prev?.arrivalVerifiedAt ?? null,
+                workStartVerifiedAt: prev?.workStartVerifiedAt ?? null,
+                completionVerifiedAt: prev?.completionVerifiedAt ?? null,
+              }))
               Alert.alert(t('jobPin.title'), t('jobPin.revoked'))
             } catch (err: any) {
               Alert.alert(t('common.error'), err?.message || t('common.error'))
@@ -103,6 +182,55 @@ export default function JobPinScreen() {
           },
         },
       ]
+    )
+  }
+
+  const handleWorkerMatch = async () => {
+    setActionLoading('identity-match')
+    try {
+      const result = await v2JobActions.confirmWorkerIdentity(id, 'MATCH')
+      setWorkerIdentity(prev => prev ? { ...prev, confirmation: result.confirmation } : prev)
+      Alert.alert(
+        'Identity confirmed',
+        'The arriving person matches the verified MaintainEX profile. You can now generate the Start Work PIN when you are ready.'
+      )
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err?.message || 'Could not confirm worker identity.')
+    } finally {
+      setActionLoading('')
+    }
+  }
+
+  const handleWorkerMismatch = () => {
+    Alert.alert(
+      'Different person arrived?',
+      'Do not share the Start Work PIN. MaintainEX will flag this booking for Trust & Safety review.',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: 'Report mismatch',
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoading('identity-mismatch')
+            try {
+              const result = await v2JobActions.confirmWorkerIdentity(
+                id,
+                'MISMATCH',
+                'Customer reported that the arriving person did not match the verified profile.'
+              )
+              setWorkerIdentity(prev => prev ? { ...prev, confirmation: result.confirmation } : prev)
+              Alert.alert(
+                'Mismatch reported',
+                'Work start is blocked. Do not share any PIN until MaintainEX resolves the identity issue.'
+              )
+            } catch (err: any) {
+              Alert.alert(t('common.error'), err?.message || 'Could not report the identity mismatch.')
+            } finally {
+              setActionLoading('')
+            }
+          },
+        },
+      ],
     )
   }
 
@@ -121,31 +249,140 @@ export default function JobPinScreen() {
     )
   }
 
+  const nextPurpose = !pinState?.arrivalVerifiedAt
+    ? 'Arrival PIN'
+    : !pinState?.workStartVerifiedAt
+      ? 'Start Work PIN'
+      : 'Verification PIN'
+
+  const nextPurposeHint = !pinState?.arrivalVerifiedAt
+    ? 'Give this one-time PIN to the provider only when they have arrived.'
+    : !pinState?.workStartVerifiedAt
+      ? 'Arrival is confirmed. Generate a fresh one-time PIN only when you are ready for work to start.'
+      : 'Work has already started. No additional start PIN is required.'
+
+  const needsWorkerIdentity =
+    Boolean(pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && workerIdentity?.required)
+  const workerMatched = workerIdentity?.confirmation?.status === 'MATCHED'
+  const workerMismatch = workerIdentity?.confirmation?.status === 'MISMATCH_REPORTED'
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <CaretLeft size={20} color={colors.ink} weight="bold" />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.ink }]}>{t('jobPin.title')}</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <Text style={styles.title}>{t('jobPin.title')}</Text>
+        <Text style={styles.subtitle}>{t('jobPin.description')}</Text>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={[styles.subtitle, { color: colors.muted }]}>{t('jobPin.description')}</Text>
+        {needsWorkerIdentity && (
+          <View style={[
+            styles.identityCard,
+            workerMismatch && { borderColor: colors.error },
+            workerMatched && { borderColor: colors.success },
+          ]}>
+            <View style={styles.identityHeader}>
+              <ShieldCheck
+                size={22}
+                color={workerMatched ? colors.success : workerMismatch ? colors.error : colors.amber}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.identityTitle}>Confirm your arriving tasker</Text>
+                <Text style={styles.identitySubtitle}>
+                  Make sure the person at your location matches this MaintainEX verified profile before work starts.
+                </Text>
+              </View>
+            </View>
 
-        {generatedPin && (
-          <View style={[styles.pinReveal, { backgroundColor: colors.white, borderColor: colors.amber }]}>
-            <Text style={[styles.pinLabel, { color: colors.muted }]}>{t('jobPin.yourPin')}</Text>
-            <Text style={[styles.pinValue, { color: colors.amber }]}>{generatedPin}</Text>
-            <Text style={[styles.pinWarning, { color: colors.error }]}>{t('jobPin.saveWarning')}</Text>
-            <TouchableOpacity style={[styles.copyBtn, { backgroundColor: colors.surface }]} onPress={handleCopyPin}>
+            {workerIdentity?.worker ? (
+              <>
+                <View style={styles.workerRow}>
+                  {workerIdentity.worker.verifiedPhotoUrl ? (
+                    <Image
+                      source={{ uri: workerIdentity.worker.verifiedPhotoUrl }}
+                      style={styles.workerPhoto}
+                    />
+                  ) : (
+                    <View style={[styles.workerPhoto, styles.workerPhotoFallback]}>
+                      <ShieldSlash size={28} color={colors.muted} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.workerName}>{workerIdentity.worker.displayName}</Text>
+                    {workerIdentity.worker.companyName && (
+                      <Text style={styles.workerCompany}>{workerIdentity.worker.companyName}</Text>
+                    )}
+                    <Text style={[
+                      styles.workerVerification,
+                      { color: workerIdentity.worker.identityVerified ? colors.success : colors.error },
+                    ]}>
+                      {workerIdentity.worker.identityVerified
+                        ? '✓ Identity verified by MaintainEX'
+                        : 'Identity photo verification pending'}
+                    </Text>
+                  </View>
+                </View>
+
+                {workerMatched ? (
+                  <View style={styles.identitySuccess}>
+                    <CheckCircle size={18} color={colors.success} />
+                    <Text style={styles.identitySuccessText}>Person confirmed. Start Work PIN is available.</Text>
+                  </View>
+                ) : workerMismatch ? (
+                  <View style={styles.identityDanger}>
+                    <WarningCircle size={18} color={colors.error} />
+                    <Text style={styles.identityDangerText}>
+                      Identity mismatch reported. Do not allow work to start.
+                    </Text>
+                  </View>
+                ) : workerIdentity.worker.identityVerified ? (
+                  <View style={styles.identityActions}>
+                    <TouchableOpacity
+                      style={[styles.identityAction, styles.identityMatchBtn]}
+                      onPress={handleWorkerMatch}
+                      disabled={!!actionLoading}
+                    >
+                      {actionLoading === 'identity-match'
+                        ? <ActivityIndicator size="small" color="#000" />
+                        : <Text style={styles.identityMatchText}>Person matches</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.identityAction, styles.identityMismatchBtn]}
+                      onPress={handleWorkerMismatch}
+                      disabled={!!actionLoading}
+                    >
+                      <Text style={styles.identityMismatchText}>Different person arrived</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.identityDanger}>
+                    <WarningCircle size={18} color={colors.error} />
+                    <Text style={styles.identityDangerText}>
+                      Do not share the Start Work PIN until MaintainEX verifies this worker's public identity photo.
+                    </Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={styles.identityDanger}>
+                <WarningCircle size={18} color={colors.error} />
+                <Text style={styles.identityDangerText}>
+                  The assigned worker is not ready for identity confirmation yet.
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {generatedPin && (!needsWorkerIdentity || workerMatched) && (
+          <View style={styles.pinReveal}>
+            <Text style={styles.pinLabel}>{nextPurpose}</Text>
+            <Text style={styles.pinValue}>{generatedPin}</Text>
+            <Text style={styles.pinWarning}>{nextPurposeHint}</Text>
+            <TouchableOpacity style={styles.copyBtn} onPress={handleCopyPin}>
               {copied ? (
                 <CheckCircle size={18} color={colors.success} />
               ) : (
                 <Copy size={18} color={colors.amber} />
               )}
-              <Text style={[styles.copyText, { color: copied ? colors.success : colors.amber }]}>
+              <Text style={[styles.copyText, copied && { color: colors.success }]}>
                 {copied ? t('jobPin.copied') : t('jobPin.copy')}
               </Text>
             </TouchableOpacity>
@@ -153,47 +390,48 @@ export default function JobPinScreen() {
         )}
 
         {pinState?.hasActivePin && !generatedPin && (
-          <View style={[styles.stateCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+          <View style={styles.stateCard}>
             <ShieldCheck size={24} color={colors.success} />
             <View style={styles.stateInfo}>
-              <Text style={[styles.stateLabel, { color: colors.ink }]}>{t('jobPin.activePin')}</Text>
-              <Text style={[styles.stateDetail, { color: colors.muted }]}>{t('jobPin.version', { n: pinState.version })}</Text>
+              <Text style={styles.stateLabel}>{t('jobPin.activePin')}</Text>
+              <Text style={styles.stateDetail}>{t('jobPin.version', { n: pinState.version })}</Text>
               {pinState.lastSuccessfulUseAt && (
-                <Text style={[styles.stateDetail, { color: colors.muted }]}>{t('jobPin.lastUsed', { time: new Date(pinState.lastSuccessfulUseAt).toLocaleString() })}</Text>
+                <Text style={styles.stateDetail}>{t('jobPin.lastUsed', { time: new Date(pinState.lastSuccessfulUseAt).toLocaleString() })}</Text>
               )}
             </View>
           </View>
         )}
 
         {pinState?.locked && (
-          <View style={[styles.stateCard, { backgroundColor: colors.white, borderColor: colors.error }]}>
+          <View style={[styles.stateCard, { borderColor: colors.error }]}>
             <WarningCircle size={24} color={colors.error} />
             <View style={styles.stateInfo}>
               <Text style={[styles.stateLabel, { color: colors.error }]}>{t('jobPin.locked')}</Text>
-              <Text style={[styles.stateDetail, { color: colors.muted }]}>{t('jobPin.lockedBody')}</Text>
+              <Text style={styles.stateDetail}>{t('jobPin.lockedBody')}</Text>
             </View>
           </View>
         )}
 
         {!pinState?.hasActivePin && !generatedPin && (
           <View style={styles.emptyState}>
-            <ShieldSlash size={48} color={colors.muted} />
-            <Text style={[styles.emptyTitle, { color: colors.ink }]}>{t('jobPin.noPin')}</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.muted }]}>{t('jobPin.noPinBody')}</Text>
+            {pinState?.workStartVerifiedAt ? (
+              <CheckCircle size={48} color={colors.success} />
+            ) : (
+              <ShieldSlash size={48} color={colors.muted} />
+            )}
+            <Text style={styles.emptyTitle}>
+              {pinState?.workStartVerifiedAt ? 'Work start verified' : nextPurpose}
+            </Text>
+            <Text style={styles.emptySubtitle}>{nextPurposeHint}</Text>
           </View>
         )}
 
-        <View style={styles.safetyCard}>
-          <Text style={[styles.safetyTitle, { color: colors.ink }]}>Safety</Text>
-          <Text style={[styles.safetyBody, { color: colors.muted }]}>Do not share the PIN over the phone. Only share it in person at the job site.</Text>
-        </View>
-
         <View style={styles.actions}>
-          {!pinState?.hasActivePin && !generatedPin && (
+          {!pinState?.hasActivePin && !generatedPin && !pinState?.workStartVerifiedAt && (
             <TouchableOpacity
-              style={[styles.actionBtn, styles.primaryBtn, { backgroundColor: colors.amber }]}
+              style={[styles.actionBtn, styles.primaryBtn]}
               onPress={handleGenerate}
-              disabled={!!actionLoading}
+              disabled={!!actionLoading || (needsWorkerIdentity && !workerMatched)}
             >
               {actionLoading === 'generate' ? (
                 <ActivityIndicator size="small" color="#000" />
@@ -209,7 +447,7 @@ export default function JobPinScreen() {
           {pinState?.hasActivePin && (
             <>
               <TouchableOpacity
-                style={[styles.actionBtn, styles.secondaryBtn, { borderColor: colors.amber }]}
+                style={[styles.actionBtn, styles.secondaryBtn]}
                 onPress={handleRotate}
                 disabled={!!actionLoading}
               >
@@ -218,13 +456,13 @@ export default function JobPinScreen() {
                 ) : (
                   <>
                     <ArrowsClockwise size={20} color={colors.amber} />
-                    <Text style={[styles.secondaryBtnText, { color: colors.amber }]}>{t('jobPin.rotate')}</Text>
+                    <Text style={styles.secondaryBtnText}>{t('jobPin.rotate')}</Text>
                   </>
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.actionBtn, styles.dangerBtn, { borderColor: colors.error }]}
+                style={[styles.actionBtn, styles.dangerBtn]}
                 onPress={handleRevoke}
                 disabled={!!actionLoading}
               >
@@ -233,7 +471,7 @@ export default function JobPinScreen() {
                 ) : (
                   <>
                     <ShieldSlash size={20} color={colors.error} />
-                    <Text style={[styles.dangerBtnText, { color: colors.error }]}>{t('jobPin.revoke')}</Text>
+                    <Text style={styles.dangerBtnText}>{t('jobPin.revoke')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -248,48 +486,67 @@ export default function JobPinScreen() {
 function makeStyles(colors: any) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
-    backBtn: { width: 40, alignItems: 'center', justifyContent: 'center' },
-    headerTitle: { fontSize: 17, fontFamily: fonts.headingBold },
     scroll: { padding: 20 },
-    subtitle: { fontSize: 14, fontFamily: fonts.body, marginBottom: 24, lineHeight: 20 },
+    title: { fontSize: 24, fontFamily: fonts.bold, color: colors.text, marginBottom: 8 },
+    subtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, marginBottom: 24, lineHeight: 20 },
     pinReveal: {
+      backgroundColor: colors.card,
       borderRadius: 16,
       padding: 24,
       alignItems: 'center',
       marginBottom: 24,
       borderWidth: 1,
+      borderColor: colors.amber,
     },
-    pinLabel: { fontSize: 14, fontFamily: fonts.body, marginBottom: 8 },
-    pinValue: { fontSize: 48, fontFamily: fonts.heading, letterSpacing: 8, marginBottom: 8 },
-    pinWarning: { fontSize: 12, fontFamily: fonts.body, textAlign: 'center', marginBottom: 16 },
-    copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
-    copyText: { fontSize: 14, fontFamily: fonts.bodyMedium },
+    pinLabel: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, marginBottom: 8 },
+    pinValue: { fontSize: 48, fontFamily: fonts.bold, color: colors.amber, letterSpacing: 8, marginBottom: 8 },
+    pinWarning: { fontSize: 12, fontFamily: fonts.regular, color: colors.error, textAlign: 'center', marginBottom: 16 },
+    copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: colors.surface },
+    copyText: { fontSize: 14, fontFamily: fonts.medium, color: colors.amber },
     stateCard: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
+      backgroundColor: colors.card,
       borderRadius: 12,
       padding: 16,
       marginBottom: 16,
       borderWidth: 1,
+      borderColor: colors.border,
     },
     stateInfo: { flex: 1 },
-    stateLabel: { fontSize: 16, fontFamily: fonts.bodySemiBold },
-    stateDetail: { fontSize: 12, fontFamily: fonts.body, marginTop: 2 },
+    stateLabel: { fontSize: 16, fontFamily: fonts.semibold, color: colors.text },
+    stateDetail: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, marginTop: 2 },
     emptyState: { alignItems: 'center', paddingVertical: 40, marginBottom: 24 },
-    emptyTitle: { fontSize: 18, fontFamily: fonts.bodySemiBold, marginTop: 16 },
-    emptySubtitle: { fontSize: 14, fontFamily: fonts.body, marginTop: 8, textAlign: 'center' },
-    safetyCard: {
-      backgroundColor: '#FFF2D6',
-      borderRadius: 18,
-      padding: 16,
-      marginBottom: 24,
-      borderWidth: 1,
+    emptyTitle: { fontSize: 18, fontFamily: fonts.semibold, color: colors.text, marginTop: 16 },
+    emptySubtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, marginTop: 8, textAlign: 'center' },
+    identityCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 18,
+      marginBottom: 20,
+      borderWidth: 1.5,
       borderColor: colors.amber,
     },
-    safetyTitle: { fontSize: 12, fontFamily: fonts.headingBold, marginBottom: 4 },
-    safetyBody: { fontSize: 11, fontFamily: fonts.body, lineHeight: 16 },
+    identityHeader: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginBottom: 16 },
+    identityTitle: { fontSize: 16, fontFamily: fonts.semibold, color: colors.text },
+    identitySubtitle: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, lineHeight: 18, marginTop: 3 },
+    workerRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+    workerPhoto: { width: 72, height: 72, borderRadius: 18, backgroundColor: colors.surface },
+    workerPhotoFallback: { alignItems: 'center', justifyContent: 'center' },
+    workerName: { fontSize: 17, fontFamily: fonts.semibold, color: colors.text },
+    workerCompany: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, marginTop: 2 },
+    workerVerification: { fontSize: 12, fontFamily: fonts.medium, marginTop: 5 },
+    identityActions: { gap: 8, marginTop: 16 },
+    identityAction: { minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingHorizontal: 12 },
+    identityMatchBtn: { backgroundColor: colors.amber },
+    identityMatchText: { color: '#000', fontFamily: fonts.semibold, fontSize: 14 },
+    identityMismatchBtn: { borderWidth: 1, borderColor: colors.error, backgroundColor: 'transparent' },
+    identityMismatchText: { color: colors.error, fontFamily: fonts.semibold, fontSize: 14 },
+    identitySuccess: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 16, padding: 12, borderRadius: 10, backgroundColor: colors.surface },
+    identitySuccessText: { flex: 1, color: colors.success, fontFamily: fonts.medium, fontSize: 12, lineHeight: 17 },
+    identityDanger: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 16, padding: 12, borderRadius: 10, backgroundColor: colors.surface },
+    identityDangerText: { flex: 1, color: colors.error, fontFamily: fonts.medium, fontSize: 12, lineHeight: 17 },
     actions: { gap: 12 },
     actionBtn: {
       flexDirection: 'row',
@@ -299,11 +556,11 @@ function makeStyles(colors: any) {
       paddingVertical: 16,
       borderRadius: 12,
     },
-    primaryBtn: {},
-    primaryBtnText: { fontSize: 16, fontFamily: fonts.bodySemiBold, color: '#000' },
-    secondaryBtn: { backgroundColor: 'transparent', borderWidth: 1 },
-    secondaryBtnText: { fontSize: 16, fontFamily: fonts.bodySemiBold },
-    dangerBtn: { backgroundColor: 'transparent', borderWidth: 1 },
-    dangerBtnText: { fontSize: 16, fontFamily: fonts.bodySemiBold },
+    primaryBtn: { backgroundColor: colors.amber },
+    primaryBtnText: { fontSize: 16, fontFamily: fonts.semibold, color: '#000' },
+    secondaryBtn: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.amber },
+    secondaryBtnText: { fontSize: 16, fontFamily: fonts.semibold, color: colors.amber },
+    dangerBtn: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.error },
+    dangerBtnText: { fontSize: 16, fontFamily: fonts.semibold, color: colors.error },
   })
 }

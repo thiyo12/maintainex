@@ -56,6 +56,16 @@ export default function TaskerEditProfile() {
       } catch { /* ignore */ }
     }
     loadTaskerProfile()
+
+    if (verified) {
+      v2Identity.getPhotoChangeStatus()
+        .then(status => {
+          if (status.verifiedPhotoUrl) setProfileImage(status.verifiedPhotoUrl)
+          setPhotoChangePending(Boolean(status.pendingRequest))
+          setPendingPhotoUrl(status.pendingRequest?.requestedPhotoUrl || null)
+        })
+        .catch(() => {})
+    }
   }, [user])
 
   const pickImage = async () => {

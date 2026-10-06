@@ -154,6 +154,34 @@ export default function V2JobDetailScreen() {
     finally { setActionLoading('') }
   }
 
+  const handleCashPayment = () => {
+    Alert.alert(
+      'Use Cash Payment?',
+      'MaintainEX will not hold cash for this booking. Pay the provider directly as agreed after the work. The provider remains responsible for MaintainEX platform commission.',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: 'Use Cash',
+          onPress: async () => {
+            setActionLoading('cash')
+            try {
+              const result = await v2JobActions.confirmCashPayment(id)
+              Alert.alert(
+                'Cash Selected',
+                `Cash amount due: ${result.currency} ${Number(result.amountDue || 0).toLocaleString()}. Use the verification PIN before work starts.`,
+              )
+              await loadJob()
+            } catch (e: any) {
+              Alert.alert(t('common.error'), e?.message || 'Could not select cash payment.')
+            } finally {
+              setActionLoading('')
+            }
+          },
+        },
+      ],
+    )
+  }
+
   const handleShareAddress = async () => {
     setActionLoading('address')
     try { await v2JobActions.shareAddress(id, { street: addressStreet, building: addressBuilding, apartment: addressApartment, landmark: addressLandmark }); Alert.alert(t('common.done'), t('jobDetail.addressShared')); loadJob(); setShowAddressForm(false) }
@@ -162,9 +190,9 @@ export default function V2JobDetailScreen() {
   }
 
   const handleApproveCompletion = () => {
-    if (!job || !escrow) return
+    if (!job || !escrow || workspace?.progressStatus !== 'COMPLETION_REQUESTED') return
     const aq = quotes.find(q => q.status === 'ACCEPTED')
-    router.push({ pathname: '/(customer)/payment/confirm-complete', params: { bookingId: id, jobTitle: job.title, taskerName: aq?.provider?.name || '', taskerPayout: String(Number(escrow.amount) - Number(escrow.serviceFee || 0)), platformFee: String(Number(escrow.serviceFee || 0)) } })
+    router.push({ pathname: '/(customer)/payment/confirm-complete', params: { bookingId: id, jobTitle: job.title, taskerName: aq?.provider?.name || 'Provider' } })
   }
 
   const handleReleaseEscrow = async () => {
@@ -501,10 +529,11 @@ export default function V2JobDetailScreen() {
               {escrow?.createdAt ? ` — fund within 24 hours or the job will reopen` : ''}
             </Text>
             <ActionBtn label="Deposit Now" loadingKey="escrow" onPress={handleDepositEscrow} />
+            <ActionBtn label="Use Cash" loadingKey="cash" onPress={handleCashPayment} outline />
           </View>
         ) : null}
 
-        {escrow && escrow.status === 'PROTECTED' && !job.addressSharedAt && (
+        {escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) && !job.addressSharedAt && (
           <View style={styles.actionCard}>
             <View style={styles.actionIconCircle}>
               <MapPin size={28} color={colors.amber} weight="fill" />
@@ -525,7 +554,7 @@ export default function V2JobDetailScreen() {
           </View>
         )}
 
-        {workspace?.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && (
+        {workspace?.progressStatus === 'ACCEPTED' && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) && (
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
@@ -545,13 +574,17 @@ export default function V2JobDetailScreen() {
               <CheckCircle size={28} color="#06C167" weight="fill" />
             </View>
             <Text style={styles.actionCardTitle}>Job Complete?</Text>
-            <Text style={styles.actionCardDesc}>Your hero says they're done. Check the work and release payment</Text>
-            <ActionBtn label="Approve & Release" loadingKey="approve" onPress={handleApproveCompletion} color="#06C167" />
+            <Text style={styles.actionCardDesc}>
+              {escrow?.status === 'CASH_CONFIRMED'
+                ? 'Your provider says the work is complete. Approve completion to close the job and record the provider platform settlement.'
+                : "Your hero says they're done. Check the work and release payment"}
+            </Text>
+            <ActionBtn label={escrow?.status === 'CASH_CONFIRMED' ? 'Approve Completion' : 'Approve & Release'} loadingKey="approve" onPress={handleApproveCompletion} color="#06C167" />
           </View>
         )}
 
         {/* ─── Escrow Status Card ─── */}
-        {escrow && escrow.status === 'PROTECTED' && (
+        {escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) && (
           <View style={styles.escrowCard}>
             <View style={styles.escrowHeader}>
               <Text style={styles.escrowTitle}>Escrow</Text>

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Calendar, MapPin, ChatCircleDots, NavigationArrow, Radio, ShieldCheck, Hourglass, Flag, CheckCircle, ArrowCircleRight, MagnifyingGlass, Camera, FileText, CaretLeft, Wrench, Play } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
@@ -34,6 +34,7 @@ export default function V2ProviderManageJobScreen() {
   const [workspace, setWorkspace] = useState<any>(null)
   const [escrow, setEscrow] = useState<any>(null)
   const [reviews, setReviews] = useState<any>(null)
+  const [pinState, setPinState] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [nextJob, setNextJob] = useState<V2Job | null>(null)
@@ -48,11 +49,15 @@ export default function V2ProviderManageJobScreen() {
 
   const loadJob = async () => {
     try {
-      const res = await v2Jobs.get(id)
+      const [res, pinRes] = await Promise.all([
+        v2Jobs.get(id),
+        v2JobActions.getPinState(id).catch(() => ({ pinState: null })),
+      ])
       setJob(res.job)
       setWorkspace(res.job.workspace || null)
       setEscrow(res.job.escrow || null)
       setReviews(res.job.reviews || null)
+      setPinState(pinRes.pinState)
       loadNextJob()
     } catch (e) {
       Alert.alert(t('common.error'), t('errors.jobNotFound'))
@@ -77,7 +82,11 @@ export default function V2ProviderManageJobScreen() {
     } catch { setNextJob(null) }
   }
 
-  useEffect(() => { loadJob() }, [id])
+  useFocusEffect(
+    useCallback(() => {
+      loadJob()
+    }, [id])
+  )
 
   // Send tasker location every 30s while sharing. Foreground-only: updates
   // pause automatically when the app is backgrounded (acceptable by design).
@@ -273,13 +282,57 @@ export default function V2ProviderManageJobScreen() {
               ) : null}
             </View>
 
-            <View style={styles.pinNotice}>
-              <ShieldCheck size={18} color={v3.colors.info} weight="fill" />
-              <View style={styles.pinCopy}>
-                <Text style={styles.pinTitle}>Arrival PIN required</Text>
-                <Text style={styles.pinText}>Ask the customer for the arrival PIN when you reach the job.</Text>
+            {job.companyAssignment?.status === 'ASSIGNED' && (
+              <View style={styles.pinNotice}>
+                <ShieldCheck size={18} color={v3.colors.info} weight="fill" />
+                <View style={styles.pinCopy}>
+                  <Text style={styles.pinTitle}>Company assignment</Text>
+                  <Text style={styles.pinText}>This is a company assignment. Accept it before verifying arrival.</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.secondaryAction}
+                  onPress={() => router.push(`/(company)/workforce/assignment/${job.companyAssignment?.id || ''}` as any)}
+                >
+                  <Text style={styles.secondaryActionText}>Review &amp; Accept Assignment</Text>
+                </TouchableOpacity>
               </View>
-            </View>
+            )}
+            {pinState?.hasActivePin && !pinState?.arrivalVerifiedAt ? (
+              <View style={styles.pinNotice}>
+                <ShieldCheck size={18} color={v3.colors.info} weight="fill" />
+                <View style={styles.pinCopy}>
+                  <Text style={styles.pinTitle}>Arrival PIN required</Text>
+                  <Text style={styles.pinText}>Ask the customer for the arrival PIN when you reach the job.</Text>
+                </View>
+              </View>
+            ) : null}
+            {!pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) ? (
+              <View style={styles.pinNotice}>
+                <Hourglass size={18} color={v3.colors.amberDark} weight="fill" />
+                <View style={styles.pinCopy}>
+                  <Text style={styles.pinTitle}>Waiting for the customer</Text>
+                  <Text style={styles.pinText}>Waiting for the customer to generate the one-time arrival PIN.</Text>
+                </View>
+              </View>
+            ) : null}
+            {!pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt ? (
+              <View style={styles.pinNotice}>
+                <Hourglass size={18} color={v3.colors.amberDark} weight="fill" />
+                <View style={styles.pinCopy}>
+                  <Text style={styles.pinTitle}>Waiting for the customer</Text>
+                  <Text style={styles.pinText}>Arrival is confirmed. Waiting for the customer to generate a fresh Start Work PIN.</Text>
+                </View>
+              </View>
+            ) : null}
+            {escrow && !['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) ? (
+              <View style={styles.pinNotice}>
+                <Hourglass size={18} color={v3.colors.amberDark} weight="fill" />
+                <View style={styles.pinCopy}>
+                  <Text style={styles.pinTitle}>Waiting for payment</Text>
+                  <Text style={styles.pinText}>Waiting for the customer to confirm a payment method.</Text>
+                </View>
+              </View>
+            ) : null}
 
             {!locationSharing ? (
               <TouchableOpacity style={styles.primaryAction} activeOpacity={0.78} onPress={startLocationSharing}>
@@ -303,23 +356,27 @@ export default function V2ProviderManageJobScreen() {
               </View>
             )}
 
-            <TouchableOpacity
-              style={styles.secondaryAction}
-              activeOpacity={0.78}
-              onPress={() => router.push((`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`) as any)}
-            >
-              <ShieldCheck size={16} color={v3.colors.ink} weight="bold" />
-              <Text style={styles.secondaryActionText}>Verify arrival PIN</Text>
-            </TouchableOpacity>
+            {pinState?.hasActivePin && !pinState?.arrivalVerifiedAt ? (
+              <TouchableOpacity
+                style={styles.secondaryAction}
+                activeOpacity={0.78}
+                onPress={() => router.push((`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`) as any)}
+              >
+                <ShieldCheck size={16} color={v3.colors.ink} weight="bold" />
+                <Text style={styles.secondaryActionText}>Verify arrival PIN</Text>
+              </TouchableOpacity>
+            ) : null}
 
-            <TouchableOpacity
-              style={styles.primaryAction}
-              activeOpacity={0.78}
-              onPress={() => router.push((`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`) as any)}
-            >
-              <Play size={16} color={v3.colors.paper} weight="fill" />
-              <Text style={styles.primaryActionText}>Start work with PIN</Text>
-            </TouchableOpacity>
+            {pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt ? (
+              <TouchableOpacity
+                style={styles.primaryAction}
+                activeOpacity={0.78}
+                onPress={() => router.push((`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`) as any)}
+              >
+                <Play size={16} color={v3.colors.paper} weight="fill" />
+                <Text style={styles.primaryActionText}>Start work with PIN</Text>
+              </TouchableOpacity>
+            ) : null}
           </>
         ) : null}
 
@@ -423,7 +480,7 @@ export default function V2ProviderManageJobScreen() {
             <Flag size={17} color={v3.colors.error} weight="bold" />
             <View style={styles.cancelActionCopy}>
               <Text style={styles.cancelActionTitle}>Cancel before work starts</Text>
-              <Text style={styles.cancelActionText}>OTP confirmation required. Protected payment will be refunded to the customer.</Text>
+              <Text style={styles.cancelActionText}>Protected payment will be refunded to the customer.</Text>
             </View>
           </TouchableOpacity>
         ) : null}
