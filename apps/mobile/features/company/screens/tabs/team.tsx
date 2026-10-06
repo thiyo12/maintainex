@@ -1,185 +1,131 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
-import { useColors } from '@/lib/ThemeContext'
+import { Plus, Star, UsersThree } from 'phosphor-react-native'
 import { company } from '@/api/companies'
+import { v3 } from '@/theme/v3/tokens'
 
 export default function CompanyTeam() {
-  const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
   const [members, setMembers] = useState<any[]>([])
+  const [pending, setPending] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
-  const fetchTeam = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      const data = await company.team.list()
-      setMembers(Array.isArray(data) ? data : [])
+      const data: any = await company.team.list()
+      setMembers(Array.isArray(data) ? data : data?.members || [])
+      setPending(Array.isArray(data) ? [] : data?.pendingInvites || [])
     } catch {
       setMembers([])
+      setPending([])
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
-  useEffect(() => {
-    fetchTeam()
-  }, [fetchTeam])
+  useEffect(() => { load() }, [load])
 
-  const totalMembers = members.length
-  const onlineCount = members.filter((m: any) => m.online).length
-  const avgRating =
-    members.length > 0
-      ? (members.reduce((sum: number, m: any) => sum + (m.rating || 0), 0) / members.length).toFixed(1)
-      : '0.0'
+  const online = members.filter((member) => member.isOnline).length
+  const avgRating = useMemo(() => {
+    const values = members.map((member) => Number(member.rating || 0)).filter((value) => value > 0)
+    return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1) : '—'
+  }, [members])
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.amber} />
-        </View>
-      </SafeAreaView>
-    )
-  }
+  if (loading) return <SafeAreaView style={styles.safe}><View style={styles.loading}><ActivityIndicator color={v3.colors.ink} /></View></SafeAreaView>
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.topBar}>
-        <Text style={styles.heading}>{t('company.team')}</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/(company)/team/invite')}>
-          <Text style={styles.addBtnText}>+ {t('common.add')}</Text>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} />}
+      >
+        <View style={styles.header}>
+          <View><Text style={styles.eyebrow}>WORKFORCE</Text><Text style={styles.title}>Team</Text></View>
+          <TouchableOpacity style={styles.add} onPress={() => router.push('/(company)/team/invite' as any)}><Plus size={17} color={v3.colors.paper} weight="bold" /><Text style={styles.addText}>Invite</Text></TouchableOpacity>
+        </View>
 
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryStat}>
-          <Text style={styles.summaryValue}>{totalMembers}</Text>
-          <Text style={styles.summaryLabel}>{t('company.teamMembers')}</Text>
+        <View style={styles.summary}>
+          <Summary value={String(members.length)} label="MEMBERS" />
+          <View style={styles.divider} />
+          <Summary value={String(online)} label="ONLINE" />
+          <View style={styles.divider} />
+          <Summary value={avgRating} label="RATING" />
         </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryStat}>
-          <Text style={styles.summaryValue}>{onlineCount}</Text>
-          <Text style={styles.summaryLabel}>{t('common.online')}</Text>
-        </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryStat}>
-          <Text style={styles.summaryValue}>{avgRating}</Text>
-          <Text style={styles.summaryLabel}>{t('tasker.rating')}</Text>
-        </View>
-      </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {members.length === 0 ? (
-          <Text style={styles.emptyText}>{t('company.teamMembers')}</Text>
-        ) : (
-          members.map((m, i) => (
-            <TouchableOpacity key={m.id || i} style={styles.memberCard} activeOpacity={0.8}>
-              <View style={styles.memberLeft}>
-                <View style={styles.memberAvatar}>
-                  <Text style={styles.avatarText}>{m.name?.[0] || '?'}</Text>
-                  {m.online ? <View style={styles.onlineDot} /> : null}
-                </View>
-                <View style={styles.memberInfo}>
-                  <Text style={styles.memberName}>{m.name}</Text>
-                  <Text style={styles.memberRole}>{m.role}</Text>
-                  {m.rating ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                      <Ionicons name="star" size={13} color="#F5A623" />
-                      <Text style={[styles.memberRole, { marginTop: 0 }]}> {m.rating}</Text>
-                    </View>
-                  ) : null}
-                  <Text style={styles.memberMeta}>{m.email || ''}</Text>
-                </View>
+        {pending.length > 0 ? (
+          <View style={styles.pendingCard}>
+            <Text style={styles.pendingTitle}>{pending.length} pending invitation{pending.length === 1 ? '' : 's'}</Text>
+            <Text style={styles.pendingText}>They will appear in your workforce after accepting the invite.</Text>
+          </View>
+        ) : null}
+
+        <Text style={styles.sectionTitle}>People</Text>
+        {members.length ? members.map((member) => (
+          <TouchableOpacity key={member.id} style={styles.member} activeOpacity={0.72}>
+            <View style={styles.avatar}><Text style={styles.avatarText}>{(member.name || '?')[0]}</Text>{member.isOnline ? <View style={styles.onlineDot} /> : null}</View>
+            <View style={styles.memberCopy}>
+              <Text style={styles.memberName}>{member.name || 'Team member'}</Text>
+              <Text style={styles.memberRole}>{String(member.role || 'WORKER').replaceAll('_', ' ')}</Text>
+              <View style={styles.metaRow}>
+                {Number(member.rating || 0) > 0 ? <><Star size={12} color={v3.colors.amber} weight="fill" /><Text style={styles.metaText}>{Number(member.rating).toFixed(1)}</Text></> : null}
+                <Text style={styles.metaText}>{member.completedJobs || 0} jobs</Text>
               </View>
-              <View style={[styles.statusBadge, { backgroundColor: m.online ? '#D1FAE5' : '#FEE2E2' }]}>
-                <Text style={[styles.statusText, { color: m.online ? colors.success : '#EF4444' }]}>
-                  {m.online ? t('common.online') : t('common.offline')}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))
+            </View>
+            <View style={[styles.status, member.isOnline ? styles.statusOnline : styles.statusOffline]}><Text style={[styles.statusText, member.isOnline ? styles.statusTextOnline : styles.statusTextOffline]}>{member.isOnline ? 'ONLINE' : 'OFFLINE'}</Text></View>
+          </TouchableOpacity>
+        )) : (
+          <View style={styles.empty}><UsersThree size={30} color={v3.colors.textMuted} /><Text style={styles.emptyTitle}>Build your workforce</Text><Text style={styles.emptyText}>Invite workers so accepted company jobs can be dispatched to the right person.</Text><TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/(company)/team/invite' as any)}><Text style={styles.emptyButtonText}>Invite first worker</Text></TouchableOpacity></View>
         )}
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
-  addBtn: {
-    backgroundColor: colors.amber,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  addBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
-  summaryCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.white,
-    marginHorizontal: 24,
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 16,
-    justifyContent: 'space-around',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  summaryStat: { alignItems: 'center' },
-  summaryValue: { fontSize: 20, fontWeight: '800', color: colors.ink },
-  summaryLabel: { fontSize: 11, color: colors.muted, marginTop: 2 },
-  summaryDivider: { width: 1, backgroundColor: colors.border },
-  memberCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    marginHorizontal: 24,
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  memberLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
-  memberAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.amber,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
-  onlineDot: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 14, height: 14, borderRadius: 7,
-    backgroundColor: colors.success, borderWidth: 2, borderColor: colors.white,
-  },
-  memberInfo: { flex: 1 },
-  memberName: { fontSize: 15, fontWeight: '700', color: colors.ink },
-  memberRole: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  memberMeta: { fontSize: 11, color: colors.muted, marginTop: 2 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  statusText: { fontSize: 11, fontWeight: '600' },
-  emptyText: { textAlign: 'center', color: colors.muted, marginTop: 40, fontSize: 14 },
+function Summary({ value, label }: { value: string; label: string }) {
+  return <View style={styles.summaryItem}><Text style={styles.summaryValue}>{value}</Text><Text style={styles.summaryLabel}>{label}</Text></View>
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: 18, paddingBottom: 34 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, paddingBottom: 14 },
+  eyebrow: { ...v3.typography.label, color: v3.colors.amberDark, letterSpacing: 1 },
+  title: { ...v3.typography.h4, color: v3.colors.ink, marginTop: 2 },
+  add: { height: 40, borderRadius: 14, backgroundColor: v3.colors.ink, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, gap: 5 },
+  addText: { ...v3.typography.captionBold, color: v3.colors.paper },
+  summary: { height: 83, backgroundColor: v3.colors.paper, borderRadius: 19, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  summaryItem: { flex: 1, alignItems: 'center' },
+  summaryValue: { ...v3.typography.title, color: v3.colors.ink },
+  summaryLabel: { ...v3.typography.smallBold, color: v3.colors.textMuted, marginTop: 3 },
+  divider: { width: 1, height: 34, backgroundColor: v3.colors.line },
+  pendingCard: { backgroundColor: v3.colors.amberSoft, borderRadius: 16, padding: 13, marginTop: 10 },
+  pendingTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
+  pendingText: { ...v3.typography.caption, color: v3.colors.amberDark, marginTop: 2 },
+  sectionTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 20, marginBottom: 9 },
+  member: { minHeight: 76, backgroundColor: v3.colors.paper, borderRadius: 18, borderWidth: 1, borderColor: v3.colors.line, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  avatar: { width: 48, height: 48, borderRadius: 16, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { ...v3.typography.title, color: v3.colors.amber },
+  onlineDot: { position: 'absolute', right: -2, bottom: -2, width: 13, height: 13, borderRadius: 7, backgroundColor: v3.colors.success, borderWidth: 2, borderColor: v3.colors.paper },
+  memberCopy: { flex: 1, marginLeft: 11 },
+  memberName: { ...v3.typography.bodyLarge, color: v3.colors.ink },
+  memberRole: { ...v3.typography.small, color: v3.colors.textMuted, marginTop: 2 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  metaText: { ...v3.typography.small, color: v3.colors.textMuted, marginRight: 5 },
+  status: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  statusOnline: { backgroundColor: v3.colors.successSoft },
+  statusOffline: { backgroundColor: v3.colors.surfaceGray },
+  statusText: { ...v3.typography.smallBold },
+  statusTextOnline: { color: v3.colors.success },
+  statusTextOffline: { color: v3.colors.textMuted },
+  empty: { alignItems: 'center', paddingHorizontal: 36, paddingTop: 64 },
+  emptyTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 12 },
+  emptyText: { ...v3.typography.caption, color: v3.colors.textMuted, textAlign: 'center', lineHeight: 17, marginTop: 5 },
+  emptyButton: { height: 46, borderRadius: 14, backgroundColor: v3.colors.ink, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+  emptyButtonText: { ...v3.typography.bodyBold, color: v3.colors.paper },
 })

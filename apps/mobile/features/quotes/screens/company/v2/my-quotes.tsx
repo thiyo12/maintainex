@@ -1,126 +1,173 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { useTranslation } from 'react-i18next'
-import { useColors } from '@/lib/ThemeContext'
-import { fonts } from '@/lib/fonts'
+import { useRouter } from 'expo-router'
+import { Briefcase, CaretLeft, MagnifyingGlass } from 'phosphor-react-native'
 import { v2Jobs } from '@/api/v2-jobs'
-import { V2Job } from '@/api/v2-types'
-import { getActiveCompanyId } from '@/api/companies'
+import type { V2Job } from '@/api/v2-types'
+import { v3 } from '@/theme/v3/tokens'
+
+type Filter = 'all' | 'open' | 'active' | 'done'
 
 export default function CompanyMyQuotesScreen() {
-  const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
   const [jobs, setJobs] = useState<V2Job[]>([])
+  const [filter, setFilter] = useState<Filter>('all')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
-  const loadJobs = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      const companyId = await getActiveCompanyId()
-      if (!companyId) throw new Error('No active company membership')
-      const res = await v2Jobs.list(`myQuotes=true&context=company&companyId=${encodeURIComponent(companyId)}`)
-      setJobs(res.jobs)
+      const response = await v2Jobs.list('myQuotes=true')
+      setJobs(response.jobs || [])
     } catch {
-      // fail silently
+      setJobs([])
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
   }, [])
 
-  useEffect(() => { loadJobs() }, [loadJobs])
+  useEffect(() => { load() }, [load])
 
-  const statusLabel = (status: string) => {
-    switch (status) {
-      case 'OPEN': return { text: t('company.quoteOpen'), color: colors.amberDark, bg: colors.amberBg }
-      case 'QUOTE_ACCEPTED': return { text: t('company.quoteAwaitingPayment'), color: '#6D28D9', bg: '#EDE9FE' }
-      case 'IN_PROGRESS': return { text: t('company.quoteInProgress'), color: '#1D4ED8', bg: '#DBEAFE' }
-      case 'COMPLETED': return { text: t('company.quoteCompleted'), color: '#065F46', bg: '#DCFCE7' }
-      case 'CANCELLED': return { text: t('company.quoteCancelled'), color: colors.error, bg: colors.errorBg }
-      case 'DISPUTED': return { text: t('company.quoteCancelled'), color: colors.error, bg: colors.errorBg }
-      default: return { text: status.replace('_', ' '), color: colors.muted, bg: colors.surface }
-    }
+  const filtered = useMemo(() => jobs.filter((job) => {
+    if (filter === 'all') return true
+    if (filter === 'open') return job.status === 'OPEN'
+    if (filter === 'active') return ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)
+    return ['COMPLETED', 'CANCELLED'].includes(job.status)
+  }), [jobs, filter])
+
+  const summary = useMemo(() => ({
+    all: jobs.length,
+    open: jobs.filter((job) => job.status === 'OPEN').length,
+    active: jobs.filter((job) => ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)).length,
+    done: jobs.filter((job) => ['COMPLETED', 'CANCELLED'].includes(job.status)).length,
+  }), [jobs])
+
+  if (loading) {
+    return <SafeAreaView style={styles.safe}><View style={styles.loading}><ActivityIndicator color={v3.colors.ink} /></View></SafeAreaView>
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
+        <TouchableOpacity style={styles.circle} onPress={() => router.back()}>
+          <CaretLeft size={18} color={v3.colors.ink} weight="bold" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('company.myQuotes')}</Text>
-        <TouchableOpacity onPress={() => router.push('/(company)/jobs/v2/browse')} hitSlop={8}>
-          <Ionicons name="search-outline" size={24} color={colors.companyAccent} />
+        <View style={styles.headerCopy}>
+          <Text style={styles.eyebrow}>COMPANY PIPELINE</Text>
+          <Text style={styles.title}>Quotes & jobs</Text>
+        </View>
+        <TouchableOpacity style={styles.circle} onPress={() => router.push('/(company)/jobs/v2/browse' as any)}>
+          <MagnifyingGlass size={18} color={v3.colors.ink} weight="bold" />
         </TouchableOpacity>
       </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color={colors.companyAccent} style={{ marginTop: 60 }} />
-      ) : jobs.length === 0 ? (
-        <View style={styles.empty}>
-          <Ionicons name="document-text-outline" size={48} color={colors.muted} style={{ marginBottom: 12 }} />
-          <Text style={styles.emptyTitle}>{t('company.noQuotesYet')}</Text>
-          <Text style={styles.emptyDesc}>{t('company.noQuotesYetDesc')}</Text>
-          <TouchableOpacity style={styles.browseBtn} onPress={() => router.push('/(company)/jobs/v2/browse')}>
-            <Text style={styles.browseBtnText}>{t('company.browseJobs')} →</Text>
+      <View style={styles.filters}>
+        {([
+          ['all', 'All', summary.all],
+          ['open', 'Waiting', summary.open],
+          ['active', 'Active', summary.active],
+          ['done', 'Closed', summary.done],
+        ] as const).map(([key, label, count]) => (
+          <TouchableOpacity key={key} style={[styles.filter, filter === key && styles.filterActive]} onPress={() => setFilter(key)}>
+            <Text style={[styles.filterLabel, filter === key && styles.filterLabelActive]}>{label}</Text>
+            <Text style={[styles.filterCount, filter === key && styles.filterCountActive]}>{count}</Text>
           </TouchableOpacity>
-        </View>
-      ) : (
-        <ScrollView
-          style={{ flex: 1, padding: 16 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadJobs() }} tintColor={colors.amber} />}
-        >
-          {jobs.map((job) => {
-            const s = statusLabel(job.status)
-            return (
-              <TouchableOpacity
-                key={job.id}
-                style={styles.jobCard}
-                onPress={() => router.push(`/(company)/jobs/v2/manage/${job.id}` as any)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.cardTop}>
-                  <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-                  <View style={[styles.statusPill, { backgroundColor: s.bg }]}>
-                    <Text style={[styles.statusPillText, { color: s.color }]}>{s.text}</Text>
-                  </View>
+        ))}
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} />}
+      >
+        {filtered.length ? filtered.map((job) => {
+          const status = statusMeta(job.status)
+          return (
+            <TouchableOpacity
+              key={job.id}
+              style={styles.card}
+              activeOpacity={0.74}
+              onPress={() => router.push(`/(company)/jobs/v2/manage/${job.id}` as any)}
+            >
+              <View style={styles.cardTop}>
+                <View style={[styles.status, { backgroundColor: status.bg }]}>
+                  <Text style={[styles.statusText, { color: status.fg }]}>{status.label}</Text>
                 </View>
-                <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
-                <View style={styles.cardFooter}>
-                  <Text style={styles.budget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
-                  <Text style={styles.meta}>{t('jobs.posted')} {new Date(job.createdAt).toLocaleDateString()}</Text>
-                </View>
-              </TouchableOpacity>
-            )
-          })}
-        </ScrollView>
-      )}
+                <Text style={styles.date}>{new Date(job.createdAt).toLocaleDateString()}</Text>
+              </View>
+              <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
+              <Text style={styles.jobText} numberOfLines={2}>{job.description}</Text>
+              <View style={styles.bottom}>
+                <Text style={styles.money}>{job.budgetAmount ? `LKR ${Number(job.budgetAmount).toLocaleString()}` : 'Customer requested quotes'}</Text>
+                <Text style={styles.open}>Open →</Text>
+              </View>
+            </TouchableOpacity>
+          )
+        }) : (
+          <View style={styles.empty}>
+            <Briefcase size={31} color={v3.colors.textMuted} />
+            <Text style={styles.emptyTitle}>Nothing in this view</Text>
+            <Text style={styles.emptyText}>Browse matching opportunities and send a quote. Submitted company quotes will stay visible here.</Text>
+            <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/(company)/jobs/v2/browse' as any)}>
+              <Text style={styles.emptyButtonText}>Find opportunities</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, fontFamily: fonts.heading },
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 6 },
-  emptyDesc: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
-  browseBtn: { backgroundColor: colors.amber, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 12 },
-  browseBtnText: { fontSize: 14, fontWeight: '800', color: '#111827' },
-  jobCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  jobTitle: { fontSize: 16, fontWeight: '700', color: colors.ink, flex: 1, marginRight: 8, fontFamily: fonts.heading },
-  statusPill: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
-  statusPillText: { fontSize: 11, fontWeight: '700' },
-  jobDesc: { fontSize: 13, color: colors.ink, opacity: 0.6, lineHeight: 19, marginBottom: 12 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  budget: { fontSize: 16, fontWeight: '800', color: colors.amberDark },
-  meta: { fontSize: 12, color: colors.muted },
+function statusMeta(status: string) {
+  switch (status) {
+    case 'OPEN': return { label: 'QUOTE SENT', fg: v3.colors.amberDark, bg: v3.colors.amberSoft }
+    case 'QUOTE_ACCEPTED': return { label: 'SELECTED', fg: v3.colors.info, bg: v3.colors.infoSoft }
+    case 'IN_PROGRESS': return { label: 'IN PROGRESS', fg: v3.colors.success, bg: v3.colors.successSoft }
+    case 'COMPLETED': return { label: 'COMPLETED', fg: v3.colors.success, bg: v3.colors.successSoft }
+    case 'CANCELLED': return { label: 'CLOSED', fg: v3.colors.error, bg: v3.colors.errorSoft }
+    default: return { label: status.replaceAll('_', ' '), fg: v3.colors.textSecondary, bg: v3.colors.surfaceGray }
+  }
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 12 },
+  circle: { width: 40, height: 40, borderRadius: 20, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, marginHorizontal: 11 },
+  eyebrow: { ...v3.typography.smallBold, color: v3.colors.amberDark, letterSpacing: 0.7 },
+  title: { ...v3.typography.title, color: v3.colors.ink, marginTop: 1 },
+  filters: { flexDirection: 'row', marginHorizontal: 18, backgroundColor: v3.colors.paper, borderRadius: 17, borderWidth: 1, borderColor: v3.colors.line, padding: 4 },
+  filter: { flex: 1, minHeight: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  filterActive: { backgroundColor: v3.colors.ink },
+  filterLabel: { ...v3.typography.smallBold, color: v3.colors.textMuted },
+  filterLabelActive: { color: v3.colors.paper },
+  filterCount: { ...v3.typography.captionBold, color: v3.colors.ink, marginTop: 1 },
+  filterCountActive: { color: v3.colors.amber },
+  content: { padding: 18, paddingTop: 12, paddingBottom: 36 },
+  card: { backgroundColor: v3.colors.paper, borderRadius: 20, borderWidth: 1, borderColor: v3.colors.line, padding: 15, marginBottom: 9 },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  status: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  statusText: { ...v3.typography.smallBold },
+  date: { ...v3.typography.small, color: v3.colors.textMuted },
+  jobTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 11 },
+  jobText: { ...v3.typography.caption, color: v3.colors.textSecondary, lineHeight: 17, marginTop: 4 },
+  bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 13 },
+  money: { ...v3.typography.captionBold, color: v3.colors.ink, flex: 1 },
+  open: { ...v3.typography.captionBold, color: v3.colors.amberDark },
+  empty: { alignItems: 'center', paddingHorizontal: 34, paddingTop: 68 },
+  emptyTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 12 },
+  emptyText: { ...v3.typography.caption, color: v3.colors.textMuted, textAlign: 'center', lineHeight: 17, marginTop: 5 },
+  emptyButton: { height: 46, borderRadius: 14, backgroundColor: v3.colors.ink, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+  emptyButtonText: { ...v3.typography.bodyBold, color: v3.colors.paper },
 })

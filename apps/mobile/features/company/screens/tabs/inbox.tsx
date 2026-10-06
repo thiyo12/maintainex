@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
+import { fonts } from '@/lib/fonts'
 import InboxList from '@/features/messaging/components/InboxList'
 
 export default function CompanyInbox() {
@@ -29,13 +30,13 @@ export default function CompanyInbox() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
   topBar: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 12 },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
+  heading: { fontSize: 28, fontFamily: fonts.heading, color: '#FFFFFF' },
   headingBadge: {
-    minWidth: 22, height: 22, borderRadius: 11, backgroundColor: colors.companyAccent,
+    minWidth: 22, height: 22, borderRadius: 11, backgroundColor: '#3B82F6',
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6,
   },
-  headingBadgeText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  headingBadgeText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
 })

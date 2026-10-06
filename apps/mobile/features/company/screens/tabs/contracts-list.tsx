@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
+import { fonts } from '@/lib/fonts'
 import { company } from '@/api/companies'
 
 type Tab = 'active' | 'completed' | 'all'
@@ -40,7 +41,7 @@ export default function CompanyContracts() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={'#F5A623'} />
         </View>
       </SafeAreaView>
     )
@@ -79,13 +80,13 @@ export default function CompanyContracts() {
               <Text style={styles.contractClient}>{c.clientName} • #{c.id}</Text>
               <View style={styles.progressRow}>
                 <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${c.progress}%`, backgroundColor: c.progress >= 100 ? colors.success : colors.amber }]} />
+                  <View style={[styles.progressFill, { width: `${c.progress}%`, backgroundColor: c.progress >= 100 ? '#06C167' : '#F5A623' }]} />
                 </View>
                 <Text style={styles.progressText}>{c.progress}%</Text>
               </View>
               <View style={styles.cardBottom}>
                 <View style={[styles.contractStatus, { backgroundColor: c.status === 'Completed' || c.status === 'completed' ? '#D1FAE5' : '#FFF7ED' }]}>
-                  <Text style={[styles.contractStatusText, { color: c.status === 'Completed' || c.status === 'completed' ? colors.success : colors.amber }]}>
+                  <Text style={[styles.contractStatusText, { color: c.status === 'Completed' || c.status === 'completed' ? '#06C167' : '#F5A623' }]}>
                     {c.status}
                   </Text>
                 </View>
@@ -100,23 +101,23 @@ export default function CompanyContracts() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
+  heading: { fontSize: 28, fontFamily: fonts.heading, color: '#FFFFFF' },
   tabs: {
     flexDirection: 'row',
     marginHorizontal: 24,
-    backgroundColor: colors.border,
+    backgroundColor: '#2E2E2E',
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
   },
   tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  tabActive: { backgroundColor: colors.white },
-  tabText: { fontSize: 14, fontWeight: '600', color: colors.muted },
-  tabTextActive: { color: colors.amber, fontWeight: '700' },
+  tabActive: { backgroundColor: '#FFFFFF' },
+  tabText: { fontSize: 14, fontFamily: fonts.bodySemiBold, color: '#6F6B6B' },
+  tabTextActive: { color: '#F5A623', fontFamily: fonts.bodyMedium },
   contractCard: {
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     marginHorizontal: 24,
     padding: 16,
     borderRadius: 14,
@@ -128,22 +129,22 @@ const makeStyles = (colors: any) => StyleSheet.create({
     elevation: 2,
   },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  contractTitle: { fontSize: 15, fontWeight: '700', color: colors.ink, flex: 1, marginRight: 8 },
-  contractValue: { fontSize: 15, fontWeight: '700', color: colors.amber },
-  contractClient: { fontSize: 13, color: colors.muted, marginBottom: 10 },
+  contractTitle: { fontSize: 15, fontFamily: fonts.bodyMedium, color: '#FFFFFF', flex: 1, marginRight: 8 },
+  contractValue: { fontSize: 15, fontFamily: fonts.bodyMedium, color: '#F5A623' },
+  contractClient: { fontSize: 13, color: '#6F6B6B', marginBottom: 10 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   progressBar: {
     flex: 1,
     height: 8,
-    backgroundColor: colors.border,
+    backgroundColor: '#2E2E2E',
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 4 },
-  progressText: { fontSize: 12, fontWeight: '600', color: colors.ink, width: 36 },
+  progressText: { fontSize: 12, fontFamily: fonts.bodySemiBold, color: '#FFFFFF', width: 36 },
   cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   contractStatus: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  contractStatusText: { fontSize: 12, fontWeight: '600' },
-  viewDetails: { fontSize: 13, color: colors.amber, fontWeight: '600' },
-  emptyText: { textAlign: 'center', color: colors.muted, marginTop: 40, fontSize: 14 },
+  contractStatusText: { fontSize: 12, fontFamily: fonts.bodySemiBold },
+  viewDetails: { fontSize: 13, color: '#F5A623', fontFamily: fonts.bodySemiBold },
+  emptyText: { textAlign: 'center', color: '#6F6B6B', marginTop: 40, fontSize: 14 },
 })
