@@ -1,6 +1,12 @@
 import type { TextStyle, ViewStyle } from 'react-native'
 import { Easing } from 'react-native-reanimated'
 
+/**
+ * @deprecated LEGACY COMPATIBILITY SHIM — do not import in new code.
+ * Canonical V2 system: `useColors()` from '@/lib/theme' (dynamic colors) +
+ * tokens from '@/lib/tokens' (spacing/borderRadius/shadows/opacity/fontSizes)
+ * + families from '@/lib/fonts'. Values below are frozen for existing screens.
+ */
 export const colors = {
   background:   '#0D0D0D',
   base:         '#141414',

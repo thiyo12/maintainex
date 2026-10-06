@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useColorScheme } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { lightColors, darkColors, AppColors } from './colors'
+import { lightColors, darkColors } from './colors'
+import type { AppColors } from './colors'
+
+export type { AppColors }
 
 type ThemeMode = 'light' | 'dark' | 'system'
 
