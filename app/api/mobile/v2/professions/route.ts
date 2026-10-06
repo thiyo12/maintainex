@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ professions })
   } catch (error) {
-    console.error('Professions list error:', error)
+    secureConsole.error('Professions list error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

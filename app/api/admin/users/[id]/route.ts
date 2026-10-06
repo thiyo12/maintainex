@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -454,7 +455,7 @@ export async function GET(
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM User 360 GET error:', error)
+    secureConsole.error('CRM User 360 GET error:', error)
     return NextResponse.json({ error: 'Failed to load User 360' }, { status: 500 })
   }
 }

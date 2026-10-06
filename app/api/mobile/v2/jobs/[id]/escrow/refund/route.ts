@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -110,7 +111,7 @@ export async function POST(
       { status: pendingExternal ? 202 : 200 }
     )
   } catch (error: any) {
-    console.error('Refund escrow error:', error)
+    logger.error('Escrow refund failed unexpectedly', { err: error, route: '/api/mobile/v2/jobs/[id]/escrow/refund', method: 'POST' })
     const message = error?.message || 'Failed to process refund'
     if (message.includes('Only the customer')) return NextResponse.json({ error: message }, { status: 403 })
     if (message.includes('ACTIVE_JOB_REQUIRES_DISPUTE')) {
@@ -131,6 +132,6 @@ export async function POST(
         { status: 409 }
       )
     }
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to process refund' }, { status: 500 })
   }
 }

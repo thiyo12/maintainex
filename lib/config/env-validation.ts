@@ -1,66 +1,129 @@
-const REQUIRED_PRODUCTION_SECRETS = [
-  'MARKETPLACE_JWT_SECRET',
-  'STAFF_JWT_SECRET',
-] as const
-
 const REQUIRED_SECRETS = [
   'MARKETPLACE_JWT_SECRET',
   'STAFF_JWT_SECRET',
   'PASSWORD_PEPPER',
+  'IDENTITY_CLAIM_PEPPER',
   'INTERNAL_SYNC_SECRET',
   'CRON_SECRET',
 ] as const
 
-function validateSecretLength(name: string, value: string, minBytes: number) {
-  const hexLength = minBytes * 2
-  if (value.length < hexLength) {
-    console.error(
-      `[SECURITY] ${name} is too short. Minimum ${minBytes} bytes (${hexLength} hex chars). Got ${value.length} chars.`
-    )
-    return false
+const INDEPENDENT_PRODUCTION_SECRETS = REQUIRED_SECRETS
+
+function validateSecretLength(name: string, value: string, minBytes: number): string | null {
+  const bytes = Buffer.byteLength(value, 'utf8')
+  if (bytes < minBytes) {
+    return `[CRITICAL] ${name} is too short. Minimum ${minBytes} bytes; got ${bytes}.`
   }
-  return true
+  return null
+}
+
+function anyConfigured(names: readonly string[]): boolean {
+  return names.some(name => Boolean(process.env[name]))
 }
 
 export function validateRequiredSecrets(): { valid: boolean; errors: string[] } {
   const errors: string[] = []
+  const production = process.env.NODE_ENV === 'production'
 
   for (const name of REQUIRED_SECRETS) {
     const value = process.env[name]
     if (!value) {
-      if (process.env.NODE_ENV === 'production') {
+      if (production) {
         errors.push(`[CRITICAL] ${name} is missing in production environment`)
       } else {
         console.warn(`[WARN] ${name} is not set (non-production)`)
       }
-    } else {
-      validateSecretLength(name, value, 32)
+      continue
+    }
+
+    const lengthError = validateSecretLength(name, value, 32)
+    if (lengthError) {
+      if (production) errors.push(lengthError)
+      else console.warn(lengthError.replace('[CRITICAL]', '[WARN]'))
     }
   }
 
-  if (process.env.NODE_ENV === 'production') {
+  if (production) {
     const marketplace = process.env.MARKETPLACE_JWT_SECRET
     const staff = process.env.STAFF_JWT_SECRET
     const legacy = process.env.JWT_SECRET
-
     if (marketplace && legacy && marketplace === legacy) {
       errors.push('[CRITICAL] MARKETPLACE_JWT_SECRET must not equal legacy JWT_SECRET')
     }
     if (staff && legacy && staff === legacy) {
       errors.push('[CRITICAL] STAFF_JWT_SECRET must not equal legacy JWT_SECRET')
     }
-    if (marketplace && staff && marketplace === staff) {
-      errors.push('[CRITICAL] MARKETPLACE_JWT_SECRET and STAFF_JWT_SECRET must be independent')
+    for (let i = 0; i < INDEPENDENT_PRODUCTION_SECRETS.length; i++) {
+      const leftName = INDEPENDENT_PRODUCTION_SECRETS[i]
+      const leftValue = process.env[leftName]
+      if (!leftValue) continue
+
+      for (let j = i + 1; j < INDEPENDENT_PRODUCTION_SECRETS.length; j++) {
+        const rightName = INDEPENDENT_PRODUCTION_SECRETS[j]
+        const rightValue = process.env[rightName]
+        if (rightValue && leftValue === rightValue) {
+          errors.push(`[CRITICAL] ${leftName} and ${rightName} must be independent`)
+        }
+      }
     }
+
     if (process.env.ALLOW_TEST_OTP === 'true') {
       errors.push('[CRITICAL] ALLOW_TEST_OTP must not be enabled in production')
+    }
+
+    const trustedProxyMode = process.env.TRUSTED_PROXY_MODE?.trim().toLowerCase()
+    if (trustedProxyMode !== 'cloudflare' && trustedProxyMode !== 'reverse-proxy') {
+      errors.push('[CRITICAL] TRUSTED_PROXY_MODE must be explicitly configured as cloudflare or reverse-proxy in production')
+    }
+
+    const mobileCorsOrigin = process.env.MOBILE_CORS_ORIGIN?.trim()
+    if (mobileCorsOrigin) {
+      if (mobileCorsOrigin === '*') {
+        errors.push('[CRITICAL] MOBILE_CORS_ORIGIN must not be wildcard in production')
+      } else {
+        try {
+          const parsed = new URL(mobileCorsOrigin)
+          if (parsed.protocol !== 'https:' || parsed.origin !== mobileCorsOrigin) {
+            errors.push('[CRITICAL] MOBILE_CORS_ORIGIN must be a single HTTPS origin in production')
+          }
+        } catch {
+          errors.push('[CRITICAL] MOBILE_CORS_ORIGIN must be a valid HTTPS origin in production')
+        }
+      }
+    }
+
+    const releaseSha = process.env.APP_RELEASE_SHA
+    if (!releaseSha) {
+      errors.push('[CRITICAL] APP_RELEASE_SHA is required in production')
+    } else if (!/^[0-9a-f]{40}$/.test(releaseSha)) {
+      errors.push('[CRITICAL] APP_RELEASE_SHA must be a lowercase 40-character git SHA')
+    }
+
+    const paypalVars = ['PAYPAL_CLIENT_ID', 'PAYPAL_CLIENT_SECRET', 'PAYPAL_WEBHOOK_ID'] as const
+    if (anyConfigured(paypalVars)) {
+      for (const name of paypalVars) {
+        if (!process.env[name]) {
+          errors.push(`[CRITICAL] ${name} is required when PayPal is configured in production`)
+        }
+      }
+      if (process.env.PAYPAL_SANDBOX !== 'false') {
+        errors.push('[CRITICAL] PAYPAL_SANDBOX must be explicitly false when PayPal is configured in production')
+      }
+    }
+
+    const payHereVars = [
+      'PAYHERE_MERCHANT_ID',
+      'PAYHERE_MERCHANT_SECRET',
+      'PAYHERE_APP_ID',
+      'PAYHERE_APP_SECRET',
+    ] as const
+    if (anyConfigured(payHereVars) && process.env.PAYHERE_SANDBOX !== 'false') {
+      errors.push('[CRITICAL] PAYHERE_SANDBOX must be explicitly false when PayHere production reconciliation/refund credentials are configured')
     }
   }
 
   if (errors.length > 0) {
-    for (const err of errors) {
-      console.error(err)
-    }
+    for (const err of errors) console.error(err)
     return { valid: false, errors }
   }
 
@@ -78,10 +141,11 @@ let validated = false
 
 export function ensureSecretsValidated() {
   if (validated) return
-  validated = true
 
   const result = validateRequiredSecrets()
   if (!result.valid && process.env.NODE_ENV === 'production') {
-    console.error('[SECURITY] Startup validation FAILED. Auth endpoints may be unavailable.')
+    throw new Error('[SECURITY] Production startup validation failed')
   }
+
+  validated = true
 }

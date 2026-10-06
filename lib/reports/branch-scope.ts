@@ -39,7 +39,7 @@ function normalizeCountries(assignedCountries?: string[] | null): string[] {
 }
 
 export async function resolveReportBranchScope(
-  session: AdminSession,
+  session: Pick<AdminSession, 'role' | 'assignedCountries'>,
   requestedBranchId: string | null
 ): Promise<ReportBranchScopeResult> {
   const requested = typeof requestedBranchId === 'string' && requestedBranchId.trim().length > 0

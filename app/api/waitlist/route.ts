@@ -1,14 +1,16 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
-    const { allowed } = checkRateLimit(ip, 5)
-    if (!allowed) {
-      return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429 })
-    }
+    const rateLimit = await checkRateLimit(request, {
+      policyName: 'PUBLIC_SUBMISSION',
+      keyPrefix: 'waitlist_submission',
+      identifier: ipKey(request),
+    })
+    if (!rateLimit.allowed) return rateLimit.response!
 
     const { name, phone, email, role } = await request.json()
 
@@ -25,21 +27,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid phone number with country code.' }, { status: 400 })
     }
 
-    if (email) {
+    const normalizedEmail = typeof email === 'string' && email.trim()
+      ? email.trim().toLowerCase().slice(0, 320)
+      : null
+    if (normalizedEmail) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(email)) {
+      if (!emailRegex.test(normalizedEmail)) {
         return NextResponse.json({ error: 'Invalid email address.' }, { status: 400 })
-      }
-
-      const existingEmail = await prisma.waitlistEntry.findUnique({ where: { email } })
-      if (existingEmail) {
-        return NextResponse.json({ error: 'This email is already registered.' }, { status: 409 })
       }
     }
 
-    const existingPhone = await prisma.waitlistEntry.findUnique({ where: { phone } })
-    if (existingPhone) {
-      return NextResponse.json({ error: 'This phone number is already registered.' }, { status: 409 })
+    const normalizedPhone = `+${digitsOnly}`
+    const existing = await prisma.waitlistEntry.findFirst({
+      where: {
+        OR: [
+          { phone: normalizedPhone },
+          ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+        ],
+      },
+      select: { id: true },
+    })
+    if (existing) {
+      return NextResponse.json({ success: true, message: "You're on the waitlist!" })
     }
 
     const validRoles = ['SEEKER', 'TASKER', 'AGENCY']
@@ -48,15 +57,18 @@ export async function POST(request: NextRequest) {
     await prisma.waitlistEntry.create({
       data: {
         name: name.trim(),
-        phone,
-        email: email || null,
+        phone: normalizedPhone,
+        email: normalizedEmail,
         role: entryRole,
       },
     })
 
     return NextResponse.json({ success: true, message: "You're on the waitlist!" })
-  } catch (error) {
-    console.error('Waitlist error:', error)
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return NextResponse.json({ success: true, message: "You're on the waitlist!" })
+    }
+    secureConsole.error('Waitlist error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

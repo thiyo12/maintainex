@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
-import { verifyAccessToken } from './admin-jwt'
+import { verifyStaffAccessToken } from '../staff-jwt'
 
 function getJwtSecret(): string {
   if (!process.env.JWT_SECRET && !process.env.NEXTAUTH_SECRET) throw new Error('[SECURITY] JWT_SECRET or NEXTAUTH_SECRET env var is required')
@@ -66,28 +66,33 @@ export function createSimpleToken(data: any): string {
   return `${encoded}.${signature}`
 }
 
-export async function getAdminSession(request: { headers: { get: (name: string) => string | null }, cookies: { get: (name: string) => { value: string } | undefined } }) {
-  // Try Bearer header first (for API/mobile clients)
-  const authHeader = request.headers.get('Authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    const rawToken = authHeader.slice(7)
-    // Try new JWT access token first
-    const jwtPayload = verifyAccessToken(rawToken)
-    if (jwtPayload) return jwtPayload
-    // Fallback to old simple token
-    const payload = verifySimpleToken(rawToken)
-    if (payload) return payload
+export async function getAdminSession(request: {
+  headers: { get: (name: string) => string | null }
+  cookies: { get: (name: string) => { value: string } | undefined }
+}) {
+  const authorization = request.headers.get('Authorization')
+  if (authorization?.startsWith('Bearer ')) {
+    const claims = verifyStaffAccessToken(authorization.slice(7))
+    if (claims) return claims
+
+    // Legacy admin tokens are development/test compatibility only. Production
+    // CRM authorization must be isolated on STAFF_JWT_SECRET.
+    if (process.env.NODE_ENV !== 'production') {
+      const legacy = verifySimpleToken(authorization.slice(7))
+      if (legacy) return legacy
+    }
+    return null
   }
-  // Fallback to cookie. Current CRM logins store the signed JWT access
-  // token in admin_token; keep simple-token verification only as a temporary
-  // compatibility fallback for older sessions.
+
   const token = request.cookies.get('admin_token')?.value
   if (!token) return null
 
-  const jwtPayload = verifyAccessToken(token)
-  if (jwtPayload) return jwtPayload
+  const claims = verifyStaffAccessToken(token)
+  if (claims) return claims
 
-  const legacyPayload = verifySimpleToken(token)
-  if (!legacyPayload) return null
-  return legacyPayload
+  if (process.env.NODE_ENV !== 'production') {
+    return verifySimpleToken(token)
+  }
+
+  return null
 }

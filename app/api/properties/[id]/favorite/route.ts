@@ -1,14 +1,17 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { PUBLIC_REAL_ESTATE_STATUSES } from '@/lib/real-estate/visibility'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getSession(request)
+    const session = await authenticateMarketplaceUser(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(session)
+    if (blocked) return blocked
 
     const { id } = await params
 
@@ -52,7 +55,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json({ success: true, favorited: result })
   } catch (error: any) {
-    console.error('Error toggling favorite:', error)
+    secureConsole.error('Error toggling favorite:', error)
     return NextResponse.json({ error: error?.message || 'Failed to toggle favorite' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmRequest, assertCrmCountryAllowed } from '@/lib/crm/security'
@@ -86,7 +87,7 @@ export async function PATCH(
       message: `Company verification ${action.toLowerCase()} completed successfully`,
     })
   } catch (error) {
-    console.error('CRM company verification error:', error)
+    logger.error('CRM company verification failed unexpectedly', { err: error, route: '/api/admin/companies/[id]/verification' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

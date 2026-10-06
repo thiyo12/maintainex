@@ -71,6 +71,8 @@ export function redactObject(obj: unknown, depth = 0): unknown {
 
 export function redactString(str: string): string {
   let result = str
+    .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]{16,}={0,2}/gi, 'Bearer [REDACTED]')
+    .replace(/\b(postgres(?:ql)?:\/\/[^:\s/]+:)[^@\s/]+@/gi, '$1[REDACTED]@')
   for (const pattern of SENSITIVE_PATTERNS) {
     result = result.replace(/([a-zA-Z_]+)=(["']?)([^"'\s,;]+)(["']?)/gi, (match, key, q1, val, q2) => {
       if (pattern.test(key)) {

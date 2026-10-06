@@ -1,13 +1,7 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { verifyRefreshToken, signAccessToken, signRefreshToken, hashRefreshToken, matchesRefreshTokenHash } from '@/lib/auth/authentication/admin-jwt'
+import { rotateStaffRefreshToken } from '@/lib/auth/staff-rotation'
 import { getIp } from '@/lib/auth/authorization/admin-rbac'
-import type { AdminRole } from '@/lib/admin-types'
-
-function parseCountries(val: string): string[] {
-  if (!val) return []
-  try { const p = JSON.parse(val); return Array.isArray(p) ? p : [] } catch { return val.split(',').map(c => c.trim()).filter(Boolean) }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,73 +10,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No refresh token' }, { status: 401 })
     }
 
-    const payload = verifyRefreshToken(refreshToken)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid refresh token' }, { status: 401 })
-    }
-
-    const session = await prisma.adminSession.findUnique({ where: { id: payload.jti } })
-    if (
-      !session ||
-      session.adminUserId !== payload.sub ||
-      session.isRevoked ||
-      session.expiresAt < new Date() ||
-      !matchesRefreshTokenHash(refreshToken, session.refreshTokenHash)
-    ) {
-      return NextResponse.json({ error: 'Session expired, revoked, or refresh token was rotated' }, { status: 401 })
-    }
-
-    const adminUser = await prisma.adminUser.findUnique({ where: { id: payload.sub } })
-    if (
-      !adminUser ||
-      !adminUser.isActive ||
-      adminUser.deletedAt ||
-      (adminUser.lockedUntil && adminUser.lockedUntil > new Date())
-    ) {
-      return NextResponse.json({ error: 'Account not active' }, { status: 401 })
-    }
-
-    const newRefreshToken = signRefreshToken(adminUser.id, session.id)
-    const newRefreshTokenHash = hashRefreshToken(newRefreshToken)
-
-    const rotated = await prisma.adminSession.updateMany({
-      where: {
-        id: session.id,
-        adminUserId: adminUser.id,
-        isRevoked: false,
-        refreshTokenHash: session.refreshTokenHash,
-      },
-      data: {
-        refreshTokenHash: newRefreshTokenHash,
-        lastUsedAt: new Date(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      },
+    const rotated = await rotateStaffRefreshToken(refreshToken, {
+      ipAddress: getIp(request),
+      userAgent: request.headers.get('user-agent') || undefined,
     })
-    if (rotated.count !== 1) {
-      return NextResponse.json({ error: 'Refresh token was already rotated' }, { status: 401 })
+    if (!rotated) {
+      return NextResponse.json(
+        { error: 'Session expired, revoked, or refresh token was replayed' },
+        { status: 401 }
+      )
     }
 
-    const accessToken = signAccessToken({
-      id: adminUser.id,
-      email: adminUser.email,
-      role: adminUser.role as AdminRole,
-      firstName: adminUser.firstName,
-      lastName: adminUser.lastName,
-      assignedCountries: parseCountries(adminUser.assignedCountries),
-      sessionId: session.id,
-    })
+    const response = NextResponse.json({ accessToken: rotated.accessToken })
 
-    const response = NextResponse.json({ accessToken })
-
-    response.cookies.set('admin_token', accessToken, {
+    response.cookies.set('admin_token', rotated.accessToken, {
       httpOnly: true,
       secure: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 24 * 60 * 60,
+      maxAge: 30 * 60,
     })
 
-    response.cookies.set('refresh_token', newRefreshToken, {
+    response.cookies.set('refresh_token', rotated.refreshTokenRaw, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
@@ -90,8 +39,6 @@ export async function POST(request: NextRequest) {
       maxAge: 7 * 24 * 60 * 60,
     })
 
-    // Remove the historical narrower cookie to avoid duplicate same-name
-    // refresh cookies being sent to the refresh endpoint.
     response.cookies.set('refresh_token', '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -102,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     return response
   } catch (error) {
-    console.error('Refresh error:', error)
+    logger.error('Admin token refresh failed unexpectedly', { err: error, route: '/api/admin/auth/refresh', method: 'POST' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

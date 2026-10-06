@@ -1,21 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rotateMarketplaceRefreshToken } from '@/lib/auth/rotation'
 import { AuthError } from '@/lib/auth/errors'
+import { checkRateLimit, ipKey } from '@/lib/shared/rate-limit/middleware'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
+
+const MAX_REFRESH_BODY_BYTES = 2048
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const limit = await checkRateLimit(request, {
+      policyName: 'AUTH',
+      keyPrefix: 'marketplace_refresh',
+      identifier: ipKey(request),
+    })
+    if (!limit.allowed) return limit.response!
+
+    const contentLength = Number(request.headers.get('content-length') || 0)
+    if (Number.isFinite(contentLength) && contentLength > MAX_REFRESH_BODY_BYTES) {
+      return NextResponse.json({ error: 'Request payload too large' }, { status: 413 })
+    }
+
+    const rawBody = await request.text()
+    if (Buffer.byteLength(rawBody, 'utf8') > MAX_REFRESH_BODY_BYTES) {
+      return NextResponse.json({ error: 'Request payload too large' }, { status: 413 })
+    }
+
+    let body: Record<string, unknown>
+    try {
+      const parsed = JSON.parse(rawBody)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+      }
+      body = parsed as Record<string, unknown>
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
+
     const refreshToken = typeof body.refreshToken === 'string' ? body.refreshToken.trim() : ''
 
     if (!refreshToken) {
       return NextResponse.json({ error: 'Refresh token required' }, { status: 400 })
     }
 
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || undefined
+    const ip = getTrustedClientIp(request.headers)
     const userAgent = request.headers.get('user-agent') || undefined
 
     const result = await rotateMarketplaceRefreshToken(refreshToken, {
-      ipAddress: ip,
+      ipAddress: ip === 'unknown' ? undefined : ip,
       userAgent,
     })
 

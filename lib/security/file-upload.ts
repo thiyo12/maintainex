@@ -46,6 +46,13 @@ export function validateFileUpload(
     }
   }
 
+  if (
+    declaredMimeType === 'image/webp' &&
+    (buffer.length < 12 || buffer.slice(8, 12).toString('ascii') !== 'WEBP')
+  ) {
+    return { valid: false, error: 'File content does not match declared type' }
+  }
+
   if (buffer.length > 10 * 1024 * 1024) {
     return { valid: false, error: 'File size exceeds 10MB limit' }
   }

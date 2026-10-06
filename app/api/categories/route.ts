@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
       }
     )
   } catch (error) {
-    console.error('Public categories GET error:', error)
+    secureConsole.error('Public categories GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 })
   }
 }

@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/shared/observability/logger'
 
 const TOKEN_LENGTH = 48
 const TOKEN_EXPIRY_HOURS = 1
@@ -54,7 +55,7 @@ export async function cleanupExpiredTokens(): Promise<number> {
     `
     return result as number
   } catch (e) {
-    console.error('Token cleanup failed:', e)
+    logger.error('Password reset token cleanup failed', { err: e })
     return 0
   }
 }

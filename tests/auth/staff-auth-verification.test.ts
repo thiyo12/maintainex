@@ -3,23 +3,20 @@ import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
+import { signStaffAccessToken } from '@/lib/auth/staff-jwt'
 import { PATCH } from '@/app/api/admin/companies/[id]/verification/route'
 import { requiresPostgres } from '../helpers/test-guard'
 
 const prisma = new PrismaClient()
 
-const JWT_SECRET = 'test-staff-auth-verification-secret-0123456789'
-const ORIGINAL_JWT = process.env.JWT_SECRET
+const STAFF_SECRET = 'test-staff-auth-verification-secret-0123456789'
+const ORIGINAL_STAFF = process.env.STAFF_JWT_SECRET
 
 let sessionCounter = 0
 function uniqueHash() { return crypto.createHash('sha256').update(`sess-${Date.now()}-${sessionCounter++}`).digest('hex') }
 
-function signToken(sub: string, sid: string, overrides?: Record<string, unknown>) {
-  return jwt.sign(
-    { sub, sid, type: 'access', ...overrides },
-    JWT_SECRET,
-    { expiresIn: '30m' }
-  )
+function signToken(sub: string, sid: string) {
+  return signStaffAccessToken(sub, sid)
 }
 
 let requestCounter = 1
@@ -51,11 +48,11 @@ describe.skipIf(!requiresPostgres())('Phase 6.6 — Route-Level Staff Auth (Comp
   let wrongSecretToken: string
 
   beforeAll(async () => {
-    process.env.JWT_SECRET = JWT_SECRET
+    process.env.STAFF_JWT_SECRET = STAFF_SECRET
     const ts = Date.now()
 
     const superAdmin = await prisma.adminUser.create({
-      data: { email: `sa-route-${ts}@test.com`, passwordHash: 'x', role: 'SUPER_ADMIN', firstName: 'SA', lastName: 'Test', isActive: true },
+      data: { email: `sa-route-${ts}@test.com`, passwordHash: 'x', role: 'SUPER_ADMIN', firstName: 'SA', lastName: 'Test', isActive: true, totpEnabled: true, totpSecret: 'TESTSUPERADMINMFASECRET' },
     })
     superAdminId = superAdmin.id
     const saSession = await prisma.adminSession.create({
@@ -121,8 +118,8 @@ describe.skipIf(!requiresPostgres())('Phase 6.6 — Route-Level Staff Auth (Comp
     revokedToken = signToken(revokedAdmin.id, revokedSessionId)
 
     expiredToken = jwt.sign(
-      { sub: superAdminId, sid: 'nonexistent-expired-sid', type: 'access', exp: Math.floor(Date.now() / 1000) - 3600 },
-      JWT_SECRET
+      { sub: superAdminId, sid: 'nonexistent-expired-sid', aud: 'maintainex-staff', iss: 'maintainex', type: 'staff_access', exp: Math.floor(Date.now() / 1000) - 3600 },
+      STAFF_SECRET
     )
 
     const inactiveAdmin = await prisma.adminUser.create({
@@ -144,7 +141,7 @@ describe.skipIf(!requiresPostgres())('Phase 6.6 — Route-Level Staff Auth (Comp
     deletedToken = signToken(deletedAdminId, deletedSession.id)
 
     wrongSecretToken = jwt.sign(
-      { sub: superAdminId, sid: superAdminSessionId, type: 'access' },
+      { sub: superAdminId, sid: superAdminSessionId, aud: 'maintainex-staff', iss: 'maintainex', type: 'staff_access' },
       'wrong-secret-key',
       { expiresIn: '30m' }
     )
@@ -163,8 +160,8 @@ describe.skipIf(!requiresPostgres())('Phase 6.6 — Route-Level Staff Auth (Comp
   })
 
   afterAll(async () => {
-    if (ORIGINAL_JWT !== undefined) process.env.JWT_SECRET = ORIGINAL_JWT
-    else delete process.env.JWT_SECRET
+    if (ORIGINAL_STAFF !== undefined) process.env.STAFF_JWT_SECRET = ORIGINAL_STAFF
+    else delete process.env.STAFF_JWT_SECRET
 
     await prisma.teamMember.deleteMany({ where: { companyId } })
     await prisma.companyProfile.delete({ where: { id: companyId } }).catch(() => {})
@@ -213,8 +210,8 @@ describe.skipIf(!requiresPostgres())('Phase 6.6 — Route-Level Staff Auth (Comp
 
   it('marketplace user token → denied', async () => {
     const marketplaceToken = jwt.sign(
-      { sub: superAdminId, sid: 'mkt-sid', type: 'marketplace_access' },
-      JWT_SECRET,
+      { sub: superAdminId, sid: 'mkt-sid', aud: 'maintainex-marketplace', iss: 'maintainex', type: 'marketplace_access' },
+      STAFF_SECRET,
       { expiresIn: '30m' }
     )
     const res = await PATCH(makeRequest(marketplaceToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })

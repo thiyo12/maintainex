@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
@@ -419,7 +420,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.message.includes('Provider is no longer available')) {
       return NextResponse.json({ error: error.message }, { status: 409 })
     }
-    console.error('Quote POST error:', error)
+    secureConsole.error('Quote POST error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

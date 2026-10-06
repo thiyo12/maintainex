@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
+import { matchesBearerSecret } from '@/lib/security/secret-compare'
 import {
   reconcilePayHereRefund,
   requestRequiredPayHereRefund,
@@ -11,11 +13,11 @@ const MAX_BATCH = 8
 
 export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET) {
-    console.error('[SECURITY] CRON_SECRET env var is required for PayHere refund worker')
+    logger.error('PayHere refund worker is missing CRON_SECRET')
     return NextResponse.json({ error: 'Worker not configured' }, { status: 503 })
   }
 
-  if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!matchesBearerSecret(request.headers.get('authorization'), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -56,10 +58,9 @@ export async function GET(request: NextRequest) {
           ...(result.code ? { code: result.code } : {}),
         })
       } catch (error) {
-        console.error('[CRON] PayHere refund item failed', {
+        logger.error('PayHere refund item failed', {
+          err: error,
           paymentIntentId: intent.id,
-          orderId: intent.merchantOrderId,
-          error: error instanceof Error ? error.message : 'Unknown error',
         })
         outcomes.push({
           paymentIntentId: intent.id,
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
       outcomes,
     })
   } catch (error) {
-    console.error('[CRON] PayHere refund worker failed:', error)
+    logger.error('PayHere refund worker failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

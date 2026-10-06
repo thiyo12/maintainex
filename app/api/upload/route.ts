@@ -1,10 +1,13 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
 import { writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
+import { checkRateLimit } from '@/lib/rate-limit/middleware'
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 const MAGIC_BYTES: Record<string, Uint8Array> = {
   'image/jpeg': new Uint8Array([0xFF, 0xD8, 0xFF]),
   'image/png': new Uint8Array([0x89, 0x50, 0x4E, 0x47]),
@@ -28,12 +31,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const rateLimit = await checkRateLimit(request, {
+      policyName: 'UPLOAD',
+      keyPrefix: 'generic_upload',
+      identifier: session.id,
+    })
+    if (!rateLimit.allowed) return rateLimit.response!
+
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const folder = formData.get('folder') as string || 'general'
+    const rawFolder = typeof formData.get('folder') === 'string' ? String(formData.get('folder')) : 'general'
+    const folder = rawFolder.replace(/[^a-zA-Z0-9/_-]/g, '').slice(0, 80) || 'general'
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    }
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json({ error: 'File size exceeds 10MB limit' }, { status: 400 })
+    }
+
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: 'Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.' }, { status: 400 })
     }
 
     const bytes = await file.arrayBuffer()
@@ -41,6 +60,11 @@ export async function POST(request: NextRequest) {
     const detectedMime = detectMimeType(new Uint8Array(bytes))
     if (!detectedMime) {
       return NextResponse.json({ error: 'Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.' }, { status: 400 })
+    }
+
+    // Industry assets are CRM-controlled public catalog content.
+    if (folder === 'industries' && session.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Only Super Admin can upload industry assets' }, { status: 403 })
     }
 
     // For industries, save locally instead of Cloudinary
@@ -78,7 +102,7 @@ export async function POST(request: NextRequest) {
       success: true 
     })
   } catch (error) {
-    console.error('Error uploading file:', error)
+    logger.error('Generic authenticated upload failed unexpectedly', { err: error, route: '/api/upload', method: 'POST' })
     return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 })
   }
 }

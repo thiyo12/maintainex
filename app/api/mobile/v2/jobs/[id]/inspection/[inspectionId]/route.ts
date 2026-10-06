@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
@@ -172,7 +173,7 @@ export async function PATCH(
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (error) {
-    console.error('Inspection transition error:', error)
+    secureConsole.error('Inspection transition error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -210,7 +211,7 @@ export async function GET(
 
     return NextResponse.json({ inspection })
   } catch (error) {
-    console.error('Get inspection error:', error)
+    secureConsole.error('Get inspection error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -243,7 +244,7 @@ export async function POST(
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (error) {
-    console.error('Inspection verify error:', error)
+    secureConsole.error('Inspection verify error:', error)
     if (error instanceof Error) {
       if (error.message === 'NOT_FOUND') return NextResponse.json({ error: 'Inspection not found' }, { status: 404 })
       if (error.message === 'NOT_CUSTOMER') return NextResponse.json({ error: 'Only the customer can verify arrival' }, { status: 403 })

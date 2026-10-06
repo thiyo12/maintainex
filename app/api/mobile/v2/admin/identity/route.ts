@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('Admin list identity error:', error)
+    logger.error('Legacy admin identity list failed unexpectedly', { err: error, route: '/api/mobile/v2/admin/identity', method: 'GET' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

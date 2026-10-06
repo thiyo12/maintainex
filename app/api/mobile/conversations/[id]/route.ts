@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       messages,
     })
   } catch (error) {
-    console.error('Conversation get error:', error)
+    logger.error('Conversation read failed unexpectedly', { err: error, route: '/api/mobile/conversations/[id]', method: 'GET' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

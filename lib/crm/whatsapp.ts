@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { formatWhatsAppPhone } from '@/lib/shared/utils/phone'
+import { logger } from '@/lib/shared/observability/logger'
 
 interface WhatsAppMessage {
   phone: string
@@ -43,7 +44,9 @@ export async function sendWhatsAppMessage(data: WhatsAppMessage): Promise<WhatsA
     })
 
     return result
-  } catch (error: any) {
+  } catch (error) {
+    logger.error('WhatsApp delivery failed', { err: error, customerId })
+
     await prisma.customerCommunication.create({
       data: {
         customerId,
@@ -51,20 +54,18 @@ export async function sendWhatsAppMessage(data: WhatsAppMessage): Promise<WhatsA
         direction: 'OUTBOUND',
         content: message,
         status: 'FAILED',
-        errorMessage: error.message,
+        errorMessage: 'WhatsApp delivery failed',
       },
     })
 
     return {
       success: false,
-      error: error.message,
+      error: 'WhatsApp delivery failed',
     }
   }
 }
 
-async function sendViaWhatsAppAPI(data: { phone: string; message: string }): Promise<WhatsAppResult> {
-  console.log('WhatsApp message would be sent:', data)
-  
+async function sendViaWhatsAppAPI(_data: { phone: string; message: string }): Promise<WhatsAppResult> {
   return {
     success: true,
     messageId: `wa_${Date.now()}`,
@@ -106,9 +107,10 @@ export async function sendBulkWhatsApp(
         results.failed++
         results.errors.push(`Customer ${customerId}: ${result.error}`)
       }
-    } catch (error: any) {
+    } catch (error) {
+      logger.error('Bulk WhatsApp delivery failed', { err: error, customerId })
       results.failed++
-      results.errors.push(`Customer ${customerId}: ${error.message}`)
+      results.errors.push(`Customer ${customerId}: WhatsApp delivery failed`)
     }
   }
   

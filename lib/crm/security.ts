@@ -350,6 +350,8 @@ export async function guardCrmRequest(
         isActive: true,
         deletedAt: true,
         lockedUntil: true,
+        totpEnabled: true,
+        totpSecret: true,
         assignedCountries: true,
         permissionOverrides: {
           select: { permission: true, effect: true },
@@ -386,6 +388,19 @@ export async function guardCrmRequest(
   }
 
   const role = liveAdmin.role as AdminRole
+  if (
+    role === 'SUPER_ADMIN' &&
+    (liveAdmin.totpEnabled === false || liveAdmin.totpSecret === null)
+  ) {
+    return deny(
+      401,
+      'CRM_MFA_REQUIRED',
+      'Super-admin accounts must have two-factor authentication enabled.',
+      request,
+      { role }
+    )
+  }
+
   if (!(role in ROLE_PERMISSIONS)) {
     return deny(403, 'CRM_ROLE_INVALID', 'Admin role is not recognized.', request)
   }

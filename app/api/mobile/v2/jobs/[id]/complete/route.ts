@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -273,7 +274,7 @@ export async function POST(
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (error: any) {
-    console.error('Complete job error:', error)
+    secureConsole.error('Complete job error:', error)
     const message = error?.message || 'Server error'
     if (message.includes('Cannot transition') || message.includes('cannot transition') || message.includes('Actor type')) {
       return NextResponse.json({ error: message }, { status: 400 })

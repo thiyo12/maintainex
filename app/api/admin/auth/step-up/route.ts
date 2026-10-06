@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import { verifyTotp } from '@/lib/admin-2fa'
 import { guardCrmAction, guardCrmRequest } from '@/lib/crm/security'
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM step-up error:', error)
+    logger.error('CRM step-up authentication failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Unable to complete step-up authentication.' }, { status: 500 })
   }
 }

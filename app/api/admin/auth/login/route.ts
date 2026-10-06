@@ -1,14 +1,17 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import jwt from 'jsonwebtoken'
-import { signAccessToken, signRefreshToken, generateRefreshTokenValue, hashRefreshToken } from '@/lib/auth/authentication/admin-jwt'
+import { createStaffSession } from '@/lib/auth/staff-sessions'
 import { createAuditLog, getIp } from '@/lib/auth/authorization/admin-rbac'
 import { verifyPasswordWithMigration } from '@/lib/security/password'
 import type { AdminRole } from '@/lib/admin-types'
 
 function getTempTokenSecret(): string {
-  if (!process.env.JWT_SECRET) throw new Error('[SECURITY] JWT_SECRET env var is required')
-  return process.env.JWT_SECRET
+  if (!process.env.STAFF_JWT_SECRET) {
+    throw new Error('[SECURITY] STAFF_JWT_SECRET env var is required')
+  }
+  return process.env.STAFF_JWT_SECRET
 }
 const MAX_ATTEMPTS = 5
 const LOCK_MINUTES = 30
@@ -29,7 +32,7 @@ async function recordLoginAttempt(params: {
   try {
     await prisma.adminLoginAttempt.create({ data: params })
   } catch (e) {
-    console.error('Failed to record login attempt:', e)
+    logger.error('Failed to record admin login attempt', { err: e, route: '/api/admin/auth/login', method: 'POST' })
   }
 }
 
@@ -115,6 +118,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
+    if (
+      adminUser.role === 'SUPER_ADMIN' &&
+      (!adminUser.totpEnabled || !adminUser.totpSecret)
+    ) {
+      await recordLoginAttempt({
+        adminUserId: adminUser.id,
+        email,
+        ipAddress: ip,
+        userAgent,
+        success: false,
+        failureReason: 'MFA_ENROLLMENT_REQUIRED',
+      })
+      return NextResponse.json(
+        {
+          error: 'Two-factor authentication must be enabled for super-admin accounts before sign-in.',
+          code: 'MFA_ENROLLMENT_REQUIRED',
+        },
+        { status: 403 }
+      )
+    }
+
     await prisma.adminUser.update({
       where: { id: adminUser.id },
       data: { failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: new Date(), lastLoginIp: ip },
@@ -130,42 +154,30 @@ export async function POST(request: NextRequest) {
 
     if (adminUser.totpEnabled && adminUser.totpSecret) {
       const tempToken = jwt.sign(
-        { sub: adminUser.id, purpose: '2fa_verify', email: adminUser.email },
+        {
+          sub: adminUser.id,
+          purpose: '2fa_verify',
+          type: 'staff_mfa',
+          email: adminUser.email,
+        },
         getTempTokenSecret(),
-        { expiresIn: '5m' }
+        {
+          expiresIn: '5m',
+          audience: 'maintainex-staff-mfa',
+          issuer: 'maintainex',
+        }
       )
       await recordLoginAttempt({ adminUserId: adminUser.id, email, ipAddress: ip, userAgent, success: true, failureReason: '2FA_REQUIRED' })
       return NextResponse.json({ requires2fa: true, tempToken })
     }
 
-    const refreshTokenValue = generateRefreshTokenValue()
-    const refreshTokenHash = hashRefreshToken(refreshTokenValue)
-
-    const session = await prisma.adminSession.create({
-      data: {
-        adminUserId: adminUser.id,
-        refreshTokenHash,
-        ipAddress: ip,
-        userAgent,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      },
+    const staffSession = await createStaffSession({
+      adminUserId: adminUser.id,
+      ipAddress: ip,
+      userAgent: userAgent || undefined,
     })
-
-    const accessToken = signAccessToken({
-      id: adminUser.id,
-      email: adminUser.email,
-      role: adminUser.role as AdminRole,
-      firstName: adminUser.firstName,
-      lastName: adminUser.lastName,
-      assignedCountries: parseCountries(adminUser.assignedCountries),
-      sessionId: session.id,
-    })
-
-    const refreshToken = signRefreshToken(adminUser.id, session.id)
-    await prisma.adminSession.update({
-      where: { id: session.id },
-      data: { refreshTokenHash: hashRefreshToken(refreshToken) },
-    })
+    const accessToken = staffSession.accessToken
+    const refreshToken = staffSession.refreshTokenRaw
 
     const response = NextResponse.json({
       accessToken,
@@ -184,7 +196,7 @@ export async function POST(request: NextRequest) {
       secure: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 24 * 60 * 60,
+      maxAge: 30 * 60,
     })
 
     response.cookies.set('refresh_token', refreshToken, {
@@ -230,7 +242,7 @@ export async function POST(request: NextRequest) {
 
     return response
   } catch (error) {
-    console.error('Admin login error:', error)
+    logger.error('Admin login failed unexpectedly', { err: error, route: '/api/admin/auth/login', method: 'POST' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

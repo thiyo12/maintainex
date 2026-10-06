@@ -1,4 +1,6 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
@@ -39,7 +41,8 @@ function accountBlocked(user: any): NextResponse | null {
 }
 
 async function buildPhoneVerificationAuthResponse(request: NextRequest, userId: string) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || undefined
+  const resolvedIp = getTrustedClientIp(request.headers)
+  const ip = resolvedIp === 'unknown' ? undefined : resolvedIp
   const userAgent = request.headers.get('user-agent') || undefined
   const authSession = await createMarketplaceAuthSession(userId, { ipAddress: ip, userAgent })
   const response = buildAuthResponse(authSession)
@@ -179,7 +182,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Verify OTP error:', error)
+    logger.error('OTP verification failed unexpectedly', { err: error, route: '/api/mobile/auth/verify-otp', method: 'POST' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

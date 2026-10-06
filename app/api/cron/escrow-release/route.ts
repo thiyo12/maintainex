@@ -1,15 +1,17 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSetting } from '@/lib/settings'
 import { createNotification } from '@/lib/notifications'
 import { completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
+import { matchesBearerSecret } from '@/lib/security/secret-compare'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET) throw new Error('[SECURITY] CRON_SECRET env var is required')
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!matchesBearerSecret(authHeader, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -110,7 +112,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, processed })
   } catch (error) {
-    console.error('[CRON] Escrow auto-release error:', error)
+    logger.error('Escrow auto-release cron failed unexpectedly', { err: error, route: '/api/cron/escrow-release', method: 'GET' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createAuditLog } from '@/lib/crm/audit'
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM runtime config GET error:', error)
+    secureConsole.error('CRM runtime config GET error:', error)
     return NextResponse.json({ error: 'Failed to load runtime controls' }, { status: 500 })
   }
 }
@@ -133,7 +134,7 @@ export async function PUT(request: NextRequest) {
       config: await getPlatformRuntimeConfig(),
     })
   } catch (error) {
-    console.error('CRM runtime config PUT error:', error)
+    secureConsole.error('CRM runtime config PUT error:', error)
     return NextResponse.json({ error: 'Failed to update runtime controls' }, { status: 500 })
   }
 }

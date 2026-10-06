@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Team invite accept error:', error)
+    secureConsole.error('Team invite accept error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

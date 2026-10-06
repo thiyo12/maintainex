@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
@@ -228,7 +229,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM real estate GET error:', error)
+    secureConsole.error('CRM real estate GET error:', error)
     return NextResponse.json({ error: 'Failed to load real-estate operations' }, { status: 500 })
   }
 }
@@ -346,7 +347,7 @@ export async function PATCH(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('CRM real estate PATCH error:', error)
+    secureConsole.error('CRM real estate PATCH error:', error)
     return NextResponse.json({ error: 'Failed to moderate listing' }, { status: 500 })
   }
 }

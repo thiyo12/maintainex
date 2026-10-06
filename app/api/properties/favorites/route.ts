@@ -1,6 +1,7 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import {
   PUBLIC_REAL_ESTATE_STATUSES,
   toPublicListingDto,
@@ -8,10 +9,12 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession(request)
+    const session = await authenticateMarketplaceUser(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(session)
+    if (blocked) return blocked
 
     const favorites = await prisma.propertyFavorite.findMany({
       where: { userId: session.id },
@@ -45,7 +48,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error: any) {
-    console.error('Error fetching favorites:', error)
+    secureConsole.error('Error fetching favorites:', error)
     return NextResponse.json({ error: error?.message || 'Failed to fetch favorites' }, { status: 500 })
   }
 }

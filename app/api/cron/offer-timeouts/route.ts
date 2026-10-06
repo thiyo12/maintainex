@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import { notifyNextOfferCandidate } from '@/lib/offer-matcher'
 
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, expired: expired.length })
   } catch (error) {
-    console.error('[CRON] Offer timeout error:', error)
+    logger.error('Offer timeout cron failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

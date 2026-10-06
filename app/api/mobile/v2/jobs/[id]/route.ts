@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -379,7 +380,7 @@ export async function GET(
       },
     })
   } catch (error) {
-    console.error('Get job error:', error)
+    secureConsole.error('Get job error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -494,7 +495,7 @@ export async function PATCH(
         )
       }
     }
-    console.error('PATCH job error:', error)
+    secureConsole.error('PATCH job error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -92,7 +93,7 @@ export async function POST(
         )
       }
     }
-    console.error('Share address error:', error)
+    secureConsole.error('Share address error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

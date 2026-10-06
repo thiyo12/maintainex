@@ -1,6 +1,7 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { verifyRefreshToken } from '@/lib/auth/authentication/admin-jwt'
+import { parseStaffRefreshToken } from '@/lib/auth/staff-rotation'
+import { revokeStaffSession } from '@/lib/auth/staff-sessions'
 
 function clearAdminCookies(response: NextResponse) {
   response.cookies.set('admin_token', '', {
@@ -19,7 +20,6 @@ function clearAdminCookies(response: NextResponse) {
     maxAge: 0,
   })
 
-  // Compatibility cleanup for the historical refresh-only path.
   response.cookies.set('refresh_token', '', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -34,23 +34,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const refreshToken = request.cookies.get('refresh_token')?.value
-
     if (refreshToken) {
-      const payload = verifyRefreshToken(refreshToken)
-      if (payload) {
-        await prisma.adminSession.updateMany({
-          where: {
-            id: payload.jti,
-            adminUserId: payload.sub,
-            isRevoked: false,
-          },
-          data: { isRevoked: true, revokedAt: new Date() },
-        })
+      const parsed = parseStaffRefreshToken(refreshToken)
+      if (parsed) {
+        await revokeStaffSession(parsed.sessionId)
       }
     }
   } catch (error) {
     revokeFailed = true
-    console.error('Logout session revocation error:', error)
+    logger.error('Admin logout session revocation failed', { err: error, route: '/api/admin/auth/logout', method: 'POST' })
   }
 
   const response = NextResponse.json({

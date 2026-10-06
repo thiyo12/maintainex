@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -150,7 +151,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM finance overview GET error:', error)
+    secureConsole.error('CRM finance overview GET error:', error)
     return NextResponse.json({ error: 'Failed to load finance overview' }, { status: 500 })
   }
 }

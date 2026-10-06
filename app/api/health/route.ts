@@ -6,8 +6,13 @@ export async function GET() {
     await prisma.$queryRaw`SELECT 1`
     return NextResponse.json({
       status: 'healthy',
-      release: 'company-marketplace-qa-20260924',
-      testOtpMode: process.env.ALLOW_TEST_OTP === 'true' ? 'synthetic-only' : 'disabled',
+      release: process.env.APP_RELEASE_SHA || 'unknown',
+      testOtpMode:
+        process.env.NODE_ENV === 'production'
+          ? 'disabled'
+          : process.env.ALLOW_TEST_OTP === 'true'
+            ? 'synthetic-only'
+            : 'disabled',
       timestamp: new Date().toISOString(),
     })
   } catch {
