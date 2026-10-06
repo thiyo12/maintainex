@@ -208,6 +208,7 @@ export default function V2ProviderManageJobScreen() {
   const isCompleted = job.status === 'COMPLETED' || progressStatus === 'COMPLETED'
   const canDispute = job.status !== 'COMPLETED' && job.status !== 'CANCELLED'
   const canOtpCancel = isAccepted && ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)
+  const paymentReady = ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status)
 
   const customerName = job.customer?.name || 'Customer'
   const customerInitial = customerName.trim().charAt(0).toUpperCase() || 'C'
@@ -297,7 +298,7 @@ export default function V2ProviderManageJobScreen() {
                 </TouchableOpacity>
               </View>
             )}
-            {pinState?.hasActivePin && !pinState?.arrivalVerifiedAt ? (
+            {paymentReady && pinState?.hasActivePin && !pinState?.arrivalVerifiedAt ? (
               <View style={styles.pinNotice}>
                 <ShieldCheck size={18} color={v3.colors.info} weight="fill" />
                 <View style={styles.pinCopy}>
@@ -306,7 +307,7 @@ export default function V2ProviderManageJobScreen() {
                 </View>
               </View>
             ) : null}
-            {!pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) ? (
+            {!pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && paymentReady ? (
               <View style={styles.pinNotice}>
                 <Hourglass size={18} color={v3.colors.amberDark} weight="fill" />
                 <View style={styles.pinCopy}>
@@ -324,7 +325,7 @@ export default function V2ProviderManageJobScreen() {
                 </View>
               </View>
             ) : null}
-            {escrow && !['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) ? (
+            {escrow && !paymentReady ? (
               <View style={styles.pinNotice}>
                 <Hourglass size={18} color={v3.colors.amberDark} weight="fill" />
                 <View style={styles.pinCopy}>
@@ -367,7 +368,7 @@ export default function V2ProviderManageJobScreen() {
               </TouchableOpacity>
             ) : null}
 
-            {pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt ? (
+            {paymentReady && pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt ? (
               <TouchableOpacity
                 style={styles.primaryAction}
                 activeOpacity={0.78}
