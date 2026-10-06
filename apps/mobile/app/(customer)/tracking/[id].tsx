@@ -1,1 +1,1 @@
-export { default } from '@/features/customer/screens/tracking/[id]'
+export { default } from '@/components/tracking/LiveTrackingScreen'

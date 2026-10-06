@@ -1,28 +1,34 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
+import {
+  View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl,
+} from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '@/lib/i18n'
 import { v2Jobs } from '@/api/v2-jobs'
 import { V2Job } from '@/api/v2-types'
+import { ClipboardText, UserCircle, CaretRight } from 'phosphor-react-native'
+import { fonts } from '@/lib/fonts'
+import { v3 } from '@/theme/v3/tokens'
+
+const FILTERS = ['All', 'Active', 'Quoted', 'Completed'] as const
+type FilterKey = (typeof FILTERS)[number]
+
+const STATUS_FILTER_MAP: Record<FilterKey, string | null> = {
+  All: null,
+  Active: 'OPEN',
+  Quoted: 'IN_PROGRESS',
+  Completed: 'COMPLETED',
+}
 
 export default function V2MyJobsScreen() {
   const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const statusColors: Record<string, string> = {
-    OPEN: colors.amber,
-    IN_PROGRESS: '#3B82F6',
-    COMPLETED: colors.success,
-    CANCELLED: colors.error,
-  }
   const [jobs, setJobs] = useState<V2Job[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('All')
 
   const loadJobs = useCallback(async () => {
     try {
@@ -38,86 +44,136 @@ export default function V2MyJobsScreen() {
 
   useEffect(() => { loadJobs() }, [loadJobs])
 
-  const onRefresh = () => { setRefreshing(true); loadJobs() }
+  const onRefresh = () => {
+    setRefreshing(true)
+    loadJobs()
+  }
+
+  const filteredJobs = activeFilter === 'All'
+    ? jobs
+    : jobs.filter((j) => j.status === STATUS_FILTER_MAP[activeFilter])
+
+  const statusPillStyle = (status: string) => {
+    switch (status) {
+      case 'OPEN': return { bg: v3.colors.amberSoft, text: v3.colors.amberDark }
+      case 'IN_PROGRESS': return { bg: v3.colors.infoSoft, text: v3.colors.info }
+      case 'COMPLETED': return { bg: v3.colors.surfaceGray, text: v3.colors.textSecondary }
+      case 'CANCELLED': return { bg: v3.colors.errorSoft, text: v3.colors.error }
+      default: return { bg: v3.colors.surfaceGray, text: v3.colors.textSecondary }
+    }
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>{t('marketplace.title')}</Text>
-          <Text style={styles.subtitle}>{t('marketplace.count', { n: jobs.length })}</Text>
-        </View>
-        <TouchableOpacity onPress={() => router.push('/(customer)/jobs/v2/create')} style={styles.createBtn}>
-          <Text style={styles.createBtnText}>{t('marketplace.new')}</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.appBar}>
+        <View style={styles.appBarSpacer} />
+        <Text style={styles.appBarTitle}>My jobs</Text>
+        <TouchableOpacity style={styles.profileBtn} onPress={() => router.push('/(customer)/(tabs)/account' as any)}>
+          <UserCircle size={28} color={v3.colors.textSecondary} weight="fill" />
         </TouchableOpacity>
       </View>
 
+      <View style={styles.titleBlock}>
+        <Text style={styles.title}>Everything you've booked.</Text>
+        <Text style={styles.subtitle}>Active, quoted, scheduled and completed jobs in one place.</Text>
+      </View>
+
+      <View style={styles.filterRow}>
+        {FILTERS.map((f) => {
+          const active = activeFilter === f
+          return (
+            <TouchableOpacity
+              key={f}
+              style={[styles.filterPill, active && styles.filterPillActive]}
+              onPress={() => setActiveFilter(f)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>{f}</Text>
+            </TouchableOpacity>
+          )
+        })}
+      </View>
+
       {loading ? (
-        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
-      ) : jobs.length === 0 ? (
+        <ActivityIndicator size="large" color={v3.colors.ink} style={{ marginTop: 60 }} />
+      ) : filteredJobs.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="clipboard-outline" size={48} color={colors.muted} style={{ marginBottom: 16 }} />
-          <Text style={styles.emptyTitle}>{t('marketplace.noJobs')}</Text>
-          <Text style={styles.emptySub}>{t('marketplace.noJobsDesc')}</Text>
-          <TouchableOpacity onPress={() => router.push('/(customer)/jobs/v2/create')} style={styles.emptyBtn}>
-            <Text style={styles.emptyBtnText}>{t('marketplace.postJob')}</Text>
+          <View style={styles.emptyIcon}>
+            <ClipboardText size={34} color={v3.colors.textMuted} weight="light" />
+          </View>
+          <Text style={styles.emptyTitle}>No jobs yet</Text>
+          <Text style={styles.emptySub}>Post your first job to get started.</Text>
+          <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/(customer)/jobs/v2/create')} activeOpacity={0.7}>
+            <Text style={styles.emptyBtnText}>Post a job</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <ScrollView
           style={styles.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.amber} />}
+          contentContainerStyle={styles.listContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={v3.colors.ink} />}
         >
-          {jobs.map((job) => (
-            <TouchableOpacity key={job.id} style={styles.jobCard} onPress={() => router.push(`/(customer)/jobs/v2/${job.id}`)} activeOpacity={0.7}>
-              <View style={styles.cardTop}>
-                <View style={[styles.statusDot, { backgroundColor: statusColors[job.status] || colors.muted }]} />
-                <View style={[styles.statusBadge, { backgroundColor: statusColors[job.status] || colors.muted }]}>
-                  <Text style={styles.statusText}>{t(translateJobStatus(job.status))}</Text>
+          {filteredJobs.map((job, idx) => {
+            const pill = statusPillStyle(job.status)
+            return (
+              <TouchableOpacity
+                key={job.id}
+                style={styles.jobCard}
+                onPress={() => router.push(`/(customer)/jobs/v2/${job.id}`)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.numberCircle}>
+                  <Text style={styles.numberText}>{idx + 1}</Text>
                 </View>
-              </View>
-              <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-              <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
-              <View style={styles.cardFooter}>
-                <View style={styles.budgetPill}>
-                  <Text style={styles.budgetText}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
+                <View style={styles.jobContent}>
+                  <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
+                  <Text style={styles.jobMeta}>
+                    {new Date(job.createdAt).toLocaleDateString()}
+                    {job.locationName ? ` · ${job.locationName}` : ''}
+                  </Text>
                 </View>
-                <Text style={styles.jobDate}>{new Date(job.createdAt).toLocaleDateString()}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                <View style={[styles.statusPill, { backgroundColor: pill.bg }]}>
+                  <Text style={[styles.statusPillText, { color: pill.text }]}>{t(translateJobStatus(job.status))}</Text>
+                </View>
+                <CaretRight size={16} color={v3.colors.textMuted} />
+              </TouchableOpacity>
+            )
+          })}
         </ScrollView>
       )}
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: colors.cream },
-  greeting: { fontSize: 22, fontWeight: '800', color: colors.ink },
-  subtitle: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  createBtn: { backgroundColor: colors.amber, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 },
-  createBtnText: { fontSize: 14, fontWeight: '700', color: colors.ink },
-
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  appBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
+  appBarSpacer: { width: 28 },
+  appBarTitle: { fontFamily: fonts.headingBold, fontSize: 16, color: v3.colors.textPrimary, textAlign: 'center' },
+  profileBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  titleBlock: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
+  title: { fontFamily: fonts.heading, fontSize: 25, color: v3.colors.textPrimary, lineHeight: 31 },
+  subtitle: { fontFamily: fonts.body, fontSize: 11, color: v3.colors.textSecondary, marginTop: 4, lineHeight: 17 },
+  filterRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 8, marginBottom: 16 },
+  filterPill: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 14, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line },
+  filterPillActive: { backgroundColor: v3.colors.ink, borderColor: v3.colors.ink },
+  filterPillText: { fontFamily: fonts.bodyMedium, fontSize: 11, color: v3.colors.textSecondary },
+  filterPillTextActive: { color: v3.colors.paper },
+  list: { flex: 1 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 24 },
+  jobCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: v3.colors.paper, borderRadius: v3.radius.lg, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: v3.colors.line },
+  numberCircle: { width: 34, height: 34, borderRadius: 17, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  numberText: { fontFamily: fonts.headingBold, fontSize: 10, color: v3.colors.ink },
+  jobContent: { flex: 1, marginRight: 10 },
+  jobTitle: { fontFamily: fonts.headingBold, fontSize: 12, color: v3.colors.textPrimary, marginBottom: 3 },
+  jobMeta: { fontFamily: fonts.body, fontSize: 9.5, color: v3.colors.textMuted },
+  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginRight: 8 },
+  statusPillText: { fontFamily: fonts.bodySemiBold, fontSize: 9 },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.ink, marginBottom: 8 },
-  emptySub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
-  emptyBtn: { backgroundColor: colors.amber, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 12 },
-  emptyBtnText: { fontSize: 16, fontWeight: '700', color: colors.ink },
-
-  list: { flex: 1, paddingHorizontal: 16, paddingTop: 4 },
-  jobCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  jobTitle: { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 6 },
-  jobDesc: { fontSize: 13, color: colors.ink, opacity: 0.6, lineHeight: 20, marginBottom: 12 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  budgetPill: { backgroundColor: colors.amberBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  budgetText: { fontSize: 13, fontWeight: '700', color: colors.amberDark },
-  jobDate: { fontSize: 12, color: colors.muted },
+  emptyIcon: { width: 70, height: 70, borderRadius: 22, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { fontFamily: fonts.headingBold, fontSize: 19, color: v3.colors.textPrimary, marginTop: 16, marginBottom: 7 },
+  emptySub: { fontFamily: fonts.body, fontSize: 12, color: v3.colors.textSecondary, textAlign: 'center', lineHeight: 19, marginBottom: 22 },
+  emptyBtn: { backgroundColor: v3.colors.ink, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14 },
+  emptyBtnText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: v3.colors.paper },
 })

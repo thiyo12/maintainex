@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Animated } from 'react-native'
-import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { XCircle, CalendarBlank, MapPin, Lock, ShieldCheck, CheckCircle, Users, CaretRight, Clock, Wallet, Star, Envelope, Wrench, Handshake, WarningCircle, FileText, ChatCircle, Hourglass, Note, Clipboard } from 'phosphor-react-native'
+import { CaretLeft, XCircle, CalendarBlank, MapPin, Lock, ShieldCheck, CheckCircle, Users, CaretRight, Clock, Wallet, Star, Envelope, Wrench, Handshake, WarningCircle, FileText, ChatCircle, Hourglass, Note, Clipboard } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '@/lib/i18n'
 import { getCategoryImageUrl } from '@/lib/categories'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { v2Jobs, v2JobActions, v2Match } from '@/api/v2-jobs'
-import { V2Job, V2Quote } from '@/api/v2-types'
+import { V2Job } from '@/api/v2-types'
+import { V2Quote } from '@/api/v2-types'
 import JobLifecycleTracker from '@/components/ui/JobLifecycleTracker'
 import { emit, removedJobs } from '@/lib/events'
 import NewChatModal from '@/features/messaging/components/NewChatModal'
@@ -81,8 +82,6 @@ export default function V2JobDetailScreen() {
   const [cancelReasonVisible, setCancelReasonVisible] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
-  const currencyCode = job?.countryCode === 'CA' ? 'CAD' : 'LKR'
-
   const loadJob = async () => {
     try {
       const res = await v2Jobs.get(id)
@@ -99,42 +98,34 @@ export default function V2JobDetailScreen() {
     } finally { setLoading(false) }
   }
 
-  useFocusEffect(
-    useCallback(() => {
-      loadJob()
-    }, [id])
-  )
+  useEffect(() => { loadJob() }, [id])
 
   const handleSelectQuote = (quoteId: string) => {
     const quote = quotes.find(q => q.id === quoteId)
     if (!quote || !job) return
-    router.push({ pathname: '/(customer)/payment/escrow-confirm', params: { bookingId: id, jobTitle: job.title, taskerName: quote.provider?.name || '', quotedAmount: String(quote.price), currency: currencyCode, quoteId } })
+    router.push({ pathname: '/(customer)/payment/escrow-confirm', params: { bookingId: id, jobTitle: job.title, taskerName: quote.provider?.name || '', quotedAmount: String(quote.price), quoteId } })
   }
 
-  const handleBargain = () => {
+  const handleBargain = async () => {
     if (!bargainModal || !bargainPrice) return
-    const price = Number.parseFloat(bargainPrice)
-    if (!Number.isFinite(price) || price < 100) {
+    const price = parseInt(bargainPrice, 10)
+    if (!price || price < 100) {
       Alert.alert(t('common.error'), t('errors.enterValidPrice'))
       return
     }
 
-    const contactUserId = bargainModal.providerType === 'COMPANY'
-      ? bargainModal.provider?.userId
-      : bargainModal.providerId
+    const chatUserId = (bargainModal.provider as any)?.chatUserId
+      || (bargainModal.providerType === 'INDIVIDUAL' ? bargainModal.providerId : null)
 
-    if (!contactUserId) {
-      Alert.alert(t('common.error'), 'Provider chat is not available for this quote.')
+    if (!chatUserId) {
+      Alert.alert('Messaging unavailable', 'This provider cannot receive negotiation messages right now.')
       return
     }
 
-    setMsgRecipient({
-      id: contactUserId,
-      name: bargainModal.provider?.name || 'Provider',
-    })
     setMsgPrefill(
-      `Counter offer: ${currencyCode} ${price.toLocaleString()}. If you agree, please revise your quote in MaintainEX so I can accept the updated price.`
+      `Hi ${bargainModal.provider?.name || ''}, would you accept LKR ${price.toLocaleString()} for this job? If we agree, please update your official MaintainEX quote so I can accept the final price.`
     )
+    setMsgRecipient({ id: chatUserId, name: bargainModal.provider?.name || 'Provider' })
     setBargainModal(null)
     setBargainPrice('')
   }
@@ -149,49 +140,18 @@ export default function V2JobDetailScreen() {
 
   const handleCancelWithReason = async () => {
     setCancelReasonVisible(false)
-    setActionLoading('cancel')
-    try {
-      await v2JobActions.complete(id, 'CANCEL', cancelReason || '')
-      removedJobs.add(id)
-      emit('jobsChanged', id)
-      router.back()
-    } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message || 'Could not cancel this booking.')
-    } finally {
-      setActionLoading('')
-    }
+    router.push({
+      pathname: '/(customer)/jobs/v2/[id]/cancel',
+      params: { id, reason: cancelReason || '' },
+    } as any)
   }
 
-  const handleDepositEscrow = () => {
-    router.push(`/(customer)/jobs/v2/confirm/${id}`)
-  }
-
-  const handleCashPayment = () => {
-    Alert.alert(
-      'Use Cash Payment?',
-      'MaintainEX will not hold cash for this booking. Pay the provider directly as agreed after the work. The provider remains responsible for MaintainEX platform commission.',
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: 'Use Cash',
-          onPress: async () => {
-            setActionLoading('cash')
-            try {
-              const result = await v2JobActions.confirmCashPayment(id)
-              Alert.alert(
-                'Cash Selected',
-                `Cash amount due: ${result.currency} ${Number(result.amountDue || 0).toLocaleString()}. Use the verification PIN before work starts.`,
-              )
-              await loadJob()
-            } catch (e: any) {
-              Alert.alert(t('common.error'), e?.message || 'Could not select cash payment.')
-            } finally {
-              setActionLoading('')
-            }
-          },
-        },
-      ],
-    )
+  const handleDepositEscrow = async () => {
+    if (!job) return
+    setActionLoading('escrow')
+    try { await v2JobActions.depositEscrow(id, job.budgetAmount ?? 0); Alert.alert(t('jobDetail.escrowDeposited'), t('jobDetail.escrowDepositedDesc')); loadJob() }
+    catch (e: any) { Alert.alert(t('common.error'), e.message) }
+    finally { setActionLoading('') }
   }
 
   const handleShareAddress = async () => {
@@ -202,16 +162,28 @@ export default function V2JobDetailScreen() {
   }
 
   const handleApproveCompletion = () => {
-    if (!job || !escrow || workspace?.progressStatus !== 'COMPLETION_REQUESTED') return
+    if (!job || !escrow) return
     const aq = quotes.find(q => q.status === 'ACCEPTED')
-    router.push({
-      pathname: '/(customer)/payment/confirm-complete',
-      params: {
-        bookingId: id,
-        jobTitle: job.title,
-        taskerName: aq?.provider?.name || 'Provider',
-      },
-    })
+    router.push({ pathname: '/(customer)/payment/confirm-complete', params: { bookingId: id, jobTitle: job.title, taskerName: aq?.provider?.name || '', taskerPayout: String(Number(escrow.amount) - Number(escrow.serviceFee || 0)), platformFee: String(Number(escrow.serviceFee || 0)) } })
+  }
+
+  const handleReleaseEscrow = async () => {
+    setActionLoading('release')
+    try { await v2JobActions.releaseEscrow(id); Alert.alert(t('jobDetail.escrowReleased'), ''); loadJob() }
+    catch (e: any) { Alert.alert(t('common.error'), e.message) }
+    finally { setActionLoading('') }
+  }
+
+  const handleRefundEscrow = async () => {
+    Alert.alert(t('jobDetail.refundEscrow'), '', [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('jobDetail.yesRefund'), style: 'destructive', onPress: async () => {
+        setActionLoading('refund')
+        try { await v2JobActions.refundEscrow(id); Alert.alert(t('jobDetail.refunded'), ''); loadJob() }
+        catch (e: any) { Alert.alert(t('common.error'), e.message) }
+        finally { setActionLoading('') }
+      }},
+    ])
   }
 
   const handleDispute = () => {
@@ -221,6 +193,13 @@ export default function V2JobDetailScreen() {
 
   if (loading) return <SafeAreaView style={styles.container}><ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} /></SafeAreaView>
   if (!job) return null
+
+  const canOtpCancel =
+    job.status === 'OPEN'
+    || (
+      ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)
+      && (!workspace || workspace.progressStatus === 'ACCEPTED')
+    )
 
   const statusColor = (status: string) => {
     const m: Record<string, string> = { OPEN: colors.amber, IN_PROGRESS: '#3B82F6', QUOTE_ACCEPTED: '#8B5CF6', ESCROW_DEPOSITED: '#06B6D4', COMPLETED: colors.success, CANCELLED: colors.error, DISPUTED: colors.error }
@@ -237,84 +216,164 @@ export default function V2JobDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* ─── App Bar ─── */}
+      <View style={styles.appBar}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.appBarBack}>
+          <CaretLeft size={20} color={colors.ink} weight="bold" />
+        </TouchableOpacity>
+        <Text style={styles.appBarTitle}>Job details</Text>
+        <View style={styles.appBarRight}>
+          <View style={styles.avatarSmall}>
+            <Text style={styles.avatarSmallText}>U</Text>
+          </View>
+        </View>
+      </View>
+
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* ─── Status Badge ─── */}
+        <View style={styles.statusBadgeRow}>
+          <Animated.View style={[styles.statusBadge, { backgroundColor: statusColor(job.status) + '22', transform: [{ translateY: bounceY }] }]}>
+            {(() => { const SI = statusMeta[job.status]?.icon || Clipboard; return <SI size={12} color={statusColor(job.status)} weight="fill" />; })()}
+            <Text style={[styles.statusBadgeText, { color: statusColor(job.status) }]}>
+              {(statusMeta[job.status]?.label || t(translateJobStatus(job.status))).toUpperCase()}
+            </Text>
+          </Animated.View>
+        </View>
+
+        {/* ─── Title + Meta ─── */}
+        <View style={styles.titleSection}>
+          <Text style={styles.title}>{job.title}</Text>
+          <View style={styles.metaRow}>
+            {job.preferredDate && (
+              <View style={styles.metaItem}>
+                <CalendarBlank size={12} color="#6F6B6B" weight="fill" />
+                <Text style={styles.metaText}>{job.timeSlot ? `${job.preferredDate} · ${job.timeSlot}` : job.preferredDate}</Text>
+              </View>
+            )}
+            {job.locationName && (
+              <View style={styles.metaItem}>
+                <MapPin size={12} color="#6F6B6B" weight="fill" />
+                <Text style={styles.metaText} numberOfLines={1}>{job.locationName}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* ─── Lifecycle ─── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
+        <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
           <JobLifecycleTracker status={job.status} escrowStatus={escrow?.status} createdAt={job.createdAt} />
         </View>
 
         {/* ─── Cancel Button ─── */}
-        {(job.status === 'OPEN' || job.status === 'QUOTE_ACCEPTED') && (
+        {canOtpCancel && (
           <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setCancelReasonVisible(true)} disabled={actionLoading !== ''}>
               <XCircle size={16} color={colors.error} weight="fill" />
-              <Text style={styles.cancelBtnText}>Cancel Booking</Text>
+              <Text style={styles.cancelBtnText}>Cancel before work starts · OTP required</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* ─── Hero ─── */}
-        <View style={styles.hero}>
-          <Animated.View style={[styles.statusPill, { backgroundColor: statusColor(job.status), transform: [{ translateY: bounceY }] }]}>
-            {(() => { const SI = statusMeta[job.status]?.icon || Clipboard; return <SI size={14} color="#fff" weight="fill" />; })()}
-            <Text style={styles.statusPillText}>{statusMeta[job.status]?.label || t(translateJobStatus(job.status))}</Text>
-          </Animated.View>
-          <Text style={[styles.title, { color: colors.ink }]}>{job.title}</Text>
-        </View>
-
-        {/* ─── Scheduled Date ─── */}
-        {job.preferredDate && (
-          <View style={styles.section}>
-            <View style={[styles.scheduleCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
-              <CalendarBlank size={18} color={colors.amberDark} weight="fill" />
-              <Text style={[styles.scheduleText, { color: colors.amberDark }]}>
-                {job.preferredTimeSlot ? `${job.preferredDate} at ${job.preferredTimeSlot}` : job.preferredDate}
-              </Text>
+        {/* ─── Professional Card (first accepted quote provider) ─── */}
+        {quotes.find(q => q.status === 'ACCEPTED') && (() => {
+          const aq = quotes.find(q => q.status === 'ACCEPTED')!
+          return (
+            <View style={styles.card}>
+              <View style={styles.professionalRow}>
+                <View style={styles.professionalAvatar}>
+                  <Text style={styles.professionalAvatarText}>{(aq.provider?.name || 'P')[0]}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.professionalName}>{aq.provider?.name || 'Provider'}</Text>
+                  <View style={styles.professionalMeta}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                      <Star size={12} color={colors.amber} weight="fill" />
+                      <Text style={styles.professionalRating}>{aq.provider?.rating?.toFixed(1) || '—'}</Text>
+                    </View>
+                    <Text style={styles.professionalDot}>·</Text>
+                    <Text style={styles.professionalJobs}>{aq.provider?.completedJobs || 0} jobs</Text>
+                  </View>
+                </View>
+              </View>
             </View>
-          </View>
-        )}
+          )
+        })()}
 
-        {/* ─── Info Cards ─── */}
-        <View style={styles.infoRow}>
-          <View style={[styles.infoCard, { backgroundColor: colors.white }]}>
-            <Wallet size={20} color={colors.amber} weight="fill" />
-            <Text style={styles.infoLabel}>Budget</Text>
-            <Text style={[styles.infoValue, { color: colors.ink }]}>{currencyCode} {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
-            <Text style={[styles.infoSub, { color: colors.muted }]}>{job.budgetType}</Text>
+        {/* ─── Job Details Card ─── */}
+        <View style={styles.card}>
+          <Text style={styles.cardHeading}>Job details</Text>
+          <View style={styles.detailRow}>
+            <View style={styles.detailLeft}>
+              <Wrench size={14} color={colors.amber} weight="fill" />
+              <Text style={styles.detailLabel}>Category</Text>
+            </View>
+            <Text style={styles.detailValue}>{(job as any)?.categoryName || job.title}</Text>
           </View>
+          <View style={styles.detailDivider} />
+          <View style={styles.detailRow}>
+            <View style={styles.detailLeft}>
+              <Wallet size={14} color={colors.amber} weight="fill" />
+              <Text style={styles.detailLabel}>Budget</Text>
+            </View>
+            <Text style={styles.detailValue}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
+          </View>
+          <View style={styles.detailDivider} />
+          {job.preferredDate && (
+            <>
+              <View style={styles.detailRow}>
+                <View style={styles.detailLeft}>
+                  <CalendarBlank size={14} color={colors.amber} weight="fill" />
+                  <Text style={styles.detailLabel}>Date</Text>
+                </View>
+                <Text style={styles.detailValue}>{job.preferredDate}</Text>
+              </View>
+              <View style={styles.detailDivider} />
+            </>
+          )}
+          {job.timeSlot && (
+            <>
+              <View style={styles.detailRow}>
+                <View style={styles.detailLeft}>
+                  <Clock size={14} color={colors.amber} weight="fill" />
+                  <Text style={styles.detailLabel}>Time</Text>
+                </View>
+                <Text style={styles.detailValue}>{job.timeSlot}</Text>
+              </View>
+              <View style={styles.detailDivider} />
+            </>
+          )}
           {job.locationName && (
-            <View style={[styles.infoCard, { backgroundColor: colors.white }]}>
-              <MapPin size={20} color={colors.amber} weight="fill" />
-              <Text style={styles.infoLabel}>Location</Text>
-              <Text style={[styles.infoValue, { color: colors.ink }]} numberOfLines={1}>{job.locationName}</Text>
-              <Text style={[styles.infoSub, { color: colors.muted }]}>Service area</Text>
+            <View style={styles.detailRow}>
+              <View style={styles.detailLeft}>
+                <MapPin size={14} color={colors.amber} weight="fill" />
+                <Text style={styles.detailLabel}>Location</Text>
+              </View>
+              <Text style={styles.detailValue} numberOfLines={1}>{job.locationName}</Text>
             </View>
           )}
+          {job.description ? (
+            <>
+              <View style={styles.detailDivider} />
+              <Text style={styles.detailDesc}>{job.description}</Text>
+            </>
+          ) : null}
         </View>
 
-        {/* ─── Description ─── */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.ink }]}>Description</Text>
-          <View style={[styles.descCard, { backgroundColor: colors.white }]}>
-            <Text style={[styles.desc, { color: colors.ink }]}>{job.description}</Text>
-          </View>
-        </View>
-
-        {/* ─── Quotes ─── */}
+        {/* ─── Quotes Section ─── */}
         {job.status === 'OPEN' && quotes.length > 0 && (
-          <View style={styles.section}>
+          <View style={styles.sectionBlock}>
             {(job as any).aiEstimate && (
-              <View style={[styles.aiEstimateBanner, { backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }]}>
+              <View style={styles.aiBanner}>
                 <WarningCircle size={16} color="#D48900" weight="fill" />
-                <Text style={[styles.aiEstimateBannerText, { color: '#92400E' }]}>
+                <Text style={styles.aiBannerText}>
                   AI estimate was {((job as any).aiEstimate.symbol || 'LKR')} {((job as any).aiEstimate.priceRange?.min || 0).toLocaleString()}–{((job as any).aiEstimate.priceRange?.max || 0).toLocaleString()}
                   {((job as any).aiEstimate.materialHandling === 'tasker_brings') ? ' with materials' : ''}. Quotes below show how taskers compare.
                 </Text>
               </View>
             )}
-            <View style={styles.quotesHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Quotes Received</Text>
-              <View style={styles.quoteCountBadge}><Text style={styles.quoteCountText}>{quotes.length}</Text></View>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeading}>Quotes received</Text>
+              <View style={styles.quoteCountPill}><Text style={styles.quoteCountText}>{quotes.length}</Text></View>
             </View>
             {quotes.map((q) => {
               const aiEst = (job as any).aiEstimate
@@ -328,17 +387,17 @@ export default function V2JobDetailScreen() {
                 }
               }
               return (
-              <View key={q.id} style={[styles.quoteCard, { backgroundColor: colors.white }]}>
+              <View key={q.id} style={styles.quoteCard}>
                 <View style={styles.quoteTop}>
-                  <View style={[styles.quoteAvatar, { backgroundColor: colors.amberLight }]}>
+                  <View style={styles.quoteAvatar}>
                     <Text style={styles.quoteAvatarText}>{(q.provider?.name || 'P')[0]}</Text>
                   </View>
-                  <View style={styles.quoteInfo}>
-                    <Text style={[styles.quoteProvider, { color: colors.ink }]}>{q.provider?.name || 'Provider'}</Text>
-                    <Text style={[styles.quoteMeta, { color: colors.muted }]}>{q.providerType} • {q.estimatedCompletionTime}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.quoteProviderName}>{q.provider?.name || 'Provider'}</Text>
+                    <Text style={styles.quoteProviderMeta}>{q.providerType} · {q.estimatedCompletionTime}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.quotePrice}>{currencyCode} {q.price.toLocaleString()}</Text>
+                    <Text style={styles.quotePrice}>LKR {q.price}</Text>
                     {quoteTag && (
                       <View style={[styles.quoteTag, { backgroundColor: quoteTag.bg }]}>
                         <Text style={[styles.quoteTagText, { color: quoteTag.color }]}>{quoteTag.label}</Text>
@@ -346,27 +405,32 @@ export default function V2JobDetailScreen() {
                     )}
                   </View>
                 </View>
-                {q.message ? <Text style={[styles.quoteMsg, { color: colors.ink }]}>{q.message}</Text> : null}
+                {q.message ? <Text style={styles.quoteMessage}>{q.message}</Text> : null}
                 {q.status === 'PENDING' ? (
                   <View style={styles.quoteActions}>
-                    <ActionBtn label="Accept" loadingKey={q.id} onPress={() => handleSelectQuote(q.id)} />
-<TouchableOpacity style={[styles.quoteActionBtn, { borderColor: colors.amber, flexDirection: 'row' }]}
-  onPress={() => { setBargainModal(q); setBargainPrice(String(q.price)) }} disabled={actionLoading !== ''}>
-  <Handshake size={14} color={colors.amber} weight="fill" style={{ marginRight: 6 }} />
-  <Text style={[styles.quoteActionBtnText, { color: colors.amber }]}>Bargain</Text>
-</TouchableOpacity>
+                    <TouchableOpacity style={styles.quoteAcceptBtn} onPress={() => handleSelectQuote(q.id)} disabled={actionLoading !== ''}>
+                      {actionLoading === q.id ? <ActivityIndicator color="#111827" size="small" /> : <Text style={styles.quoteAcceptText}>Accept</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.quoteBargainBtn}
+                      onPress={() => { setBargainModal(q); setBargainPrice(String(q.price)) }} disabled={actionLoading !== ''}>
+                      <Handshake size={14} color={colors.amber} weight="fill" />
+                      <Text style={styles.quoteBargainText}>Bargain</Text>
+                    </TouchableOpacity>
                   </View>
                 ) : null}
-                {q.provider?.id && (
+                {((q.provider as any)?.chatUserId || (q.providerType === 'INDIVIDUAL' && q.providerId)) && (
                   <TouchableOpacity
-                    style={[styles.messageRow, { borderTopColor: colors.border }]}
+                    style={styles.quoteMessageRow}
                     onPress={() => {
                       setMsgPrefill(`Hi ${q.provider?.name || ''}, I'm interested in your service for "${job?.title || 'this job'}".`)
-                      setMsgRecipient({ id: q.provider!.id, name: q.provider?.name || 'Provider' })
+                      setMsgRecipient({
+                        id: (q.provider as any)?.chatUserId || q.providerId,
+                        name: q.provider?.name || 'Provider',
+                      })
                     }}
                   >
-                    <ChatCircle size={16} color={colors.amber} weight="fill" />
-                    <Text style={[styles.messageRowText, { color: colors.ink }]}>Message {q.provider?.name || 'provider'}</Text>
+                    <ChatCircle size={14} color={colors.amber} weight="fill" />
+                    <Text style={styles.quoteMessageText}>Message {q.provider?.name || 'provider'}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -377,37 +441,37 @@ export default function V2JobDetailScreen() {
 
         {/* ─── No Quotes ─── */}
         {job.status === 'OPEN' && quotes.length === 0 && (
-          <View style={styles.noQuotesCard}>
+          <View style={styles.emptyState}>
             <Animated.View style={{ opacity: pulseOpacity }}><Hourglass size={48} color={colors.amber} weight="fill" /></Animated.View>
-            <Text style={[styles.noQuotesTitle, { color: colors.ink }]}>Waiting for heroes...</Text>
-            <Text style={[styles.noQuotesSub, { color: colors.muted }]}>Providers are reviewing your mission. Hang tight!</Text>
+            <Text style={styles.emptyTitle}>Waiting for heroes...</Text>
+            <Text style={styles.emptySub}>Providers are reviewing your mission. Hang tight!</Text>
           </View>
         )}
 
-        {/* ─── Taskers ─── */}
+        {/* ─── Nearby Heroes ─── */}
         {job.status === 'OPEN' && providers.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.providersHeader}>
-              <Users size={20} color={colors.amber} weight="fill" />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Nearby Heroes ({providers.length})</Text>
+          <View style={styles.sectionBlock}>
+            <View style={styles.sectionHeaderRow}>
+              <Users size={18} color={colors.amber} weight="fill" />
+              <Text style={styles.sectionHeading}>Nearby Heroes ({providers.length})</Text>
             </View>
             {providers.map((p: any, i: number) => (
-              <TouchableOpacity key={p.id || i} style={[styles.providerCard, { backgroundColor: colors.white }]}
+              <TouchableOpacity key={p.id || i} style={styles.heroCard}
                 activeOpacity={0.7} onPress={() => router.push(`/(customer)/find/taskers/${job.id}`)}>
-                <View style={[styles.providerAvatar, { backgroundColor: colors.amberLight }]}>
-                  <Text style={styles.providerAvatarText}>{(p.name || 'T')[0]}</Text>
+                <View style={styles.heroAvatar}>
+                  <Text style={styles.heroAvatarText}>{(p.name || 'T')[0]}</Text>
                 </View>
-                <View style={styles.providerInfo}>
-                  <View style={styles.providerTop}>
-                    <Text style={[styles.providerName, { color: colors.ink }]}>{p.name || 'Tasker'}</Text>
-                    {p.isVerified && <CheckCircle size={14} color="#3B82F6" weight="fill" />}
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={styles.heroName}>{p.name || 'Tasker'}</Text>
+                    {p.isVerified && <CheckCircle size={12} color="#3B82F6" weight="fill" />}
                   </View>
-                  <View style={styles.providerMeta}>
-                    {p.rating ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}><Star size={11} color={colors.amber} weight="fill" /><Text style={[styles.providerMetaText, { color: colors.amber }]}> {p.rating.toFixed(1)}</Text></View> : null}
-                    {p.completedJobs > 0 && <Text style={[styles.providerMetaText, { color: colors.muted }]}>{p.completedJobs} jobs</Text>}
-                    {p.distance && <Text style={[styles.providerMetaText, { color: colors.muted }]}>{p.distance}</Text>}
+                  <View style={styles.heroMeta}>
+                    {p.rating ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}><Star size={10} color={colors.amber} weight="fill" /><Text style={styles.heroMetaText}> {p.rating.toFixed(1)}</Text></View> : null}
+                    {p.completedJobs > 0 && <Text style={styles.heroMetaText}>{p.completedJobs} jobs</Text>}
+                    {p.distance && <Text style={styles.heroMetaText}>{p.distance}</Text>}
                   </View>
-                  {p.hourlyRate ? <Text style={[styles.providerRate, { color: colors.success }]}>{currencyCode} {p.hourlyRate}/hr</Text> : p.fixedRate ? <Text style={[styles.providerRate, { color: colors.success }]}>{currencyCode} {p.fixedRate}</Text> : null}
+                  {p.hourlyRate ? <Text style={styles.heroRate}>LKR {p.hourlyRate}/hr</Text> : p.fixedRate ? <Text style={styles.heroRate}>LKR {p.fixedRate}</Text> : null}
                 </View>
                 <TouchableOpacity
                   hitSlop={8}
@@ -415,7 +479,7 @@ export default function V2JobDetailScreen() {
                     setMsgPrefill(`Hi ${p.name || ''}, I saw your profile for "${job?.title || 'this job'}". Are you available?`)
                     setMsgRecipient({ id: p.id, name: p.name || 'Tasker' })
                   }}
-                  style={[styles.messageIconBtn, { backgroundColor: colors.amberLight }]}
+                  style={styles.heroMsgBtn}
                 >
                   <ChatCircle size={16} color={colors.amber} weight="fill" />
                 </TouchableOpacity>
@@ -426,135 +490,140 @@ export default function V2JobDetailScreen() {
         )}
 
         {/* ─── Action Cards ─── */}
-        {job.status === 'QUOTE_ACCEPTED' && escrow?.status === 'PENDING_PAYMENT' ? (
-          <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
-            <Lock size={32} color={colors.ink} weight="fill" />
-            <Text style={styles.actionCardTitle}>Secure Payment</Text>
+        {(job.status === 'QUOTE_ACCEPTED' && escrow?.status === 'PENDING_PAYMENT') || (job.status === 'IN_PROGRESS' && !escrow) ? (
+          <View style={styles.actionCard}>
+            <View style={styles.actionIconCircle}>
+              <Lock size={28} color={colors.ink} weight="fill" />
+            </View>
+            <Text style={styles.actionCardTitle}>Fund Escrow</Text>
             <Text style={styles.actionCardDesc}>
-              Choose secure online payment or cash. Online payment is protected by MaintainEX. Cash is paid directly to the provider and is not held by MaintainEX.
+              Deposit LKR {escrow?.amount || job.budgetAmount} into escrow to start the work
+              {escrow?.createdAt ? ` — fund within 24 hours or the job will reopen` : ''}
             </Text>
-            <ActionBtn label="Pay Securely" loadingKey="escrow" onPress={handleDepositEscrow} />
-            <ActionBtn label="Use Cash" loadingKey="cash" onPress={handleCashPayment} outline />
+            <ActionBtn label="Deposit Now" loadingKey="escrow" onPress={handleDepositEscrow} />
           </View>
         ) : null}
 
-        {escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) && !job.addressSharedAt && (
-          <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
-            <MapPin size={28} color={colors.amber} weight="fill" />
+        {escrow && escrow.status === 'PROTECTED' && !job.addressSharedAt && (
+          <View style={styles.actionCard}>
+            <View style={styles.actionIconCircle}>
+              <MapPin size={28} color={colors.amber} weight="fill" />
+            </View>
             <Text style={styles.actionCardTitle}>Share Address</Text>
             <Text style={styles.actionCardDesc}>Let your hero know where to go</Text>
             {!showAddressForm ? (
               <ActionBtn label="Share Address" loadingKey="share-btn" onPress={() => setShowAddressForm(true)} outline />
             ) : (
               <View style={styles.addressForm}>
-                <TextInput style={[styles.input, { backgroundColor: colors.white, borderColor: colors.border, color: colors.ink }]} value={addressStreet} onChangeText={setAddressStreet} placeholder="Street" placeholderTextColor={colors.muted} />
-                <TextInput style={[styles.input, { backgroundColor: colors.white, borderColor: colors.border, color: colors.ink }]} value={addressBuilding} onChangeText={setAddressBuilding} placeholder="Building" placeholderTextColor={colors.muted} />
-                <TextInput style={[styles.input, { backgroundColor: colors.white, borderColor: colors.border, color: colors.ink }]} value={addressApartment} onChangeText={setAddressApartment} placeholder="Apartment" placeholderTextColor={colors.muted} />
-                <TextInput style={[styles.input, { backgroundColor: colors.white, borderColor: colors.border, color: colors.ink }]} value={addressLandmark} onChangeText={setAddressLandmark} placeholder="Landmark" placeholderTextColor={colors.muted} />
+                <TextInput style={styles.inputField} value={addressStreet} onChangeText={setAddressStreet} placeholder="Street" placeholderTextColor="#6F6B6B" />
+                <TextInput style={styles.inputField} value={addressBuilding} onChangeText={setAddressBuilding} placeholder="Building" placeholderTextColor="#6F6B6B" />
+                <TextInput style={styles.inputField} value={addressApartment} onChangeText={setAddressApartment} placeholder="Apartment" placeholderTextColor="#6F6B6B" />
+                <TextInput style={styles.inputField} value={addressLandmark} onChangeText={setAddressLandmark} placeholder="Landmark" placeholderTextColor="#6F6B6B" />
                 <ActionBtn label="Save" loadingKey="address" onPress={handleShareAddress} />
               </View>
             )}
           </View>
         )}
 
-        {workspace?.progressStatus === 'ACCEPTED' && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) && (
-          <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
-            <ShieldCheck size={28} color={colors.amber} weight="fill" />
-            <Text style={styles.actionCardTitle}>Arrival & Work Start Verification</Text>
-            <Text style={styles.actionCardDesc}>
-              Generate a one-time arrival PIN when the provider reaches you. After arrival is confirmed, generate a fresh PIN only when you are ready for work to start.
-            </Text>
-            <ActionBtn
-              label="Open Verification PIN"
-              loadingKey=""
-              onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
-            />
-          </View>
+        {workspace?.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && (
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
+          >
+            <View style={styles.actionIconCircle}>
+              <ShieldCheck size={28} color={colors.amber} weight="fill" />
+            </View>
+            <Text style={styles.actionCardTitle}>Confirm Arrival</Text>
+            <Text style={styles.actionCardDesc}>Enter the verification PIN from your hero</Text>
+            <ActionBtn label="Verify PIN" loadingKey="" onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)} />
+          </TouchableOpacity>
         )}
 
         {workspace?.progressStatus === 'COMPLETION_REQUESTED' && (
-          <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.success }]}>
-            <CheckCircle size={32} color={colors.success} weight="fill" />
+          <View style={[styles.actionCard, { borderColor: '#06C16744' }]}>
+            <View style={[styles.actionIconCircle, { backgroundColor: '#06C16722' }]}>
+              <CheckCircle size={28} color="#06C167" weight="fill" />
+            </View>
             <Text style={styles.actionCardTitle}>Job Complete?</Text>
-            <Text style={styles.actionCardDesc}>
-              {escrow?.status === 'CASH_CONFIRMED'
-                ? 'Your provider says the work is complete. Approve completion to close the job and record the provider platform settlement.'
-                : 'Your hero says they are done. Check the work and release the protected payment.'}
-            </Text>
-            <ActionBtn
-              label={escrow?.status === 'CASH_CONFIRMED' ? 'Approve Completion' : 'Approve & Release'}
-              loadingKey="approve"
-              onPress={handleApproveCompletion}
-              color={colors.success}
-            />
+            <Text style={styles.actionCardDesc}>Your hero says they're done. Check the work and release payment</Text>
+            <ActionBtn label="Approve & Release" loadingKey="approve" onPress={handleApproveCompletion} color="#06C167" />
           </View>
         )}
 
-        {/* ─── Escrow Status ─── */}
-        {escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) && (
-          <View style={[styles.escrowCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+        {/* ─── Escrow Status Card ─── */}
+        {escrow && escrow.status === 'PROTECTED' && (
+          <View style={styles.escrowCard}>
             <View style={styles.escrowHeader}>
-              <Text style={[styles.escrowTitle, { color: colors.ink }]}>Escrow</Text>
-              <View style={styles.escrowBadge}>
-                <Text style={styles.escrowBadgeText}>
-                  {escrow.status === 'CASH_CONFIRMED' ? 'Cash selected' : 'Protected'}
-                </Text>
-              </View>
+              <Text style={styles.escrowTitle}>Escrow</Text>
+              <View style={styles.escrowBadge}><Text style={styles.escrowBadgeText}>Protected</Text></View>
             </View>
-            <Text style={[styles.escrowAmount, { color: colors.ink }]}>
-              {escrow.currency || 'LKR'} {Number(escrow.totalAmount || escrow.amount || 0).toLocaleString()}
-            </Text>
-            <Text style={[styles.actionCardDesc, { marginBottom: 0 }]}>
-              {escrow.status === 'CASH_CONFIRMED'
-                ? 'Cash is paid directly to the provider and is not held by MaintainEX. Use the verification PIN before work begins.'
-                : 'Payment stays protected until you approve completed work. Before work starts, use the booking cancellation action above.'}
-            </Text>
+            <Text style={styles.escrowAmount}>LKR {escrow.amount}</Text>
+            <View style={styles.escrowActions}>
+              <ActionBtn label="Release to Hero" loadingKey="release" onPress={handleReleaseEscrow} color={colors.amber} />
+              <ActionBtn label="Refund & Cancel" loadingKey="refund" onPress={handleRefundEscrow} color={colors.error} />
+            </View>
           </View>
         )}
 
         {/* ─── Dispute ─── */}
-        {job.status === 'IN_PROGRESS' && workspace?.progressStatus !== 'DISPUTED' && (
-          <TouchableOpacity style={styles.disputeBtn} onPress={handleDispute}>
-            <Text style={styles.disputeBtnText}>Raise a Dispute</Text>
+        {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
+          <TouchableOpacity style={styles.linkBtn} onPress={handleDispute}>
+            <Text style={styles.linkBtnText}>Raise a Dispute</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* ─── Job PIN ─── */}
+        {(job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS') && (
+          <TouchableOpacity
+            style={[styles.linkBtn, { borderColor: colors.amber }]}
+            onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
+          >
+            <ShieldCheck size={16} color={colors.amber} />
+            <Text style={[styles.linkBtnText, { color: colors.amber, marginLeft: 8 }]}>Job Verification PIN</Text>
           </TouchableOpacity>
         )}
 
         {/* ─── Reviews ─── */}
         {reviews?.customerReviews?.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.ink }]}>Reviews</Text>
+          <View style={styles.sectionBlock}>
+            <Text style={styles.sectionHeading}>Reviews</Text>
             {reviews.customerReviews.map((r: any) => (
-              <View key={r.id} style={[styles.reviewCard, { backgroundColor: colors.white }]}>
+              <View key={r.id} style={styles.reviewCard}>
                 <View style={styles.reviewStars}>
                   {[1, 2, 3, 4, 5].map((s) => {
                     const active = s <= Math.round((r.quality + r.communication + r.timeliness) / 3)
-                    return <Star key={s} size={18} color={active ? colors.amber : colors.border} weight={active ? 'fill' : 'regular'} style={{ marginRight: 2 }} />
+                    return <Star key={s} size={16} color={active ? colors.amber : '#2E2E2E'} weight={active ? 'fill' : 'regular'} style={{ marginRight: 2 }} />
                   })}
                 </View>
-                <Text style={[styles.reviewScores, { color: colors.muted }]}>Quality: {r.quality} · Communication: {r.communication} · Timeliness: {r.timeliness}</Text>
-                {r.comment ? <Text style={[styles.reviewComment, { color: colors.ink }]}>{r.comment}</Text> : null}
+                <Text style={styles.reviewScores}>Quality: {r.quality} · Communication: {r.communication} · Timeliness: {r.timeliness}</Text>
+                {r.comment ? <Text style={styles.reviewComment}>{r.comment}</Text> : null}
               </View>
             ))}
           </View>
         )}
+
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* ─── Bargain Modal ─── */}
       <Modal visible={!!bargainModal} transparent animationType="slide" onRequestClose={() => setBargainModal(null)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { backgroundColor: colors.white }]}>
-            <Handshake size={36} color={colors.amber} weight="fill" style={{ alignSelf: 'center', marginBottom: 8 }} />
-            <Text style={[styles.modalTitle, { color: colors.ink }]}>Counter Offer</Text>
-            <Text style={[styles.modalSub, { color: colors.muted }]}>Propose your price to {bargainModal?.provider?.name || 'the hero'}</Text>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalIconCircle}>
+              <Handshake size={32} color={colors.amber} weight="fill" />
+            </View>
+            <Text style={styles.modalTitle}>Counter Offer</Text>
+            <Text style={styles.modalSub}>Propose your price to {bargainModal?.provider?.name || 'the hero'}</Text>
             <TextInput
-              style={[styles.modalInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
-              value={bargainPrice} onChangeText={setBargainPrice} placeholder={`${currencyCode} 0`} placeholderTextColor={colors.muted} keyboardType="numeric" />
+              style={styles.modalInput}
+              value={bargainPrice} onChangeText={setBargainPrice} placeholder="LKR 0" placeholderTextColor="#6F6B6B" keyboardType="numeric" />
             <View style={styles.modalActions}>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.border }]} onPress={() => setBargainModal(null)}>
-                <Text style={[styles.modalBtnText, { color: colors.ink }]}>Cancel</Text>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setBargainModal(null)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.amber }]} onPress={handleBargain} disabled={actionLoading !== ''}>
-                {actionLoading === 'bargain' ? <ActivityIndicator color="#111827" size="small" /> : <Text style={styles.modalBtnText}>Send Offer</Text>}
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleBargain} disabled={actionLoading !== ''}>
+                {actionLoading === 'bargain' ? <ActivityIndicator color="#111827" size="small" /> : <Text style={styles.modalConfirmText}>Send Offer</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -564,33 +633,37 @@ export default function V2JobDetailScreen() {
       {/* ─── Cancel Reason Modal ─── */}
       <Modal visible={cancelReasonVisible} transparent animationType="slide" onRequestClose={() => setCancelReasonVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { backgroundColor: colors.white }]}>
-            <XCircle size={36} color={colors.error} weight="fill" style={{ alignSelf: 'center', marginBottom: 8 }} />
-            <Text style={[styles.modalTitle, { color: colors.ink }]}>Cancel Mission</Text>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={[styles.modalIconCircle, { backgroundColor: '#E1190022' }]}>
+              <XCircle size={32} color="#E11900" weight="fill" />
+            </View>
+            <Text style={styles.modalTitle}>Cancel Mission</Text>
             <View style={styles.reasonList}>
               {cancelReasons.map((r) => (
                 <TouchableOpacity key={r.key} style={[styles.reasonOption, cancelReason === r.label && { backgroundColor: colors.amberBg }]}
                   onPress={() => setCancelReason(r.label)} activeOpacity={0.7}>
-                  <View style={[styles.radio, { borderColor: colors.border }, cancelReason === r.label && { borderColor: colors.amber }]}>
+                  <View style={[styles.radio, { borderColor: '#2E2E2E' }, cancelReason === r.label && { borderColor: colors.amber }]}>
                     {cancelReason === r.label && <View style={[styles.radioDot, { backgroundColor: colors.amber }]} />}
                   </View>
-                  <Text style={[styles.reasonText, { color: colors.ink }]}>{r.label}</Text>
+                  <Text style={styles.reasonText}>{r.label}</Text>
                 </TouchableOpacity>
               ))}
-              <TextInput style={[styles.reasonInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
-                value={cancelReason} onChangeText={setCancelReason} placeholder="Other reason..." placeholderTextColor={colors.muted} multiline />
+              <TextInput style={styles.reasonInput}
+                value={cancelReason} onChangeText={setCancelReason} placeholder="Other reason..." placeholderTextColor="#6F6B6B" multiline />
             </View>
             <View style={styles.modalActions}>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.border }]} onPress={() => setCancelReasonVisible(false)}>
-                <Text style={[styles.modalBtnText, { color: colors.ink }]}>Keep Job</Text>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setCancelReasonVisible(false)}>
+                <Text style={styles.modalCancelText}>Keep Job</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.error }]} onPress={handleCancelWithReason} disabled={actionLoading !== ''}>
-                {actionLoading === 'cancel' ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={[styles.modalBtnText, { color: '#FFFFFF' }]}>Cancel</Text>}
+              <TouchableOpacity style={[styles.modalConfirmBtn, { backgroundColor: '#E11900' }]} onPress={handleCancelWithReason} disabled={actionLoading !== ''}>
+                {actionLoading === 'cancel' ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={[styles.modalConfirmText, { color: '#FFFFFF' }]}>Cancel</Text>}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
       <NewChatModal
         visible={!!msgRecipient}
         onClose={() => setMsgRecipient(null)}
@@ -604,108 +677,133 @@ export default function V2JobDetailScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
   scroll: { flex: 1 },
 
-  hero: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 },
-  heroImg: { width: '100%', height: 120, borderRadius: 18, marginBottom: 6 },
-  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100, marginBottom: 8 },
-  statusPillText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#fff' },
-  title: { fontSize: 26, fontFamily: fonts.heading, lineHeight: 34, letterSpacing: -0.5 },
-  cancelBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 16, borderWidth: 1.5, borderColor: colors.error, backgroundColor: colors.errorBg },
-  cancelBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.error },
+  appBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+  appBarBack: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  appBarTitle: { fontSize: 13, fontFamily: fonts.headingBold, color: '#FFFFFF', textAlign: 'center', flex: 1 },
+  appBarRight: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  avatarSmall: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#2E2E2E', alignItems: 'center', justifyContent: 'center' },
+  avatarSmallText: { fontSize: 13, fontFamily: fonts.headingBold, color: '#F5A623' },
 
-  infoRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 10, marginBottom: 4 },
-  infoCard: { flex: 1, borderRadius: 20, padding: 14, gap: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  infoLabel: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  infoValue: { fontSize: 16, fontFamily: fonts.headingBold },
-  infoSub: { fontSize: 12, fontFamily: fonts.body },
+  statusBadgeRow: { paddingHorizontal: 16, marginBottom: 6 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14 },
+  statusBadgeText: { fontSize: 10, fontFamily: fonts.headingBold, letterSpacing: 0.8 },
 
-  section: { padding: 16, paddingBottom: 6 },
-  sectionTitle: { fontSize: 18, fontFamily: fonts.heading, marginBottom: 4 },
-  quotesHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  quoteCountBadge: { backgroundColor: colors.amber, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  quoteCountText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#111827' },
-  descCard: { borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  desc: { fontSize: 14, fontFamily: fonts.body, lineHeight: 22, opacity: 0.8 },
+  titleSection: { paddingHorizontal: 16, marginBottom: 10 },
+  title: { fontSize: 25, fontFamily: fonts.heading, color: '#FFFFFF', lineHeight: 32, letterSpacing: -0.5, marginBottom: 6 },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { fontSize: 10, fontFamily: fonts.bodyMedium, color: '#6F6B6B' },
 
-  scheduleCard: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 14, borderWidth: 1.5 },
-  scheduleText: { fontSize: 13, fontFamily: fonts.bodyMedium, flex: 1 },
+  card: { backgroundColor: '#FFFFFF', marginHorizontal: 16, marginBottom: 12, borderRadius: 18, padding: 16 },
+  cardHeading: { fontSize: 14, fontFamily: fonts.headingBold, color: '#000000', marginBottom: 12 },
 
-  noQuotesCard: { alignItems: 'center', padding: 32, gap: 10 },
-  noQuotesTitle: { fontSize: 18, fontFamily: fonts.heading },
-  noQuotesSub: { fontSize: 13, fontFamily: fonts.body, textAlign: 'center', lineHeight: 20, paddingHorizontal: 20 },
+  professionalRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  professionalAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(245,166,35,0.14)', alignItems: 'center', justifyContent: 'center' },
+  professionalAvatarText: { fontSize: 18, fontFamily: fonts.headingBold, color: '#F5A623' },
+  professionalName: { fontSize: 15, fontFamily: fonts.headingBold, color: '#000000' },
+  professionalMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  professionalRating: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#F5A623' },
+  professionalDot: { fontSize: 12, color: '#6F6B6B' },
+  professionalJobs: { fontSize: 12, fontFamily: fonts.body, color: '#6F6B6B' },
 
-  providersHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  providerCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 18, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  providerAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  providerAvatarText: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.amberDark },
-  providerInfo: { flex: 1 },
-  providerTop: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
-  providerName: { fontSize: 15, fontFamily: fonts.bodyMedium },
-  providerMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
-  providerMetaText: { fontSize: 11, fontFamily: fonts.bodyMedium },
-  providerRate: { fontSize: 13, fontFamily: fonts.headingBold },
+  detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
+  detailLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  detailLabel: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#6F6B6B' },
+  detailValue: { fontSize: 13, fontFamily: fonts.headingBold, color: '#000000', textAlign: 'right', flex: 1, marginLeft: 8 },
+  detailDivider: { height: 1, backgroundColor: '#2E2E2E' },
+  detailDesc: { fontSize: 13, fontFamily: fonts.body, color: '#000000', lineHeight: 20, marginTop: 10, opacity: 0.8 },
 
-  actionCard: { borderWidth: 1.5, borderRadius: 24, marginHorizontal: 16, marginBottom: 12, padding: 24, alignItems: 'center' },
-  actionCardTitle: { fontSize: 18, fontFamily: fonts.heading, color: colors.ink, marginBottom: 6, marginTop: 4 },
-  actionCardDesc: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
+  sectionBlock: { paddingHorizontal: 16, marginBottom: 8 },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  sectionHeading: { fontSize: 17, fontFamily: fonts.heading, color: '#FFFFFF' },
 
-  quoteCard: { borderRadius: 20, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  quoteCountPill: { backgroundColor: '#F5A623', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  quoteCountText: { fontSize: 11, fontFamily: fonts.headingBold, color: '#111827' },
+
+  quoteCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, marginBottom: 10 },
   quoteTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  quoteAvatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  quoteAvatarText: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.amberDark },
-  quoteInfo: { flex: 1 },
-  quoteProvider: { fontSize: 15, fontFamily: fonts.bodyMedium },
-  quoteMeta: { fontSize: 12, fontFamily: fonts.body, marginTop: 2 },
-  quotePrice: { fontSize: 18, fontFamily: fonts.heading, letterSpacing: -0.3, color: colors.amberDark },
-  quoteTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginTop: 4 },
-  quoteTagText: { fontSize: 10, fontFamily: fonts.bodySemiBold },
-  quoteMsg: { fontSize: 13, fontFamily: fonts.body, opacity: 0.7, lineHeight: 20, marginBottom: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border },
+  quoteAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(245,166,35,0.14)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  quoteAvatarText: { fontSize: 15, fontFamily: fonts.headingBold, color: '#F5A623' },
+  quoteProviderName: { fontSize: 14, fontFamily: fonts.headingBold, color: '#000000' },
+  quoteProviderMeta: { fontSize: 11, fontFamily: fonts.body, color: '#6F6B6B', marginTop: 2 },
+  quotePrice: { fontSize: 17, fontFamily: fonts.heading, color: '#F5A623', letterSpacing: -0.3 },
+  quoteTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginTop: 4 },
+  quoteTagText: { fontSize: 10, fontFamily: fonts.bodyMedium },
+  quoteMessage: { fontSize: 12, fontFamily: fonts.body, color: '#000000', opacity: 0.65, lineHeight: 18, marginBottom: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#2E2E2E' },
   quoteActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  quoteActionBtn: { flex: 1, paddingVertical: 10, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  quoteActionBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium },
-  messageRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, marginTop: 10, borderTopWidth: 1 },
-  messageRowText: { fontSize: 13, fontFamily: fonts.bodyMedium },
-  messageIconBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginRight: 4 },
+  quoteAcceptBtn: { flex: 1, paddingVertical: 11, borderRadius: 14, backgroundColor: '#F5A623', alignItems: 'center', justifyContent: 'center' },
+  quoteAcceptText: { fontSize: 13, fontFamily: fonts.headingBold, color: '#111827' },
+  quoteBargainBtn: { flex: 1, paddingVertical: 11, borderRadius: 14, borderWidth: 1.5, borderColor: '#F5A623', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  quoteBargainText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#F5A623' },
+  quoteMessageRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, marginTop: 10, borderTopWidth: 1, borderTopColor: '#2E2E2E' },
+  quoteMessageText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#000000' },
 
-  aiEstimateBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 12 },
-  aiEstimateBannerText: { fontSize: 13, fontFamily: fonts.bodyMedium, flex: 1, lineHeight: 18 },
+  emptyState: { alignItems: 'center', padding: 40, gap: 10 },
+  emptyTitle: { fontSize: 18, fontFamily: fonts.heading, color: '#FFFFFF' },
+  emptySub: { fontSize: 13, fontFamily: fonts.body, color: '#6F6B6B', textAlign: 'center', lineHeight: 20, paddingHorizontal: 20 },
+
+  heroCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 18, padding: 14, marginBottom: 10 },
+  heroAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(245,166,35,0.14)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  heroAvatarText: { fontSize: 16, fontFamily: fonts.headingBold, color: '#F5A623' },
+  heroName: { fontSize: 14, fontFamily: fonts.headingBold, color: '#000000' },
+  heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  heroMetaText: { fontSize: 11, fontFamily: fonts.bodyMedium, color: '#6F6B6B' },
+  heroRate: { fontSize: 13, fontFamily: fonts.headingBold, color: '#06C167', marginTop: 2 },
+  heroMsgBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(245,166,35,0.14)', alignItems: 'center', justifyContent: 'center', marginRight: 4 },
+
+  actionCard: { backgroundColor: 'rgba(245,166,35,0.12)', marginHorizontal: 16, marginBottom: 12, borderRadius: 18, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(245,166,35,0.2)' },
+  actionIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(245,166,35,0.14)', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  actionCardTitle: { fontSize: 17, fontFamily: fonts.headingBold, color: '#FFFFFF', marginBottom: 4, marginTop: 2 },
+  actionCardDesc: { fontSize: 12, fontFamily: fonts.body, color: '#6F6B6B', textAlign: 'center', lineHeight: 18, marginBottom: 16 },
 
   addressForm: { width: '100%', marginTop: 8 },
-  input: { borderWidth: 1.5, borderRadius: 16, padding: 14, fontSize: 14, fontFamily: fonts.body, marginBottom: 10 },
+  inputField: { borderWidth: 1.5, borderRadius: 14, padding: 13, fontSize: 14, fontFamily: fonts.body, color: '#000000', backgroundColor: '#FFFFFF', borderColor: '#2E2E2E', marginBottom: 10 },
 
-  actionBtn: { paddingVertical: 14, paddingHorizontal: 24, borderRadius: 16, alignItems: 'center', justifyContent: 'center', minWidth: 120, marginTop: 8 },
-  actionBtnText: { fontSize: 15, fontFamily: fonts.bodyMedium },
-
-  escrowCard: { borderRadius: 24, marginHorizontal: 16, marginBottom: 12, padding: 20, borderWidth: 1.5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  escrowCard: { backgroundColor: '#FFFFFF', marginHorizontal: 16, marginBottom: 12, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#2E2E2E' },
   escrowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  escrowTitle: { fontSize: 16, fontFamily: fonts.heading },
-  escrowBadge: { backgroundColor: colors.amberBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  escrowBadgeText: { fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.amberDark },
-  escrowAmount: { fontSize: 28, fontFamily: fonts.heading, letterSpacing: -1, marginBottom: 16 },
+  escrowTitle: { fontSize: 15, fontFamily: fonts.headingBold, color: '#000000' },
+  escrowBadge: { backgroundColor: 'rgba(245,166,35,0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  escrowBadgeText: { fontSize: 10, fontFamily: fonts.bodyMedium, color: '#F5A623' },
+  escrowAmount: { fontSize: 26, fontFamily: fonts.heading, color: '#000000', letterSpacing: -1, marginBottom: 16 },
   escrowActions: { gap: 4 },
 
-  disputeBtn: { alignItems: 'center', paddingVertical: 16, marginBottom: 12 },
-  disputeBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.muted },
+  linkBtn: { alignItems: 'center', paddingVertical: 16, marginBottom: 4, flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  linkBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#6F6B6B' },
 
-  reviewCard: { borderRadius: 20, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
+  reviewCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 10 },
   reviewStars: { flexDirection: 'row', gap: 2, marginBottom: 8 },
-  reviewScores: { fontSize: 13, fontFamily: fonts.body, marginBottom: 6 },
-  reviewComment: { fontSize: 13, fontFamily: fonts.body, opacity: 0.7, lineHeight: 20 },
+  reviewScores: { fontSize: 12, fontFamily: fonts.body, color: '#6F6B6B', marginBottom: 6 },
+  reviewComment: { fontSize: 12, fontFamily: fonts.body, color: '#000000', opacity: 0.65, lineHeight: 18 },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  modalSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 44 },
-  modalTitle: { fontSize: 20, fontFamily: fonts.heading, marginBottom: 4, textAlign: 'center' },
-  modalSub: { fontSize: 13, fontFamily: fonts.body, textAlign: 'center', marginBottom: 20 },
-  modalInput: { borderWidth: 1.5, borderRadius: 16, padding: 16, fontSize: 16, fontFamily: fonts.headingBold, textAlign: 'center', marginBottom: 20 },
+  cancelBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, borderRadius: 14, borderWidth: 1.5, borderColor: '#E11900', backgroundColor: '#E1190014' },
+  cancelBtnText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#E11900' },
+
+  actionBtn: { paddingVertical: 13, paddingHorizontal: 24, borderRadius: 16, alignItems: 'center', justifyContent: 'center', minWidth: 120, marginTop: 8 },
+  actionBtnText: { fontSize: 14, fontFamily: fonts.headingBold },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 44 },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#2E2E2E', alignSelf: 'center', marginBottom: 20 },
+  modalIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(245,166,35,0.12)', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 12 },
+  modalTitle: { fontSize: 19, fontFamily: fonts.heading, color: '#000000', textAlign: 'center', marginBottom: 4 },
+  modalSub: { fontSize: 12, fontFamily: fonts.body, color: '#6F6B6B', textAlign: 'center', marginBottom: 20 },
+  modalInput: { borderWidth: 1.5, borderRadius: 14, padding: 15, fontSize: 16, fontFamily: fonts.headingBold, textAlign: 'center', color: '#000000', backgroundColor: '#F5F5F5', borderColor: '#2E2E2E', marginBottom: 20 },
   modalActions: { flexDirection: 'row', gap: 12 },
-  modalBtn: { flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: 'center' },
-  modalBtnText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: '#111827' },
-  reasonList: { marginVertical: 16, gap: 4 },
+  modalCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: 'center', backgroundColor: '#2E2E2E' },
+  modalCancelText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
+  modalConfirmBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: 'center', backgroundColor: '#F5A623' },
+  modalConfirmText: { fontSize: 14, fontFamily: fonts.headingBold, color: '#111827' },
+
+  reasonList: { marginVertical: 16, gap: 2 },
   reasonOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4, borderRadius: 12 },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
-  reasonText: { fontSize: 15, fontFamily: fonts.bodyMedium, flex: 1 },
-  reasonInput: { borderWidth: 1.5, borderRadius: 16, padding: 14, fontSize: 14, fontFamily: fonts.body, minHeight: 60, textAlignVertical: 'top', marginTop: 8 },
+  reasonText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: '#000000', flex: 1 },
+  reasonInput: { borderWidth: 1.5, borderRadius: 14, padding: 13, fontSize: 13, fontFamily: fonts.body, color: '#000000', backgroundColor: '#F5F5F5', borderColor: '#2E2E2E', minHeight: 56, textAlignVertical: 'top', marginTop: 8 },
+
+  aiBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 12, backgroundColor: '#FFFBEB', borderColor: '#FCD34D' },
+  aiBannerText: { fontSize: 12, fontFamily: fonts.bodyMedium, flex: 1, lineHeight: 17, color: '#92400E' },
 })

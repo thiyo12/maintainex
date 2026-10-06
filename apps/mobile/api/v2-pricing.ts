@@ -41,10 +41,15 @@ export const v2Pricing = {
 }
 
 export const v2SmartBooking = {
-  templates: (jobCategoryId?: string) =>
-    v2Request<SmartTemplate[]>(
-      `/api/mobile/v2/service-templates${jobCategoryId ? `?jobCategoryId=${encodeURIComponent(jobCategoryId)}` : ''}`
-    ),
+  templates: (jobCategoryId?: string, countryCode?: string) => {
+    const params = new URLSearchParams()
+    if (jobCategoryId) params.set('jobCategoryId', jobCategoryId)
+    if (countryCode) params.set('country', countryCode)
+    const query = params.toString()
+    return v2Request<SmartTemplate[]>(
+      `/api/mobile/v2/service-templates${query ? `?${query}` : ''}`
+    )
+  },
   priceEstimate: (data: {
     templateId: string
     answers: Record<string, any>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, Lock, ShieldCheck } from 'phosphor-react-native'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { v2JobActions } from '@/api/v2-jobs'
@@ -19,12 +19,15 @@ export default function EscrowConfirmScreen() {
   const styles = makeStyles(colors)
 
   const amount = parseFloat(quotedAmount) || 0
+  const platformFee = Math.round(amount * 0.1 * 100) / 100
+  const totalAmount = amount + platformFee
 
   const handleConfirm = async () => {
     if (!quoteId) { Alert.alert('Error', 'Missing quote information'); return }
     setLoading(true)
     try {
       await v2JobActions.selectQuote(bookingId, quoteId)
+      await v2JobActions.depositEscrow(bookingId, totalAmount)
       router.replace(`/(customer)/jobs/v2/confirm/${bookingId}`)
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to accept quote.')
@@ -37,18 +40,18 @@ export default function EscrowConfirmScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.ink} />
+          <CaretLeft size={22} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Accept Quote</Text>
+        <Text style={styles.headerTitle}>Secure Payment</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <View style={styles.lockBox}>
-        <Ionicons name="lock-closed-outline" size={32} color={colors.amberDark} />
+        <Lock size={32} color={colors.amberDark} />
       </View>
-      <Text style={styles.htitle}>Accept This Quote</Text>
+      <Text style={styles.htitle}>Secure Your Booking</Text>
       <Text style={styles.hsub}>
-        Accept the provider quote first. On the next screen you can choose protected online payment or cash.
+        Your money is held safely until you confirm the job is done. {taskerName} cannot receive it until you approve.
       </Text>
 
       <View style={styles.card}>
@@ -62,26 +65,26 @@ export default function EscrowConfirmScreen() {
           <Text style={styles.rowV}>{currency} {amount.toLocaleString()}</Text>
         </View>
         <View style={styles.row}>
-          <Text style={styles.rowL}>Service fee</Text>
-          <Text style={styles.rowV}>Calculated securely after acceptance</Text>
+          <Text style={styles.rowL}>Platform fee (10%)</Text>
+          <Text style={styles.rowV}>{currency} {platformFee.toLocaleString()}</Text>
         </View>
         <View style={styles.totalRow}>
-          <Text style={styles.totalL}>Quote amount</Text>
-          <Text style={styles.totalV}>{currency} {amount.toLocaleString()}</Text>
+          <Text style={styles.totalL}>Total to secure</Text>
+          <Text style={styles.totalV}>{currency} {totalAmount.toLocaleString()}</Text>
         </View>
       </View>
 
       <View style={styles.trustRow}>
-        <Ionicons name="shield-checkmark-outline" size={18} color="#22C55E" />
+        <ShieldCheck size={18} color="#06C167" />
         <Text style={styles.trustTxt}>
-          Accepting the quote does not charge you. Your payment method is selected on the next step.
+          Money is held securely by MΛINTΛINEX. It is only released to {taskerName} after you confirm the work is done. You are protected.
         </Text>
       </View>
 
       <TouchableOpacity style={styles.btn} onPress={handleConfirm} disabled={loading} activeOpacity={0.8}>
-        <Ionicons name="checkmark-circle-outline" size={18} color="#111827" />
+        <Lock size={18} color="#111827" />
         <Text style={styles.btnTxt}>
-          {loading ? 'Accepting...' : 'Accept Quote & Continue'}
+          {loading ? 'Securing...' : `Secure ${currency} ${totalAmount.toLocaleString()}`}
         </Text>
       </TouchableOpacity>
 
@@ -93,7 +96,7 @@ export default function EscrowConfirmScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream, padding: 16 },
+  container: { flex: 1, backgroundColor: colors.surface, padding: 16 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 17, fontFamily: fonts.headingBold, color: colors.ink },
@@ -108,8 +111,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, marginTop: 4, borderTopWidth: 1.5, borderTopColor: colors.border },
   totalL: { fontSize: 15, fontFamily: fonts.headingBold, color: colors.ink },
   totalV: { fontSize: 20, fontFamily: fonts.heading, color: colors.amberDark, letterSpacing: -0.5 },
-  trustRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#D1FAE5', borderRadius: 12, padding: 12, marginBottom: 12 },
-  trustTxt: { fontSize: 12, fontFamily: fonts.body, color: '#22C55E', flex: 1, lineHeight: 18 },
+  trustRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: colors.successBg, borderRadius: 12, padding: 12, marginBottom: 12 },
+  trustTxt: { fontSize: 12, fontFamily: fonts.body, color: '#06C167', flex: 1, lineHeight: 18 },
   btn: { backgroundColor: colors.amber, borderRadius: 14, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
   btnTxt: { fontSize: 15, fontFamily: fonts.headingBold, color: '#111827' },
   cancelBtn: { alignItems: 'center', marginTop: 12, padding: 12 },

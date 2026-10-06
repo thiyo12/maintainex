@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Animated, Easing, Platform, ActivityIndicator, Keyboard } from 'react-native'
 import { Sparkle, ArrowRight, X, MagnifyingGlass, Lightning, Drop, Snowflake, Palette, Hammer, GridFour, Wrench, House, Bug, Leaf, LockSimple, Car, CarProfile, Desktop, MusicNotes, Person, Building, Sun, PlusCircle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '../../lib/ThemeContext'
-import { fonts } from '../../lib/fonts'
+import { useColors } from '@/lib/ThemeContext'
+import { fonts } from '@/lib/fonts'
 import { v2Search } from '@/api/v2-search'
 import { taskers } from '@/api/taskers'
-import { buildSampleTaskers } from '../../lib/sampleTaskers'
+import { buildSampleTaskers } from '@/lib/sampleTaskers'
 
 const SAMPLE_TASKER_RESULTS: TaskerResult[] = buildSampleTaskers(null).map((s, i) => ({
   id: s.id,
@@ -129,8 +129,24 @@ export default function AISearchBar({
         taskers.list(`category=${encodeURIComponent(key)}`)
           .then((list) => {
             if (isDisposedRef.current) return
-            const real = (list || []).slice(0, 3)
-            setTaskerResults((real.length > 0 ? real : SAMPLE_TASKER_RESULTS) as TaskerResult[])
+            const real: TaskerResult[] = (list || []).slice(0, 3).map((item: any) => ({
+              id: item.id,
+              userId: item.userId || item.user?.id || item.id,
+              bio: item.bio || '',
+              hourlyRate: Number(item.hourlyRate || 0),
+              skills: Array.isArray(item.skills) ? item.skills : [],
+              rating: Number(item.rating || 0),
+              completedJobs: Number(item.completedJobs || 0),
+              isVerified: !!item.isVerified,
+              isOnline: !!item.isOnline,
+              user: {
+                id: item.user?.id || item.userId || item.id,
+                name: item.user?.name || item.name || 'Tasker',
+                phone: item.user?.phone || '',
+                email: item.user?.email || '',
+              },
+            }))
+            setTaskerResults(real.length > 0 ? real : SAMPLE_TASKER_RESULTS)
           })
           .catch(() => { if (!isDisposedRef.current) setTaskerResults([]) })
           .finally(() => { if (!isDisposedRef.current) setTaskersLoading(false) })
