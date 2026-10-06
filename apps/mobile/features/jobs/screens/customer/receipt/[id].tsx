@@ -56,9 +56,11 @@ export default function ReceiptScreen() {
   }
 
   const acceptedQuote = job?.quotes?.find((q: any) => q.status === 'ACCEPTED')
+  const currency = job?.escrow?.currency || 'LKR'
   const subtotal = acceptedQuote?.price || job?.budgetAmount || 0
   const fee = job?.escrow ? Number(job.escrow.serviceFee) : Math.round(subtotal * 0.1)
   const total = subtotal + fee
+  const paymentMethodLabel = job?.escrow?.paymentMethod === 'CASH' ? 'Cash payment' : 'Online payment'
   const serviceDate = job?.preferredDate
     ? new Date(job.preferredDate).toLocaleDateString('en-US', {
         weekday: 'short',
@@ -97,19 +99,19 @@ export default function ReceiptScreen() {
 
           <View style={styles.lineItem}>
             <Text style={styles.lineLabel}>{t('receipt.serviceAmount')}</Text>
-            <Text style={styles.lineValue}>LKR {subtotal.toLocaleString()}</Text>
+            <Text style={styles.lineValue}>{currency} {subtotal.toLocaleString()}</Text>
           </View>
           <View style={styles.lineItem}>
             <Text style={styles.lineLabel}>{t('receipt.platformFee')}</Text>
-            <Text style={styles.lineValue}>LKR {fee.toLocaleString()}</Text>
+            <Text style={styles.lineValue}>{currency} {fee.toLocaleString()}</Text>
           </View>
           <View style={styles.lineItem}>
             <Text style={styles.lineLabel}>{t('receipt.discount')}</Text>
-            <Text style={[styles.lineValue, { color: colors.success }]}>- LKR 0</Text>
+            <Text style={[styles.lineValue, { color: colors.success }]}>- {currency} 0</Text>
           </View>
           <View style={[styles.lineItem, styles.totalRow]}>
             <Text style={styles.totalLabel}>{t('receipt.totalCharged')}</Text>
-            <Text style={styles.totalValue}>LKR {total.toLocaleString()}</Text>
+            <Text style={styles.totalValue}>{currency} {total.toLocaleString()}</Text>
           </View>
 
           <View style={styles.divider} />
@@ -118,7 +120,7 @@ export default function ReceiptScreen() {
             <Text style={styles.paymentLabel}>{t('receipt.paymentMethod')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <CreditCard size={14} color={colors.ink} weight="regular" />
-              <Text style={styles.paymentValue}>{t('receipt.visa')}</Text>
+              <Text style={styles.paymentValue}>{paymentMethodLabel}</Text>
             </View>
           </View>
           <View style={styles.paymentSection}>
