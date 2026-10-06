@@ -1,496 +1,374 @@
-import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated, Alert } from 'react-native'
+import { useState, useEffect, useCallback } from 'react'
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { useTranslation } from 'react-i18next'
-import { useColors } from '@/lib/ThemeContext'
+import { CaretRight } from 'phosphor-react-native'
 import { taskers } from '@/api/taskers'
-import { getAuthToken } from '@/api/token'
-import { conversations } from '@/api/messaging'
-import { notifications } from '@/api/notifications'
-import { getActiveCompanyContext } from '@/api/companies'
+import { earnings } from '@/api/payments'
+import { v2Identity } from '@/api/v2-identity'
 import { useAuth } from '@/features/auth/context/auth'
-import type { TaskerProfile } from '@/lib/types'
-import ProfileHeader from '@/components/ProfileHeader'
 import { fonts } from '@/lib/fonts'
+import { v3 } from '@/theme/v3/tokens'
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
+type ProfileData = any
 
-function useSlideUp(delay = 0) {
-  const anim = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    Animated.timing(anim, { toValue: 1, duration: 450, delay, useNativeDriver: true }).start()
-  }, [])
-  return {
-    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
-    transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
-  }
+type ProfileRowProps = {
+  title: string
+  subtitle: string
+  onPress?: () => void
 }
 
-function usePopIn(delay = 0) {
-  const anim = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    Animated.spring(anim, { toValue: 1, delay, useNativeDriver: true, friction: 7, tension: 60 }).start()
-  }, [])
-  return {
-    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
-    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
-  }
+function ProfileRow({ title, subtitle, onPress }: ProfileRowProps) {
+  const body = (
+    <>
+      <View style={styles.rowCopy}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        <Text style={styles.rowSubtitle} numberOfLines={1}>{subtitle}</Text>
+      </View>
+      <CaretRight size={16} color={v3.colors.textSecondary} weight="bold" />
+    </>
+  )
+
+  if (!onPress) return <View style={styles.row}>{body}</View>
+
+  return (
+    <TouchableOpacity style={styles.row} activeOpacity={0.7} onPress={onPress}>
+      {body}
+    </TouchableOpacity>
+  )
 }
 
 export default function TaskerProfile() {
-  const { t } = useTranslation()
   const router = useRouter()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const { user, logout } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState<TaskerProfile | null>(null)
-  const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
-  const [unreadMsgs, setUnreadMsgs] = useState(0)
-  const [unreadNotifs, setUnreadNotifs] = useState(0)
-  const [companyRole, setCompanyRole] = useState<string | null>(null)
+  const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [identityStatus, setIdentityStatus] = useState('NOT_SUBMITTED')
+  const [balance, setBalance] = useState(0)
 
-  const cardAnim = useSlideUp(0)
-  const sectionAnim2 = useSlideUp(80)
-  const sectionAnim3 = useSlideUp(130)
-  const sectionAnim4 = useSlideUp(180)
-  const sectionAnim5 = useSlideUp(230)
-  const popIn0 = usePopIn(80)
-  const popIn1 = usePopIn(120)
-  const popIn2 = usePopIn(160)
-  const popIn3 = usePopIn(200)
-  const popIn4 = usePopIn(240)
-  const popIn5 = usePopIn(280)
-  const popIn6 = usePopIn(320)
-  const popIn7 = usePopIn(360)
-  const popIn8 = usePopIn(400)
-  const popIn9 = usePopIn(440)
-  const popIn10 = usePopIn(480)
-  const popIn11 = usePopIn(520)
-  const popIns = [popIn0, popIn1, popIn2, popIn3, popIn4, popIn5, popIn6, popIn7, popIn8, popIn9, popIn10, popIn11]
-  let popInIdx = 0
-
-  useEffect(() => {
-    loadProfile()
-    loadIdentity()
-    getActiveCompanyContext()
-      .then((context) => setCompanyRole(context?.role || null))
-      .catch(() => setCompanyRole(null))
-  }, [])
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null
-    const loadCounts = async () => {
-      try {
-        const [convos, notifs] = await Promise.all([
-          conversations.list(),
-          notifications.list(),
-        ])
-        const msgs = (convos || []).reduce((n: number, c: any) => n + (c.unreadCount || 0), 0)
-        setUnreadMsgs(msgs)
-        setUnreadNotifs((notifs || []).filter((n: any) => !n.read).length)
-      } catch {}
-    }
-    loadCounts()
-    interval = setInterval(loadCounts, 30000)
-    return () => { if (interval) clearInterval(interval) }
-  }, [])
-
-  const handleLogout = () => {
-    Alert.alert(t('profile.logout'), t('profile.logoutConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('profile.logout'), style: 'destructive', onPress: async () => {
-        await logout()
-        router.replace('/(auth)/welcome')
-      } },
-    ])
-  }
-
-  async function loadProfile() {
-    if (!user?.id) return
+  const load = useCallback(async () => {
+    setLoading(true)
     try {
-      const data = await taskers.get(user.id)
-      setProfile(data)
-    } catch (e) {
-      console.error(e)
+      const [profileRes, identityRes, earningsRes] = await Promise.allSettled([
+        taskers.getMyProfile(),
+        v2Identity.getStatus(),
+        earnings.get(),
+      ])
+
+      if (profileRes.status === 'fulfilled') setProfile(profileRes.value)
+      if (identityRes.status === 'fulfilled') setIdentityStatus((identityRes.value as any)?.identityStatus || 'NOT_SUBMITTED')
+      if (earningsRes.status === 'fulfilled') {
+        const value: any = earningsRes.value
+        setBalance(Number(value?.balance ?? value?.availableBalance ?? 0))
+      }
+    } catch (error) {
+      console.error('Load tasker profile error:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  async function loadIdentity() {
-    try {
-      const token = await getAuthToken()
-      const res = await fetch(`${API_URL}/api/mobile/v2/identity`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setIdentityStatus(data.identityStatus)
-      }
-    } catch (e) {
-      console.error('Load identity error:', e)
-    }
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const handleLogout = () => {
+    Alert.alert('Log out', 'Do you want to log out of MaintainEX?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: async () => {
+          await logout()
+          router.replace('/(auth)/welcome')
+        },
+      },
+    ])
   }
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.amber} />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loading}>
+          <ActivityIndicator size="small" color={v3.colors.ink} />
         </View>
       </SafeAreaView>
     )
   }
 
-  const name = profile?.user?.name || user?.name || t('customer.tasker')
-  const nickname = profile?.user?.nickname || user?.nickname || ''
-  const initials = name.split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase() || 'T'
-  const skills = profile?.skills || []
-  const serviceAreas = profile?.serviceAreas || []
-  const rating = Number(profile?.rating || 0)
-  const completedJobs = profile?.completedJobs || 0
-  const completionRate = Math.max(0, Math.min(100, Number((profile as any)?.completionRate || 0)))
-  const avgResponseMin = Math.max(0, Math.round(Number((profile as any)?.avgResponseMin || 0)))
-  const reviews = Array.isArray((profile as any)?.reviews)
-    ? (profile as any).reviews.map((review: any) => {
-        const reviewerName = review.reviewerName || 'Customer'
-        const initials = reviewerName
-          .split(' ')
-          .map((part: string) => part[0])
-          .join('')
-          .slice(0, 2)
-          .toUpperCase()
-        return {
-          initials,
-          name: reviewerName,
-          stars: Number(review.rating || 0),
-          text: review.comment || '',
-        }
-      })
-    : []
+  const p = profile?.taskerProfile || profile || {}
+  const name = p?.user?.name || profile?.user?.name || user?.name || 'Tasker'
+  const initials = String(name).split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'T'
+  const skills: string[] = Array.isArray(p?.skills) ? p.skills : []
+  const serviceAreas: string[] = Array.isArray(p?.serviceAreas) ? p.serviceAreas : []
+  const reviews: any[] = Array.isArray(p?.reviews) ? p.reviews : []
+  const portfolio: any[] = Array.isArray(p?.portfolio)
+    ? p.portfolio
+    : Array.isArray(p?.workPhotos)
+      ? p.workPhotos
+      : []
 
-  const identityDone = identityStatus === 'APPROVED' || identityStatus === 'VERIFIED'
-  const verifications = [
-    {
-      icon: 'card-outline',
-      title: 'Identity Verification',
-      sub: identityDone ? 'Identity approved by MaintainEX' : 'Complete identity verification to build customer trust',
-      done: identityDone,
-    },
-    {
-      icon: 'construct-outline',
-      title: 'Tasker Profile',
-      sub: profile?.isVerified ? 'Provider profile approved' : 'Profile approval is still pending',
-      done: !!profile?.isVerified,
-    },
-  ] as const
+  const rating = Number(p?.rating || 0)
+  const completedJobs = Number(p?.completedJobs || 0)
+  const onTimeRate = p?.onTimeRate == null ? null : Number(p.onTimeRate)
+  const cancellationRate = p?.cancellationRate == null ? null : Number(p.cancellationRate)
+  const isVerified = ['APPROVED', 'VERIFIED'].includes(identityStatus)
+  const isTopTasker = Boolean(
+    p?.isTopTasker ||
+    (Array.isArray(p?.badges) && p.badges.some((badge: any) => String(badge?.label || badge?.name || badge).toLowerCase().includes('top tasker')))
+  )
+
+  const serviceSummary = skills.length
+    ? skills.slice(0, 3).join(' · ')
+    : 'Add your services'
+  const areaSummary = serviceAreas.length
+    ? serviceAreas.slice(0, 2).join(', ')
+    : p?.area?.name || 'Set your service area'
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <ProfileHeader
-          initials={initials}
-          name={name}
-          nickname={nickname}
-          roleLabel={`${skills[0] || 'Tasker'}${serviceAreas[0] ? ` · ${serviceAreas[0]}` : ''}`}
-          variant="tasker"
-          verified={identityStatus === 'APPROVED' || identityStatus === 'VERIFIED'}
-          onEdit={() => router.push('/(tasker)/settings/edit-profile')}
-          onSettings={() => router.push('/notifications')}
-        />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <Text style={styles.pageTitle}>Tasker profile</Text>
 
-        <Animated.View style={[styles.card, cardAnim]}>
-          <View style={styles.statsRow}>
-            {[
-              { val: completedJobs, lbl: t('tasker.jobsDone') },
-              { val: rating.toFixed(1), lbl: t('tasker.rating') },
-              { val: `${completionRate}%`, lbl: 'Completion' },
-              { val: avgResponseMin > 0 ? `${avgResponseMin}m` : '—', lbl: 'Response' },
-            ].map((s) => (
-              <Animated.View key={s.lbl} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
-                <Text style={[styles.statValue, { color: colors.ink }]}>{s.val}</Text>
-                <Text style={[styles.statLabel, { color: colors.muted }]}>{s.lbl}</Text>
-              </Animated.View>
-            ))}
+        <View style={styles.identityRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials}</Text>
           </View>
-        </Animated.View>
+          <View style={styles.identityCopy}>
+            <Text style={styles.name} numberOfLines={1}>{name}</Text>
+            <Text style={styles.profession} numberOfLines={1}>{serviceSummary}</Text>
+          </View>
+          <View style={styles.badges}>
+            {isTopTasker ? (
+              <View style={[styles.badge, styles.topBadge]}>
+                <Text style={[styles.badgeText, styles.topBadgeText]}>TOP TASKER</Text>
+              </View>
+            ) : null}
+            {isVerified ? (
+              <View style={[styles.badge, styles.verifiedBadge]}>
+                <Text style={[styles.badgeText, styles.verifiedBadgeText]}>VERIFIED</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
 
-        <Animated.View style={[styles.card, sectionAnim2]}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="construct-outline" size={14} color={colors.amberDark} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.yourSkills')}</Text>
-            </View>
-            <View style={styles.chipRow}>
-              {skills.length > 0 ? skills.map((s: string) => (
-                <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
-                  <Ionicons name="flash-outline" size={12} color={colors.amberDark} />
-                  <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
-                </Animated.View>
-              )) : (
-                <Text style={[styles.revText, { color: colors.muted }]}>No services added yet.</Text>
-              )}
-            </View>
+        <View style={styles.metricsCard}>
+          <View style={styles.metric}>
+            <Text style={styles.metricValue}>{rating > 0 ? rating.toFixed(1) + ' ★' : 'New'}</Text>
+            <Text style={styles.metricLabel}>{completedJobs} completed</Text>
           </View>
-        </Animated.View>
+          <View style={styles.metric}>
+            <Text style={styles.metricValue}>{onTimeRate == null ? '—' : Math.round(onTimeRate) + '%'}</Text>
+            <Text style={styles.metricLabel}>on-time</Text>
+          </View>
+          <View style={styles.metric}>
+            <Text style={styles.metricValue}>{cancellationRate == null ? '—' : cancellationRate.toFixed(1) + '%'}</Text>
+            <Text style={styles.metricLabel}>cancellation</Text>
+          </View>
+          {Array.isArray(p?.badges) && p.badges.length > 0 ? (
+            <TouchableOpacity style={styles.badgesLink} activeOpacity={0.72}>
+              <Text style={styles.badgesLinkText}>View badges ›</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
-        <Animated.View style={[styles.card, sectionAnim3]}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="images-outline" size={14} color={colors.amberDark} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.yourSkills')}</Text>
-            </View>
-            <Text style={[styles.revText, { color: colors.muted }]}>No portfolio photos added yet.</Text>
-          </View>
-        </Animated.View>
+        <View style={styles.rowList}>
+          <ProfileRow
+            title="Your services"
+            subtitle={skills.length ? skills.length + ' active categories' : 'No active services yet'}
+            onPress={() => router.push('/(tasker)/settings/job-selection' as any)}
+          />
+          <ProfileRow
+            title="Service area"
+            subtitle={areaSummary}
+            onPress={() => router.push('/(tasker)/settings/service-area' as any)}
+          />
+          <ProfileRow
+            title="Availability"
+            subtitle={p?.isOnline ? 'Online now' : 'Manage your working hours'}
+            onPress={() => router.push('/(tasker)/settings/availability' as any)}
+          />
+          <ProfileRow
+            title="Identity & readiness"
+            subtitle={isVerified ? 'Verified' : 'Setup requires attention'}
+            onPress={() => router.push('/(tasker)/readiness' as any)}
+          />
+          <ProfileRow
+            title="Portfolio"
+            subtitle={portfolio.length ? portfolio.length + ' work photos' : 'Add work photos'}
+            onPress={() => router.push('/(tasker)/settings/edit-profile' as any)}
+          />
+          <ProfileRow
+            title="Reviews"
+            subtitle={(rating > 0 ? rating.toFixed(1) + ' average' : 'No rating yet') + ' · ' + reviews.length + ' written'}
+          />
+          <ProfileRow
+            title="Wallet & payouts"
+            subtitle={'Available LKR ' + balance.toLocaleString()}
+            onPress={() => router.push('/(tasker)/(tabs)/earnings' as any)}
+          />
+        </View>
 
-        <Animated.View style={[styles.card, sectionAnim4]}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.amberDark} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.reviews')}</Text>
-            </View>
-            {reviews.length === 0 ? (
-              <Text style={[styles.revText, { color: colors.muted }]}>No customer reviews yet.</Text>
-            ) : reviews.map((rev: any, i: number) => (
-              <View key={i} style={[styles.revItem, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-                <View style={[styles.revAvt, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Text style={[styles.revAvtText, { color: colors.ink }]}>{rev.initials}</Text>
-                </View>
-                <View style={styles.revBody}>
-                  <View style={styles.revTop}>
-                    <Text style={[styles.revName, { color: colors.ink }]}>{rev.name}</Text>
-                    <View style={styles.revStars}>
-                      {Array.from({ length: 5 }).map((_, si) => (
-                        <Ionicons key={si} name={si < rev.stars ? 'star' : 'star-outline'} size={11} color={colors.amber} />
-                      ))}
-                    </View>
-                  </View>
-                  <Text style={[styles.revText, { color: colors.muted }]}>{rev.text || 'No written comment.'}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </Animated.View>
-
-        <Animated.View style={[styles.card, sectionAnim5, { marginBottom: 24 }]}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="shield-checkmark-outline" size={14} color={colors.amberDark} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.identityVerification')}</Text>
-            </View>
-            {verifications.map((v, i) => (
-              <View key={i} style={[styles.verifRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-                <View style={[styles.verifIcon, v.done ? { backgroundColor: '#D1FAE5' } : { backgroundColor: colors.amberLight }]}>
-                  <Ionicons name={v.icon as any} size={16} color={v.done ? '#059669' : colors.amberDark} />
-                </View>
-                <View style={styles.verifText}>
-                  <Text style={[styles.verifTitle, { color: colors.ink }]}>{v.title}</Text>
-                  <Text style={[styles.verifSub, { color: colors.muted }]}>{v.sub}</Text>
-                </View>
-                <Text style={[styles.verifStatus, { color: v.done ? '#059669' : colors.amberDark }]}>
-                  {v.done ? t('common.done') : t('tasker.pending')}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </Animated.View>
-
-        <Animated.View style={[styles.card, { marginBottom: 24 }]}>
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-              onPress={() => router.push('/(tasker)/readiness' as any)}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="checkmark-circle-outline" size={16} color="#D97706" />
-              </View>
-              <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('readiness.title')}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-            </TouchableOpacity>
-            {companyRole && (
-              <TouchableOpacity
-                style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-                onPress={() => {
-                  if (companyRole === 'WORKER') router.push('/(tasker)/company-assignments' as any)
-                  else if (companyRole === 'DISPATCHER') router.push('/(company)/(tabs)/dispatch' as any)
-                  else if (companyRole === 'FINANCE') router.push('/(company)/(tabs)/earnings-list' as any)
-                  else router.push('/(company)' as any)
-                }}
-              >
-                <View style={[styles.menuIcon, { backgroundColor: '#EDE9FE' }]}>
-                  <Ionicons name="business-outline" size={16} color="#6D28D9" />
-                </View>
-                <Text style={[styles.menuTitle, { color: colors.ink }]}>
-                  {companyRole === 'WORKER' ? 'Company Assignments' : 'Company Workspace'}
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-              onPress={() => router.push('/(tasker)/(tabs)/earnings')}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: '#D1FAE5' }]}>
-                <Ionicons name="wallet-outline" size={16} color="#059669" />
-              </View>
-              <Text style={[styles.menuTitle, { color: colors.ink }]}>Earnings</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-              onPress={() => router.push('/(tasker)/settings/job-selection')}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: colors.amberLight }]}>
-                <Ionicons name="construct-outline" size={16} color={colors.amberDark} />
-              </View>
-              <Text style={[styles.menuTitle, { color: colors.ink }]}>Your Services</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-              onPress={() => router.push('/(chat)' as any)}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: '#DBEAFE' }]}>
-                <Ionicons name="chatbubble-ellipses-outline" size={16} color="#2563EB" />
-              </View>
-              <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.messages')}</Text>
-              {unreadMsgs > 0 && (
-                <View style={[styles.badge, { backgroundColor: colors.amberDark }]}>
-                  <Text style={styles.badgeText}>{unreadMsgs > 99 ? '99+' : unreadMsgs}</Text>
-                </View>
-              )}
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-              onPress={() => router.push('/notifications' as any)}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="notifications-outline" size={16} color="#D48900" />
-              </View>
-              <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.notifications')}</Text>
-              {unreadNotifs > 0 && (
-                <View style={[styles.badge, { backgroundColor: colors.amberDark }]}>
-                  <Text style={styles.badgeText}>{unreadNotifs > 99 ? '99+' : unreadNotifs}</Text>
-                </View>
-              )}
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuRow} onPress={() => router.push('/settings/my-profile')}>
-              <View style={[styles.menuIcon, { backgroundColor: '#EDE9FE' }]}>
-                <Ionicons name="person-circle-outline" size={16} color="#7C3AED" />
-              </View>
-              <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('tasker.myProfile')}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.menuRow, { borderTopWidth: 1, borderTopColor: colors.border }]}
-              onPress={() => router.push('/settings/account-close' as any)}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: '#FEE2E2' }]}>
-                <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
-              </View>
-              <Text style={[styles.menuTitle, { color: '#DC2626' }]}>Close account</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
-              <View style={[styles.menuIcon, { backgroundColor: '#FEE2E2' }]}>
-                <Ionicons name="log-out-outline" size={16} color="#DC2626" />
-              </View>
-              <Text style={[styles.menuTitle, { color: '#DC2626' }]}>{t('profile.logout')}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
+        <View style={styles.accountSection}>
+          <Text style={styles.accountLabel}>Account</Text>
+          <ProfileRow title="Edit tasker profile" subtitle="Personal details, bio and profile media" onPress={() => router.push('/(tasker)/settings/edit-profile' as any)} />
+          <ProfileRow title="Switch profile" subtitle="Customer, Individual or Company workspace" onPress={() => router.push('/(auth)/role-switch' as any)} />
+          <ProfileRow title="Messages" subtitle="Customer and job conversations" onPress={() => router.push('/(chat)' as any)} />
+          <ProfileRow title="Notifications" subtitle="Job alerts and account updates" onPress={() => router.push('/notifications' as any)} />
+          <TouchableOpacity style={styles.logoutRow} activeOpacity={0.72} onPress={handleLogout}>
+            <Text style={styles.logoutText}>Log out</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card: {
-    marginHorizontal: 8,
-    marginBottom: 8,
-    borderRadius: 22,
-    backgroundColor: colors.surface,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 28,
-    elevation: 4,
-    overflow: 'hidden',
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 34,
   },
-  statsRow: { flexDirection: 'row', padding: 16, gap: 10 },
-  statCard: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
+  pageTitle: {
+    fontSize: 24,
+    lineHeight: 30,
+    fontFamily: fonts.heading,
+    color: v3.colors.ink,
   },
-  statValue: { fontSize: 17, fontFamily: fonts.headingBold, letterSpacing: -0.3 },
-  statLabel: { fontSize: 9, fontFamily: fonts.bodyMedium, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 },
-  section: { padding: 16 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
-  menuIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  menuTitle: { flex: 1, fontSize: 14, fontFamily: fonts.bodyMedium },
-  badge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  badgeText: { color: '#fff', fontSize: 11, fontFamily: fonts.bodyMedium },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  sectionTitle: { fontSize: 12, fontFamily: fonts.headingBold },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
+  identityRow: {
+    marginTop: 20,
+    minHeight: 70,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 7,
-    paddingHorizontal: 13,
-    borderRadius: 100,
   },
-  chipText: { fontSize: 11, fontFamily: fonts.bodyMedium },
-  portGrid: { flexDirection: 'row', gap: 8 },
-  portItem: {
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#D9D9D9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 12,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.ink,
+  },
+  identityCopy: {
     flex: 1,
-    aspectRatio: 1,
+    marginLeft: 12,
+    paddingRight: 8,
+  },
+  name: {
+    fontSize: 15,
+    fontFamily: fonts.heading,
+    color: v3.colors.ink,
+  },
+  profession: {
+    marginTop: 4,
+    fontSize: 9.5,
+    fontFamily: fonts.bodySemiBold,
+    color: v3.colors.textSecondary,
+  },
+  badges: {
+    alignItems: 'flex-end',
+    gap: 5,
+  },
+  badge: {
+    minHeight: 23,
     borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: 'center',
+    paddingHorizontal: 10,
     alignItems: 'center',
-  },
-  revItem: { flexDirection: 'row', gap: 10, paddingVertical: 12 },
-  revAvt: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    borderWidth: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
   },
-  revAvtText: { fontSize: 12, fontFamily: fonts.headingBold },
-  revBody: { flex: 1 },
-  revTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  revName: { fontSize: 12, fontFamily: fonts.headingBold },
-  revStars: { flexDirection: 'row', gap: 1 },
-  revText: { fontSize: 11, fontFamily: fonts.body, lineHeight: 16, marginTop: 3 },
-  verifRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
-  verifIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+  badgeText: {
+    fontSize: 8.8,
+    fontFamily: fonts.headingBold,
+  },
+  topBadge: { backgroundColor: v3.colors.amberSoft },
+  topBadgeText: { color: v3.colors.amberDark },
+  verifiedBadge: { backgroundColor: v3.colors.infoSoft },
+  verifiedBadgeText: { color: v3.colors.info },
+  metricsCard: {
+    position: 'relative',
+    marginTop: 16,
+    minHeight: 104,
+    borderRadius: 18,
+    backgroundColor: v3.colors.ink,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 22,
+    flexDirection: 'row',
+  },
+  metric: { flex: 1 },
+  metricValue: {
+    fontSize: 19,
+    fontFamily: fonts.heading,
+    color: v3.colors.paper,
+  },
+  metricLabel: {
+    marginTop: 4,
+    fontSize: 8.8,
+    fontFamily: fonts.bodySemiBold,
+    color: '#CFCFCF',
+  },
+  badgesLink: {
+    position: 'absolute',
+    right: 14,
+    bottom: 9,
+  },
+  badgesLinkText: {
+    fontSize: 8.8,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.amber,
+  },
+  rowList: {
+    marginTop: 22,
+  },
+  row: {
+    minHeight: 62,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: v3.colors.line,
+  },
+  rowCopy: { flex: 1, paddingRight: 10 },
+  rowTitle: {
+    fontSize: 10.7,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.ink,
+  },
+  rowSubtitle: {
+    marginTop: 4,
+    fontSize: 8.7,
+    fontFamily: fonts.bodySemiBold,
+    color: v3.colors.textSecondary,
+  },
+  accountSection: {
+    marginTop: 25,
+    paddingTop: 5,
+  },
+  accountLabel: {
+    paddingHorizontal: 14,
+    marginBottom: 4,
+    fontSize: 10,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  logoutRow: {
+    minHeight: 54,
+    paddingHorizontal: 14,
     justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
   },
-  verifText: { flex: 1 },
-  verifTitle: { fontSize: 12, fontFamily: fonts.headingBold },
-  verifSub: { fontSize: 10, fontFamily: fonts.body, marginTop: 1 },
-  verifStatus: { fontSize: 10, fontFamily: fonts.headingBold, textTransform: 'uppercase', letterSpacing: 0.4 },
+  logoutText: {
+    fontSize: 11,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.error,
+  },
 })
