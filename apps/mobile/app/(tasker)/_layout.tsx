@@ -20,7 +20,6 @@ export default function TaskerLayout() {
       <Stack.Screen name="wallet/withdraw" />
       <Stack.Screen name="jobs/v2/browse" />
       <Stack.Screen name="jobs/v2/quote/[id]" />
-      <Stack.Screen name="jobs/v2/my-jobs" />
       <Stack.Screen name="jobs/v2/manage/[id]" />
       <Stack.Screen name="jobs/v2/manage/[id]/verify-pin" />
       <Stack.Screen name="jobs/v2/manage/[id]/evidence" />
