@@ -7,7 +7,7 @@ import { Briefcase, Money, ChatCircle, Info, Checks, BellSlash, CaretRight } fro
 import { useTranslation } from 'react-i18next'
 
 import { notifications } from '@/api/notifications'
-import { colors, spacing, radius, typography } from '@/lib/design'
+import { v3 } from '@/theme/v3/tokens'
 
 import PressableScale from '@/components/ui/PressableScale'
 import EmptyState from '@/components/ui/EmptyState'
@@ -25,10 +25,10 @@ interface AppNotification {
 type NotifType = 'job_update' | 'payment' | 'message' | 'system'
 
 const TYPE_META: Record<NotifType, { icon: any; color: string }> = {
-  job_update: { icon: Briefcase, color: colors.accent },
-  payment: { icon: Money, color: colors.success },
-  message: { icon: ChatCircle, color: colors.info },
-  system: { icon: Info, color: colors.textSecondary },
+  job_update: { icon: Briefcase, color: '#F5A623' },
+  payment: { icon: Money, color: '#06C167' },
+  message: { icon: ChatCircle, color: '#276EF1' },
+  system: { icon: Info, color: '#6F6B6B' },
 }
 
 function detectType(n: AppNotification): NotifType {
@@ -113,7 +113,7 @@ export default function NotificationsScreen() {
         {unreadCount > 0 ? (
           <PressableScale onPress={markAll} scaleTo={0.95} style={styles.markAllPress}>
             <View style={styles.markAllBtn}>
-              <Checks size={16} color={colors.accent} weight="bold" />
+              <Checks size={16} color={'#F5A623'} weight="bold" />
               <Text style={styles.markAllText}>{t('notifications.markAllRead')}</Text>
             </View>
           </PressableScale>
@@ -123,7 +123,7 @@ export default function NotificationsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadList(true)} tintColor={colors.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadList(true)} tintColor={'#F5A623'} />}
       >
         {!loading && list.length === 0 ? (
           <EmptyState
@@ -152,7 +152,7 @@ export default function NotificationsScreen() {
                         ) : null}
                         <Text style={styles.time}>{relative(n.createdAt)}</Text>
                       </View>
-                      <CaretRight size={14} color={colors.textMuted} weight="bold" />
+                      <CaretRight size={14} color={'#6B6B6B'} weight="bold" />
                     </View>
                   </PressableScale>
                 </Animated.View>
@@ -166,32 +166,32 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: spacing.md, paddingTop: spacing.sm, marginBottom: spacing.md,
+    paddingHorizontal: 16, paddingTop: 8, marginBottom: 16,
   },
-  pageTitle: { ...typography.h1, letterSpacing: -0.5 },
-  markAllPress: { borderRadius: radius.full },
-  markAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.full, backgroundColor: colors.accentSoft },
-  markAllText: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_700Bold' },
+  pageTitle: { fontSize: 28, fontFamily: 'Outfit_900Black', color: v3.colors.ink, letterSpacing: -0.5 },
+  markAllPress: { borderRadius: 999 },
+  markAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: v3.colors.amberSoft },
+  markAllText: { fontSize: 12, fontFamily: 'Outfit_700Bold', color: v3.colors.amberDark },
 
-  scroll: { paddingBottom: spacing.xxl, paddingHorizontal: spacing.md },
-  list: { gap: spacing.sm },
+  scroll: { paddingBottom: 32, paddingHorizontal: 16 },
+  list: { gap: 8 },
 
-  cardPress: { borderRadius: radius.md },
+  cardPress: { borderRadius: 14 },
   card: {
-    flexDirection: 'row', alignItems: 'flex-start', padding: spacing.md, borderRadius: radius.md,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    flexDirection: 'row', alignItems: 'flex-start', padding: 16, borderRadius: 14,
+    backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line,
   },
   cardUnread: {
-    borderWidth: 3, borderColor: colors.accent,
+    borderWidth: 1.5, borderColor: v3.colors.amber, backgroundColor: v3.colors.amberSoft,
   },
-  unreadDot: { position: 'absolute', top: spacing.md, right: spacing.md, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
-  iconBox: { width: 46, height: 46, borderRadius: radius.sm * 1.5, alignItems: 'center', justifyContent: 'center' },
-  body: { flex: 1, marginLeft: spacing.md, marginRight: spacing.md },
-  title: { ...typography.body, fontFamily: 'Outfit_600SemiBold', fontSize: 15 },
-  titleUnread: { color: colors.accent },
-  text: { ...typography.bodyMuted, fontSize: 14, marginTop: 2, lineHeight: 19 },
-  time: { ...typography.caption, color: colors.textMuted, marginTop: 6 },
+  unreadDot: { position: 'absolute', top: 14, right: 14, width: 8, height: 8, borderRadius: 4, backgroundColor: v3.colors.amber },
+  iconBox: { width: 46, height: 46, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  body: { flex: 1, marginLeft: 16, marginRight: 16 },
+  title: { fontFamily: 'Outfit_700Bold', fontSize: 15, color: v3.colors.ink },
+  titleUnread: { color: v3.colors.ink },
+  text: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: v3.colors.textSecondary, marginTop: 2, lineHeight: 18 },
+  time: { fontSize: 11, fontFamily: 'Outfit_500Medium', color: v3.colors.textMuted, marginTop: 6 },
 })

@@ -1,136 +1,36 @@
-import { useEffect, useMemo, useRef, useCallback, useState, useSyncExternalStore } from 'react'
-import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, useWindowDimensions } from 'react-native'
+import { useEffect, useMemo, useCallback, useState, useSyncExternalStore } from 'react'
+import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, Image } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { LinearGradient } from 'expo-linear-gradient'
-import LottieView from 'lottie-react-native'
-import { Bell, MapPin, Star, CaretRight, Plus, PaperPlaneTilt, BuildingOffice, HouseLine } from 'phosphor-react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Bell, Briefcase, ChatCircle, Heart, MagnifyingGlass, MapPin, Microphone, Plus, Wrench } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import Animated, { FadeInUp } from 'react-native-reanimated'
 
 import { useAuth } from '@/features/auth/context/auth'
+import { useCountry } from '@/lib/country'
 import { v2Jobs, v2Match } from '@/api/v2-jobs'
 import { v2Quotes } from '@/api/v2-quotes'
 import { taskers } from '@/api/taskers'
 import { notifications } from '@/api/notifications'
+import { realEstate } from '@/api/real-estate'
 import { translateJobStatus } from '@/lib/i18n'
 import { on, removedJobs, subscribe, getVersion } from '@/lib/events'
-import { colors, spacing, radius, typography, shadows } from '@/lib/design'
-import { CATEGORY_FALLBACK, categoryVisualBySlug, categoryIcon, CategoryVisual } from '@/lib/categoryVisuals'
-import { tierById } from '@/lib/tiers'
+import { CATEGORY_FALLBACK } from '@/lib/categoryVisuals'
+import { v3 } from '@/theme/v3/tokens'
 
-import AISearchBar from '@/components/shared/AISearchBar'
+import V3CustomerBottomNav from '@/components/v3/V3CustomerBottomNav'
 import AvatarCircle from '@/components/ui/AvatarCircle'
-import PressableScale from '@/components/ui/PressableScale'
-import Skeleton from '@/components/ui/Skeleton'
-import EmptyState from '@/components/ui/EmptyState'
-import StatusBadge from '@/components/ui/StatusBadge'
-
-const LottieAnimation = LottieView as any
 
 const TRACKABLE = ['QUOTE_ACCEPTED', 'PENDING_PAYMENT', 'ESCROW_DEPOSITED', 'IN_PROGRESS']
 
-const MOCK_PROVIDERS = [
-  { id: 'm1', name: 'Saman Kumara', avatar: '', rating: 4.8, completedJobs: 127, hourlyRate: 1500, isVerified: true, categories: ['Cleaning', 'Plumbing'] },
-  { id: 'm2', name: 'Priya Devi', avatar: '', rating: 4.9, completedJobs: 89, fixedRate: 8500, isVerified: true, categories: ['Electrical', 'AC'] },
-  { id: 'm3', name: 'QuickFix Solutions', avatar: '', rating: 4.6, completedJobs: 203, hourlyRate: 1200, isVerified: true, categories: ['Painting', 'Cleaning'] },
-  { id: 'm4', name: 'Nimal Fernando', avatar: '', rating: 4.7, completedJobs: 156, hourlyRate: 1800, isVerified: true, categories: ['Plumbing', 'Electrical'] },
-  { id: 'm5', name: 'Ruwan Wick', avatar: '', rating: 4.9, completedJobs: 312, hourlyRate: 2000, isVerified: true, categories: ['Electrical', 'AC', 'Plumbing'] },
-] as any[]
-
-function CatVisual({ visual, size = 42 }: { visual: CategoryVisual; size?: number }) {
-  const [failed, setFailed] = useState(false)
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    setFailed(false)
-    const timeout = setTimeout(() => setFailed(true), 6000)
-    return () => clearTimeout(timeout)
-  }, [visual.id])
-
-  const Icon = visual.icon
-  return (
-    <View style={styles.catAnimBox}>
-      <Icon size={size} color="rgba(255,255,255,0.94)" weight="fill" />
-      {visual.lottie && !failed ? (
-        <LottieAnimation
-          source={{ uri: visual.lottie } as any}
-          style={StyleSheet.absoluteFill}
-          autoPlay
-          loop
-          onLoad={() => setTick(t => t + 1)}
-        />
-      ) : null}
-    </View>
-  )
-}
-
-function TaskerCard({ p, onPress }: { p: any; onPress: () => void }) {
-  const { t } = useTranslation()
-  const image = p.avatar || p.profileImage
-  const category = (p.categories || p.skills || [])[0] || t('customer.professional')
-  const price = p.hourlyRate ? t('ui.fromLkr', { amount: p.hourlyRate.toLocaleString() }) : p.fixedRate ? `LKR ${p.fixedRate.toLocaleString()}` : null
-
-  return (
-    <Animated.View entering={FadeInUp.delay(120).springify().damping(20).stiffness(300)} style={styles.taskerWrap}>
-      <PressableScale onPress={onPress} scaleTo={0.98} style={styles.taskerPress}>
-        <View style={styles.taskerCard}>
-          <View style={styles.taskerTop}>
-            <AvatarCircle uri={image} name={p.name} size={86} showOnline={!!p.isOnline} showVerified={!!p.isVerified} verified={!!p.isVerified} />
-          </View>
-          <Text style={styles.taskerName} numberOfLines={1}>{p.name || 'Tasker'}</Text>
-          <Text style={styles.taskerCat} numberOfLines={1}>{category}</Text>
-          <View style={styles.taskerRatingRow}>
-            <Star size={12} color={colors.accent} weight="fill" />
-            <Text style={styles.taskerRating}>{p.rating ? p.rating.toFixed(1) : '—'}</Text>
-            {p.completedJobs > 0 && (
-              <Text style={styles.taskerJobs}>({p.completedJobs} jobs)</Text>
-            )}
-          </View>
-          {price ? <Text style={styles.taskerPrice}>{price}</Text> : null}
-        </View>
-      </PressableScale>
-    </Animated.View>
-  )
-}
-
-function RecentJobRow({ job, onRebook, onOpen }: { job: any; onRebook: () => void; onOpen: () => void }) {
-  const { t } = useTranslation()
-  const Icon = categoryIcon(job.categoryId)
-  return (
-    <PressableScale onPress={onOpen} scaleTo={0.98} style={styles.recentPress}>
-      <LinearGradient
-        colors={[colors.surface, colors.surfaceHigh]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.recentCard}
-      >
-        <View style={styles.recentIconBox}>
-          <Icon size={22} color={colors.accent} weight="fill" />
-        </View>
-        <View style={styles.recentBody}>
-          <Text style={styles.recentTitle} numberOfLines={1}>{job.title || 'Untitled job'}</Text>
-          <Text style={styles.recentDate}>{new Date(job.createdAt).toLocaleDateString()}</Text>
-          <View style={{ alignSelf: 'flex-start', marginTop: 6 }}>
-            <StatusBadge status={job.status} />
-          </View>
-        </View>
-        {job.status === 'COMPLETED' ? (
-          <PressableScale onPress={onRebook} scaleTo={0.96} style={styles.rebookWrap}>
-            <View style={styles.rebookBtn}>
-              <Text style={styles.rebookText}>{t('ui.rebook')}</Text>
-            </View>
-          </PressableScale>
-        ) : null}
-      </LinearGradient>
-    </PressableScale>
-  )
+const money = (value: unknown) => {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? `LKR ${n.toLocaleString()}` : null
 }
 
 export default function CustomerHome() {
   const router = useRouter()
-  const insets = useSafeAreaInsets()
-  const { width: winWidth } = useWindowDimensions()
   const { user } = useAuth()
+  const { selectedCountry } = useCountry()
   const { t } = useTranslation()
   const { newJobId } = useLocalSearchParams<{ newJobId?: string }>()
 
@@ -142,8 +42,10 @@ export default function CustomerHome() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [homeCategories, setHomeCategories] = useState<any[]>([])
+  const [properties, setProperties] = useState<any[]>([])
 
   const userId = user?.id
+  const countryCode = selectedCountry?.code || (user as any)?.countryCode || 'LK'
 
   const ownJobs = useMemo(
     () => myJobs.filter(j => !removedJobs.has(j.id) && (j.customerId === userId || (newJobId && j.id === newJobId))),
@@ -155,27 +57,28 @@ export default function CustomerHome() {
     [ownJobs]
   )
 
-  const recentJobs = useMemo(
-    () => [...ownJobs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 3),
-    [ownJobs]
-  )
-
   const region = useMemo(
-    () => user?.province || user?.region || activeJob?.locationName?.split(',')[0] || 'Jaffna',
+    () => user?.province || user?.region || activeJob?.locationName?.split(',')[0] || 'Colombo 05',
     [user, activeJob]
   )
 
   const loadHomeCategories = useCallback(async () => {
     setHomeCategories(CATEGORY_FALLBACK)
     try {
-      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/job-categories`)
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/job-categories?country=${encodeURIComponent(countryCode)}`)
       if (!res.ok) return
       const data = await res.json()
       const list = Array.isArray(data) ? data : data.categories || data.data || []
       if (list.length > 0) setHomeCategories(list)
-    } catch {
-      // keep showing CATEGORY_FALLBACK on network failure
-    }
+    } catch {}
+  }, [countryCode])
+
+  const loadProperties = useCallback(async () => {
+    try {
+      const response: any = await realEstate.list({ status: 'approved' })
+      const list = Array.isArray(response) ? response : Array.isArray(response?.data) ? response.data : []
+      setProperties(list.slice(0, 4))
+    } catch {}
   }, [])
 
   const loadJobs = useCallback(async (refresh = false) => {
@@ -183,20 +86,24 @@ export default function CustomerHome() {
       if (refresh) setRefreshing(true)
       else setLoading(true)
       loadHomeCategories()
+      loadProperties()
+
       const res = await v2Jobs.list()
       const jobs = res.jobs || []
       setMyJobs(jobs)
+
       const own = jobs.filter((j: any) => j.customerId === userId || (newJobId && j.id === newJobId))
       if (own.length > 0) {
         const qResults = await Promise.allSettled(own.map((j: any) => v2Quotes.list(j.id)))
         const counts: Record<string, number> = {}
         own.forEach((j: any, i: number) => {
           const r = qResults[i]
-          if (r.status === 'fulfilled') counts[j.id] = (r.value.quotes || []).filter((q: any) => q.status === 'PENDING').length
-          else counts[j.id] = 0
+          counts[j.id] = r.status === 'fulfilled' ? (r.value.quotes || []).filter((q: any) => q.status === 'PENDING').length : 0
         })
         setQuoteCounts(counts)
-      } else setQuoteCounts({})
+      } else {
+        setQuoteCounts({})
+      }
 
       const targetJobId = newJobId || (own.length > 0 ? own[0].id : null)
       if (targetJobId) {
@@ -205,14 +112,20 @@ export default function CustomerHome() {
         const others = allTaskersRes.status === 'fulfilled' ? (allTaskersRes.value || []) : []
         const seen = new Set<string>()
         const merged: any[] = []
-        const add = (p: any) => { if (p?.id && !seen.has(p.id)) { seen.add(p.id); merged.push(p) } }
+        const add = (p: any) => {
+          if (p?.id && !seen.has(p.id)) {
+            seen.add(p.id)
+            merged.push(p)
+          }
+        }
         matched.forEach(add)
         others.forEach(add)
-        setRelatedProviders(merged.length >= 4 ? merged.slice(0, 10) : [...merged, ...MOCK_PROVIDERS].slice(0, 10))
+        setRelatedProviders(merged.slice(0, 10))
       } else {
         const allTaskers = await taskers.list().catch(() => null)
-        setRelatedProviders((allTaskers || []).length >= 4 ? (allTaskers as any[]).slice(0, 10) : MOCK_PROVIDERS)
+        setRelatedProviders(((allTaskers || []) as any[]).slice(0, 10))
       }
+
       notifications.unreadCount().then((r: any) => setUnreadCount(r.count || 0)).catch(() => {})
     } catch (e) {
       console.error('Load jobs error:', e)
@@ -220,7 +133,7 @@ export default function CustomerHome() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [userId, newJobId, loadHomeCategories])
+  }, [userId, newJobId, loadHomeCategories, loadProperties])
 
   useEffect(() => {
     const unsub = on('jobsChanged', () => setRefreshKey(k => k + 1))
@@ -231,420 +144,742 @@ export default function CustomerHome() {
   useEffect(() => { if (refreshKey > 0) loadJobs() }, [refreshKey, loadJobs])
   useEffect(() => { loadJobs() }, [loadJobs])
 
-  const getGreeting = () => {
-    const h = new Date().getHours()
-    if (h < 12) return t('home.greeting.morning')
-    if (h < 17) return t('home.greeting.afternoon')
-    return t('home.greeting.evening')
-  }
-
-  const firstName = (user?.name || t('home.user')).split(' ')[0]
-  const tier = tierById(user?.tierLevel)
-  const TierIcon = tier.icon
-
-  const openCategoryDetail = (id: string, _name: string) => {
+  const openCategoryDetail = (id: string) => {
     router.push({ pathname: '/(customer)/find/[categoryId]', params: { categoryId: id } } as any)
   }
 
-  const catTileW = Math.floor((winWidth - spacing.md * 2 - spacing.sm) / 4.4)
-  const catRows = (() => {
-    const items = homeCategories.length > 0 ? homeCategories : CATEGORY_FALLBACK
-    const mid = Math.ceil(items.length / 2)
-    return [items.slice(0, mid), items.slice(mid)]
-  })()
-
-  const provider = activeJob?.acceptedQuote?.provider
   const navToActive = () => {
     if (!activeJob) return
     if (TRACKABLE.includes(activeJob.status)) router.push(`/(customer)/tracking/${activeJob.id}`)
     else router.push(`/(customer)/jobs/v2/${activeJob.id}`)
   }
 
-  const ctaBottom = insets.bottom + 64
+  const provider = activeJob?.acceptedQuote?.provider || activeJob?.provider
+  const quick = (homeCategories.length > 0 ? homeCategories : CATEGORY_FALLBACK).slice(0, 3)
+  const featuredProperty = properties[0]
+  const secondProperty = properties[1]
+  const propertyImage = featuredProperty?.images?.[0] || featuredProperty?.imageUrl || featuredProperty?.photoUrl
+  const secondImage = secondProperty?.images?.[0] || secondProperty?.imageUrl || secondProperty?.photoUrl
+  const acceptedAmount = money(activeJob?.acceptedQuote?.amount || activeJob?.acceptedQuote?.price || activeJob?.budget)
+  const eta = activeJob?.acceptedQuote?.etaMinutes || activeJob?.etaMinutes
+  const firstName = (user?.name || 'there').trim().split(/\s+/)[0]
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadJobs(true)} tintColor={colors.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadJobs(true)} tintColor={v3.colors.ink} />}
       >
-        {/* ═══ Top bar ═══ */}
-        <View style={styles.headerRow}>
-          <AvatarCircle uri={(user as any)?.profileImage || (user as any)?.avatar} name={user?.name} size={46} />
-          <PressableScale onPress={() => router.push('/(customer)/settings/addresses' as any)} scaleTo={0.95} style={styles.locPillPress}>
-            <View style={styles.locPill}>
-              <MapPin size={14} color={colors.accent} weight="fill" />
-              <Text style={styles.locPillText} numberOfLines={1}>{region}</Text>
-            </View>
-          </PressableScale>
-          <View style={styles.headerActions}>
-            <PressableScale onPress={() => router.push('/(customer)/(tabs)/notifications' as any)} scaleTo={0.94} style={styles.iconBtnPress}>
-              <View style={styles.iconBtn}>
-                <Bell size={20} color={colors.textPrimary} weight="regular" />
-                {unreadCount > 0 ? <View style={styles.bellDot} /> : null}
-              </View>
-            </PressableScale>
+        <View style={styles.brandRow}>
+          <View>
+            <Text style={styles.brand}>MΛINTΛINEX</Text>
+            <TouchableOpacity style={styles.locationRow} onPress={() => router.push('/(customer)/settings/addresses' as any)} activeOpacity={0.7}>
+              <MapPin size={14} color={v3.colors.textSecondary} />
+              <Text style={styles.locationText} numberOfLines={1}>{region}</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.notificationButton} onPress={() => router.push('/(customer)/(tabs)/notifications' as any)} activeOpacity={0.7}>
+            <Bell size={17} color={v3.colors.ink} weight="fill" />
+            {unreadCount > 0 ? <View style={styles.notificationDot} /> : null}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.welcomeCard}>
+          <View style={styles.welcomeGlowOne} />
+          <View style={styles.welcomeGlowTwo} />
+          <Text style={styles.welcomeEyebrow}>WELCOME BACK</Text>
+          <Text style={styles.welcomeTitle}>Hi ${firstName}, what needs doing?</Text>
+          <Text style={styles.welcomeText}>Search the work, compare nearby providers, or post once and receive quotes.</Text>
+          <View style={styles.welcomeActions}>
+            <TouchableOpacity
+              activeOpacity={0.82}
+              style={styles.welcomePrimary}
+              onPress={() => router.push('/(customer)/find' as any)}
+            >
+              <Wrench size={16} color={v3.colors.ink} weight="fill" />
+              <Text style={styles.welcomePrimaryText}>Find help</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.82}
+              style={styles.welcomeSecondary}
+              onPress={() => router.push('/(customer)/jobs/v2/create' as any)}
+            >
+              <Plus size={16} color={v3.colors.paper} weight="bold" />
+              <Text style={styles.welcomeSecondaryText}>Post job</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.greetingBlock}>
-          <Text style={styles.greetingSub}>{getGreeting()},</Text>
-          <Text style={styles.greetingName}>{firstName}</Text>
-          <PressableScale onPress={() => router.push('/settings/membership' as any)} scaleTo={0.95} style={{ alignSelf: 'flex-start' }}>
-            <View style={styles.tierPill}>
-              <TierIcon size={12} color={tier.color} weight="fill" />
-              <Text style={[styles.tierPillText, { color: tier.color }]}>{t(`tiers.${tier.id.toLowerCase()}`)}</Text>
-            </View>
-          </PressableScale>
+        <TouchableOpacity style={styles.searchBar} onPress={() => router.push('/(customer)/find' as any)} activeOpacity={0.75}>
+          <MagnifyingGlass size={18} color={v3.colors.ink} />
+          <Text style={styles.searchText}>Describe a job or search anything</Text>
+          <View style={styles.voiceCircle}>
+            <Microphone size={15} color={v3.colors.ink} weight="bold" />
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>Quick start</Text>
+          <TouchableOpacity onPress={() => router.push('/(customer)/find' as any)}>
+            <Text style={styles.sectionLink}>All services →</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* ═══ Hero search ═══ */}
-        <AISearchBar
-          placeholder={t('home.searchPlaceholder')}
-          onCategorySelect={(catId) => {
-            router.push({ pathname: '/(customer)/find/[categoryId]', params: { categoryId: catId } } as any)
-          }}
-          onJobSelect={(jobId) => {
-            router.push({ pathname: '/(customer)/find/taskers/[jobId]', params: { jobId } } as any)
-          }}
-          onTaskerSelect={(taskerId) => router.push(`/(customer)/find/tasker-profile/${taskerId}` as any)}
-          onPostJob={(query) => router.push({ pathname: '/(customer)/jobs/v2/create', params: { title: query } } as any)}
-        />
+        <View style={styles.quickRow}>
+          {quick.map((item: any, index: number) => {
+            const id = item.id || item.slug || String(index)
+            const label = item.name || item.slug || ['Clean', 'Repair', 'AC'][index]
+            const sub = ['Today', 'Fast quote', 'Near you'][index] || 'Near you'
+            return (
+              <TouchableOpacity
+                key={id}
+                style={[styles.quickCard, index === 1 && styles.quickCardAccent]}
+                onPress={() => openCategoryDetail(id)}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.quickName} numberOfLines={1}>{label}</Text>
+                <Text style={styles.quickSub}>{sub}</Text>
+              </TouchableOpacity>
+            )
+          })}
+          <TouchableOpacity style={styles.quickCard} onPress={() => router.push('/(customer)/find' as any)} activeOpacity={0.75}>
+            <Text style={styles.quickName}>All</Text>
+            <Text style={styles.quickSub}>100+ services</Text>
+          </TouchableOpacity>
+        </View>
 
-        {/* ═══ Active job ═══ */}
         {activeJob ? (
-          <Animated.View entering={FadeInUp.springify().damping(20).stiffness(300)} style={styles.activeWrap}>
-            <PressableScale onPress={navToActive} scaleTo={0.98} style={styles.activePress}>
-              <LinearGradient colors={[colors.accent, colors.accentDim]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.activeCard}>
-                <View style={styles.activeGlow} />
-                <View style={styles.activeHeader}>
-                  <Text style={styles.activeLabel}>{t('ui.activeJob')}</Text>
-                  {(quoteCounts[activeJob.id] || 0) > 0 && (
-                    <View style={styles.activeCountPill}>
-                      <Text style={styles.activeCountText}>{quoteCounts[activeJob.id]} {t('quotes.title').toLowerCase()}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.activeTitle} numberOfLines={1}>{activeJob.title || 'Your job'}</Text>
-                {provider && (
-                  <View style={styles.activeTaskerRow}>
-                    <AvatarCircle uri={provider.avatar || provider.profileImage} name={provider.name} size={24} />
-                    <Text style={styles.activeTaskerName} numberOfLines={1}>{provider.name}</Text>
-                    <View style={[styles.activePill, { marginLeft: 8 }]}>
-                      <Text style={styles.activePillText}>{t(translateJobStatus(activeJob.status))}</Text>
-                    </View>
-                  </View>
-                )}
-                <View style={styles.trackBtnRow}>
-                  <View style={styles.trackBtn}>
-                    <PaperPlaneTilt size={16} color={colors.background} weight="fill" />
-                    <Text style={styles.trackBtnText}>{t('ui.track')}</Text>
-                  </View>
-                </View>
-              </LinearGradient>
-            </PressableScale>
-          </Animated.View>
+          <TouchableOpacity style={styles.activeCard} onPress={navToActive} activeOpacity={0.85}>
+            <Text style={styles.activeEyebrow}>ACTIVE JOB · {String(t(translateJobStatus(activeJob.status))).toUpperCase()}</Text>
+            <Text style={styles.activeTitle} numberOfLines={1}>{activeJob.title || 'Your active job'}</Text>
+            <View style={styles.activeBottomRow}>
+              <View style={styles.activeProviderRow}>
+                <AvatarCircle
+                  uri={provider?.avatarUrl || provider?.profilePhoto || provider?.imageUrl}
+                  name={provider?.name || 'Tasker'}
+                  size={36}
+                  showOnline
+                />
+                <Text style={styles.activeMeta} numberOfLines={1}>
+                  {provider?.name || 'Tasker'}{eta ? ` · ${eta} min` : ''}{acceptedAmount ? ` · ${acceptedAmount}` : ''}
+                </Text>
+              </View>
+              <View style={styles.trackButton}>
+                <Text style={styles.trackButtonText}>Track</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         ) : null}
 
-        {/* ═══ Service categories ═══ */}
-        <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>{t('home.whatDoYouNeed')}</Text>
-        </View>
-        {loading && relatedProviders.length === 0 ? (
-          <View style={styles.catGrid}>
-            {[0, 1].map(row => (
-              <View key={row} style={styles.catRow}>
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <View key={i} style={{ width: catTileW, alignItems: 'center' }}>
-                    <Skeleton width={catTileW - 26} height={catTileW - 26} radius={999} />
-                    <Skeleton width={catTileW - 16} height={11} radius={5} style={{ marginTop: spacing.xs }} />
-                  </View>
-                ))}
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.catGrid}>
-            {catRows.map((row, ri) => (
-              <ScrollView
-                key={ri}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.catRow}
-                snapToInterval={catTileW + spacing.xs}
-                decelerationRate="fast"
-              >
-                {row.map((item: any, i) => {
-                  const idx = ri * row.length + i
-                  const id = item.slug || item.id || ''
-                  const navId = item.id || item.slug || ''
-                  const vis = categoryVisualBySlug(id)
-                  const visual: CategoryVisual = { id, icon: vis.icon, gradient: vis.gradient }
-                  const label = item.name || item.slug || id
-                  return (
-                    <Animated.View key={id || idx} entering={FadeInUp.delay(idx * 30).springify().damping(20).stiffness(300)} style={{ width: catTileW, alignItems: 'center' }}>
-                      <PressableScale onPress={() => openCategoryDetail(navId, label)} scaleTo={0.9} style={styles.catPress}>
-                        <LinearGradient colors={visual.gradient} style={[styles.catCircle, { width: catTileW - 24, height: catTileW - 24 }]}>
-                          <CatVisual visual={visual} size={26} />
-                        </LinearGradient>
-                      </PressableScale>
-                      <Text style={styles.catLabel} numberOfLines={2}>{label}</Text>
-                    </Animated.View>
-                  )
-                })}
-              </ScrollView>
-            ))}
-          </View>
-        )}
-
-        {/* ═══ Real estate ═══ */}
-        <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>{t('home.realEstate')}</Text>
-        </View>
-        <View style={styles.realEstateRow}>
-          <PressableScale onPress={() => router.push('/real-estate' as any)} scaleTo={0.97} style={styles.rePress}>
-            <LinearGradient colors={[colors.surfaceHigh, colors.surface]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.reCard}>
-              <View style={styles.reIconBox}>
-                <BuildingOffice size={22} color={colors.accent} weight="fill" />
-              </View>
-              <Text style={styles.reTitle}>{t('home.browseProperties')}</Text>
-              <Text style={styles.reSub} numberOfLines={2}>{t('home.browsePropertiesSub')}</Text>
-              <View style={styles.reArrow}>
-                <CaretRight size={14} color={colors.background} weight="bold" />
-              </View>
-            </LinearGradient>
-          </PressableScale>
-          <PressableScale onPress={() => router.push('/real-estate/my-listings' as any)} scaleTo={0.97} style={styles.rePress}>
-            <LinearGradient colors={[colors.surfaceHigh, colors.surface]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.reCard}>
-              <View style={styles.reIconBox}>
-                <HouseLine size={22} color={colors.accent} weight="fill" />
-              </View>
-              <Text style={styles.reTitle}>{t('home.myListings')}</Text>
-              <Text style={styles.reSub} numberOfLines={2}>{t('home.myListingsSub')}</Text>
-              <View style={styles.reArrow}>
-                <CaretRight size={14} color={colors.background} weight="bold" />
-              </View>
-            </LinearGradient>
-          </PressableScale>
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>Your shortcuts</Text>
+          <Text style={styles.sectionHint}>Fast access</Text>
         </View>
 
-        {/* ═══ Nearby taskers ═══ */}
-        {relatedProviders.length > 0 && (
-          <>
-            <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>{t('home.topTaskersNearYou')}</Text>
-              <PressableScale onPress={() => router.push('/(customer)/find' as any)} scaleTo={0.96}>
-                <View style={styles.seeAllRow}>
-                  <Text style={styles.seeAllText}>{t('tasker.seeAll')}</Text>
-                  <CaretRight size={12} color={colors.accent} weight="bold" />
-                </View>
-              </PressableScale>
-              <View style={styles.regionPill}>
-                <MapPin size={12} color={colors.accent} weight="fill" />
-                <Text style={styles.regionText}>{region}</Text>
-              </View>
+        <View style={styles.shortcutGrid}>
+          <TouchableOpacity activeOpacity={0.78} style={styles.shortcutCard} onPress={() => router.push('/(customer)/jobs/v2/create' as any)}>
+            <View style={[styles.shortcutIcon, { backgroundColor: v3.colors.ink }]}>
+              <Plus size={19} color={v3.colors.paper} weight="bold" />
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskersRow}>
-              {relatedProviders.slice(0, 5).map((p: any) => (
-                <TaskerCard
-                  key={p.id}
-                  p={p}
-                  onPress={() => router.push(`/(customer)/find/tasker-profile/${p.id}` as any)}
-                />
-              ))}
-            </ScrollView>
-          </>
-        )}
-
-        {/* ═══ Recent activity ═══ */}
-        <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>{t('ui.recentJobs')}</Text>
-          {recentJobs.length > 0 && (
-            <PressableScale onPress={() => router.push('/(customer)/jobs/v2' as any)} scaleTo={0.96}>
-              <View style={styles.seeAllRow}>
-                <Text style={styles.seeAllText}>{t('tasker.seeAll')}</Text>
-                <CaretRight size={12} color={colors.accent} weight="bold" />
-              </View>
-            </PressableScale>
-          )}
+            <Text style={styles.shortcutTitle}>Post a job</Text>
+            <Text style={styles.shortcutMeta}>Describe it in seconds</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.78} style={styles.shortcutCard} onPress={() => router.push('/(customer)/find' as any)}>
+            <View style={[styles.shortcutIcon, { backgroundColor: v3.colors.amberSoft }]}>
+              <Wrench size={19} color={v3.colors.ink} weight="fill" />
+            </View>
+            <Text style={styles.shortcutTitle}>Find a pro</Text>
+            <Text style={styles.shortcutMeta}>Browse trusted taskers</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.78} style={styles.shortcutCard} onPress={() => router.push('/(customer)/(tabs)/activity' as any)}>
+            <View style={[styles.shortcutIcon, { backgroundColor: v3.colors.infoSoft }]}>
+              <Briefcase size={19} color={v3.colors.info} weight="fill" />
+            </View>
+            <Text style={styles.shortcutTitle}>My jobs</Text>
+            <Text style={styles.shortcutMeta}>Track quotes & progress</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.78} style={styles.shortcutCard} onPress={() => router.push('/(chat)' as any)}>
+            <View style={[styles.shortcutIcon, { backgroundColor: v3.colors.successSoft }]}>
+              <ChatCircle size={19} color={v3.colors.success} weight="fill" />
+            </View>
+            <Text style={styles.shortcutTitle}>Messages</Text>
+            <Text style={styles.shortcutMeta}>Taskers, companies, owners</Text>
+          </TouchableOpacity>
         </View>
-        {loading && recentJobs.length === 0 ? (
-          <View style={styles.recentList}>
-            {[0, 1].map(i => <Skeleton key={i} width="100%" height={86} radius={16} />)}
-          </View>
-        ) : recentJobs.length === 0 ? (
-          <EmptyState
-            title={t('ui.postFirstJob')}
-            subtitle={t('ui.postFirstJobSub')}
-            ctaText={t('home.postJob')}
-            onCta={() => router.push('/(customer)/jobs/v2/create' as any)}
-            FallbackIcon={categoryIcon('general')}
-          />
-        ) : (
-          <View style={styles.recentList}>
-            {recentJobs.map(job => (
-              <RecentJobRow
-                key={job.id}
-                job={job}
-                onOpen={() => router.push(`/(customer)/jobs/v2/${job.id}` as any)}
-                onRebook={() => router.push('/(customer)/jobs/v2/create' as any)}
+
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>Available now</Text>
+          <TouchableOpacity onPress={() => router.push('/(customer)/find' as any)}>
+            <Text style={styles.sectionLink}>See taskers →</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskerRow}>
+          {(relatedProviders.length > 0 ? relatedProviders : []).slice(0, 8).map((p: any) => (
+            <TouchableOpacity key={p.id} style={styles.taskerMini} onPress={() => router.push(`/(customer)/find/tasker-profile/${p.id}` as any)}>
+              <AvatarCircle
+                uri={p.avatarUrl || p.profilePhoto || p.imageUrl}
+                name={p.name || 'Tasker'}
+                size={36}
+                showOnline
               />
-            ))}
-          </View>
-        )}
+              <Text style={styles.taskerName} numberOfLines={1}>{(p.name || 'Tasker').split(' ')[0]}</Text>
+            </TouchableOpacity>
+          ))}
+          {!loading && relatedProviders.length === 0 ? <Text style={styles.emptyHint}>No taskers online right now.</Text> : null}
+        </ScrollView>
+
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>Stay & rent</Text>
+          <TouchableOpacity onPress={() => router.push('/real-estate' as any)}>
+            <Text style={styles.sectionLink}>Property hub →</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.propertyTabs}>
+          <TouchableOpacity style={styles.propertyTabActive} onPress={() => router.push('/real-estate' as any)}>
+            <Text style={styles.propertyTabActiveText}>Daily</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.propertyTab} onPress={() => router.push('/real-estate' as any)}>
+            <Text style={styles.propertyTabText}>Monthly</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.propertyTab} onPress={() => router.push('/real-estate' as any)}>
+            <Text style={styles.propertyTabText}>Rooms</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.propertyTabWide} onPress={() => router.push('/real-estate/upload' as any)}>
+            <Text style={styles.propertyTabText}>List yours</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.buyLink} onPress={() => router.push('/real-estate' as any)}>
+            <Text style={styles.buyLinkText}>Buy & land</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        <View style={styles.propertyRow}>
+          <TouchableOpacity
+            style={styles.propertyMainCard}
+            onPress={() => featuredProperty?.id && router.push(`/real-estate/${featuredProperty.id}` as any)}
+            activeOpacity={featuredProperty ? 0.8 : 1}
+          >
+            <View style={styles.propertyImageWrap}>
+              {propertyImage ? <Image source={{ uri: propertyImage }} style={styles.propertyImage} resizeMode="cover" /> : <View style={styles.propertyPlaceholder} />}
+              <View style={styles.propertyBadge}><Text style={styles.propertyBadgeText}>DAILY STAY</Text></View>
+              <View style={styles.heartButton}><Heart size={16} color={v3.colors.ink} /></View>
+            </View>
+            <Text style={styles.propertyPrice} numberOfLines={1}>
+              {featuredProperty?.nightlyPrice ? `${money(featuredProperty.nightlyPrice)} / night` : featuredProperty?.price ? money(featuredProperty.price) : 'LKR 8,500 / night'}
+            </Text>
+            <Text style={styles.propertyTitle} numberOfLines={1}>{featuredProperty?.title || 'Entire home'}</Text>
+            <View style={styles.propertyMetaRow}>
+              <MapPin size={12} color={v3.colors.textSecondary} />
+              <Text style={styles.propertyMeta} numberOfLines={1}>{featuredProperty?.location || featuredProperty?.city || 'Near you'} · Instant request</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.propertySmallCard}
+            onPress={() => secondProperty?.id && router.push(`/real-estate/${secondProperty.id}` as any)}
+            activeOpacity={secondProperty ? 0.8 : 1}
+          >
+            <View style={styles.propertySmallImageWrap}>
+              {secondImage ? <Image source={{ uri: secondImage }} style={styles.propertyImage} resizeMode="cover" /> : <View style={[styles.propertyPlaceholder, styles.propertyPlaceholderWarm]} />}
+              <View style={styles.monthlyBadge}><Text style={styles.monthlyBadgeText}>MONTHLY</Text></View>
+            </View>
+            <Text style={styles.smallPropertyPrice} numberOfLines={1}>{secondProperty?.rentPrice ? money(secondProperty.rentPrice) : secondProperty?.price ? money(secondProperty.price) : 'LKR 95K'}</Text>
+            <Text style={styles.smallPropertyLocation} numberOfLines={1}>{secondProperty?.location || secondProperty?.city || 'Colombo'}</Text>
+            <Text style={styles.smallPropertyMeta} numberOfLines={1}>{secondProperty?.bedrooms ? `${secondProperty.bedrooms}BR` : '2BR'} · furnished</Text>
+          </TouchableOpacity>
+        </View>
+
+
+        <View style={{ height: 112 }} />
       </ScrollView>
 
-      {/* ═══ Floating CTA ═══ */}
-      <View style={[styles.ctaWrap, { bottom: ctaBottom }]}>
-        <PressableScale onPress={() => router.push('/(customer)/jobs/v2/create' as any)} scaleTo={0.96} style={styles.ctaPress}>
-          <LinearGradient colors={[colors.accent, colors.accentDim]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
-            <Plus size={22} color={colors.background} weight="bold" />
-            <Text style={styles.ctaText}>{t('home.postJob')}</Text>
-          </LinearGradient>
-        </PressableScale>
-      </View>
+      <V3CustomerBottomNav
+        activeTab="home"
+        onTabPress={(tab) => {
+          if (tab === 'home') return
+          if (tab === 'explore') router.push('/(customer)/find' as any)
+          else router.push(`/(customer)/(tabs)/${tab}` as any)
+        }}
+        onPostJob={() => router.push('/(customer)/jobs/v2/create' as any)}
+      />
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  scroll: { paddingBottom: 140, paddingHorizontal: spacing.md },
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  scroll: { paddingBottom: 12 },
 
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.sm, gap: spacing.sm },
-  locPillPress: { flex: 1, borderRadius: radius.full },
-  locPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    paddingVertical: 10, paddingHorizontal: spacing.md, borderRadius: radius.full,
+  brandRow: {
+    paddingHorizontal: 18,
+    paddingTop: 6,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
-  locPillText: { ...typography.caption, color: colors.textPrimary, fontFamily: 'Outfit_600SemiBold', flexShrink: 1 },
-  headerActions: { flexDirection: 'row', gap: spacing.sm },
-  iconBtnPress: { borderRadius: radius.full },
-  iconBtn: {
-    width: 44, height: 44, borderRadius: radius.full,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center', position: 'relative',
+  brand: {
+    fontSize: 13,
+    fontFamily: 'Outfit_900Black',
+    color: v3.colors.ink,
+    letterSpacing: 0.8,
   },
-  bellDot: {
-    position: 'absolute', top: 8, right: 9,
-    width: 9, height: 9, borderRadius: 5,
-    backgroundColor: colors.accent, borderWidth: 1.5, borderColor: colors.background,
+  locationRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: 220,
+  },
+  locationText: {
+    fontSize: 10.5,
+    fontFamily: 'Outfit_700Bold',
+    color: v3.colors.textSecondary,
+  },
+  notificationButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: v3.colors.amber,
+    borderWidth: 1.5,
+    borderColor: v3.colors.paper,
   },
 
-  greetingBlock: { marginTop: spacing.lg, marginBottom: spacing.lg },
-  greetingSub: { ...typography.bodyMuted, fontSize: 14, fontFamily: 'Outfit_500Medium' },
-  greetingName: { ...typography.h1, fontSize: 30, letterSpacing: -0.5, marginTop: 2 },
-  tierPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    marginTop: spacing.sm, paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.full,
-    backgroundColor: colors.accentSoft,
+  welcomeCard: {
+    position: 'relative',
+    overflow: 'hidden',
+    marginHorizontal: 18,
+    marginTop: 14,
+    minHeight: 188,
+    borderRadius: 24,
+    backgroundColor: v3.colors.ink,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 16,
   },
-  tierPillText: { fontSize: 12, fontFamily: 'Outfit_700Bold', color: colors.accent },
+  welcomeGlowOne: {
+    position: 'absolute',
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    right: -34,
+    top: -46,
+    backgroundColor: v3.colors.amber,
+    opacity: 0.95,
+  },
+  welcomeGlowTwo: {
+    position: 'absolute',
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    right: 42,
+    top: -44,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.08,
+  },
+  welcomeEyebrow: {
+    fontSize: 9,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: v3.colors.amber,
+    letterSpacing: 1,
+  },
+  welcomeTitle: {
+    marginTop: 8,
+    maxWidth: 245,
+    fontSize: 25,
+    lineHeight: 30,
+    fontFamily: 'Outfit_900Black',
+    color: v3.colors.paper,
+    letterSpacing: -0.35,
+  },
+  welcomeText: {
+    marginTop: 7,
+    maxWidth: 282,
+    fontSize: 11.2,
+    lineHeight: 16,
+    fontFamily: 'Outfit_400Regular',
+    color: '#C8C8C8',
+  },
+  welcomeActions: {
+    marginTop: 16,
+    flexDirection: 'row',
+    gap: 9,
+  },
+  welcomePrimary: {
+    height: 42,
+    paddingHorizontal: 14,
+    borderRadius: 13,
+    backgroundColor: v3.colors.amber,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  welcomePrimaryText: {
+    fontSize: 11.5,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: v3.colors.ink,
+  },
+  welcomeSecondary: {
+    height: 42,
+    paddingHorizontal: 14,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#404040',
+    backgroundColor: '#171717',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  welcomeSecondaryText: {
+    fontSize: 11.5,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: v3.colors.paper,
+  },
 
-  activeWrap: { marginTop: spacing.md },
-  activePress: { borderRadius: radius.lg, ...shadows.card },
+  searchBar: {
+    marginHorizontal: 18,
+    marginTop: 12,
+    height: 52,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    backgroundColor: v3.colors.paper,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+  },
+  searchText: {
+    flex: 1,
+    marginLeft: 14,
+    fontSize: 12.5,
+    fontFamily: 'Outfit_600SemiBold',
+    color: v3.colors.textSecondary,
+  },
+  voiceCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#F1F1F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  sectionTitleRow: {
+    marginTop: 18,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionTitle: {
+    fontSize: 14.5,
+    fontFamily: 'Outfit_900Black',
+    color: v3.colors.ink,
+  },
+  sectionLink: {
+    fontSize: 9.8,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#4F4F4F',
+  },
+  sectionHint: { fontSize: 9.8, fontFamily: 'Outfit_700Bold', color: v3.colors.textMuted },
+  shortcutGrid: {
+    marginTop: 10,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  shortcutCard: {
+    width: '48.5%',
+    minHeight: 112,
+    borderRadius: 18,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    padding: 13,
+  },
+  shortcutIcon: {
+    width: 38, height: 38, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 11,
+  },
+  shortcutTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 13.5, color: v3.colors.ink },
+  shortcutMeta: { marginTop: 3, fontFamily: 'Outfit_400Regular', fontSize: 10.5, lineHeight: 14, color: v3.colors.textSecondary },
+
+  quickRow: {
+    marginTop: 10,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    gap: 9,
+  },
+  quickCard: {
+    flex: 1,
+    minWidth: 0,
+    height: 74,
+    borderRadius: 18,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    paddingHorizontal: 11,
+    paddingTop: 15,
+  },
+  quickCardAccent: { backgroundColor: v3.colors.amberSoft },
+  quickName: {
+    fontSize: 11,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: v3.colors.ink,
+  },
+  quickSub: {
+    marginTop: 10,
+    fontSize: 8.5,
+    fontFamily: 'Outfit_600SemiBold',
+    color: v3.colors.textSecondary,
+  },
+
   activeCard: {
-    borderRadius: radius.lg, padding: spacing.lg, overflow: 'hidden',
+    marginHorizontal: 18,
+    marginTop: 14,
+    minHeight: 82,
+    borderRadius: 20,
+    backgroundColor: v3.colors.ink,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
   },
-  activeGlow: {
-    position: 'absolute', right: -40, top: -40, width: 160, height: 160, borderRadius: 80,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+  activeEyebrow: {
+    fontSize: 8.4,
+    fontFamily: 'Outfit_900Black',
+    color: v3.colors.amber,
+    letterSpacing: 0.5,
   },
-  activeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  activeLabel: { ...typography.label, color: colors.background, opacity: 0.85, fontFamily: 'Outfit_600SemiBold' },
-  activeCountPill: { backgroundColor: 'rgba(11,12,18,0.25)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.full },
-  activeCountText: { ...typography.caption, color: colors.textPrimary, fontFamily: 'Outfit_600SemiBold' },
-  activeTitle: { ...typography.h3, fontSize: 22, color: colors.background },
-  activeTaskerRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
-  activeTaskerName: { ...typography.body, color: colors.background, fontFamily: 'Outfit_600SemiBold', marginLeft: spacing.sm, flex: 1 },
-  activePill: { backgroundColor: 'rgba(11,12,18,0.25)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.full },
-  activePillText: { ...typography.caption, color: colors.background, fontFamily: 'Outfit_600SemiBold' },
-  trackBtnRow: { marginTop: spacing.lg },
-  trackBtn: {
-    alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.background, paddingVertical: 10, paddingHorizontal: 18, borderRadius: radius.full,
+  activeTitle: {
+    marginTop: 8,
+    fontSize: 15.5,
+    fontFamily: 'Outfit_900Black',
+    color: v3.colors.paper,
   },
-  trackBtnText: { ...typography.body, color: colors.textPrimary, fontFamily: 'Outfit_700Bold', fontSize: 14 },
-
-  sectionHead: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginTop: spacing.xl, marginBottom: spacing.md,
+  activeBottomRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
   },
-  sectionTitle: { ...typography.h3, fontSize: 18 },
-  regionPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full, backgroundColor: colors.accentSoft },
-  regionText: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_600SemiBold' },
-
-  catGrid: { gap: spacing.md },
-  catRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingHorizontal: spacing.sm },
-  catPress: { borderRadius: radius.full },
-  catCircle: {
-    borderRadius: radius.full, overflow: 'hidden',
-    alignItems: 'center', justifyContent: 'center',
+  activeProviderRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  catAnimBox: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  catLabel: { fontSize: 11.5, lineHeight: 14, textAlign: 'center', marginTop: spacing.xs, color: colors.textPrimary, fontFamily: 'Outfit_600SemiBold' },
-
-  realEstateRow: { flexDirection: 'row', gap: spacing.md },
-  rePress: { flex: 1, borderRadius: radius.md, ...shadows.card },
-  reCard: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    padding: spacing.md, paddingBottom: spacing.lg, position: 'relative', minHeight: 150,
+  activeMeta: {
+    flex: 1,
+    fontSize: 9.4,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#CFCFCF',
   },
-  reIconBox: {
-    width: 42, height: 42, borderRadius: radius.sm * 1.5,
-    backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm,
+  trackButton: {
+    minWidth: 60,
+    height: 32,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: v3.colors.paper,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  reTitle: { ...typography.body, fontFamily: 'Outfit_700Bold', fontSize: 15, marginTop: spacing.sm },
-  reSub: { ...typography.caption, color: colors.textSecondary, marginTop: 2, lineHeight: 16 },
-  reArrow: {
-    position: 'absolute', bottom: spacing.md, right: spacing.md,
-    width: 26, height: 26, borderRadius: 13, backgroundColor: colors.accent,
-    alignItems: 'center', justifyContent: 'center',
+  trackButtonText: {
+    fontSize: 10.5,
+    fontFamily: 'Outfit_700Bold',
+    color: v3.colors.ink,
   },
 
-  taskersRow: { gap: spacing.md, paddingRight: spacing.md },
-  taskerWrap: { width: 200 },
-  taskerPress: { borderRadius: radius.md, ...shadows.card },
-  taskerCard: {
-    backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, paddingBottom: spacing.lg,
-    borderWidth: 1, borderColor: colors.border, height: 220,
+  propertyTabs: {
+    marginTop: 10,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    gap: 6,
   },
-  taskerTop: { alignItems: 'center', marginBottom: spacing.md },
-  taskerName: { ...typography.body, textAlign: 'center', fontFamily: 'Outfit_700Bold', fontSize: 15 },
-  taskerCat: { ...typography.caption, textAlign: 'center', marginTop: 2, color: colors.textSecondary },
-  taskerRatingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: spacing.sm },
-  taskerRating: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_600SemiBold' },
-  taskerJobs: { ...typography.caption, color: colors.textSecondary },
-  taskerPrice: { ...typography.body, textAlign: 'center', marginTop: spacing.sm, color: colors.accent, fontFamily: 'Outfit_600SemiBold', fontSize: 13 },
+  propertyTabActive: {
+    height: 32,
+    minWidth: 58,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: v3.colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  propertyTabActiveText: { fontSize: 10.5, fontFamily: 'Outfit_700Bold', color: v3.colors.paper },
+  propertyTab: {
+    height: 32,
+    minWidth: 62,
+    paddingHorizontal: 13,
+    borderRadius: 16,
+    backgroundColor: '#F1F1F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  propertyTabWide: {
+    height: 32,
+    minWidth: 74,
+    paddingHorizontal: 13,
+    borderRadius: 16,
+    backgroundColor: '#F1F1F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  propertyTabText: { fontSize: 10.5, fontFamily: 'Outfit_700Bold', color: v3.colors.ink },
+  buyLink: { height: 32, justifyContent: 'center', paddingLeft: 6 },
+  buyLinkText: { fontSize: 8.8, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.textSecondary },
 
-  recentList: { gap: spacing.sm },
-  recentPress: { borderRadius: radius.md },
-  recentCard: {
-    flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border,
+  propertyRow: {
+    marginTop: 10,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    gap: 12,
   },
-  recentIconBox: {
-    width: 44, height: 44, borderRadius: radius.sm * 1.5,
-    backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center',
+  propertyMainCard: {
+    width: 244,
+    height: 156,
+    borderRadius: 18,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    overflow: 'hidden',
   },
-  recentBody: { flex: 1, marginLeft: spacing.md },
-  recentTitle: { ...typography.body, fontFamily: 'Outfit_600SemiBold', fontSize: 15 },
-  recentDate: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  rebookWrap: { paddingLeft: spacing.sm },
-  rebookBtn: { backgroundColor: colors.accentSoft, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.full },
-  rebookText: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_700Bold' },
+  propertyImageWrap: { height: 88, backgroundColor: '#DCE7E1' },
+  propertySmallCard: {
+    width: 98,
+    height: 156,
+    borderRadius: 18,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    overflow: 'hidden',
+  },
+  propertySmallImageWrap: { height: 82, backgroundColor: '#E7DED4' },
+  propertyImage: { width: '100%', height: '100%' },
+  propertyPlaceholder: { flex: 1, backgroundColor: '#DCE7E1' },
+  propertyPlaceholderWarm: { backgroundColor: '#E7DED4' },
+  propertyBadge: {
+    position: 'absolute',
+    left: 10,
+    top: 10,
+    minWidth: 72,
+    height: 24,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: v3.colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  propertyBadgeText: { fontSize: 8.8, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.paper },
+  monthlyBadge: {
+    position: 'absolute',
+    left: 10,
+    top: 10,
+    minWidth: 66,
+    height: 24,
+    paddingHorizontal: 7,
+    borderRadius: 12,
+    backgroundColor: v3.colors.paper,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthlyBadgeText: { fontSize: 8.8, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  heartButton: {
+    position: 'absolute',
+    right: 7,
+    top: 9,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: v3.colors.paper,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  propertyPrice: {
+    marginTop: 9,
+    marginHorizontal: 11,
+    fontSize: 14.2,
+    fontFamily: 'Outfit_900Black',
+    color: v3.colors.ink,
+  },
+  propertyTitle: {
+    marginTop: 2,
+    marginHorizontal: 11,
+    fontSize: 10.5,
+    fontFamily: 'Outfit_700Bold',
+    color: v3.colors.ink,
+  },
+  propertyMetaRow: {
+    marginTop: 5,
+    marginHorizontal: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  propertyMeta: {
+    flex: 1,
+    fontSize: 8.3,
+    fontFamily: 'Outfit_600SemiBold',
+    color: v3.colors.textSecondary,
+  },
+  smallPropertyPrice: {
+    marginTop: 9,
+    marginHorizontal: 11,
+    fontSize: 12,
+    fontFamily: 'Outfit_900Black',
+    color: v3.colors.ink,
+  },
+  smallPropertyLocation: {
+    marginTop: 2,
+    marginHorizontal: 11,
+    fontSize: 8.5,
+    fontFamily: 'Outfit_700Bold',
+    color: '#4F4F4F',
+  },
+  smallPropertyMeta: {
+    marginTop: 6,
+    marginHorizontal: 11,
+    fontSize: 8.2,
+    fontFamily: 'Outfit_600SemiBold',
+    color: v3.colors.textSecondary,
+  },
 
-  seeAllRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  seeAllText: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_600SemiBold' },
-
-  ctaWrap: { position: 'absolute', left: spacing.md, right: spacing.md },
-  ctaPress: { borderRadius: radius.full, ...shadows.card },
-  cta: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
-    paddingVertical: 16, borderRadius: radius.full,
-    shadowColor: colors.accent, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 16, elevation: 10,
+  taskerRow: {
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    gap: 18,
+    alignItems: 'flex-start',
   },
-  ctaText: { ...typography.body, color: colors.background, fontFamily: 'Outfit_700Bold', fontSize: 17 },
+  taskerMini: { width: 48, alignItems: 'center' },
+  taskerName: {
+    marginTop: 5,
+    width: 54,
+    textAlign: 'center',
+    fontSize: 8.2,
+    fontFamily: 'Outfit_700Bold',
+    color: '#4F4F4F',
+  },
+  emptyHint: {
+    fontSize: 10,
+    fontFamily: 'Outfit_600SemiBold',
+    color: v3.colors.textMuted,
+    paddingVertical: 12,
+  },
 })
