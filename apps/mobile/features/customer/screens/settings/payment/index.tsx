@@ -14,7 +14,7 @@ export default function PaymentScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <V3SectionLabel>Payment methods</V3SectionLabel>
         <V3SettingsCard>
-          <V3SettingsRow icon={CreditCard} title="Cards" subtitle="Add Visa or Mastercard for secure checkout" value="Add" onPress={() => Alert.alert('Cards', 'Card setup will open when the payment provider is connected.')} />
+          <V3SettingsRow icon={CreditCard} title="PayPal online checkout" subtitle="Pay securely with PayPal for eligible online payments" value="Online" onPress={() => Alert.alert('PayPal', 'PayPal checkout opens when you confirm an eligible booking.')} />
           <V3SettingsRow icon={Money} title="Cash" subtitle="Available for eligible jobs" value="Eligible" onPress={() => Alert.alert('Cash', 'Cash is shown only when the selected job supports it.')} />
           <V3SettingsRow icon={Wallet} title="MX Wallet" subtitle="Balance, top ups and refunds" onPress={() => router.push('/(customer)/wallet' as any)} />
           <V3SettingsRow icon={Bank} title="Payout / refund destination" subtitle="Manage where eligible refunds are returned" onPress={() => Alert.alert('Refund destination', 'Refund destination management is being connected to the payment provider.')} last />
