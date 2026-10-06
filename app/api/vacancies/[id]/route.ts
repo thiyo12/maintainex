@@ -1,6 +1,43 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
+import { guardCrmRequest } from '@/lib/crm/security'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
+
+async function authorizeVacancy(request: NextRequest, id: string) {
+  const guard = await guardCrmRequest(request, {
+    permission: 'users:edit',
+    level: 'mutation',
+    requireCountryScope: true,
+  })
+  if (!guard.ok) return { ok: false as const, response: guard.response }
+
+  const vacancy = await prisma.jobVacancy.findUnique({ where: { id } })
+  if (!vacancy) {
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: 'Vacancy not found' }, { status: 404 }),
+    }
+  }
+
+  if (!guard.context.isSuperAdmin) {
+    if (!vacancy.branchId) {
+      return {
+        ok: false as const,
+        response: NextResponse.json({ error: 'Vacancy is outside your assigned countries' }, { status: 403 }),
+      }
+    }
+    const scope = await resolveReportBranchScope(guard.context, vacancy.branchId)
+    if (!scope.ok) {
+      return {
+        ok: false as const,
+        response: NextResponse.json({ error: scope.error }, { status: scope.status }),
+      }
+    }
+  }
+
+  return { ok: true as const, guard: guard.context, vacancy }
+}
 
 export async function DELETE(
   request: NextRequest,
@@ -8,25 +45,13 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const access = await authorizeVacancy(request, id)
+    if (!access.ok) return access.response
 
-    const isSuper = session.role === 'SUPER_ADMIN'
-    const canManage = ['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(session.role)
-
-    if (!canManage) {
-      return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
-    }
-
-    await prisma.jobVacancy.delete({
-      where: { id }
-    })
-
+    await prisma.jobVacancy.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Vacancy DELETE error:', error)
+    secureConsole.error('Vacancy DELETE error:', error)
     return NextResponse.json({ error: 'Failed to delete vacancy' }, { status: 500 })
   }
 }
@@ -37,35 +62,41 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const isSuper = session.role === 'SUPER_ADMIN'
-    const canManage = ['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(session.role)
-
-    if (!canManage) {
-      return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
-    }
+    const access = await authorizeVacancy(request, id)
+    if (!access.ok) return access.response
 
     const body = await request.json()
     const { title, description, location, isActive, branchId } = body
 
+    let nextBranchId: string | undefined
+    if (branchId !== undefined) {
+      if (typeof branchId !== 'string' || !branchId) {
+        return NextResponse.json({ error: 'Invalid branchId' }, { status: 400 })
+      }
+      const scope = await resolveReportBranchScope(access.guard, branchId)
+      if (!scope.ok || scope.scope.branchId !== branchId) {
+        return NextResponse.json(
+          { error: scope.ok ? 'Branch is outside your assigned countries' : scope.error },
+          { status: scope.ok ? 403 : scope.status }
+        )
+      }
+      nextBranchId = branchId
+    }
+
     const vacancy = await prisma.jobVacancy.update({
       where: { id },
       data: {
-        ...(title && { title }),
-        ...(description !== undefined && { description }),
-        ...(location !== undefined && { location }),
-        ...(isActive !== undefined && { isActive }),
-        ...(branchId && isSuper && { branchId })
-      }
+        ...(typeof title === 'string' && title.trim() && { title: title.trim().slice(0, 200) }),
+        ...(description !== undefined && { description: description ? String(description).slice(0, 10000) : null }),
+        ...(location !== undefined && { location: location ? String(location).slice(0, 500) : null }),
+        ...(typeof isActive === 'boolean' && { isActive }),
+        ...(nextBranchId && { branchId: nextBranchId }),
+      },
     })
 
     return NextResponse.json(vacancy)
   } catch (error) {
-    console.error('Vacancy PATCH error:', error)
+    secureConsole.error('Vacancy PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update vacancy' }, { status: 500 })
   }
 }

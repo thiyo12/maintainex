@@ -1,6 +1,7 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import {
   PUBLIC_REAL_ESTATE_STATUSES,
   isSafePropertyMediaRef,
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
     let includePrivateFields = false
 
     if (myOnly) {
-      const session = await getSession(request)
+      const session = await authenticateMarketplaceUser(request)
       if (!session) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
@@ -122,17 +123,19 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error: any) {
-    console.error('Error fetching properties:', error)
+    secureConsole.error('Error fetching properties:', error)
     return NextResponse.json({ error: error?.message || 'Failed to fetch properties' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession(request)
+    const session = await authenticateMarketplaceUser(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(session)
+    if (blocked) return blocked
 
     const body = await request.json().catch(() => ({}))
     const title = typeof body?.title === 'string' ? body.title.trim().slice(0, 180) : ''
@@ -219,7 +222,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: listing }, { status: 201 })
   } catch (error: any) {
-    console.error('Error creating property:', error)
+    secureConsole.error('Error creating property:', error)
     return NextResponse.json({ error: error?.message || 'Failed to create property' }, { status: 500 })
   }
 }

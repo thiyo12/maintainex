@@ -3,7 +3,9 @@ import { View, Text, StyleSheet } from 'react-native'
 import LottieView from 'lottie-react-native'
 import { Icon } from 'phosphor-react-native'
 import PressableScale from './PressableScale'
-import { colors, radius, spacing, typography } from '../../lib/design'
+import { useColors } from '../../lib/theme'
+import { borderRadius, fontSizes, lineHeights, spacing } from '../../lib/tokens'
+import { fonts } from '../../lib/fonts'
 
 const LottieAnimation = LottieView as any
 
@@ -26,6 +28,8 @@ export default function EmptyState({
   FallbackIcon,
   iconSize = 64,
 }: Props) {
+  const colors = useColors()
+  const themed = useStyles()
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -42,7 +46,7 @@ export default function EmptyState({
       <View style={styles.animBox}>
         {!loaded || failed ? (
           <View style={styles.fallback}>
-            {FallbackIcon ? <FallbackIcon size={iconSize} color={colors.textMuted} weight="duotone" /> : null}
+            {FallbackIcon ? <FallbackIcon size={iconSize} color={colors.muted} weight="duotone" /> : null}
           </View>
         ) : null}
         {lottieUrl && !failed ? (
@@ -56,12 +60,12 @@ export default function EmptyState({
           />
         ) : null}
       </View>
-      <Text style={styles.title}>{title}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <Text style={themed.title}>{title}</Text>
+      {subtitle ? <Text style={themed.subtitle}>{subtitle}</Text> : null}
       {ctaText && onCta ? (
-        <PressableScale onPress={onCta} scaleTo={0.96} style={styles.ctaWrap}>
-          <View style={styles.cta}>
-            <Text style={styles.ctaText}>{ctaText}</Text>
+        <PressableScale onPress={onCta} scaleTo={0.96} style={themed.ctaWrap}>
+          <View style={themed.cta}>
+            <Text style={themed.ctaText}>{ctaText}</Text>
           </View>
         </PressableScale>
       ) : null}
@@ -74,14 +78,20 @@ const styles = StyleSheet.create({
   animBox: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
   fallback: { ...(StyleSheet.absoluteFill as any), alignItems: 'center', justifyContent: 'center' },
   lottie: { width: 140, height: 140 },
-  title: { ...typography.h3, textAlign: 'center' },
-  subtitle: { ...typography.bodyMuted, textAlign: 'center' },
-  ctaWrap: { marginTop: spacing.md, alignSelf: 'stretch', alignItems: 'center' },
-  cta: {
-    backgroundColor: colors.accent,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radius.full,
-  },
-  ctaText: { ...typography.body, fontFamily: 'Outfit_700Bold', color: colors.background },
 })
+
+function useStyles() {
+  const colors = useColors()
+  return StyleSheet.create({
+    title: { fontSize: fontSizes.h3, lineHeight: lineHeights.h3, fontFamily: fonts.semibold, color: colors.textPrimary, textAlign: 'center' },
+    subtitle: { fontSize: fontSizes.body, lineHeight: lineHeights.body, fontFamily: fonts.body, color: colors.textSecondary, textAlign: 'center' },
+    ctaWrap: { marginTop: spacing.md, alignSelf: 'stretch', alignItems: 'center' },
+    cta: {
+      backgroundColor: colors.amber,
+      paddingVertical: 14,
+      paddingHorizontal: spacing.xl,
+      borderRadius: borderRadius.full,
+    },
+    ctaText: { fontSize: fontSizes.body, lineHeight: lineHeights.body, fontFamily: fonts.bold, color: '#111111' },
+  })
+}

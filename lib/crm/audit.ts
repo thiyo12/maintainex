@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { redactCrmSensitiveData } from '@/lib/crm/security'
+import { logger } from '@/lib/observability/logger'
 
 interface AuditLogParams {
   action: string
@@ -48,7 +49,7 @@ export async function createAuditLog(params: AuditLogParams) {
       },
     })
   } catch (error) {
-    console.error('Failed to create audit log:', error)
+    logger.error('Failed to create audit log', { err: error })
   }
 }
 

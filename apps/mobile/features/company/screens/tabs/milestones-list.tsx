@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
+import { fonts } from '@/lib/fonts'
 import { company } from '@/api/companies'
 
 export default function CompanyMilestones() {
@@ -113,7 +114,7 @@ export default function CompanyMilestones() {
 const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
+  heading: { fontSize: 28, fontFamily: fonts.heading, color: colors.ink },
   tabs: {
     flexDirection: 'row',
     marginHorizontal: 24,
@@ -124,8 +125,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   },
   tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   tabActive: { backgroundColor: colors.white },
-  tabText: { fontSize: 12, fontWeight: '600', color: colors.muted },
-  tabTextActive: { color: colors.amber, fontWeight: '700' },
+  tabText: { fontSize: 12, fontFamily: fonts.bodySemiBold, color: colors.muted },
+  tabTextActive: { color: colors.amber, fontFamily: fonts.headingBold },
   milestoneCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -144,12 +145,12 @@ const makeStyles = (colors: any) => StyleSheet.create({
   cardLeft: { flexDirection: 'row', alignItems: 'flex-start', flex: 1, gap: 12 },
   statusDot: { width: 10, height: 10, borderRadius: 5, marginTop: 6 },
   cardContent: { flex: 1 },
-  milestoneTitle: { fontSize: 14, fontWeight: '700', color: colors.ink, marginBottom: 2 },
+  milestoneTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 2 },
   milestoneContract: { fontSize: 12, color: colors.muted, marginBottom: 6 },
   milestoneBottom: { flexDirection: 'row', gap: 12 },
-  milestoneAmount: { fontSize: 13, fontWeight: '700', color: colors.ink },
+  milestoneAmount: { fontSize: 13, fontFamily: fonts.headingBold, color: colors.ink },
   milestoneDate: { fontSize: 12, color: colors.muted },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginLeft: 8 },
-  statusText: { fontSize: 11, fontWeight: '600' },
+  statusText: { fontSize: 11, fontFamily: fonts.bodySemiBold },
   emptyText: { textAlign: 'center', color: colors.muted, marginTop: 40, fontSize: 14 },
 })

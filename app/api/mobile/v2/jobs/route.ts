@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { Prisma } from '@prisma/client'
@@ -348,7 +349,7 @@ export async function POST(request: NextRequest) {
         ruleIds: estimate.ruleIds,
       })
     } catch (error) {
-      console.error('Canonical price estimate generation failed:', error)
+      secureConsole.error('Canonical price estimate generation failed:', error)
     }
 
     const jobData = {
@@ -450,7 +451,7 @@ export async function POST(request: NextRequest) {
         const blast = await blastJobToTaskers(job.id)
         notifiedCount = blast.matched
       } catch (error) {
-        console.error('Blast job error:', error)
+        secureConsole.error('Blast job error:', error)
       }
     }
 
@@ -555,7 +556,7 @@ export async function POST(request: NextRequest) {
       estimatedResponseTime: '5-30 minutes',
     }, { status: 201 })
   } catch (error) {
-    console.error('Create job error:', error)
+    secureConsole.error('Create job error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -791,7 +792,7 @@ export async function GET(request: NextRequest) {
       })),
     })
   } catch (error) {
-    console.error('List jobs error:', error)
+    secureConsole.error('List jobs error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

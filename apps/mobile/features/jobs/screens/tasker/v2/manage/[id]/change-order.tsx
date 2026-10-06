@@ -2,16 +2,15 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, FileText, ShieldCheck } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2Jobs, v2ChangeOrder } from '@/api/v2-jobs'
+import { v2Jobs } from '@/api/v2-jobs'
+import { v2ChangeOrder } from '@/api/v2-jobs'
+import { v3 } from '@/theme/v3/tokens'
 
 export default function ChangeOrderScreen() {
   const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
 
@@ -74,130 +73,134 @@ export default function ChangeOrderScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loading}><ActivityIndicator size="small" color={v3.colors.ink} /></View>
       </SafeAreaView>
     )
   }
 
-  const currentPrice = job?.budgetAmount || 0
+  const currentPrice = Number(job?.budgetAmount || 0)
   const adjustment = parseFloat(priceAdjustment) || 0
   const newPrice = currentPrice + adjustment
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-        <Text style={styles.heading}>{t('changeOrder.title')}</Text>
-        <Text style={styles.subtitle}>{t('changeOrder.subtitle')}</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.backButton} activeOpacity={0.72} onPress={() => router.back()}>
+          <CaretLeft size={17} color={v3.colors.ink} weight="bold" />
+        </TouchableOpacity>
+        <Text style={styles.topTitle}>Change order</Text>
+        <View style={styles.placeholder} />
+      </View>
 
-        {/* Current Price (client preview only) */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.iconBox}><FileText size={23} color={v3.colors.ink} weight="bold" /></View>
+        <Text style={styles.hero}>Request extra work</Text>
+        <Text style={styles.subtitle}>Use a change order when the agreed job scope or price needs customer approval.</Text>
+
         <View style={styles.priceCard}>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{t('changeOrder.currentPrice')}</Text>
+          <View style={styles.priceLine}>
+            <Text style={styles.priceLabel}>Current job value</Text>
             <Text style={styles.priceValue}>LKR {currentPrice.toLocaleString()}</Text>
           </View>
-          {priceAdjustment !== '' && (
-            <>
-              <View style={styles.priceDivider} />
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>{t('changeOrder.priceAdjustment')}</Text>
-                <Text style={[styles.priceValue, { color: adjustment >= 0 ? '#059669' : '#DC2626' }]}>
-                  {adjustment >= 0 ? '+' : ''}LKR {adjustment.toLocaleString()}
-                </Text>
-              </View>
-              <View style={styles.priceDivider} />
-              <View style={styles.priceRow}>
-                <Text style={[styles.priceLabel, { fontWeight: '700' }]}>{t('changeOrder.newPrice')}</Text>
-                <Text style={[styles.priceValue, { fontSize: 20 }]}>LKR {newPrice.toLocaleString()}</Text>
-              </View>
-            </>
-          )}
+          <View style={styles.priceDivider} />
+          <View style={styles.priceLine}>
+            <Text style={styles.priceLabel}>Added amount</Text>
+            <Text style={[styles.priceValue, adjustment < 0 && { color: v3.colors.error }]}>
+              {adjustment >= 0 ? '+' : ''}LKR {adjustment.toLocaleString()}
+            </Text>
+          </View>
+          <View style={styles.priceDivider} />
+          <View style={styles.priceLine}>
+            <Text style={styles.priceStrongLabel}>New total</Text>
+            <Text style={styles.priceStrong}>LKR {newPrice.toLocaleString()}</Text>
+          </View>
         </View>
 
-        {/* Reason */}
-        <Text style={styles.label}>{t('changeOrder.reason')} *</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={reason}
-          onChangeText={setReason}
-          placeholder={t('changeOrder.reasonPlaceholder')}
-          placeholderTextColor={colors.muted}
-          multiline
-          numberOfLines={3}
-        />
-
-        {/* Price Adjustment (delta in LKR, sent as cents to server) */}
-        <Text style={styles.label}>{t('changeOrder.priceAdjustment')}</Text>
-        <View style={styles.priceInputRow}>
-          <Text style={styles.currencySign}>LKR</Text>
+        <Text style={styles.sectionLabel}>REASON</Text>
+        <View style={styles.fieldCard}>
           <TextInput
-            style={[styles.input, styles.priceInput]}
+            style={styles.textArea}
+            value={reason}
+            onChangeText={setReason}
+            placeholder="Why is the scope changing?"
+            placeholderTextColor={v3.colors.textPlaceholder}
+            multiline
+            textAlignVertical="top"
+          />
+        </View>
+
+        <Text style={styles.sectionLabel}>ADDED AMOUNT</Text>
+        <View style={styles.moneyField}>
+          <Text style={styles.currency}>LKR</Text>
+          <TextInput
+            style={styles.moneyInput}
             value={priceAdjustment}
             onChangeText={setPriceAdjustment}
             placeholder="0"
-            placeholderTextColor={colors.muted}
+            placeholderTextColor={v3.colors.textPlaceholder}
             keyboardType="numeric"
           />
         </View>
 
-        {/* Scope Delta */}
-        <Text style={styles.label}>{t('changeOrder.description')}</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={scopeDelta}
-          onChangeText={setScopeDelta}
-          placeholder={t('changeOrder.descriptionPlaceholder')}
-          placeholderTextColor={colors.muted}
-          multiline
-          numberOfLines={4}
-        />
+        <Text style={styles.sectionLabel}>NOTE TO CUSTOMER</Text>
+        <View style={styles.fieldCard}>
+          <TextInput
+            style={styles.textArea}
+            value={scopeDelta}
+            onChangeText={setScopeDelta}
+            placeholder="Explain the additional work or materials."
+            placeholderTextColor={v3.colors.textPlaceholder}
+            multiline
+            textAlignVertical="top"
+          />
+        </View>
 
-        {/* Submit */}
+        <View style={styles.approvalCard}>
+          <ShieldCheck size={16} color={v3.colors.info} weight="fill" />
+          <Text style={styles.approvalText}>The extra amount is not charged until the customer approves this change order.</Text>
+        </View>
+
         <TouchableOpacity
-          style={[styles.submitBtn, (submitting || !reason.trim()) && styles.submitBtnDisabled]}
-          onPress={handleSubmit}
+          style={[styles.submitButton, (submitting || !reason.trim()) && styles.disabled]}
+          activeOpacity={0.78}
           disabled={submitting || !reason.trim()}
-          activeOpacity={0.7}
+          onPress={handleSubmit}
         >
-          {submitting ? (
-            <ActivityIndicator size="small" color={colors.white} />
-          ) : (
-            <Text style={styles.submitBtnText}>{t('changeOrder.submit')}</Text>
-          )}
+          {submitting ? <ActivityIndicator size="small" color={v3.colors.paper} /> : <Text style={styles.submitText}>Send for approval</Text>}
         </TouchableOpacity>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  scroll: { paddingHorizontal: 24 },
-  heading: { fontSize: 24, fontWeight: '800', color: colors.ink, marginTop: 16 },
-  subtitle: { fontSize: 14, color: colors.muted, marginTop: 4, marginBottom: 20, lineHeight: 20 },
-
-  priceCard: {
-    backgroundColor: colors.white, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.border, marginBottom: 20,
-  },
-  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
-  priceLabel: { fontSize: 13, color: colors.muted },
-  priceValue: { fontSize: 16, fontWeight: '700', color: colors.ink },
-  priceDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
-
-  label: { fontSize: 14, fontWeight: '700', color: colors.ink, marginBottom: 6, marginTop: 12 },
-  input: {
-    backgroundColor: colors.white, borderRadius: 12, padding: 14, fontSize: 15,
-    borderWidth: 1.5, borderColor: colors.border, color: colors.ink,
-  },
-  textArea: { minHeight: 100, textAlignVertical: 'top' },
-
-  priceInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  currencySign: { fontSize: 18, fontWeight: '700', color: colors.ink },
-  priceInput: { flex: 1, fontSize: 24, fontWeight: '700' },
-
-  submitBtn: { backgroundColor: colors.amber, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 20 },
-  submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { fontSize: 16, fontWeight: '700', color: colors.ink },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  topBar: { height: 70, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  backButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  placeholder: { width: 38, height: 38 },
+  topTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  content: { paddingHorizontal: 20, paddingBottom: 34 },
+  iconBox: { width: 46, height: 46, marginTop: 9, borderRadius: 15, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  hero: { marginTop: 14, fontSize: 27, lineHeight: 33, fontFamily: fonts.heading, color: v3.colors.ink, letterSpacing: -0.35 },
+  subtitle: { marginTop: 6, maxWidth: 330, fontSize: 10.5, lineHeight: 16, fontFamily: fonts.bodySemiBold, color: v3.colors.textSecondary },
+  priceCard: { marginTop: 23, borderRadius: 18, paddingHorizontal: 15, backgroundColor: v3.colors.ink },
+  priceLine: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  priceDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#333333' },
+  priceLabel: { fontSize: 9.5, fontFamily: fonts.bodySemiBold, color: '#CFCFCF' },
+  priceStrongLabel: { fontSize: 10, fontFamily: fonts.headingBold, color: v3.colors.paper },
+  priceValue: { fontSize: 12, fontFamily: fonts.headingBold, color: v3.colors.success },
+  priceStrong: { fontSize: 16, fontFamily: fonts.heading, color: v3.colors.paper },
+  sectionLabel: { marginTop: 23, marginBottom: 8, fontSize: 9, letterSpacing: 0.6, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  fieldCard: { minHeight: 96, borderRadius: 16, padding: 13, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line },
+  textArea: { minHeight: 68, padding: 0, fontSize: 11, lineHeight: 17, fontFamily: fonts.bodyMedium, color: v3.colors.ink },
+  moneyField: { height: 56, borderRadius: 16, paddingHorizontal: 14, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  currency: { marginRight: 7, fontSize: 16, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  moneyInput: { flex: 1, padding: 0, fontSize: 18, fontFamily: fonts.heading, color: v3.colors.ink },
+  approvalCard: { minHeight: 64, marginTop: 18, borderRadius: 15, padding: 13, backgroundColor: v3.colors.infoSoft, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  approvalText: { flex: 1, fontSize: 8.8, lineHeight: 14, fontFamily: fonts.bodySemiBold, color: '#4F4F4F' },
+  submitButton: { height: 54, marginTop: 24, borderRadius: 16, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  disabled: { opacity: 0.42 },
+  submitText: { fontSize: 13, fontFamily: fonts.headingBold, color: v3.colors.paper },
 })

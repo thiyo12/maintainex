@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Share,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, PaperPlaneRight } from 'phosphor-react-native'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { v2Team } from '@/api/v2-companies'
@@ -17,7 +17,7 @@ export default function InviteTeamMember() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [role, setRole] = useState('WORKER')
+  const [role, setRole] = useState('MEMBER')
   const [sending, setSending] = useState(false)
 
   const handleSend = async () => {
@@ -31,32 +31,15 @@ export default function InviteTeamMember() {
     }
     setSending(true)
     try {
-      const result = await v2Team.invite({
+      await v2Team.invite({
         name,
         email: email || undefined,
         phone: phone || undefined,
         role,
       })
-      const token = result.invite?.token
-      const inviteLink = token ? `maintainex://company-invite?token=${encodeURIComponent(token)}` : null
-
-      Alert.alert(
-        t('common.success'),
-        inviteLink
-          ? 'Invitation created. Share the secure invite link with this team member.'
-          : 'Invitation created.',
-        [
-          ...(inviteLink ? [{
-            text: 'Share Invite',
-            onPress: () => {
-              Share.share({
-                message: `You have been invited to join our MaintainEX company team. Open this link after installing MaintainEX: ${inviteLink}`,
-              }).catch(() => {})
-            },
-          }] : []),
-          { text: t('common.done'), onPress: () => router.back() },
-        ]
-      )
+      Alert.alert(t('common.success'), t('common.success'), [
+        { text: t('common.ok'), onPress: () => router.back() },
+      ])
     } catch (err: any) {
       Alert.alert(t('common.error'), err.message || t('errors.generic'))
     } finally {
@@ -67,7 +50,7 @@ export default function InviteTeamMember() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Ionicons name="arrow-back" size={24} color={colors.ink} />
+        <CaretLeft size={24} color={colors.ink} />
       </TouchableOpacity>
 
       <Text style={styles.title}>{t('company.inviteMember')}</Text>
@@ -107,22 +90,18 @@ export default function InviteTeamMember() {
 
       <Text style={styles.label}>{t('profile.role')}</Text>
       <View style={styles.roleRow}>
-        {[
-          { id: 'WORKER', label: 'Worker' },
-          { id: 'DISPATCHER', label: 'Dispatcher' },
-          { id: 'MANAGER', label: 'Manager' },
-          { id: 'FINANCE', label: 'Finance' },
-        ].map((option) => (
-          <TouchableOpacity
-            key={option.id}
-            style={[styles.rolePill, role === option.id && styles.rolePillActive]}
-            onPress={() => setRole(option.id)}
-          >
-            <Text style={[styles.roleText, role === option.id && styles.roleTextActive]}>
-              {option.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <TouchableOpacity
+          style={[styles.rolePill, role === 'MEMBER' && styles.rolePillActive]}
+          onPress={() => setRole('MEMBER')}
+        >
+            <Text style={[styles.roleText, role === 'MEMBER' && styles.roleTextActive]}>{t('team.memberRole')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.rolePill, role === 'ADMIN' && styles.rolePillActive]}
+          onPress={() => setRole('ADMIN')}
+        >
+          <Text style={[styles.roleText, role === 'ADMIN' && styles.roleTextActive]}>{t('team.adminRole')}</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
@@ -134,7 +113,7 @@ export default function InviteTeamMember() {
           <ActivityIndicator color={colors.white} />
         ) : (
           <>
-            <Ionicons name="send-outline" size={18} color={colors.white} />
+            <PaperPlaneRight size={18} color={colors.white} />
             <Text style={styles.sendText}>{t('company.inviteMember')}</Text>
           </>
         )}
@@ -155,7 +134,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     fontFamily: fonts.body, color: colors.ink, marginBottom: 16,
     borderWidth: 1, borderColor: colors.border,
   },
-  roleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 32 },
+  roleRow: { flexDirection: 'row', gap: 10, marginBottom: 32 },
   rolePill: {
     paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12,
     backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border,

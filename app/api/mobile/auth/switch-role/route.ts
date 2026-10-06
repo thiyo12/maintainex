@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
@@ -52,7 +54,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown'
+    const ip = getTrustedClientIp(request.headers)
     const userAgent = request.headers.get('user-agent') ?? ''
 
     const oldRole = user.role
@@ -91,7 +93,7 @@ export async function PUT(request: NextRequest) {
       user: response.user,
     })
   } catch (error) {
-    console.error('Switch role error:', error)
+    logger.error('Mobile role switch failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

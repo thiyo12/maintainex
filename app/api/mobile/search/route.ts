@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
       totalResults,
     })
   } catch (error) {
-    console.error('Search error:', error)
+    secureConsole.error('Search error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

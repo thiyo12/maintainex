@@ -1,191 +1,127 @@
-import { useState, useRef, useEffect } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
-} from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
-import { Lock, Eye, EyeSlash } from 'phosphor-react-native'
+import { useState } from 'react'
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native'
+import { CaretRight } from 'phosphor-react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+
 import { auth } from '@/api/auth'
-import { useAuth } from '@/features/auth/context/auth'
-import { useColors } from '@/lib/ThemeContext'
-import { useTranslation } from 'react-i18next'
-import { fonts } from '@/lib/fonts'
-import { fontSizes } from '@/lib/tokens'
-import { spacing, borderRadius } from '@/lib/tokens'
+import { v3 } from '@/theme/v3/tokens'
+import AuthShell from '@/components/v3/AuthShell'
+import V3NavBar from '@/components/v3/V3NavBar'
+import V3Button from '@/components/v3/V3Button'
 
 export default function ResetPasswordScreen() {
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const { email } = useLocalSearchParams<{ email: string }>()
-  const { t } = useTranslation()
-
-  const [code, setCode] = useState<string[]>(Array(6).fill(''))
+  const { email, code } = useLocalSearchParams<{ email?: string; code?: string }>()
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [resendTimer, setResendTimer] = useState(60)
-  const inputRefs = useRef<(TextInput | null)[]>([])
 
-  useEffect(() => {
-    if (resendTimer <= 0) return
-    const interval = setInterval(() => setResendTimer((t) => t - 1), 1000)
-    return () => clearInterval(interval)
-  }, [resendTimer])
-
-  const handleResend = async () => {
-    setResendTimer(60)
-    try {
-      await auth.forgotPassword({ email: email || '' })
-    } catch {}
-  }
-
-  const handleCodeChange = (text: string, index: number) => {
-    const digit = text.replace(/\D/g, '').slice(-1)
-    const newCodes = [...code]
-    newCodes[index] = digit
-    setCode(newCodes)
-    if (digit && index < 5) {
-      inputRefs.current[index + 1]?.focus()
-    }
-  }
-
-  const handleKeyPress = (key: string, index: number) => {
-    if (key === 'Backspace' && !code[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus()
-    }
-  }
+  const canSubmit = !!email && !!code && newPassword.length >= 8 && newPassword === confirmPassword
 
   const handleReset = async () => {
-    const codeStr = code.join('')
-    if (codeStr.length < 6) {
-      Alert.alert(t('common.error'), t('errors.enterCompleteCode'))
+    if (!email || !code) {
+      Alert.alert('Reset code missing', 'Request a new password reset code and try again.')
       return
     }
-    if (!newPassword || newPassword.length < 6) {
-      Alert.alert(t('common.error'), t('errors.passwordMinLength'))
+    if (newPassword.length < 8) {
+      Alert.alert('Password too short', 'Use at least 8 characters.')
       return
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert(t('common.error'), t('errors.passwordsDoNotMatch'))
+      Alert.alert('Passwords do not match', 'Enter the same password in both fields.')
       return
     }
 
     setLoading(true)
     try {
-      await auth.resetPassword({ email: email || '', code: codeStr, newPassword })
-      Alert.alert(t('auth.resetPassword.success'), t('auth.resetPassword.successMessage'), [
-        { text: 'OK', onPress: () => router.replace('/(auth)/login') },
+      await auth.resetPassword({ email, code, newPassword })
+      Alert.alert('Password updated', 'Sign in again with your new password.', [
+        { text: 'Sign in', onPress: () => router.replace('/(auth)/login') },
       ])
     } catch (err: any) {
-      Alert.alert(t('common.error'), err.message || t('errors.invalidCode'))
+      let message = err?.message || 'Failed to reset password'
+      try { message = JSON.parse(message).error || message } catch {}
+      Alert.alert('Unable to reset password', message)
     } finally {
       setLoading(false)
     }
   }
 
-  const allFilled = code.every((c) => c !== '')
-
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={[styles.backText, { color: colors.primary }]}>{'\u2190'} {t('common.back')}</Text>
-      </TouchableOpacity>
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <AuthShell bg={v3.colors.canvas}>
+        <V3NavBar title="New password" onBack={() => router.back()} />
 
-      <Text style={[styles.title, { color: colors.ink }]}>{t('auth.resetPassword.title')}</Text>
-      <Text style={[styles.subtitle, { color: colors.inkLight }]}>
-        {t('auth.resetPassword.description')} {email}
-      </Text>
+        <View style={styles.content}>
+          <Text style={styles.title}>Create a new password.</Text>
+          <Text style={styles.subtitle}>Use a strong password you have not used before.</Text>
 
-      <View style={styles.codeRow}>
-        {code.map((digit, i) => (
-          <TextInput
-            key={i}
-            ref={(ref) => { inputRefs.current[i] = ref }}
-            style={[
-              styles.codeBox,
-              {
-                borderColor: digit ? colors.primary : colors.border,
-                backgroundColor: digit ? colors.primaryLight : colors.surface,
-                color: colors.ink,
-              },
-            ]}
-            value={digit}
-            onChangeText={(t) => handleCodeChange(t, i)}
-            onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
-            keyboardType="number-pad"
-            maxLength={1}
-            selectionColor={colors.primary}
-          />
-        ))}
-      </View>
+          <View style={styles.row}>
+            <View style={styles.number}><Text style={styles.numberText}>1</Text></View>
+            <View style={styles.rowCopy}>
+              <Text style={styles.rowTitle}>New password</Text>
+              <TextInput
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder="••••••••••••"
+                placeholderTextColor={v3.colors.textMuted}
+                secureTextEntry
+                textContentType="newPassword"
+                style={styles.input}
+              />
+            </View>
+            <CaretRight size={16} color={v3.colors.ink} />
+          </View>
 
-      <TouchableOpacity onPress={handleResend} disabled={resendTimer > 0} style={styles.resendButton}>
-        <Text style={[styles.resendText, { color: colors.primary }, resendTimer > 0 && { color: colors.muted }]}>
-          {resendTimer > 0 ? `${t('auth.otp.resendIn')}${resendTimer}s` : t('auth.otp.resend')}
-        </Text>
-      </TouchableOpacity>
+          <View style={styles.row}>
+            <View style={styles.number}><Text style={styles.numberText}>2</Text></View>
+            <View style={styles.rowCopy}>
+              <Text style={styles.rowTitle}>Confirm password</Text>
+              <TextInput
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="••••••••••••"
+                placeholderTextColor={v3.colors.textMuted}
+                secureTextEntry
+                textContentType="newPassword"
+                style={styles.input}
+              />
+            </View>
+            <CaretRight size={16} color={v3.colors.ink} />
+          </View>
 
-      <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Lock size={18} color={colors.muted} weight="regular" style={styles.inputIcon} />
-        <TextInput
-          style={[styles.input, { color: colors.ink }]}
-          value={newPassword}
-          onChangeText={setNewPassword}
-          placeholder={t('auth.register.passwordPlaceholder')}
-          secureTextEntry={!showPw}
-          placeholderTextColor={colors.muted}
-        />
-        <TouchableOpacity onPress={() => setShowPw(!showPw)} style={styles.eyeBtn}>
-          {showPw ? <EyeSlash size={18} color={colors.muted} /> : <Eye size={18} color={colors.muted} />}
-        </TouchableOpacity>
-      </View>
+          <View style={styles.row}>
+            <View style={styles.number}><Text style={styles.numberText}>3</Text></View>
+            <View style={styles.rowCopy}>
+              <Text style={styles.rowTitle}>Security</Text>
+              <Text style={styles.rowSubtitle}>All other sessions will be signed out</Text>
+            </View>
+            <CaretRight size={16} color={v3.colors.ink} />
+          </View>
 
-      <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Lock size={18} color={colors.muted} weight="regular" style={styles.inputIcon} />
-        <TextInput
-          style={[styles.input, { color: colors.ink }]}
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          placeholder={t('auth.register.confirmPasswordPlaceholder')}
-          secureTextEntry={!showPw}
-          placeholderTextColor={colors.muted}
-        />
-      </View>
+          {!email || !code ? <Text style={styles.warning}>This reset session is incomplete. Go back and request a new code.</Text> : null}
 
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: colors.primary }, (!allFilled || !newPassword || !confirmPassword || loading) && { opacity: 0.5 }]}
-        onPress={handleReset}
-        disabled={!allFilled || !newPassword || !confirmPassword || loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.buttonText}>{t('auth.resetPassword.button')}</Text>
-        )}
-      </TouchableOpacity>
+          <View style={styles.bottom}>
+            <V3Button label="Save new password" onPress={handleReset} loading={loading} disabled={!canSubmit} />
+          </View>
+        </View>
+      </AuthShell>
     </KeyboardAvoidingView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, padding: spacing.xxxl, paddingTop: 60 },
-  backButton: { marginBottom: spacing.xxxl },
-  backText: { fontSize: fontSizes.body, fontFamily: fonts.label },
-  title: { fontSize: fontSizes.h1, fontFamily: fonts.headingBold, marginBottom: spacing.sm },
-  subtitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body, marginBottom: spacing.sm, lineHeight: 24 },
-  codeRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.lg },
-  codeBox: { width: 48, height: 56, borderRadius: borderRadius.md, borderWidth: 1.5, textAlign: 'center', fontSize: fontSizes.h2, fontFamily: fonts.headingBold },
-  resendButton: { alignItems: 'center', marginBottom: spacing.xxxxl },
-  resendText: { fontSize: fontSizes.bodySmall, fontFamily: fonts.label },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: borderRadius.md, borderWidth: 1.5, marginBottom: 12 },
-  inputIcon: { paddingLeft: 16 },
-  input: { flex: 1, padding: 15, fontSize: fontSizes.body, fontFamily: fonts.body },
-  eyeBtn: { paddingRight: 16 },
-  button: { paddingVertical: spacing.lg, borderRadius: borderRadius.lg, alignItems: 'center', marginTop: spacing.md },
-  buttonText: { fontSize: fontSizes.h3, fontFamily: fonts.button, color: '#FFFFFF' },
+const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: v3.colors.canvas },
+  content: { flex: 1, paddingHorizontal: 18, paddingTop: 8 },
+  title: { fontSize: 25, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  subtitle: { marginTop: 8, marginBottom: 20, fontSize: 10.2, lineHeight: 15, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  row: { minHeight: 66, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, marginBottom: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  number: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
+  numberText: { fontSize: 10, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  rowCopy: { flex: 1 },
+  rowTitle: { fontSize: 11.2, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  rowSubtitle: { marginTop: 3, fontSize: 8.8, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  input: { marginTop: 1, paddingVertical: 1, fontSize: 10, fontFamily: 'Outfit_600SemiBold', color: v3.colors.ink },
+  warning: { marginTop: 4, fontSize: 9, lineHeight: 13, fontFamily: 'Outfit_600SemiBold', color: v3.colors.error },
+  bottom: { flex: 1, justifyContent: 'flex-end', paddingBottom: 16 },
 })

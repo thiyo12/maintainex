@@ -80,6 +80,8 @@ describe.skipIf(!requiresPostgres())('Reports authorization — canonical admin 
           firstName: 'Qual',
           lastName: 'Reports',
           isActive: true,
+          totpEnabled: fixture.role === 'SUPER_ADMIN',
+          totpSecret: fixture.role === 'SUPER_ADMIN' ? 'reports-test-totp-secret' : null,
           assignedCountries: JSON.stringify(fixture.assignedCountries),
         },
       })

@@ -1,390 +1,544 @@
-import { useState, useRef } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
-  Animated, Image,
-} from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
-import { CaretLeft, User, Wrench, ArrowRight } from 'phosphor-react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { CheckCircle, MagnifyingGlass, User, Wrench } from 'phosphor-react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+
 import { useAuth } from '@/features/auth/context/auth'
+import { jobCategories as jobCategoriesApi } from '@/api/jobs'
+import type { JobCategory, TemplateJob } from '@/lib/types'
+import { v3 } from '@/theme/v3/tokens'
+import AuthShell from '@/components/v3/AuthShell'
+import V3NavBar from '@/components/v3/V3NavBar'
+import V3Input from '@/components/v3/V3Input'
+import V3OTPInput from '@/components/v3/V3OTPInput'
+import V3Button from '@/components/v3/V3Button'
+import V3RoleCard from '@/components/v3/V3RoleCard'
+import V3InfoBanner from '@/components/v3/V3InfoBanner'
 import CountryPicker, { COUNTRIES, Country } from '@/components/ui/CountryPicker'
-import OtpInput from '@/components/ui/OtpInput'
-import PressableScale from '@/components/ui/PressableScale'
 
-const STEPS = [1, 2, 3]
-
-const CUSTOMER_PILLS = ['Cleaning', 'Repairs', 'Home', 'More']
-const TASKER_PILLS = ['Handyman', 'Cleaning', 'Repairs', 'More']
+const MAX_INITIAL_SERVICES = 15
 
 export default function RegisterScreen() {
   const router = useRouter()
-  const { role: paramRole } = useLocalSearchParams<{ role: string }>()
+  const { role: paramRole } = useLocalSearchParams<{ role?: string }>()
   const { register, verifyRegisterOtp } = useAuth()
 
   const [step, setStep] = useState(paramRole ? 2 : 1)
   const [role, setRole] = useState<'CUSTOMER' | 'TASKER' | 'COMPANY' | ''>(
-    paramRole === 'TASKER' ? 'TASKER' : paramRole === 'COMPANY' ? 'COMPANY' : paramRole === 'CUSTOMER' ? 'CUSTOMER' : ''
+    paramRole === 'TASKER'
+      ? 'TASKER'
+      : paramRole === 'COMPANY'
+        ? 'COMPANY'
+        : paramRole === 'CUSTOMER'
+          ? 'CUSTOMER'
+          : ''
   )
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
+
   const [country, setCountry] = useState<Country>(COUNTRIES[0])
+  const [name, setName] = useState('')
+  const [companyName, setCompanyName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [catalog, setCatalog] = useState<JobCategory[]>([])
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
+  const [serviceQuery, setServiceQuery] = useState('')
+  const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [otpError, setOtpError] = useState('')
   const [verifying, setVerifying] = useState(false)
-  const slideAnim = useRef(new Animated.Value(paramRole ? 1 : 0)).current
+  const [otpCode, setOtpCode] = useState('')
 
-  const fullPhone = `${country.dial}${phone.replace(/\D/g, '')}`
   const phoneDigits = phone.replace(/\D/g, '')
-  const canStep2 = name.length >= 2 && phoneDigits.length >= 7
+  const localDigits = phoneDigits.replace(/^0+/, '')
+  const fullPhone = `${country.dial}${localDigits}`
 
-  const goNext = () => {
-    Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start()
-    setStep(2)
-  }
+  const allJobs = useMemo(
+    () => catalog.flatMap(category => category.jobs || []),
+    [catalog]
+  )
+
+  const selectedJobs = useMemo(
+    () => allJobs.filter(job => selectedServices.has(job.id)),
+    [allJobs, selectedServices]
+  )
+
+  const visibleJobs = useMemo(() => {
+    const query = serviceQuery.trim().toLowerCase()
+    if (query) {
+      return allJobs.filter(job =>
+        job.name.toLowerCase().includes(query) ||
+        String(job.description || '').toLowerCase().includes(query)
+      )
+    }
+
+    const active = catalog.find(category => category.id === activeCategoryId)
+    return active?.jobs || []
+  }, [activeCategoryId, allJobs, catalog, serviceQuery])
+
+  useEffect(() => {
+    if (role !== 'TASKER') return
+
+    let active = true
+    setCatalogLoading(true)
+    jobCategoriesApi.list(country.code)
+      .then(rows => {
+        if (!active) return
+        const available = rows
+          .map(category => ({
+            ...category,
+            jobs: (category.jobs || []).filter(job => !job.isCompanyOnly),
+          }))
+          .filter(category => (category.jobs || []).length > 0)
+
+        setCatalog(available)
+        setActiveCategoryId(current =>
+          current && available.some(category => category.id === current)
+            ? current
+            : available[0]?.id || null
+        )
+      })
+      .catch(() => {
+        if (active) Alert.alert('Unable to load services', 'Please check your connection and try again.')
+      })
+      .finally(() => {
+        if (active) setCatalogLoading(false)
+      })
+
+    return () => { active = false }
+  }, [country.code, role])
 
   const goBack = () => {
-    if (step === 2 && !paramRole) {
-      Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start()
-      setStep(1)
-    } else if (step === 3) {
-      setStep(2)
-      setOtpError('')
-    } else {
+    if (step === 1) {
       router.back()
+      return
+    }
+
+    if (step === 2) {
+      if (paramRole) router.back()
+      else setStep(1)
+      return
+    }
+
+    if (step === 3) {
+      setStep(2)
+      return
+    }
+
+    if (step === 4) {
+      setOtpCode('')
+      setOtpError('')
+      setStep(role === 'TASKER' ? 3 : 2)
     }
   }
 
-  const handleSendCode = async () => {
-    if (!canStep2) return
+  const toggleService = (jobId: string) => {
+    setSelectedServices(current => {
+      const next = new Set(current)
+      if (next.has(jobId)) {
+        next.delete(jobId)
+        return next
+      }
+
+      if (next.size >= MAX_INITIAL_SERVICES) {
+        Alert.alert('Service limit', `Choose up to ${MAX_INITIAL_SERVICES} services. You can change them later from Tasker Profile.`)
+        return current
+      }
+
+      next.add(jobId)
+      return next
+    })
+  }
+
+  const sendRegistrationOtp = async () => {
+    if (name.trim().length < 2 || phoneDigits.length < 7) {
+      Alert.alert('Check your details', 'Enter your full name and a valid mobile number.')
+      return
+    }
+
+    if (role === 'TASKER' && selectedServices.size === 0) {
+      Alert.alert('Choose a service', 'Select at least one service you can provide.')
+      return
+    }
+
+    if (role === 'COMPANY' && companyName.trim().length < 2) {
+      Alert.alert('Company name required', 'Enter the company name you want customers to see.')
+      return
+    }
+
     setLoading(true)
     try {
-      const res = await register({
-        name,
-        phone: fullPhone,
-        email: email || undefined,
-        role: role || 'CUSTOMER',
-      })
-      if (res.requiresVerification) {
-        setStep(3)
-        setOtpError('')
-      }
+      const payload = role === 'TASKER'
+        ? {
+            role: 'TASKER' as const,
+            phone: fullPhone,
+            countryCode: country.code,
+            name: name.trim(),
+            serviceJobIds: Array.from(selectedServices),
+          }
+        : role === 'COMPANY'
+          ? {
+              role: 'COMPANY' as const,
+              phone: fullPhone,
+              countryCode: country.code,
+              name: name.trim(),
+              companyName: companyName.trim(),
+            }
+          : {
+              role: 'CUSTOMER' as const,
+              phone: fullPhone,
+              countryCode: country.code,
+              name: name.trim(),
+            }
+
+      const res = await register(payload)
+      if (!res?.requiresVerification) throw new Error('Verification code was not requested')
+
+      setOtpCode('')
+      setOtpError('')
+      setStep(4)
     } catch (err: any) {
       let message = err?.message || 'Registration failed'
       try { message = JSON.parse(message).error || message } catch {}
-      Alert.alert('Error', message)
+      Alert.alert('Unable to continue', message)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleVerifyOtp = async (code: string) => {
+  const handleVerifyOtp = async (candidate = otpCode) => {
+    if (candidate.length !== 6) return
+
     setVerifying(true)
     setOtpError('')
     try {
-      const user = await verifyRegisterOtp(fullPhone, code, 'PHONE_VERIFICATION')
-      if (user?.role === 'TASKER') {
-        router.replace('/(auth)/onboarding/tasker-services')
-      } else if (user?.role === 'COMPANY') {
-        router.replace('/(auth)/onboarding/company-setup')
-      } else {
-        router.replace('/(customer)')
-      }
+      const user = await verifyRegisterOtp(fullPhone, candidate, 'PHONE_VERIFICATION')
+      if (user?.role === 'TASKER') router.replace('/(auth)/onboarding/tasker-services' as any)
+      else if (user?.role === 'COMPANY') router.replace('/(auth)/onboarding/company-setup' as any)
+      else router.replace('/(customer)' as any)
     } catch (err: any) {
       let message = err?.message || 'Invalid code'
       try { message = JSON.parse(message).error || message } catch {}
       setOtpError(message)
+      setOtpCode('')
     } finally {
       setVerifying(false)
     }
   }
 
-  const pills = role === 'TASKER' ? TASKER_PILLS : CUSTOMER_PILLS
+  const basicReady = name.trim().length >= 2 && phoneDigits.length >= 7
+  const companyReady = basicReady && companyName.trim().length >= 2
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={goBack} style={styles.backButton}>
-            <CaretLeft size={20} color="#FFFFFF" weight="bold" />
-          </TouchableOpacity>
-          {step === 1 && (
-            <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
-              <Text style={styles.skipText}>Skip</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+    <AuthShell bg={v3.colors.canvas}>
+      {step === 1 ? (
+        <View style={styles.roleStep}>
+          <Text style={styles.brand}>MΛINTΛINEX</Text>
+          <Text style={styles.title}>Create your account</Text>
+          <Text style={styles.subtitle}>Start with the essentials. You can complete the rest of your profile after you enter the app.</Text>
 
-        {step === 1 && (
-          <View style={styles.stepContainer}>
-            <View style={styles.dotsRow}>
-              {STEPS.map((s) => (
-                <View key={s} style={[styles.dot, s === 1 && styles.dotActive]} />
-              ))}
-            </View>
-
-            <View style={styles.logoSection}>
-              <View style={styles.logoBox}>
-                <Image source={require('@/assets/logo.png')} style={styles.logo} resizeMode="contain" />
-              </View>
-            </View>
-
-            <Text style={styles.title}>How will you use{'\n'}MΛINTΛINEX?</Text>
-            <Text style={styles.subtitle}>Choose your role to get started.{'\n'}You can always change this later.</Text>
-
-            <PressableScale
-              scaleTo={0.97}
+          <View style={styles.roles}>
+            <V3RoleCard
+              icon={<User size={18} color={v3.colors.amberDark} weight="fill" />}
+              iconBg={v3.colors.amberSoft}
+              title="I need services"
+              subtitle="Create a Customer account with your name and mobile number."
+              badge="Customer"
+              badgeColor={v3.colors.amberDark}
+              badgeBg={v3.colors.amberSoft}
+              selected={role === 'CUSTOMER'}
               onPress={() => setRole('CUSTOMER')}
-              style={[styles.roleCard, role === 'CUSTOMER' && styles.roleCardActive]}
-            >
-              <View style={[styles.roleIconCircle, role === 'CUSTOMER' && styles.roleIconActive]}>
-                <User size={26} color={role === 'CUSTOMER' ? '#0D0D0D' : '#F5A623'} weight="fill" />
-              </View>
-              <View style={styles.roleText}>
-                <Text style={styles.roleTitle}>I need a service</Text>
-                <Text style={styles.roleSub}>Find and book trusted professionals near you.</Text>
-                <View style={styles.pillsRow}>
-                  {CUSTOMER_PILLS.map((p) => (
-                    <View key={p} style={styles.pill}>
-                      <Text style={styles.pillText}>{p}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              <View style={[styles.radio, role === 'CUSTOMER' && styles.radioActive]}>
-                {role === 'CUSTOMER' && <View style={styles.radioInner} />}
-              </View>
-            </PressableScale>
-
-            <PressableScale
-              scaleTo={0.97}
-              onPress={() => setRole('TASKER')}
-              style={[styles.roleCard, role === 'TASKER' && styles.roleCardActive]}
-            >
-              <View style={[styles.roleIconCircle, role === 'TASKER' && styles.roleIconActive]}>
-                <Wrench size={26} color={role === 'TASKER' ? '#0D0D0D' : '#F5A623'} weight="fill" />
-              </View>
-              <View style={styles.roleText}>
-                <Text style={styles.roleTitle}>I offer services</Text>
-                <Text style={styles.roleSub}>Earn money with your skills and experience.</Text>
-                <View style={styles.pillsRow}>
-                  {TASKER_PILLS.map((p) => (
-                    <View key={p} style={styles.pill}>
-                      <Text style={styles.pillText}>{p}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              <View style={[styles.radio, role === 'TASKER' && styles.radioActive]}>
-                {role === 'TASKER' && <View style={styles.radioInner} />}
-              </View>
-            </PressableScale>
-
-            <PressableScale
-              scaleTo={0.97}
-              onPress={goNext}
-              disabled={!role}
-              style={[styles.pillButton, !role && styles.pillButtonDisabled]}
-            >
-              <View style={styles.pillBtnRow}>
-                <Text style={styles.pillBtnText}>Continue</Text>
-                <ArrowRight size={20} color="#0D0D0D" weight="bold" />
-              </View>
-            </PressableScale>
+            />
+            <V3RoleCard
+              icon={<Wrench size={18} color={v3.colors.info} weight="fill" />}
+              iconBg={v3.colors.infoSoft}
+              title="I want to earn"
+              subtitle="Join as an individual professional or register your company."
+              badge="Provider"
+              badgeColor={v3.colors.info}
+              badgeBg={v3.colors.infoSoft}
+              selected={false}
+              onPress={() => router.push('/(auth)/provider-type')}
+            />
           </View>
-        )}
 
-        {step === 2 && (
-          <Animated.View style={[styles.stepContainer, { opacity: slideAnim, transform: [{ translateX: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }]}>
-            <View style={styles.dotsRow}>
-              {STEPS.map((s) => (
-                <View key={s} style={[styles.dot, s <= 2 && styles.dotActive]} />
-              ))}
-            </View>
+          <V3Button label="Continue" onPress={() => setStep(2)} disabled={!role} />
+        </View>
+      ) : step === 2 ? (
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <V3NavBar
+            title={role === 'TASKER' ? 'Create Tasker account' : role === 'COMPANY' ? 'Create company account' : 'Create customer account'}
+            onBack={goBack}
+          />
 
-            <Text style={styles.title}>Your details</Text>
-            <Text style={styles.subtitle}>We'll use this to create your account</Text>
+          <View style={styles.content}>
+            <Text style={styles.title}>
+              {role === 'TASKER' ? 'Start earning with MaintainEX' : role === 'COMPANY' ? 'Create your company workspace' : 'Tell us your name'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {role === 'TASKER'
+                ? 'We only need your name, mobile number and the services you provide. Complete identity, experience and payout details later from Tasker Profile.'
+                : role === 'COMPANY'
+                  ? 'Create the owner login and company workspace now. Complete business documents, team and service areas later.'
+                  : 'Your name and mobile number are enough to start booking services.'}
+            </Text>
 
-            <Text style={styles.fieldLabel}>Full name</Text>
-            <View style={styles.inputRow}>
-              <User size={18} color="#6B6B6B" weight="regular" style={styles.inputIcon} />
-              <TextInput
-                style={styles.textInput}
-                value={name}
-                onChangeText={setName}
-                placeholder="Kamal Perera"
-                placeholderTextColor="#6B6B6B"
-              />
-            </View>
+            <V3Input
+              label={role === 'COMPANY' ? "Owner's full name" : 'Full name'}
+              placeholder="Enter your full name"
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+            />
 
+            {role === 'COMPANY' ? (
+              <>
+                <View style={styles.spacer} />
+                <V3Input
+                  label="Company name"
+                  placeholder="Business or company name"
+                  value={companyName}
+                  onChangeText={setCompanyName}
+                  autoCapitalize="words"
+                />
+              </>
+            ) : null}
+
+            <View style={styles.spacer} />
             <Text style={styles.fieldLabel}>Mobile number</Text>
             <View style={styles.phoneRow}>
               <CountryPicker selected={country} onChange={setCountry} />
-              <TextInput
-                style={styles.phoneInput}
+              <V3Input
+                containerStyle={styles.phoneInputContainer}
+                placeholder={country.code === 'LK' ? '77 123 4567' : '202 555 0102'}
                 value={phone}
                 onChangeText={setPhone}
-                placeholder={country.code === 'LK' ? '771 234 567' : '416 234 5678'}
-                placeholderTextColor="#6B6B6B"
                 keyboardType="phone-pad"
-                maxLength={15}
               />
             </View>
 
-            {(role === 'TASKER' || role === 'COMPANY') && (
+            <View style={{ height: 18 }} />
+            <V3InfoBanner
+              title="Password-free sign in"
+              subtitle="We will verify this mobile number with a 6-digit OTP. Profile details can be completed after login."
+            />
+
+            <View style={{ height: 28 }} />
+            {role === 'TASKER' ? (
+              <V3Button
+                label="Choose services"
+                onPress={() => setStep(3)}
+                disabled={!basicReady}
+              />
+            ) : (
+              <V3Button
+                label="Send OTP"
+                onPress={sendRegistrationOtp}
+                loading={loading}
+                disabled={role === 'COMPANY' ? !companyReady : !basicReady}
+              />
+            )}
+          </View>
+        </ScrollView>
+      ) : step === 3 ? (
+        <View style={styles.servicesScreen}>
+          <V3NavBar title="Choose your services" onBack={goBack} />
+
+          <ScrollView contentContainerStyle={styles.servicesContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Text style={styles.title}>What jobs can you do?</Text>
+            <Text style={styles.subtitle}>Choose only the exact services you are comfortable doing. Pricing and experience can be added later.</Text>
+
+            <View style={styles.selectionSummary}>
+              <Text style={styles.selectionCount}>{selectedServices.size}/{MAX_INITIAL_SERVICES} selected</Text>
+              <Text style={styles.selectionHint}>
+                {selectedJobs.length
+                  ? selectedJobs.slice(0, 3).map(job => job.name).join(' · ') + (selectedJobs.length > 3 ? ` +${selectedJobs.length - 3} more` : '')
+                  : 'Select at least one service to continue.'}
+              </Text>
+            </View>
+
+            <View style={styles.searchBox}>
+              <MagnifyingGlass size={17} color={v3.colors.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                value={serviceQuery}
+                onChangeText={setServiceQuery}
+                placeholder="Search services"
+                placeholderTextColor={v3.colors.textPlaceholder}
+              />
+            </View>
+
+            {catalogLoading ? (
+              <ActivityIndicator color={v3.colors.ink} style={{ marginTop: 42 }} />
+            ) : (
               <>
-                <Text style={styles.fieldLabel}>Email (optional)</Text>
-                <View style={styles.inputRow}>
-                  <TextInput
-                    style={styles.textInput}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="kamal@email.com"
-                    placeholderTextColor="#6B6B6B"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
+                {!serviceQuery.trim() ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.categoryTabs}
+                  >
+                    {catalog.map(category => {
+                      const active = activeCategoryId === category.id
+                      const picked = (category.jobs || []).filter(job => selectedServices.has(job.id)).length
+                      return (
+                        <TouchableOpacity
+                          key={category.id}
+                          style={[styles.categoryTab, active && styles.categoryTabActive]}
+                          onPress={() => setActiveCategoryId(category.id)}
+                          activeOpacity={0.78}
+                        >
+                          <Text style={[styles.categoryTabText, active && styles.categoryTabTextActive]}>{category.name}</Text>
+                          {picked > 0 ? (
+                            <View style={[styles.categoryCount, active && styles.categoryCountActive]}>
+                              <Text style={[styles.categoryCountText, active && styles.categoryCountTextActive]}>{picked}</Text>
+                            </View>
+                          ) : null}
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </ScrollView>
+                ) : null}
+
+                <View style={styles.jobList}>
+                  {visibleJobs.map((job: TemplateJob) => {
+                    const selected = selectedServices.has(job.id)
+                    return (
+                      <TouchableOpacity
+                        key={job.id}
+                        style={[styles.jobRow, selected && styles.jobRowSelected]}
+                        onPress={() => toggleService(job.id)}
+                        activeOpacity={0.76}
+                      >
+                        <View style={[styles.check, selected && styles.checkSelected]}>
+                          {selected ? <CheckCircle size={20} color={v3.colors.paper} weight="fill" /> : null}
+                        </View>
+                        <View style={styles.jobCopy}>
+                          <Text style={styles.jobName}>{job.name}</Text>
+                          {job.description ? (
+                            <Text style={styles.jobDescription} numberOfLines={2}>{job.description}</Text>
+                          ) : null}
+                        </View>
+                        <Text style={[styles.addLabel, selected && styles.addLabelSelected]}>{selected ? 'Selected' : 'Add'}</Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+
+                  {visibleJobs.length === 0 ? (
+                    <View style={styles.emptyCard}>
+                      <Text style={styles.emptyTitle}>No matching services</Text>
+                      <Text style={styles.emptyText}>Try another search or choose a different category.</Text>
+                    </View>
+                  ) : null}
                 </View>
               </>
             )}
 
-            <PressableScale
-              scaleTo={0.97}
-              onPress={handleSendCode}
-              disabled={!canStep2 || loading}
-              style={[styles.pillButton, !canStep2 && styles.pillButtonDisabled]}
-            >
-              {loading ? (
-                <ActivityIndicator color="#0D0D0D" />
-              ) : (
-                <View style={styles.pillBtnRow}>
-                  <Text style={styles.pillBtnText}>Send Verification Code</Text>
-                  <ArrowRight size={20} color="#0D0D0D" weight="bold" />
-                </View>
-              )}
-            </PressableScale>
-          </Animated.View>
-        )}
+            <View style={{ height: 24 }} />
+            <V3Button
+              label={selectedServices.size ? `Continue with ${selectedServices.size} service${selectedServices.size === 1 ? '' : 's'}` : 'Select at least one service'}
+              onPress={sendRegistrationOtp}
+              loading={loading}
+              disabled={selectedServices.size === 0 || catalogLoading}
+            />
+          </ScrollView>
+        </View>
+      ) : (
+        <View style={styles.otpStep}>
+          <V3NavBar title="Verify your number" onBack={goBack} />
+          <View style={styles.otpContent}>
+            <Text style={styles.title}>Enter your OTP</Text>
+            <Text style={styles.subtitle}>Enter the 6-digit code for {maskPhone(fullPhone)}.</Text>
+            <Text style={styles.enterCode}>Verification code</Text>
 
-        {step === 3 && (
-          <View style={styles.stepContainer}>
-            <View style={styles.dotsRow}>
-              {STEPS.map((s) => (
-                <View key={s} style={[styles.dot, styles.dotActive]} />
-              ))}
+            <View style={styles.otpWrap}>
+              <V3OTPInput
+                size="compact"
+                autoSubmit={false}
+                onChangeCode={setOtpCode}
+                onComplete={handleVerifyOtp}
+                error={otpError}
+                loading={verifying}
+              />
             </View>
 
-            <Text style={styles.title}>Verify your number</Text>
-            <Text style={styles.subtitle}>Code sent to {fullPhone}</Text>
+            <TouchableOpacity onPress={goBack}>
+              <Text style={styles.changeNumber}>Wrong number? Change it</Text>
+            </TouchableOpacity>
 
-            <OtpInput
-              onComplete={handleVerifyOtp}
-              error={otpError}
-              loading={verifying}
-            />
+            <TouchableOpacity onPress={sendRegistrationOtp} disabled={loading || verifying} activeOpacity={0.72}>
+              <Text style={styles.resendCode}>{loading ? 'Sending…' : 'Send a new code'}</Text>
+            </TouchableOpacity>
 
-            <View style={styles.resendRow}>
-              <TouchableOpacity onPress={() => setStep(2)}>
-                <Text style={styles.wrongNumber}>Wrong number?</Text>
-              </TouchableOpacity>
+            {otpError ? <Text style={styles.otpError}>{otpError}</Text> : null}
+
+            <View style={styles.otpBottom}>
+              <V3Button
+                label="Verify & enter MaintainEX"
+                onPress={() => handleVerifyOtp()}
+                loading={verifying}
+                disabled={otpCode.length !== 6}
+              />
             </View>
           </View>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </View>
+      )}
+    </AuthShell>
   )
 }
 
+function maskPhone(num: string) {
+  const digits = num.replace(/\D/g, '')
+  if (digits.length < 6) return num
+  return `+${digits.slice(0, Math.max(2, digits.length - 7))} ${digits.slice(-7, -4)}•••${digits.slice(-4)}`
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
-  scrollContent: { padding: 24, paddingTop: 60, flexGrow: 1 },
-
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  backButton: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: '#1C1C1C',
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#2E2E2E',
-  },
-  skipText: { fontSize: 16, fontFamily: 'Outfit_600SemiBold', color: '#FFFFFF' },
-
-  dotsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
-  dot: { width: 24, height: 4, borderRadius: 2, backgroundColor: '#2E2E2E' },
-  dotActive: { backgroundColor: '#F5A623' },
-
-  logoSection: { alignItems: 'center', marginBottom: 24 },
-  logoBox: {
-    width: 64, height: 64, borderRadius: 16,
-    backgroundColor: 'rgba(245,166,35,0.08)',
-    borderWidth: 1.5, borderColor: '#F5A623',
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#F5A623', shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35, shadowRadius: 16, elevation: 8,
-  },
-  logo: { width: 40, height: 40 },
-
-  stepContainer: { flex: 1 },
-  title: { fontSize: 30, fontFamily: 'Outfit_800ExtraBold', color: '#FFFFFF', marginBottom: 8, lineHeight: 36 },
-  subtitle: { fontSize: 15, fontFamily: 'Outfit_400Regular', color: '#B3B3B3', marginBottom: 28, lineHeight: 22 },
-
-  roleCard: {
-    flexDirection: 'row', alignItems: 'flex-start', padding: 16,
-    backgroundColor: '#1C1C1C', borderWidth: 1.5, borderColor: '#2E2E2E',
-    borderRadius: 20, marginBottom: 12,
-  },
-  roleCardActive: { borderColor: '#F5A623' },
-  roleIconCircle: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(245,166,35,0.12)',
-    justifyContent: 'center', alignItems: 'center', marginRight: 14, marginTop: 2,
-  },
-  roleIconActive: { backgroundColor: '#F5A623' },
-  roleText: { flex: 1 },
-  roleTitle: { fontSize: 17, fontFamily: 'Outfit_700Bold', color: '#FFFFFF', marginBottom: 3 },
-  roleSub: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: '#B3B3B3', marginBottom: 10, lineHeight: 18 },
-  pillsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  pill: {
-    paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-  },
-  pillText: { fontSize: 12, fontFamily: 'Outfit_500Medium', color: '#B3B3B3' },
-
-  radio: {
-    width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#6B6B6B',
-    justifyContent: 'center', alignItems: 'center', marginTop: 4,
-  },
-  radioActive: { borderColor: '#F5A623' },
-  radioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#F5A623' },
-
-  fieldLabel: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: '#B3B3B3', marginBottom: 6, marginTop: 4 },
-  inputRow: {
-    flexDirection: 'row', alignItems: 'center', height: 56, borderRadius: 16,
-    backgroundColor: '#1C1C1C', borderWidth: 1, borderColor: '#2E2E2E',
-    marginBottom: 16, overflow: 'hidden',
-  },
-  inputIcon: { paddingLeft: 16, marginRight: 8 },
-  textInput: { flex: 1, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Outfit_500Medium', color: '#FFFFFF' },
-
-  phoneRow: {
-    flexDirection: 'row', height: 56, borderRadius: 16,
-    backgroundColor: '#1C1C1C', borderWidth: 1, borderColor: '#2E2E2E',
-    overflow: 'hidden', marginBottom: 16,
-  },
-  phoneInput: {
-    flex: 1, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Outfit_500Medium',
-    color: '#FFFFFF',
-  },
-
-  pillButton: {
-    height: 56, borderRadius: 16, backgroundColor: '#F5A623',
-    justifyContent: 'center', alignItems: 'center', marginTop: 8,
-    shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 12, elevation: 4,
-  },
-  pillButtonDisabled: { backgroundColor: '#2E2E2E', shadowOpacity: 0 },
-  pillBtnRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pillBtnText: { fontSize: 17, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
-
-  resendRow: { alignItems: 'center', marginTop: 16 },
-  wrongNumber: { fontSize: 14, fontFamily: 'Outfit_600SemiBold', color: '#F5A623' },
+  roleStep: { flex: 1, padding: 18 },
+  brand: { fontSize: 13, fontFamily: 'Outfit_900Black', color: v3.colors.ink, letterSpacing: 0.8, marginBottom: 32 },
+  title: { fontSize: 26, lineHeight: 31, fontFamily: 'Outfit_900Black', color: v3.colors.ink, marginBottom: 6 },
+  subtitle: { fontSize: 11, lineHeight: 17, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary, marginBottom: 22 },
+  roles: { flex: 1, gap: 12, marginBottom: 16 },
+  scroll: { flexGrow: 1, paddingBottom: 28 },
+  content: { paddingHorizontal: 18, paddingTop: 10 },
+  spacer: { height: 14 },
+  fieldLabel: { fontSize: 10, fontFamily: 'Outfit_700Bold', color: '#4F4F4F', marginBottom: 6 },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  phoneInputContainer: { flex: 1 },
+  servicesScreen: { flex: 1 },
+  servicesContent: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 34 },
+  selectionSummary: { padding: 14, borderRadius: 16, backgroundColor: v3.colors.ink, marginBottom: 14 },
+  selectionCount: { fontSize: 14, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.paper },
+  selectionHint: { marginTop: 5, fontSize: 9.5, lineHeight: 14, fontFamily: 'Outfit_500Medium', color: '#D1D1D1' },
+  searchBox: { height: 52, borderRadius: 15, borderWidth: 1, borderColor: v3.colors.line, backgroundColor: v3.colors.paper, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  searchInput: { flex: 1, fontSize: 11.5, fontFamily: 'Outfit_600SemiBold', color: v3.colors.ink, paddingVertical: 0 },
+  categoryTabs: { paddingTop: 14, paddingBottom: 12, gap: 8, paddingRight: 16 },
+  categoryTab: { minHeight: 40, borderRadius: 20, borderWidth: 1, borderColor: v3.colors.line, backgroundColor: v3.colors.paper, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  categoryTabActive: { backgroundColor: v3.colors.ink, borderColor: v3.colors.ink },
+  categoryTabText: { fontSize: 10, fontFamily: 'Outfit_700Bold', color: v3.colors.ink },
+  categoryTabTextActive: { color: v3.colors.paper },
+  categoryCount: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  categoryCountActive: { backgroundColor: v3.colors.paper },
+  categoryCountText: { fontSize: 8, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.paper },
+  categoryCountTextActive: { color: v3.colors.ink },
+  jobList: { gap: 9 },
+  jobRow: { minHeight: 70, borderRadius: 16, paddingHorizontal: 13, paddingVertical: 11, borderWidth: 1, borderColor: v3.colors.line, backgroundColor: v3.colors.paper, flexDirection: 'row', alignItems: 'center' },
+  jobRowSelected: { borderColor: v3.colors.ink, borderWidth: 1.5 },
+  check: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  checkSelected: { borderColor: v3.colors.ink, backgroundColor: v3.colors.ink },
+  jobCopy: { flex: 1, marginLeft: 11, paddingRight: 8 },
+  jobName: { fontSize: 11.5, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  jobDescription: { marginTop: 3, fontSize: 9, lineHeight: 13, fontFamily: 'Outfit_500Medium', color: v3.colors.textSecondary },
+  addLabel: { fontSize: 9, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.textMuted },
+  addLabelSelected: { color: v3.colors.ink },
+  emptyCard: { padding: 22, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center' },
+  emptyTitle: { fontSize: 12, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  emptyText: { marginTop: 4, fontSize: 9.5, fontFamily: 'Outfit_500Medium', color: v3.colors.textMuted, textAlign: 'center' },
+  otpStep: { flex: 1 },
+  otpContent: { flex: 1, paddingHorizontal: 24, paddingTop: 10 },
+  enterCode: { marginTop: 46, textAlign: 'center', fontSize: 11, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary },
+  otpWrap: { alignItems: 'center', marginTop: 18 },
+  changeNumber: { marginTop: 24, textAlign: 'center', fontSize: 10, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary },
+  resendCode: { marginTop: 12, textAlign: 'center', fontSize: 10, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  otpError: { marginTop: 8, textAlign: 'center', fontSize: 9.5, fontFamily: 'Outfit_600SemiBold', color: v3.colors.error },
+  otpBottom: { flex: 1, justifyContent: 'flex-end', paddingBottom: 16 },
 })

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v2 as cloudinary } from 'cloudinary'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
+import { validateFileUpload, generateSecureFilename } from '@/lib/security/file-upload'
+import { checkRateLimit } from '@/lib/rate-limit/middleware'
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -8,53 +10,21 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 })
 
-const rateLimitMap = new Map<string, { count: number; lastReset: number }>()
-const RATE_LIMIT = 10
-const RATE_WINDOW = 60 * 1000
-
-function cleanupOldEntries() {
-  const now = Date.now()
-  const entries = Array.from(rateLimitMap.entries())
-  for (const [ip, record] of entries) {
-    if (now - record.lastReset > RATE_WINDOW * 2) {
-      rateLimitMap.delete(ip)
-    }
-  }
-}
-
-if (typeof window === 'undefined') {
-  setInterval(cleanupOldEntries, RATE_WINDOW * 2)
-}
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now()
-  const record = rateLimitMap.get(ip)
-
-  if (!record || now - record.lastReset > RATE_WINDOW) {
-    rateLimitMap.set(ip, { count: 1, lastReset: now })
-    return true
-  }
-
-  if (record.count >= RATE_LIMIT) {
-    return false
-  }
-
-  record.count++
-  return true
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession(request)
-    if (!session) {
+    const user = await authenticateMarketplaceUser(request)
+    if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
-
-    if (!checkRateLimit(ip)) {
-      return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
-    }
+    const rateLimit = await checkRateLimit(request, {
+      policyName: 'UPLOAD',
+      keyPrefix: 'cv_upload',
+      identifier: user.id,
+    })
+    if (!rateLimit.allowed) return rateLimit.response!
 
     let formData
     try {
@@ -77,17 +47,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 })
     }
 
-    const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    if (fileName.length > 100) {
-      return NextResponse.json({ error: 'Invalid filename' }, { status: 400 })
-    }
-
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
+    const validation = validateFileUpload(buffer, file.type, file.name)
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+    const fileName = generateSecureFilename(file.name)
 
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        { folder: 'maintainex/cvs', resource_type: 'raw' },
+        {
+          folder: 'maintainex/cvs',
+          resource_type: 'raw',
+          public_id: fileName.replace(/\.pdf$/i, ''),
+          use_filename: false,
+          unique_filename: false,
+        },
         (error, result) => {
           if (error) reject(error)
           else resolve(result)

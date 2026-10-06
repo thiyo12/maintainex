@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
 import { bigIntToSafeNumber, type Currency, getCurrencyForCountry } from '@/lib/shared/money/money'
@@ -607,6 +608,6 @@ export const FINANCIAL_EVENTS = {
 
 export function emitFinancialEvent(event: string, data: Record<string, unknown>): void {
   if (process.env.NODE_ENV !== 'test') {
-    console.log(`[FINANCIAL_EVENT] ${event}`, JSON.stringify(data))
+    secureConsole.log(`[FINANCIAL_EVENT] ${event}`, JSON.stringify(data))
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
@@ -45,7 +46,7 @@ export async function GET() {
 
     return NextResponse.json({ source, countries })
   } catch (error) {
-    console.error('Mobile locations GET error:', error)
+    secureConsole.error('Mobile locations GET error:', error)
     return NextResponse.json(
       {
         source: 'static-fallback',

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmRequest, type CrmSecurityContext } from '@/lib/crm/security'
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM professions list error:', error)
+    secureConsole.error('CRM professions list error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
     if (message.includes('Unique constraint')) {
       return NextResponse.json({ error: 'Profession with this slug or i18nKey already exists' }, { status: 409 })
     }
-    console.error('CRM profession create error:', error)
+    secureConsole.error('CRM profession create error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

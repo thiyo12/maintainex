@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -353,7 +354,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM wallets GET error:', error)
+    logger.error('CRM wallets read failed unexpectedly', { err: error, route: '/api/admin/financial/wallets', method: 'GET' })
     return NextResponse.json({ error: 'Failed to fetch wallet data' }, { status: 500 })
   }
 }
@@ -468,7 +469,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ wallet: updated })
   } catch (error) {
-    console.error('CRM wallets PATCH error:', error)
+    logger.error('CRM wallets update failed unexpectedly', { err: error, route: '/api/admin/financial/wallets', method: 'PATCH' })
     return NextResponse.json({ error: 'Failed to update wallet' }, { status: 500 })
   }
 }

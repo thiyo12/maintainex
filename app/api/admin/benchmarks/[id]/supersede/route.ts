@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       message: `Benchmark superseded. New draft v${newBenchmark.version} created.`,
     })
   } catch (error) {
-    console.error('CRM benchmark supersede error:', error)
+    secureConsole.error('CRM benchmark supersede error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

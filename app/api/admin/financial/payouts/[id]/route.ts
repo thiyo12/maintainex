@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, guardCrmAction } from '@/lib/crm/security'
@@ -230,7 +231,7 @@ export async function PATCH(
       status: result.status,
     })
   } catch (error) {
-    console.error('CRM payout action error:', error)
+    logger.error('CRM payout action failed unexpectedly', { err: error, route: '/api/admin/financial/payouts/[id]', method: 'PATCH' })
     return NextResponse.json({ error: 'Failed to process payout action' }, { status: 500 })
   }
 }

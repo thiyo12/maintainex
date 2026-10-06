@@ -37,11 +37,26 @@ export async function createStaffSession(
       lastName: true,
       isActive: true,
       deletedAt: true,
+      lockedUntil: true,
+      totpEnabled: true,
+      totpSecret: true,
     },
   })
 
   if (!adminUser) throw new Error('AdminUser not found')
-  if (!adminUser.isActive || adminUser.deletedAt) throw new Error('Account disabled')
+  if (
+    !adminUser.isActive ||
+    adminUser.deletedAt ||
+    (adminUser.lockedUntil && adminUser.lockedUntil > new Date())
+  ) {
+    throw new Error('Account disabled')
+  }
+  if (
+    adminUser.role === 'SUPER_ADMIN' &&
+    (!adminUser.totpEnabled || !adminUser.totpSecret)
+  ) {
+    throw new Error('SUPER_ADMIN_MFA_REQUIRED')
+  }
 
   const tokenFamilyId = crypto.randomUUID()
   const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000)

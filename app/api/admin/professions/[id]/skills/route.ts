@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmRequest, type CrmSecurityContext } from '@/lib/crm/security'
@@ -49,7 +50,7 @@ export async function GET(
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM profession skills GET error:', error)
+    secureConsole.error('CRM profession skills GET error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -121,7 +122,7 @@ export async function POST(
     if (message.includes('Unique constraint')) {
       return NextResponse.json({ error: 'Skill with this slug already exists in this profession' }, { status: 409 })
     }
-    console.error('CRM profession skill create error:', error)
+    secureConsole.error('CRM profession skill create error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -229,7 +230,7 @@ export async function PATCH(
     if (message.includes('Unique constraint')) {
       return NextResponse.json({ error: 'Skill with this slug already exists in this profession' }, { status: 409 })
     }
-    console.error('CRM profession skill update error:', error)
+    secureConsole.error('CRM profession skill update error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -278,7 +279,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Skill deactivated', skill: updated })
   } catch (error) {
-    console.error('CRM profession skill deactivate error:', error)
+    secureConsole.error('CRM profession skill deactivate error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

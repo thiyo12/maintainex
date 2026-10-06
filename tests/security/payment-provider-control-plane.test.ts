@@ -45,7 +45,10 @@ describe('payment provider control plane', () => {
     expect(bootstrap).not.toContain('paymentProviderConfig.upsert')
     expect(bootstrap).not.toContain('paymentProviderConfig.create')
     expect(bootstrap).not.toContain('deleteMany')
-    expect(docker).toContain('node scripts/bootstrap-payment-providers.cjs')
+    expect(docker).toContain('scripts/start-production.sh')
+    const starter = source('scripts/start-production.sh')
+    expect(starter).toContain('node scripts/bootstrap-payment-providers.cjs')
+    expect(starter).toContain('npx prisma migrate deploy')
   })
 
   it('restricts new online checkout to PayPal with market verification', () => {

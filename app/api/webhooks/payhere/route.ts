@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   getPayHereConfig,
@@ -97,10 +98,7 @@ export async function POST(request: NextRequest) {
 
     const isValidSignature = verifyNotificationSignature(notification, config.merchantSecret)
     if (!isValidSignature) {
-      console.error('[SECURITY] PayHere webhook signature mismatch', {
-        orderId: notification.order_id,
-        merchantId: notification.merchant_id,
-      })
+      logger.warn('PayHere webhook signature verification failed', { route: '/api/webhooks/payhere', method: 'POST' })
       return NextResponse.json({ error: 'Invalid signature' }, { status: 403 })
     }
 
@@ -109,14 +107,14 @@ export async function POST(request: NextRequest) {
     if (statusCode === 2) {
       const result = await processPaymentSuccess(notification)
       if (!result.success) {
-        console.error('PayHere success processing failed:', result.error)
-        return NextResponse.json({ error: result.error }, { status: 409 })
+        logger.error('PayHere success webhook processing failed', { route: '/api/webhooks/payhere', method: 'POST' })
+        return NextResponse.json({ error: 'Payment processing conflict' }, { status: 409 })
       }
     } else {
       const result = await processPaymentFailure(notification)
       if (!result.success) {
-        console.error('PayHere failure processing failed:', result.error)
-        return NextResponse.json({ error: result.error }, { status: 409 })
+        logger.error('PayHere failure webhook processing failed', { route: '/api/webhooks/payhere', method: 'POST' })
+        return NextResponse.json({ error: 'Payment processing conflict' }, { status: 409 })
       }
     }
 
@@ -132,7 +130,7 @@ export async function POST(request: NextRequest) {
     if (message === 'INVALID_JSON') {
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 })
     }
-    console.error('PayHere webhook error:', error)
+    logger.error('PayHere webhook failed unexpectedly', { err: error, route: '/api/webhooks/payhere', method: 'POST' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import { notifyEscrowTimeout } from '@/lib/notifications'
 import { sendExpoPush } from '@/lib/push'
 import { expirePendingEscrow } from '@/lib/finance/escrow/escrow-service'
 import { markFailed } from '@/lib/finance/payouts/payout-engine'
+import { matchesBearerSecret } from '@/lib/security/secret-compare'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET) throw new Error('[SECURITY] CRON_SECRET env var is required')
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!matchesBearerSecret(authHeader, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -109,7 +111,7 @@ export async function GET(request: NextRequest) {
       pendingPayouts: pendingPayoutCount,
     })
   } catch (error) {
-    console.error('[CRON] Daily maintenance error:', error)
+    logger.error('Daily maintenance cron failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,82 +1,37 @@
-import { useEffect, useRef } from 'react'
-import { View, Text, ScrollView, StyleSheet, Animated } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { useColors } from '@/lib/ThemeContext'
-import { useTranslation } from 'react-i18next'
+import { v3 } from '@/theme/v3/tokens'
+import V3PageHeader from '@/components/v3/V3PageHeader'
+
+const SECTIONS = [
+  ['Using MaintainEX', 'MaintainEX connects customers with independent taskers, companies and property owners. Confirm scope, price and timing before work starts.'],
+  ['Payments & protection', 'Eligible bookings can use MaintainEX payment and escrow workflows. The final payment screen shows the amount and protection state before confirmation.'],
+  ['Safety & conduct', 'Users must provide accurate information, respect other users and follow applicable laws. Report unsafe behavior through Help & safety.'],
+  ['Property listings', 'Owners are responsible for listing accuracy, availability and legal permission to rent or sell the property.'],
+  ['Privacy', 'Account and booking information is used to operate the marketplace, provide support and improve safety. Exact contact details are disclosed only when required by the workflow.'],
+]
 
 export default function TermsScreen() {
-  const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
-  const fadeAnim = useRef(new Animated.Value(0)).current
-
-  const sections = [
-    {
-      title: t('profile.termsOfService'),
-      icon: 'document-text-outline' as const,
-      content:
-        'By using MΛINTΛINEX, you agree to these terms. MΛINTΛINEX connects customers with taskers for various services. We do not directly employ taskers and are not liable for the quality of work performed. All bookings and payments are handled through our platform. You must provide accurate information when creating an account. Any misuse of the platform may result in account termination.',
-    },
-    {
-      title: t('profile.privacyPolicy'),
-      icon: 'shield-checkmark-outline' as const,
-      content:
-        'We collect personal information such as your name, email, phone number, and location data to provide our services. Your data is stored securely and is never shared with third parties without your consent. We use encryption and industry-standard security measures to protect your information. You can request deletion of your data at any time by contacting support.',
-    },
-    {
-      title: t('profile.cookiePolicy'),
-      icon: 'cafe-outline' as const,
-      content:
-        'MΛINTΛINEX uses cookies to enhance your experience. These include essential cookies for authentication, analytics cookies to help us improve the platform, and preference cookies to remember your settings. You can manage cookie preferences in your browser settings. Disabling certain cookies may affect platform functionality.',
-    },
-  ]
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start()
-  }, [])
-
   return (
-    <SafeAreaView style={styles.container}>
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>{t('profile.termsPrivacy')}</Text>
-
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-          {sections.map((s, i) => (
-            <View key={i} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name={s.icon} size={22} color={colors.customerAccent} />
-                <Text style={styles.cardTitle}>  {s.title}</Text>
-              </View>
-              <Text style={styles.cardBody}>{s.content}</Text>
-            </View>
-          ))}
-
-          <View style={styles.footer}>
-            <Ionicons name="time-outline" size={16} color={colors.gray} />
-            <Text style={styles.footerText}>  {t('profile.lastUpdated')}</Text>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <V3PageHeader title="Terms & privacy" subtitle="The essentials in plain language." />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {SECTIONS.map(([title, body]) => (
+          <View key={title} style={styles.card}>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.body}>{body}</Text>
           </View>
-        </ScrollView>
-      </Animated.View>
+        ))}
+        <Text style={styles.note}>This in-app summary does not replace the full legal terms published by MaintainEX.</Text>
+      </ScrollView>
     </SafeAreaView>
   )
 }
-
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
-  scroll: { paddingHorizontal: 24 },
-  card: {
-    backgroundColor: colors.white, borderRadius: 14, padding: 16, marginBottom: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: colors.dark },
-  cardBody: { fontSize: 13, color: colors.darkMid, lineHeight: 20 },
-  footer: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    paddingVertical: 24,
-  },
-  footerText: { fontSize: 12, color: colors.gray },
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  content: { paddingHorizontal: 18, paddingBottom: 36 },
+  card: { marginBottom: 10, padding: 16, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line },
+  title: { fontFamily: 'Outfit_800ExtraBold', fontSize: 15, color: v3.colors.ink },
+  body: { marginTop: 6, fontFamily: 'Outfit_400Regular', fontSize: 12, lineHeight: 19, color: v3.colors.textSecondary },
+  note: { marginTop: 8, fontFamily: 'Outfit_500Medium', fontSize: 10.5, lineHeight: 16, color: v3.colors.textMuted },
 })

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { MemoryRateLimitStore } from './memory-store'
 import { getPolicy, buildRateLimitKey } from './policies'
 
@@ -6,9 +7,7 @@ const store = new MemoryRateLimitStore()
 const policy = getPolicy('FINANCIAL_MUTATION')
 
 function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown'
+  return getTrustedClientIp(request.headers)
 }
 
 export async function requireFinancialRateLimit(

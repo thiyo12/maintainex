@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
@@ -81,7 +82,7 @@ export async function GET(
       },
     })
   } catch (error) {
-    console.error('Get assignment error:', error)
+    secureConsole.error('Get assignment error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -149,7 +150,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, assignmentId: id })
   } catch (error) {
-    console.error('Assignment action error:', error)
+    secureConsole.error('Assignment action error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

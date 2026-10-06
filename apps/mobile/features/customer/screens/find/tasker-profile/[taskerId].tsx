@@ -1,411 +1,247 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
-import {
-  View, Text, ScrollView, StyleSheet, Image, Alert, Modal, Pressable,
-  KeyboardAvoidingView, Platform, TextInput, ActivityIndicator, TouchableOpacity,
-} from 'react-native'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { CaretLeft, ChatCircleText, Check, DotsThree, SealCheck, Star } from 'phosphor-react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { Star, ChatCircleText, SealCheck, MapPin, PaperPlaneTilt, X, User, CalendarCheck } from 'phosphor-react-native'
-import { useTranslation } from 'react-i18next'
+import { SafeAreaView } from 'react-native-safe-area-context'
+
+import { conversations } from '@/api/messaging'
 import { taskers } from '@/api/taskers'
-import { useAuth } from '@/features/auth/context/auth'
-import { colors, spacing, radius, typography, shadows } from '@/lib/design'
-import PressableScale from '@/components/ui/PressableScale'
+import { templateJobs } from '@/api/jobs'
+import { v3 } from '@/theme/v3/tokens'
+import AvatarCircle from '@/components/ui/AvatarCircle'
 
-const TIME_SLOTS = ['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-18:00']
-
-function dateOptions() {
-  const out: { label: string; value: string }[] = []
-  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  for (let i = 0; i < 4; i++) {
-    const d = new Date()
-    d.setDate(d.getDate() + i)
-    const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : weekdays[d.getDay()]
-    out.push({ label, value: d.toISOString().split('T')[0] })
-  }
-  return out
+const formatPercent = (value: unknown) => {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return '—'
+  return `${n > 1 ? n.toFixed(1) : (n * 100).toFixed(1)}%`
 }
 
-export default function TaskerProfileScreen() {
-  const { t } = useTranslation()
+const money = (value: unknown) => {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? `LKR ${n.toLocaleString()}` : null
+}
+
+export default function ProviderProfile() {
   const router = useRouter()
   const { taskerId, jobId } = useLocalSearchParams<{ taskerId: string; jobId?: string }>()
-  const { user } = useAuth()
-
   const [tasker, setTasker] = useState<any>(null)
+  const [job, setJob] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-
-  const [showQuote, setShowQuote] = useState(false)
-  const [qDate, setQDate] = useState(dateOptions()[0].value)
-  const [qSlot, setQSlot] = useState('')
-  const [qMsg, setQMsg] = useState('')
-  const [sending, setSending] = useState(false)
+  const [startingChat, setStartingChat] = useState(false)
 
   const load = useCallback(async () => {
     if (!taskerId) return
     setLoading(true)
     setError(false)
     try {
-      const data = await taskers.get(taskerId)
-      setTasker(data)
-    } catch {
+      const [provider, service] = await Promise.all([
+        taskers.get(taskerId),
+        jobId ? templateJobs.get(jobId).catch(() => null) : Promise.resolve(null),
+      ])
+      setTasker(provider)
+      setJob(service)
+    } catch (e) {
+      console.error('Failed to load provider profile', e)
       setError(true)
     } finally {
       setLoading(false)
     }
   }, [taskerId, jobId])
 
-  const didLoad = useRef(false)
-  useEffect(() => {
-    if (!didLoad.current) {
-      didLoad.current = true
-      load()
+  useEffect(() => { load() }, [load])
+
+  const name = tasker?.user?.name || tasker?.name || tasker?.companyName || 'Professional'
+  const specialty = tasker?.skills?.[0] || tasker?.specialty || tasker?.category || 'MaintainEX professional'
+  const reviews = Array.isArray(tasker?.reviews) ? tasker.reviews : []
+  const featuredReview = reviews[0]
+  const rating = Number(tasker?.rating || 0)
+  const jobs = Number(tasker?.completedJobs || tasker?.jobsCompleted || 0)
+
+  const price = useMemo(() => {
+    const providerPrice = Number(tasker?.startingPrice || tasker?.hourlyRate || 0)
+    if (providerPrice > 0) return money(providerPrice)
+    const min = Number(job?.priceMin || 0)
+    const max = Number(job?.priceMax || 0)
+    if (min > 0 && max > 0) return money(Math.round((min + max) / 2))
+    return 'Quote required'
+  }, [tasker, job])
+
+  const message = async (quoteRequest = false) => {
+    const participantId = tasker?.userId || tasker?.user?.id
+    if (!participantId) {
+      Alert.alert('Unable to message', 'This provider does not have a messaging profile yet.')
+      return
     }
-  }, [load])
-
-  const name = tasker?.user?.name || ''
-  const initial = (name || 'T').charAt(0).toUpperCase()
-  const rate = tasker?.hourlyRate || 0
-
-  const sendMessage = () => {
-    Alert.alert(
-      'Create a service request first',
-      'For safety and privacy, MaintainEX chat opens after a provider is connected to a marketplace job. Create a targeted request for this Tasker first.',
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: 'Create Request', onPress: bookNow },
-      ]
-    )
+    setStartingChat(true)
+    try {
+      const text = quoteRequest
+        ? `Hi ${name}, I would like a quote${job?.name ? ` for ${job.name}` : ''}.`
+        : `Hi ${name}, I’m interested in your services.`
+      const conversation = await conversations.create({ participantId, initialMessage: text })
+      if (!conversation?.id) throw new Error('Conversation could not be created')
+      if (conversation.existing) await conversations.sendMessage(conversation.id, text).catch(() => {})
+      router.push(`/(chat)/${conversation.id}` as any)
+    } catch (e: any) {
+      Alert.alert('Unable to start chat', e?.message || 'Please try again.')
+    } finally {
+      setStartingChat(false)
+    }
   }
 
-  const sendQuoteReq = async () => {
+  const book = () => {
     if (!jobId) {
-      Alert.alert(t('common.error'), 'Select a service before requesting a quote.')
+      Alert.alert('Choose a service first', 'Select a service before starting a protected booking.')
       return
     }
-    if (!qDate || !qSlot) {
-      Alert.alert(t('common.error'), t('taskerProfile.pickDateSlot'))
-      return
-    }
-
-    setSending(true)
-    setShowQuote(false)
-    router.push({
-      pathname: '/(customer)/jobs/v2/create',
-      params: {
-        templateJobId: jobId,
-        taskerId: taskerId as string,
-        preferredDate: qDate,
-        preferredTimeSlot: qSlot,
-        notes: qMsg || '',
-      },
-    } as any)
-    setSending(false)
-  }
-
-  const bookNow = () => {
-    if (!jobId) return
-    router.push({
-      pathname: `/(customer)/find/booking/${jobId}`,
-      params: { taskerId: taskerId as string, rate: String(rate || 0) },
-    } as any)
+    router.push({ pathname: '/(customer)/find/booking/[jobId]', params: { jobId, taskerId } } as any)
   }
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.skeletonHeader} />
-        <View style={styles.skeletonRow} />
-        <View style={styles.skeletonCard} />
-      </View>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loadingWrap}><ActivityIndicator color={v3.colors.ink} /></View>
+      </SafeAreaView>
     )
   }
 
   if (error || !tasker) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', padding: spacing.xl }]}>
-        <Text style={styles.errorText}>{t('errors.generic')}</Text>
-        <PressableScale onPress={load} scaleTo={0.96} style={styles.retryBtn}>
-          <Text style={styles.retryText}>{t('common.retry')}</Text>
-        </PressableScale>
-      </View>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}><CaretLeft size={20} color={v3.colors.ink} weight="bold" /></TouchableOpacity>
+          <Text style={styles.headerTitle}>Professional profile</Text>
+          <View style={styles.headerButtonRight} />
+        </View>
+        <View style={styles.errorWrap}>
+          <Text style={styles.errorTitle}>Profile unavailable</Text>
+          <Text style={styles.errorBody}>We couldn’t load this professional right now.</Text>
+          <TouchableOpacity style={styles.retry} onPress={load}><Text style={styles.retryText}>Try again</Text></TouchableOpacity>
+        </View>
+      </SafeAreaView>
     )
   }
 
-  const reviews = (tasker.reviews || []).slice(0, 5)
-
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <PressableScale scaleTo={0.96} style={styles.avatarWrap}>
-            {tasker.profileImage ? (
-              <Image source={{ uri: tasker.profileImage }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
-            )}
-            {tasker.isOnline ? <View style={styles.onlineDot} /> : null}
-          </PressableScale>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerButton} onPress={() => router.back()} hitSlop={10}><CaretLeft size={20} color={v3.colors.ink} weight="bold" /></TouchableOpacity>
+        <Text style={styles.headerTitle}>Professional profile</Text>
+        <View style={styles.headerButtonRight}><DotsThree size={17} color={v3.colors.ink} weight="bold" /></View>
+      </View>
 
-          <View style={styles.nameBlock}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name}>{name}</Text>
-              {tasker.isVerified ? <SealCheck size={20} color="#3B82F6" weight="fill" /> : null}
-            </View>
-            <View style={styles.catRow}>
-              <User size={13} color={colors.textSecondary} />
-              <Text style={styles.catText}>
-                {(tasker.skills?.[0] || 'Tasker')} · {t(`taskerProfile.${tasker.isOnline ? 'online' : 'offline'}`)}
-              </Text>
-            </View>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.profileHero}>
+          <AvatarCircle uri={tasker.profileImage || tasker.avatarUrl || tasker.user?.profileImage} name={name} size={76} showOnline={!!tasker.isOnline} showVerified verified={!!tasker.isVerified} />
+          <Text style={styles.name}>{name}</Text>
+          <Text style={styles.specialty}>{specialty}</Text>
+          <View style={styles.ratingRow}>
+            <Star size={16} color={v3.colors.amber} weight="fill" />
+            <Text style={styles.ratingText}>{rating > 0 ? rating.toFixed(1) : 'New'} · {jobs} completed</Text>
+          </View>
+          <View style={styles.badges}>
+            {rating >= 4.8 ? <View style={styles.darkBadge}><Text style={styles.darkBadgeText}>TOP TASKER</Text></View> : null}
+            {tasker.isVerified ? <View style={styles.lightBadge}><SealCheck size={11} color={v3.colors.success} weight="fill" /><Text style={styles.lightBadgeText}>VERIFIED</Text></View> : null}
+            {tasker.onTimeRate != null ? <View style={styles.lightBadge}><Text style={styles.lightBadgeText}>ON-TIME {Math.round(Number(tasker.onTimeRate) > 1 ? Number(tasker.onTimeRate) : Number(tasker.onTimeRate) * 100)}%</Text></View> : null}
           </View>
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statVal}>{tasker.rating?.toFixed(1) || '—'}</Text>
-            <Text style={styles.statLbl}>{t('taskerProfile.rating')}</Text>
-          </View>
-          <View style={styles.statDiv} />
-          <View style={styles.stat}>
-            <Text style={styles.statVal}>{tasker.completedJobs || 0}</Text>
-            <Text style={styles.statLbl}>{t('taskerProfile.jobsDone')}</Text>
-          </View>
-          <View style={styles.statDiv} />
-          <View style={styles.stat}>
-            <Text style={styles.statVal}>{tasker.avgResponseMin != null ? `${tasker.avgResponseMin}m` : '—'}</Text>
-            <Text style={styles.statLbl}>{t('taskerProfile.avgResponse')}</Text>
-          </View>
-          <View style={styles.statDiv} />
-          <View style={styles.stat}>
-            <Text style={styles.statVal}>{tasker.completionRate ?? '—'}%</Text>
-            <Text style={styles.statLbl}>{t('taskerProfile.completionRate')}</Text>
-          </View>
+        <Text style={styles.sectionTitle}>Trust snapshot</Text>
+        <View style={styles.trustCard}>
+          <View style={styles.trustCell}><Text style={styles.trustLabel}>Response</Text><Text style={styles.trustValue}>{tasker.avgResponseMin != null ? `${tasker.avgResponseMin} min` : '—'}</Text></View>
+          <View style={styles.trustCell}><Text style={styles.trustLabel}>Cancellation</Text><Text style={styles.trustValue}>{formatPercent(tasker.cancellationRate)}</Text></View>
+          <View style={styles.trustCell}><Text style={styles.trustLabel}>Repeat clients</Text><Text style={styles.trustValue}>{formatPercent(tasker.repeatClientRate)}</Text></View>
+          <View style={styles.trustCell}><Text style={styles.trustLabel}>Identity</Text><Text style={styles.trustValue}>{tasker.isVerified || tasker.identityStatus === 'VERIFIED' ? 'Verified' : tasker.identityStatus || 'Pending'}</Text></View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.rateLabel}>{t('taskerProfile.rating')} & Rate</Text>
-          <View style={styles.rateTop}>
-            <View style={styles.rateRow}>
-              <Star size={18} color={colors.accent} weight="fill" />
-              <Text style={styles.rateVal}>{t('taskerProfile.fromRate', { n: rate.toLocaleString() })}</Text>
-            </View>
-            <View style={styles.ratingPill}>
-              <Star size={12} color="#0D0D0D" weight="fill" />
-              <Text style={styles.ratingPillText}>{tasker.rating?.toFixed(1) || '—'}</Text>
-            </View>
-          </View>
-        </View>
-
-        {tasker.skills?.length > 0 ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{t('taskerProfile.skills')}</Text>
-            <View style={styles.chips}>
-              {tasker.skills.map((sk: string, i: number) => (
-                <View key={i} style={styles.chip}><Text style={styles.chipText}>{sk}</Text></View>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {tasker.bio ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{t('taskerProfile.about')}</Text>
-            <Text style={styles.bio}>{tasker.bio}</Text>
-          </View>
-        ) : null}
-
-        {tasker.serviceAreas?.length > 0 ? (
-          <View style={styles.card}>
-            <View style={styles.areaHeader}>
-              <MapPin size={15} color={colors.textSecondary} />
-              <Text style={styles.cardTitle}>{t('taskerProfile.serviceAreas')}</Text>
-            </View>
-            <Text style={styles.bio}>{tasker.serviceAreas.join(' · ')}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t('taskerProfile.reviews')} ({reviews.length})</Text>
-          {reviews.length === 0 ? (
-            <Text style={styles.noReviews}>{t('taskerProfile.noReviews')}</Text>
+        <Text style={styles.sectionTitle}>Recent customer feedback</Text>
+        <View style={styles.feedbackCard}>
+          {featuredReview ? (
+            <>
+              <Text style={styles.stars}>{'★'.repeat(Math.max(1, Math.min(5, Number(featuredReview.rating || 5))))}</Text>
+              <Text style={styles.feedbackText}>“{featuredReview.comment || 'Completed the job professionally.'}”</Text>
+              <Text style={styles.feedbackMeta}>{featuredReview.serviceName || job?.name || specialty}{featuredReview.createdAt ? ` · ${new Date(featuredReview.createdAt).toLocaleDateString()}` : ''}</Text>
+            </>
           ) : (
-            reviews.map((r: any) => (
-              <View key={r.id} style={styles.review}>
-                <View style={styles.reviewTop}>
-                  <Text style={styles.reviewName}>{r.reviewerName}</Text>
-                  <View style={styles.reviewStars}>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <Star key={n} size={10} color={n <= r.rating ? colors.accent : colors.surfaceHigh} weight={n <= r.rating ? 'fill' : 'regular'} />
-                    ))}
-                  </View>
-                </View>
-                {r.comment ? <Text style={styles.reviewComment}>{r.comment}</Text> : null}
-              </View>
-            ))
+            <>
+              <Text style={styles.feedbackText}>No written feedback yet.</Text>
+              <Text style={styles.feedbackMeta}>{jobs} completed jobs on MaintainEX</Text>
+            </>
           )}
         </View>
+
+        <Text style={styles.sectionTitle}>Quote</Text>
+        <View style={styles.quoteCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.quoteService} numberOfLines={1}>{job?.name || 'Selected service'}</Text>
+            <Text style={styles.quotePrice}>{price}</Text>
+          </View>
+          <Text style={styles.arrival}>{tasker.distanceMinutes ? `Arrival ${tasker.distanceMinutes} min` : tasker.isOnline ? 'Available now' : 'Request availability'}</Text>
+        </View>
+
+        <TouchableOpacity style={styles.messageRow} onPress={() => message(false)} disabled={startingChat} activeOpacity={0.72}>
+          <ChatCircleText size={17} color={v3.colors.ink} />
+          <Text style={styles.messageText}>{startingChat ? 'Opening chat…' : 'Message professional'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.requestQuoteRow} onPress={() => message(true)} disabled={startingChat} activeOpacity={0.72}>
+          <Text style={styles.requestQuoteText}>Request a detailed quote</Text>
+        </TouchableOpacity>
+
+        <View style={{ height: 108 }} />
       </ScrollView>
 
       <View style={styles.bottomBar}>
-        {jobId ? (
-          <PressableScale onPress={bookNow} scaleTo={0.97} style={[styles.btn, styles.btnPrimary, { flex: 1.1 }]}>
-            <CalendarCheck size={18} color="#0D0D0D" weight="fill" />
-            <Text style={styles.btnPrimaryText}>{t('taskerProfile.bookNow')}</Text>
-          </PressableScale>
-        ) : null}
-        <PressableScale onPress={sendMessage} scaleTo={0.97} style={[styles.btn, styles.btnOutline]}>
-          <ChatCircleText size={18} color={colors.accent} weight="fill" />
-          <Text style={styles.btnOutlineText}>{t('taskerProfile.message')}</Text>
-        </PressableScale>
-        <PressableScale onPress={() => setShowQuote(true)} scaleTo={0.97} style={[styles.btn, styles.btnPrimary]}>
-          <PaperPlaneTilt size={18} color="#0D0D0D" weight="fill" />
-          <Text style={styles.btnPrimaryText}>{t('taskerProfile.requestQuote')}</Text>
-        </PressableScale>
+        <TouchableOpacity style={styles.primaryButton} onPress={book} activeOpacity={0.82}>
+          <Text style={styles.primaryButtonText}>{jobId ? 'Book this tasker' : 'Choose a service first'}</Text>
+        </TouchableOpacity>
       </View>
-
-      <Modal visible={showQuote} transparent animationType="slide" onRequestClose={() => setShowQuote(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalWrap}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setShowQuote(false)} />
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('taskerProfile.quoteModalTitle')}</Text>
-              <TouchableOpacity onPress={() => setShowQuote(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <X size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalLabel}>{t('taskerProfile.date')}</Text>
-            <View style={styles.dateRow}>
-              {dateOptions().map((d) => {
-                const active = qDate === d.value
-                return (
-                  <PressableScale key={d.value} onPress={() => setQDate(d.value)} scaleTo={0.95} style={[styles.dateChip, active && styles.dateChipActive]}>
-                    <Text style={[styles.dateChipLabel, active && styles.dateChipLabelActive]}>{d.label}</Text>
-                    <Text style={[styles.dateChipVal, active && styles.dateChipLabelActive]}>{d.value.slice(5)}</Text>
-                  </PressableScale>
-                )
-              })}
-            </View>
-
-            <Text style={styles.modalLabel}>{t('taskerProfile.timeSlot')}</Text>
-            <View style={styles.slotRow}>
-              {TIME_SLOTS.map((slot) => {
-                const active = qSlot === slot
-                return (
-                  <PressableScale key={slot} onPress={() => setQSlot(slot)} scaleTo={0.95} style={[styles.slotChip, active && styles.slotChipActive]}>
-                    <Text style={[styles.slotChipText, active && styles.slotChipTextActive]}>{slot}</Text>
-                  </PressableScale>
-                )
-              })}
-            </View>
-
-            <TextInput style={styles.msgInput} value={qMsg} onChangeText={setQMsg} placeholder={t('taskerProfile.optionalMsg')} placeholderTextColor={colors.textSecondary} multiline numberOfLines={3} />
-
-            <PressableScale onPress={sendQuoteReq} scaleTo={0.97} style={[styles.btn, styles.btnPrimary, { width: '100%' }]} disabled={sending}>
-              {sending ? <ActivityIndicator color="#0D0D0D" /> : <Text style={styles.btnPrimaryText}>{t('taskerProfile.sendRequest')}</Text>}
-            </PressableScale>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    </View>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.md, paddingBottom: 120 },
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  header: { height: 52, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerButton: { width: 36, height: 36, alignItems: 'flex-start', justifyContent: 'center' },
+  headerButtonRight: { width: 36, height: 36, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { flex: 1, marginHorizontal: 8, fontSize: 18, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  scroll: { paddingHorizontal: 18, paddingBottom: 8 },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  errorWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
+  errorTitle: { fontSize: 18, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  errorBody: { marginTop: 6, fontSize: 11, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary, textAlign: 'center' },
+  retry: { marginTop: 16, height: 42, paddingHorizontal: 20, borderRadius: 14, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  retryText: { fontSize: 10.5, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.paper },
 
-  skeletonHeader: { height: 90, borderRadius: radius.lg, backgroundColor: colors.surface, marginBottom: spacing.md },
-  skeletonRow: { height: 70, borderRadius: radius.md, backgroundColor: colors.surface, marginBottom: spacing.md },
-  skeletonCard: { height: 140, borderRadius: radius.lg, backgroundColor: colors.surface },
-  errorText: { ...typography.body, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md },
-  retryBtn: { backgroundColor: colors.accentSoft, paddingHorizontal: spacing.xl, paddingVertical: 12, borderRadius: radius.full },
-  retryText: { ...typography.body, color: colors.accent, fontFamily: 'Outfit_700Bold', fontSize: 14 },
+  profileHero: { alignItems: 'center', paddingTop: 8 },
+  name: { marginTop: 9, fontSize: 21, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  specialty: { marginTop: 3, fontSize: 10.5, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  ratingRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  ratingText: { fontSize: 10, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  badges: { marginTop: 10, flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'center' },
+  darkBadge: { minHeight: 25, paddingHorizontal: 10, borderRadius: 13, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  darkBadgeText: { fontSize: 8.5, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.paper },
+  lightBadge: { minHeight: 25, paddingHorizontal: 10, borderRadius: 13, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  lightBadgeText: { fontSize: 8.5, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface,
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg,
-    padding: spacing.lg, marginBottom: spacing.md,
-  },
-  avatarWrap: { position: 'relative' },
-  avatar: { width: 66, height: 66, borderRadius: 33, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.accent },
-  avatarImage: { width: 66, height: 66, borderRadius: 33, borderWidth: 2, borderColor: colors.accent },
-  avatarText: { fontSize: 26, fontFamily: 'Outfit_700Bold', color: colors.accent },
-  onlineDot: {
-    position: 'absolute', right: 0, bottom: 0, width: 16, height: 16, borderRadius: 8,
-    backgroundColor: '#34D399', borderWidth: 2.5, borderColor: colors.surface,
-  },
-  nameBlock: { flex: 1, marginLeft: spacing.md },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { ...typography.h3, fontSize: 20, margin: 0 },
-  catRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
-  catText: { ...typography.caption, color: colors.textSecondary, fontSize: 13 },
-
-  statsRow: {
-    flexDirection: 'row', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.lg, paddingVertical: spacing.md, marginBottom: spacing.md,
-  },
-  stat: { flex: 1, alignItems: 'center' },
-  statDiv: { width: 1, backgroundColor: colors.border },
-  statVal: { ...typography.body, color: colors.accent, fontSize: 17, fontFamily: 'Outfit_700Bold' },
-  statLbl: { ...typography.caption, color: colors.textSecondary, fontSize: 11, marginTop: 2, textAlign: 'center' },
-
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md },
-  cardTitle: { ...typography.caption, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, fontFamily: 'Outfit_700Bold', fontSize: 12, marginBottom: 12 },
-  rateLabel: { display: 'none' },
-  rateTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  rateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rateVal: { ...typography.h3, fontSize: 20, color: colors.accent, fontFamily: 'Outfit_700Bold' },
-  ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.accent, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
-  ratingPillText: { fontSize: 12, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
-
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: colors.surfaceHigh, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full },
-  chipText: { fontSize: 12, fontFamily: 'Outfit_500Medium', color: colors.textPrimary },
-  bio: { ...typography.body, fontSize: 14, color: colors.textPrimary, lineHeight: 21 },
-  areaHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-
-  noReviews: { ...typography.bodyMuted, fontSize: 13, color: colors.textSecondary },
-  review: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border },
-  reviewTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  reviewName: { ...typography.body, fontSize: 14, fontFamily: 'Outfit_600SemiBold' },
-  reviewStars: { flexDirection: 'row', gap: 2 },
-  reviewComment: { ...typography.caption, color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
-
-  bottomBar: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    flexDirection: 'row', gap: spacing.sm,
-    backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border,
-    padding: spacing.md, paddingBottom: spacing.lg,
-    ...shadows.md,
-  },
-  btn: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, paddingVertical: 14, borderRadius: radius.lg },
-  btnOutline: { borderWidth: 1.5, borderColor: colors.accent, backgroundColor: 'transparent' },
-  btnOutlineText: { fontSize: 14, fontFamily: 'Outfit_700Bold', color: colors.accent },
-  btnPrimary: { backgroundColor: colors.accent },
-  btnPrimaryText: { fontSize: 14, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
-
-  modalWrap: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: { ...(StyleSheet.absoluteFill as any), backgroundColor: 'rgba(0,0,0,0.6)' },
-  modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.lg, paddingBottom: spacing.xl },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
-  modalTitle: { ...typography.h3, fontSize: 18 },
-  modalLabel: { ...typography.caption, color: colors.textSecondary, fontFamily: 'Outfit_600SemiBold', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 },
-  dateRow: { flexDirection: 'row', gap: 8, marginBottom: spacing.md },
-  dateChip: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceHigh },
-  dateChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  dateChipLabel: { fontSize: 12, fontFamily: 'Outfit_600SemiBold', color: colors.textSecondary },
-  dateChipVal: { fontSize: 11, fontFamily: 'Outfit_400Regular', color: colors.textSecondary, marginTop: 1 },
-  dateChipLabelActive: { color: '#0D0D0D' },
-  slotRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md },
-  slotChip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceHigh },
-  slotChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  slotChipText: { fontSize: 12, fontFamily: 'Outfit_500Medium', color: colors.textSecondary },
-  slotChipTextActive: { color: '#0D0D0D', fontFamily: 'Outfit_700Bold' },
-  msgInput: {
-    backgroundColor: colors.surfaceHigh, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    padding: 14, fontSize: 14, color: colors.textPrimary, fontFamily: 'Outfit_400Regular',
-    textAlignVertical: 'top', minHeight: 84, marginBottom: spacing.md,
-  },
+  sectionTitle: { marginTop: 24, marginBottom: 9, fontSize: 14.5, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  trustCard: { borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden' },
+  trustCell: { width: '50%', minHeight: 60, paddingHorizontal: 15, paddingVertical: 12, borderBottomWidth: 1, borderRightWidth: 1, borderColor: v3.colors.line },
+  trustLabel: { fontSize: 8.7, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary },
+  trustValue: { marginTop: 5, fontSize: 12, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  feedbackCard: { borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, padding: 14 },
+  stars: { fontSize: 12, color: v3.colors.amber, letterSpacing: 1 },
+  feedbackText: { marginTop: 7, fontSize: 9.5, lineHeight: 15, fontFamily: 'Outfit_600SemiBold', color: v3.colors.ink },
+  feedbackMeta: { marginTop: 8, fontSize: 8.5, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  quoteCard: { minHeight: 82, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  quoteService: { fontSize: 10, fontFamily: 'Outfit_700Bold', color: v3.colors.ink },
+  quotePrice: { marginTop: 8, fontSize: 18, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  arrival: { maxWidth: 100, fontSize: 9.5, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary, textAlign: 'right' },
+  messageRow: { marginTop: 10, minHeight: 48, borderRadius: 15, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  messageText: { fontSize: 10.5, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  requestQuoteRow: { minHeight: 38, alignItems: 'center', justifyContent: 'center' },
+  requestQuoteText: { fontSize: 9.8, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary, textDecorationLine: 'underline' },
+  bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 24, backgroundColor: v3.colors.paper, borderTopWidth: 1, borderTopColor: v3.colors.line },
+  primaryButton: { height: 54, borderRadius: 17, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  primaryButtonText: { fontSize: 13.5, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.paper },
 })

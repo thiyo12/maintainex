@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       createdAt: bid.createdAt.toISOString(),
     })
   } catch (error) {
-    console.error('Bid error:', error)
+    secureConsole.error('Bid error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

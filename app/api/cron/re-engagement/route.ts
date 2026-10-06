@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import { getSetting } from '@/lib/settings'
 import { createNotification } from '@/lib/notifications'
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, notified })
   } catch (error) {
-    console.error('[CRON] Re-engagement error:', error)
+    logger.error('Re-engagement cron failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

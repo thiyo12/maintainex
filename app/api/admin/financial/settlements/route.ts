@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
@@ -171,7 +172,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM settlement history GET error:', error)
+    secureConsole.error('CRM settlement history GET error:', error)
     return NextResponse.json({ error: 'Failed to load settlement history' }, { status: 500 })
   }
 }

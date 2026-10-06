@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 
@@ -153,7 +154,7 @@ export async function PUT(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Profile update error:', error)
+    logger.error('Mobile profile update failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

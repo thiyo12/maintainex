@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ certifications: certs })
   } catch (error) {
-    console.error('Get certifications error:', error)
+    secureConsole.error('Get certifications error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true }, { status: 201 })
   } catch (error) {
-    console.error('Create certification error:', error)
+    secureConsole.error('Create certification error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

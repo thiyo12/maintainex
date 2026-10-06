@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { getStatsForPeriod } from '@/lib/activity-log'
@@ -214,7 +215,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('PDF Export error:', error)
+    logger.error('Report export failed unexpectedly', { err: error, route: '/api/reports/export', method: 'GET' })
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 })
   }
 }

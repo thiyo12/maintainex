@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
@@ -111,7 +112,7 @@ export async function PATCH(
     if (message.includes('already reviewed') || message.includes('Self-review prohibited')) {
       return NextResponse.json({ error: message }, { status: 409 })
     }
-    console.error('CRM profession submission review error:', error)
+    secureConsole.error('CRM profession submission review error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

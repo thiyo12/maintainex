@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -23,7 +24,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, isOnline })
   } catch (error) {
-    console.error('Status update error:', error)
+    secureConsole.error('Status update error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { guardCrmRequest } from '@/lib/crm/security'
+import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
 import { getProvinceFromDistrict } from '@/lib/provinces'
+import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
 
 function sanitizeString(str: string): string {
   return str.replace(/<[^>]*>/g, '').trim()
@@ -17,32 +19,47 @@ function isValidPhone(phone: string): boolean {
   return cleaned.length >= 10 && cleaned.length <= 15
 }
 
+function isSafeCvReference(value: string): boolean {
+  if (!value) return true
+  if (value.length > 2048) return false
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:') return false
+    const host = url.hostname.toLowerCase()
+    if (host !== 'res.cloudinary.com') return false
+    return /\/raw\/upload\/.+\/maintainex\/cvs\//.test(url.pathname)
+  } catch {
+    return false
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
+    const guard = await guardCrmRequest(request, {
+      permission: 'users:view',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const branchId = searchParams.get('branchId')
+    const requestedBranchId = searchParams.get('branchId')
 
-    const isSuper = session.role === 'SUPER_ADMIN'
-    const userBranchId = session.branchId
+    const scopeResult = await resolveReportBranchScope(guard.context, requestedBranchId)
+    if (!scopeResult.ok) {
+      return NextResponse.json({ error: scopeResult.error }, { status: scopeResult.status })
+    }
 
     const where: any = {}
     if (status) where.status = status
-
-    if (!isSuper && userBranchId) {
-      where.branchId = userBranchId
-    } else if (branchId && isSuper) {
-      where.branchId = branchId
+    if (scopeResult.scope.branchIds !== null) {
+      where.branchId = { in: scopeResult.scope.branchIds }
     }
 
     const applications = await prisma.application.findMany({
       where,
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     })
 
     return NextResponse.json(applications)
@@ -53,6 +70,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimit = await checkRateLimit(request, {
+      policyName: 'PUBLIC_SUBMISSION',
+      keyPrefix: 'public_application_submission',
+      identifier: ipKey(request),
+    })
+    if (!rateLimit.allowed) return rateLimit.response!
+
     const body = await request.json()
     
     let { 
@@ -85,6 +109,13 @@ export async function POST(request: NextRequest) {
     address = sanitizeString(address || '')
     cvUrl = sanitizeString(cvUrl || '')
     resumeUrl = sanitizeString(resumeUrl || '')
+
+    if (!isSafeCvReference(cvUrl) || !isSafeCvReference(resumeUrl)) {
+      return NextResponse.json({ error: 'Invalid CV reference' }, { status: 400 })
+    }
+    if (cvUrl && resumeUrl && cvUrl !== resumeUrl) {
+      return NextResponse.json({ error: 'Conflicting CV references' }, { status: 400 })
+    }
 
     if (name.length < 2 || name.length > 100) {
       return NextResponse.json({ error: 'Name must be between 2 and 100 characters' }, { status: 400 })

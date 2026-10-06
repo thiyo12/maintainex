@@ -2,18 +2,16 @@ import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Image } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Camera, Image as ImageIcon, XCircle, Images, CaretLeft } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { upload } from '@/api/upload'
 import { v2Evidence } from '@/api/v2-jobs'
 import * as ImagePicker from 'expo-image-picker'
+import { v3 } from '@/theme/v3/tokens'
 
 export default function EvidenceScreen() {
   const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
 
@@ -77,127 +75,148 @@ export default function EvidenceScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-        <Text style={styles.heading}>{t('evidence.title')}</Text>
-        <Text style={styles.subtitle}>{t('evidence.subtitle')}</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.backButton} activeOpacity={0.72} onPress={() => router.back()}>
+          <CaretLeft size={17} color={v3.colors.ink} weight="bold" />
+        </TouchableOpacity>
+        <Text style={styles.topTitle}>Evidence</Text>
+        <View style={styles.placeholder} />
+      </View>
 
-        {/* Photo actions */}
-        <View style={styles.photoRow}>
-          <TouchableOpacity style={styles.addPhotoBtn} onPress={() => addPhoto(true)} activeOpacity={0.7}>
-            <Ionicons name="camera-outline" size={24} color={colors.amberDark} />
-            <Text style={styles.addPhotoText}>{t('evidence.takePhoto')}</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Text style={styles.hero}>Show the work clearly</Text>
+        <Text style={styles.subtitle}>Add before and after photos so the job record is easy to verify.</Text>
+
+        <View style={styles.photoPair}>
+          {[0, 1].map((index) => {
+            const uri = photos[index]
+            const label = index === 0 ? 'BEFORE' : 'AFTER'
+            return (
+              <View key={label} style={styles.slotWrap}>
+                <Text style={styles.slotLabel}>{label}</Text>
+                {uri ? (
+                  <View style={styles.photoSlot}>
+                    <Image source={{ uri }} style={styles.slotImage} resizeMode="cover" />
+                    <TouchableOpacity style={styles.removeButton} onPress={() => removePhoto(index)}>
+                      <XCircle size={20} color={v3.colors.error} weight="fill" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={styles.emptySlot} activeOpacity={0.72} onPress={() => addPhoto(true)}>
+                    <Camera size={23} color={v3.colors.ink} weight="bold" />
+                    <Text style={styles.emptySlotTitle}>Take photo</Text>
+                    <Text style={styles.emptySlotText}>{index === 0 ? 'Before work' : 'After work'}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )
+          })}
+        </View>
+
+        <View style={styles.sourceRow}>
+          <TouchableOpacity style={styles.sourceButton} activeOpacity={0.72} onPress={() => addPhoto(true)} disabled={uploading}>
+            <Camera size={15} color={v3.colors.ink} />
+            <Text style={styles.sourceText}>Camera</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.addPhotoBtn} onPress={() => addPhoto(false)} activeOpacity={0.7}>
-            <Ionicons name="image-outline" size={24} color={colors.amberDark} />
-            <Text style={styles.addPhotoText}>{t('evidence.chooseFromLibrary')}</Text>
+          <TouchableOpacity style={styles.sourceButton} activeOpacity={0.72} onPress={() => addPhoto(false)} disabled={uploading}>
+            <ImageIcon size={15} color={v3.colors.ink} />
+            <Text style={styles.sourceText}>Library</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.hint}>{t('evidence.maxSize')} · {t('evidence.supportedFormats')}</Text>
-
-        {uploading && (
-          <View style={styles.uploadingCard}>
-            <ActivityIndicator size="small" color={colors.amber} />
-            <Text style={styles.uploadingText}>{t('common.loading')}</Text>
+        {uploading ? (
+          <View style={styles.uploadingRow}>
+            <ActivityIndicator size="small" color={v3.colors.ink} />
+            <Text style={styles.uploadingText}>Uploading photo…</Text>
           </View>
-        )}
+        ) : null}
 
-        {photos.length > 0 && (
+        {photos.length > 2 ? (
           <>
-            <Text style={styles.photoCount}>{t('evidence.photoCount', { n: photos.length })}</Text>
-            <View style={styles.photoGrid}>
-              {photos.map((uri, i) => (
-                <View key={i} style={styles.photoWrap}>
-                  <Image source={{ uri }} style={styles.photo} resizeMode="cover" />
-                  <TouchableOpacity style={styles.removePhotoBtn} onPress={() => removePhoto(i)}>
-                    <Ionicons name="close-circle" size={20} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
+            <Text style={styles.sectionLabel}>MORE PHOTOS</Text>
+            <View style={styles.extraGrid}>
+              {photos.slice(2).map((uri, offset) => {
+                const index = offset + 2
+                return (
+                  <View key={uri + index} style={styles.extraPhoto}>
+                    <Image source={{ uri }} style={styles.extraImage} resizeMode="cover" />
+                    <TouchableOpacity style={styles.extraRemove} onPress={() => removePhoto(index)}>
+                      <XCircle size={18} color={v3.colors.error} weight="fill" />
+                    </TouchableOpacity>
+                  </View>
+                )
+              })}
             </View>
           </>
-        )}
+        ) : null}
 
-        {photos.length === 0 && !uploading && (
-          <View style={styles.emptyPhotos}>
-            <Ionicons name="images-outline" size={40} color={colors.muted} />
-            <Text style={styles.emptyPhotosText}>{t('evidence.photoCount', { n: 0 })}</Text>
+        <Text style={styles.sectionLabel}>NOTE</Text>
+        <View style={styles.noteCard}>
+          <TextInput
+            style={styles.noteInput}
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Describe what these photos show."
+            placeholderTextColor={v3.colors.textPlaceholder}
+            multiline
+            textAlignVertical="top"
+          />
+        </View>
+
+        {photos.length === 0 ? (
+          <View style={styles.infoCard}>
+            <Images size={16} color={v3.colors.textMuted} />
+            <Text style={styles.infoText}>At least one photo is required before evidence can be saved.</Text>
           </View>
-        )}
+        ) : null}
 
-        {/* Notes */}
-        <Text style={styles.label}>{t('evidence.notes')}</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={notes}
-          onChangeText={setNotes}
-          placeholder={t('evidence.notesPlaceholder')}
-          placeholderTextColor={colors.muted}
-          multiline
-          numberOfLines={4}
-        />
-
-        {/* Submit */}
         <TouchableOpacity
-          style={[styles.submitBtn, (submitting || photos.length === 0) && styles.submitBtnDisabled]}
+          style={[styles.submitButton, (submitting || photos.length === 0) && styles.disabled]}
+          activeOpacity={0.78}
           onPress={handleSubmit}
           disabled={submitting || photos.length === 0}
-          activeOpacity={0.7}
         >
-          {submitting ? (
-            <ActivityIndicator size="small" color={colors.white} />
-          ) : (
-            <Text style={styles.submitBtnText}>{t('evidence.submit')}</Text>
-          )}
+          {submitting ? <ActivityIndicator size="small" color={v3.colors.paper} /> : <Text style={styles.submitText}>Save evidence</Text>}
         </TouchableOpacity>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  scroll: { paddingHorizontal: 24 },
-  heading: { fontSize: 24, fontWeight: '800', color: colors.ink, marginTop: 16 },
-  subtitle: { fontSize: 14, color: colors.muted, marginTop: 4, marginBottom: 20, lineHeight: 20 },
-
-  photoRow: { flexDirection: 'row', gap: 12, marginBottom: 8 },
-  addPhotoBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: colors.white, padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed',
-  },
-  addPhotoText: { fontSize: 13, fontWeight: '600', color: colors.ink },
-  hint: { fontSize: 11, color: colors.muted, marginBottom: 12, fontStyle: 'italic' },
-
-  uploadingCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: colors.white, padding: 16, borderRadius: 12, marginBottom: 12,
-  },
-  uploadingText: { fontSize: 13, color: colors.muted },
-
-  photoCount: { fontSize: 13, fontWeight: '600', color: colors.ink, marginBottom: 8 },
-  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  photoWrap: { position: 'relative', width: 80, height: 80, borderRadius: 8, overflow: 'hidden' },
-  photo: { width: '100%', height: '100%', backgroundColor: colors.border },
-  removePhotoBtn: { position: 'absolute', top: 2, right: 2, backgroundColor: colors.white, borderRadius: 10 },
-
-  emptyPhotos: {
-    alignItems: 'center', padding: 32, backgroundColor: colors.white, borderRadius: 12,
-    borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed', marginBottom: 16,
-  },
-  emptyPhotosText: { fontSize: 13, color: colors.muted, marginTop: 8 },
-
-  label: { fontSize: 14, fontWeight: '700', color: colors.ink, marginBottom: 6, marginTop: 12 },
-  input: {
-    backgroundColor: colors.white, borderRadius: 12, padding: 14, fontSize: 15,
-    borderWidth: 1.5, borderColor: colors.border, color: colors.ink,
-  },
-  textArea: { minHeight: 100, textAlignVertical: 'top' },
-
-  submitBtn: { backgroundColor: colors.amber, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 20 },
-  submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { fontSize: 16, fontWeight: '700', color: colors.ink },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  topBar: { height: 70, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  backButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  placeholder: { width: 38, height: 38 },
+  topTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  content: { paddingHorizontal: 18, paddingBottom: 34 },
+  hero: { marginTop: 8, fontSize: 27, lineHeight: 33, fontFamily: fonts.heading, color: v3.colors.ink, letterSpacing: -0.35 },
+  subtitle: { marginTop: 6, maxWidth: 320, fontSize: 10.5, lineHeight: 16, fontFamily: fonts.bodySemiBold, color: v3.colors.textSecondary },
+  photoPair: { marginTop: 24, flexDirection: 'row', gap: 10 },
+  slotWrap: { flex: 1 },
+  slotLabel: { marginBottom: 7, fontSize: 8.5, letterSpacing: 0.6, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  photoSlot: { height: 180, borderRadius: 17, overflow: 'hidden', backgroundColor: v3.colors.surfaceGray, borderWidth: 1, borderColor: v3.colors.line },
+  slotImage: { width: '100%', height: '100%' },
+  removeButton: { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: v3.colors.paper, alignItems: 'center', justifyContent: 'center' },
+  emptySlot: { height: 180, borderRadius: 17, backgroundColor: v3.colors.paper, borderWidth: 1, borderStyle: 'dashed', borderColor: '#C8C8C8', alignItems: 'center', justifyContent: 'center' },
+  emptySlotTitle: { marginTop: 10, fontSize: 10.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  emptySlotText: { marginTop: 2, fontSize: 8.5, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  sourceRow: { marginTop: 10, flexDirection: 'row', gap: 8 },
+  sourceButton: { flex: 1, height: 42, borderRadius: 13, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  sourceText: { fontSize: 9.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  uploadingRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  uploadingText: { fontSize: 9, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  sectionLabel: { marginTop: 24, marginBottom: 8, fontSize: 9, letterSpacing: 0.6, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  extraGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  extraPhoto: { width: 74, height: 74, borderRadius: 13, overflow: 'hidden', backgroundColor: v3.colors.surfaceGray },
+  extraImage: { width: '100%', height: '100%' },
+  extraRemove: { position: 'absolute', top: 3, right: 3 },
+  noteCard: { minHeight: 96, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, padding: 13 },
+  noteInput: { minHeight: 68, padding: 0, fontSize: 11, lineHeight: 17, fontFamily: fonts.bodyMedium, color: v3.colors.ink },
+  infoCard: { minHeight: 54, marginTop: 12, paddingHorizontal: 13, borderRadius: 14, backgroundColor: v3.colors.surfaceGray, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  infoText: { flex: 1, fontSize: 8.8, lineHeight: 14, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  submitButton: { height: 54, marginTop: 24, borderRadius: 16, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  disabled: { opacity: 0.42 },
+  submitText: { fontSize: 13, fontFamily: fonts.headingBold, color: v3.colors.paper },
 })

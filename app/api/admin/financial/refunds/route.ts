@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM refund queue GET error:', error)
+    logger.error('CRM refund queue read failed unexpectedly', { err: error, route: '/api/admin/financial/refunds', method: 'GET' })
     return NextResponse.json({ error: 'Failed to load refund queue' }, { status: 500 })
   }
 }
@@ -287,7 +288,7 @@ export async function PATCH(request: NextRequest) {
       { status: 202 }
     )
   } catch (error) {
-    console.error('CRM refund queue PATCH error:', error)
+    logger.error('CRM refund action failed unexpectedly', { err: error, route: '/api/admin/financial/refunds', method: 'PATCH' })
     return NextResponse.json({ error: 'Failed to process refund action' }, { status: 500 })
   }
 }

@@ -1,44 +1,19 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { guardCrmRequest } from '@/lib/crm/security'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
-  const session = await getSession(request)
-  
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
-  }
-
-  if (session.role !== 'SUPER_ADMIN') {
-    await prisma.securityAudit.create({
-      data: {
-        action: 'ACCESS_DENIED',
-        category: 'SECURITY',
-        userId: session.id,
-        userEmail: session.email,
-        userRole: session.role,
-        description: 'Attempted to access audit logs without SUPER_ADMIN role',
-        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
-        userAgent: request.headers.get('user-agent') || null,
-        success: false,
-        errorMessage: 'Insufficient permissions',
-        riskLevel: 'HIGH',
-        isSuspicious: true,
-      },
-    })
-    
-    return NextResponse.json(
-      { error: 'Forbidden - SUPER_ADMIN access required' },
-      { status: 403 }
-    )
-  }
+  const guard = await guardCrmRequest(request, {
+    permission: 'security:audit',
+    allowedRoles: ['SUPER_ADMIN'],
+    level: 'read',
+  })
+  if (!guard.ok) return guard.response
 
   const searchParams = request.nextUrl.searchParams
-  const page = parseInt(searchParams.get('page') || '1')
-  const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
+  const page = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1)
+  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10) || 50, 1), 100)
   const category = searchParams.get('category')
   const action = searchParams.get('action')
   const userId = searchParams.get('userId')
@@ -49,20 +24,20 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search')
 
   const where: any = {}
-  
+
   if (category) where.category = category
   if (action) where.action = action
   if (userId) where.userId = userId
   if (riskLevel) where.riskLevel = riskLevel
   if (isSuspicious === 'true') where.isSuspicious = true
   if (isSuspicious === 'false') where.isSuspicious = false
-  
+
   if (startDate || endDate) {
     where.createdAt = {}
     if (startDate) where.createdAt.gte = new Date(startDate)
     if (endDate) where.createdAt.lte = new Date(endDate)
   }
-  
+
   if (search) {
     where.OR = [
       { description: { contains: search, mode: 'insensitive' } },
@@ -86,12 +61,12 @@ export async function GET(request: NextRequest) {
       data: {
         action: 'VIEW',
         category: 'SECURITY',
-        userId: session.id,
-        userEmail: session.email,
-        userRole: session.role,
+        userId: guard.context.adminId,
+        userEmail: guard.context.email,
+        userRole: guard.context.role,
         description: `Viewed audit logs - page ${page}, filters applied`,
-        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
-        userAgent: request.headers.get('user-agent') || null,
+        ipAddress: guard.context.ipAddress,
+        userAgent: guard.context.userAgent,
         success: true,
         riskLevel: 'LOW',
       },
@@ -107,10 +82,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Failed to fetch audit logs:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch audit logs' },
-      { status: 500 }
-    )
+    secureConsole.error('Failed to fetch audit logs:', error)
+    return NextResponse.json({ error: 'Failed to fetch audit logs' }, { status: 500 })
   }
 }

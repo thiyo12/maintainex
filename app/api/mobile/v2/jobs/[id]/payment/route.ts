@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { createPaymentIntent, getPaymentStatus } from '@/lib/payment/payment-service'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -59,7 +60,7 @@ export async function POST(
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
-    console.error('Create payment intent error:', error)
+    logger.error('Payment intent creation failed unexpectedly', { err: error, route: '/api/mobile/v2/jobs/[id]/payment', method: 'POST' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -166,7 +167,7 @@ export async function GET(
 
     return NextResponse.json({ payment, options })
   } catch (error) {
-    console.error('Payment status error:', error)
+    logger.error('Payment status read failed unexpectedly', { err: error, route: '/api/mobile/v2/jobs/[id]/payment', method: 'GET' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

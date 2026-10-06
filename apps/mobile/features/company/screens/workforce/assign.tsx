@@ -1,108 +1,131 @@
-import { useState, useEffect } from 'react'
-import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { useTranslation } from 'react-i18next'
-import { useRouter, useLocalSearchParams } from 'expo-router'
-import { useColors } from '@/lib/ThemeContext'
-import { v2Request } from '@/api/v2-client'
-import { v2Jobs } from '@/api/v2-jobs'
+import { useRouter } from 'expo-router'
+import { Briefcase, CaretLeft, CheckCircle, UserCircle, UsersThree } from 'phosphor-react-native'
 import { getActiveCompanyId } from '@/api/companies'
+import { v2Jobs } from '@/api/v2-jobs'
+import { v2Request } from '@/api/v2-client'
+import { v3 } from '@/theme/v3/tokens'
 
-interface TeamMember {
+type TeamMember = {
   id: string
-  userId: string
+  userId: string | null
   name: string
   role: string
+  status?: string
   skills: string[]
   isOnline: boolean
   rating: number
   completedJobs: number
-  identityVerified: boolean
-  profilePhotoVerified: boolean
-  verifiedPhotoUrl: string | null
 }
 
-interface Job {
+type DispatchJob = {
   id: string
   title: string
   status: string
-  preferredDate: string | null
-  workerIdentityCheckRequired: boolean
+  preferredDate?: string | null
+  preferredTimeSlot?: string | null
 }
 
 export default function AssignWorkerScreen() {
-  const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const { jobId: requestedJobId } = useLocalSearchParams<{ jobId?: string }>()
-
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
+  const [companyId, setCompanyId] = useState<string | null>(null)
   const [workers, setWorkers] = useState<TeamMember[]>([])
-  const [availableJobs, setAvailableJobs] = useState<Job[]>([])
+  const [jobs, setJobs] = useState<DispatchJob[]>([])
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [requestedJobId])
-
-  const loadData = async () => {
+  const load = async () => {
+    setLoading(true)
     try {
-      const companyId = await getActiveCompanyId()
-      if (!companyId) return
+      const activeCompanyId = await getActiveCompanyId()
+      if (!activeCompanyId) {
+        setCompanyId(null)
+        return
+      }
+      setCompanyId(activeCompanyId)
 
       const [teamData, assignmentsData, quotedJobs] = await Promise.all([
-        v2Request<{ members: TeamMember[] }>(`/api/mobile/company/team?companyId=${companyId}`),
-        v2Request<{ assignments: any[] }>(`/api/mobile/company/assignments?companyId=${companyId}`),
-        v2Jobs.list(`myQuotes=true&context=company&companyId=${encodeURIComponent(companyId)}`),
+        v2Request<{ members: TeamMember[] }>(`/api/mobile/company/team?companyId=${activeCompanyId}`),
+        v2Request<{ assignments: any[] }>(`/api/mobile/company/assignments?companyId=${activeCompanyId}`),
+        v2Jobs.list(`myQuotes=true&context=company&companyId=${encodeURIComponent(activeCompanyId)}`),
       ])
 
-      const assignedJobIds = new Set(
+      const activeAssignedJobs = new Set(
         (assignmentsData.assignments || [])
-          .filter((a: any) => ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(a.status))
-          .map((a: any) => a.jobId)
+          .filter(row => ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(row.status))
+          .map(row => row.jobId)
       )
 
-      setWorkers(
-        (teamData.members || []).filter(
-          (m) => m.role === 'WORKER' || m.role === 'DISPATCHER'
+      const candidateJobs = (quotedJobs.jobs || []).filter(job =>
+        ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status) && !activeAssignedJobs.has(job.id)
+      )
+
+      const details = await Promise.all(
+        candidateJobs.slice(0, 30).map(job =>
+          v2Jobs.get(job.id).then(result => result.job).catch(() => null)
         )
       )
 
-      const eligibleJobs = (quotedJobs.jobs || [])
-        .filter((job: any) => job.status === 'QUOTE_ACCEPTED' && !assignedJobIds.has(job.id))
-        .map((job: any) => ({
-          id: job.id,
-          title: job.title,
-          status: job.status,
-          preferredDate: job.preferredDate,
-          workerIdentityCheckRequired: Boolean(job.workerIdentityCheckRequired),
-        }))
-      setAvailableJobs(eligibleJobs)
+      setJobs(
+        details
+          .filter((job): job is any => Boolean(job))
+          .filter(job =>
+            (job.quotes || []).some((quote: any) =>
+              quote.providerType === 'COMPANY'
+              && quote.providerId === activeCompanyId
+              && quote.status === 'ACCEPTED'
+            )
+          )
+          .map(job => ({
+            id: job.id,
+            title: job.title,
+            status: job.status,
+            preferredDate: job.preferredDate,
+            preferredTimeSlot: job.preferredTimeSlot,
+          }))
+      )
 
-      if (requestedJobId && eligibleJobs.some((job: any) => job.id === requestedJobId)) {
-        setSelectedJob(requestedJobId)
-      } else if (eligibleJobs.length === 1) {
-        setSelectedJob(eligibleJobs[0].id)
-      }
-    } catch {
+      setWorkers(
+        (teamData.members || []).filter(member =>
+          Boolean(member.userId)
+          && member.status === 'ACTIVE'
+          && ['WORKER', 'DISPATCHER', 'MANAGER', 'COMPANY_OWNER'].includes(member.role)
+        )
+      )
+    } catch (error: any) {
+      Alert.alert('Could not load dispatch', error?.message || 'Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleAssign = async () => {
-    if (!selectedWorker || !selectedJob) {
-      Alert.alert(t('common.error'), 'Select both a worker and a job')
-      return
-    }
+  useEffect(() => { load() }, [])
 
+  const selectedWorkerData = useMemo(
+    () => workers.find(worker => worker.userId === selectedWorker),
+    [workers, selectedWorker]
+  )
+  const selectedJobData = useMemo(
+    () => jobs.find(job => job.id === selectedJob),
+    [jobs, selectedJob]
+  )
+
+  const assign = async () => {
+    if (!companyId || !selectedWorker || !selectedJob) return
     setSubmitting(true)
     try {
-      const companyId = await getActiveCompanyId()
       await v2Request('/api/mobile/company/assign', {
         method: 'POST',
         body: JSON.stringify({
@@ -111,11 +134,13 @@ export default function AssignWorkerScreen() {
           workerUserId: selectedWorker,
         }),
       })
-      Alert.alert(t('common.success'), t('company.workforce.assigned'), [
-        { text: t('common.ok'), onPress: () => router.back() },
-      ])
-    } catch (err: any) {
-      Alert.alert(t('common.error'), err.message || 'Failed to assign worker')
+      Alert.alert(
+        'Worker assigned',
+        `${selectedWorkerData?.name || 'Worker'} will receive the job notification now.`,
+        [{ text: 'Done', onPress: () => router.replace('/(company)/(tabs)/dispatch' as any) }],
+      )
+    } catch (error: any) {
+      Alert.alert('Unable to assign', error?.message || 'The worker may be busy or missing the required capability.')
     } finally {
       setSubmitting(false)
     }
@@ -123,169 +148,146 @@ export default function AssignWorkerScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.amber} />
-        </View>
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.loading}><ActivityIndicator color={v3.colors.ink} /></View>
       </SafeAreaView>
     )
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionTitle}>{t('company.workforce.assignWorker')}</Text>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.circle} onPress={() => router.back()}>
+          <CaretLeft size={18} color={v3.colors.ink} weight="bold" />
+        </TouchableOpacity>
+        <View style={styles.headerCopy}>
+          <Text style={styles.eyebrow}>DISPATCH</Text>
+          <Text style={styles.title}>Assign work</Text>
+        </View>
+        <View style={styles.circlePlaceholder} />
+      </View>
 
-        <Text style={styles.label}>{t('company.team')} — Worker</Text>
-        {workers.length === 0 ? (
-          <Text style={styles.emptyText}>No workers available. Invite workers first.</Text>
-        ) : (
-          workers.map((w) => {
-            const selectedJobRecord = availableJobs.find(job => job.id === selectedJob)
-            const identityRequired = selectedJobRecord?.workerIdentityCheckRequired === true
-            const blockedByIdentity = identityRequired && !w.identityVerified
-
-            return (
-              <TouchableOpacity
-                key={w.id}
-                style={[
-                  styles.optionCard,
-                  selectedWorker === w.userId && styles.optionCardActive,
-                  blockedByIdentity && styles.optionCardDisabled,
-                ]}
-                onPress={() => {
-                  if (blockedByIdentity) {
-                    Alert.alert(
-                      'Worker identity photo required',
-                      'This booking requires a MaintainEX-approved worker photo. Ask this worker to complete identity verification/photo review before assignment.'
-                    )
-                    return
-                  }
-                  setSelectedWorker(w.userId)
-                }}
-              >
-                <View style={styles.optionLeft}>
-                  {w.verifiedPhotoUrl ? (
-                    <Image source={{ uri: w.verifiedPhotoUrl }} style={styles.workerPhoto} />
-                  ) : (
-                    <View style={[styles.avatar, { backgroundColor: w.isOnline ? colors.success : colors.muted }]}>
-                      <Text style={styles.avatarText}>{w.name?.[0] || '?'}</Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.optionName}>{w.name}</Text>
-                    <Text style={styles.optionMeta}>
-                      {w.completedJobs} jobs · {w.rating > 0 ? `${w.rating}★` : 'No rating'}
-                    </Text>
-                    <Text style={[
-                      styles.identityMeta,
-                      { color: w.identityVerified ? colors.success : colors.error },
-                    ]}>
-                      {w.identityVerified
-                        ? '✓ Identity photo verified'
-                        : 'Identity photo not approved'}
-                    </Text>
-                  </View>
-                </View>
-                {selectedWorker === w.userId && !blockedByIdentity && (
-                  <Ionicons name="checkmark-circle" size={22} color={colors.amber} />
-                )}
-              </TouchableOpacity>
-            )
-          })
-        )}
-
-        <Text style={styles.label}>Accepted Job</Text>
-        {availableJobs.length === 0 ? (
-          <Text style={styles.emptyText}>No accepted company jobs are waiting for assignment.</Text>
-        ) : (
-          availableJobs.map((job) => (
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <Text style={styles.sectionTitle}>1 · Select accepted job</Text>
+        {jobs.length === 0 ? (
+          <View style={styles.empty}>
+            <Briefcase size={25} color={v3.colors.textMuted} />
+            <Text style={styles.emptyTitle}>No jobs waiting for assignment</Text>
+            <Text style={styles.emptyText}>A company quote must be accepted before the job can be dispatched to an employee.</Text>
+          </View>
+        ) : jobs.map(job => {
+          const active = selectedJob === job.id
+          const date = job.preferredDate ? new Date(job.preferredDate).toLocaleDateString() : 'As soon as possible'
+          return (
             <TouchableOpacity
               key={job.id}
-              style={[styles.optionCard, selectedJob === job.id && styles.optionCardActive]}
-              onPress={() => {
-                setSelectedJob(job.id)
-                if (job.workerIdentityCheckRequired) {
-                  const currentWorker = workers.find(worker => worker.userId === selectedWorker)
-                  if (currentWorker && !currentWorker.identityVerified) {
-                    setSelectedWorker(null)
-                  }
-                }
-              }}
+              style={[styles.option, active && styles.optionActive]}
+              onPress={() => setSelectedJob(job.id)}
+              activeOpacity={0.72}
             >
-              <View style={styles.optionLeft}>
-                <View style={[styles.avatar, { backgroundColor: colors.companyAccent || colors.amber }]}>
-                  <Ionicons name="briefcase-outline" size={20} color={colors.white} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.optionName}>{job.title}</Text>
-                  <Text style={styles.optionMeta}>
-                    {job.preferredDate ? new Date(job.preferredDate).toLocaleDateString() : 'Schedule not set'}
-                  </Text>
-                </View>
+              <View style={styles.optionIcon}><Briefcase size={18} color={v3.colors.ink} weight="bold" /></View>
+              <View style={styles.optionCopy}>
+                <Text style={styles.optionTitle}>{job.title}</Text>
+                <Text style={styles.optionMeta}>{date}{job.preferredTimeSlot ? ` · ${job.preferredTimeSlot}` : ''}</Text>
               </View>
-              {selectedJob === job.id && (
-                <Ionicons name="checkmark-circle" size={22} color={colors.amber} />
-              )}
+              {active ? <CheckCircle size={20} color={v3.colors.success} weight="fill" /> : null}
             </TouchableOpacity>
-          ))
-        )}
+          )
+        })}
+
+        <Text style={styles.sectionTitle}>2 · Select employee</Text>
+        {workers.length === 0 ? (
+          <View style={styles.empty}>
+            <UsersThree size={25} color={v3.colors.textMuted} />
+            <Text style={styles.emptyTitle}>No eligible team accounts</Text>
+            <Text style={styles.emptyText}>Invite employees and make sure their identity and job capabilities are ready.</Text>
+          </View>
+        ) : workers.map(worker => {
+          const active = selectedWorker === worker.userId
+          return (
+            <TouchableOpacity
+              key={worker.id}
+              style={[styles.option, active && styles.optionActive]}
+              onPress={() => worker.userId && setSelectedWorker(worker.userId)}
+              activeOpacity={0.72}
+            >
+              <View style={[styles.avatar, worker.isOnline && styles.avatarOnline]}>
+                <Text style={styles.avatarText}>{worker.name?.[0]?.toUpperCase() || '?'}</Text>
+              </View>
+              <View style={styles.optionCopy}>
+                <Text style={styles.optionTitle}>{worker.name}</Text>
+                <Text style={styles.optionMeta}>
+                  {worker.role.replaceAll('_', ' ')} · {worker.completedJobs || 0} jobs
+                  {worker.rating > 0 ? ` · ${worker.rating.toFixed(1)}★` : ''}
+                </Text>
+              </View>
+              <View style={[styles.presence, worker.isOnline ? styles.online : styles.offline]}>
+                <Text style={[styles.presenceText, worker.isOnline ? styles.onlineText : styles.offlineText]}>
+                  {worker.isOnline ? 'ONLINE' : 'OFFLINE'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )
+        })}
+
+        {selectedJobData && selectedWorkerData ? (
+          <View style={styles.summary}>
+            <UserCircle size={20} color={v3.colors.ink} weight="bold" />
+            <View style={styles.summaryCopy}>
+              <Text style={styles.summaryTitle}>Ready to dispatch</Text>
+              <Text style={styles.summaryText}>{selectedWorkerData.name} → {selectedJobData.title}</Text>
+            </View>
+          </View>
+        ) : null}
 
         <TouchableOpacity
-          style={[styles.assignBtn, (!selectedWorker || !selectedJob || submitting) && styles.assignBtnDisabled]}
-          onPress={handleAssign}
+          style={[styles.assignButton, (!selectedWorker || !selectedJob || submitting) && styles.disabled]}
           disabled={!selectedWorker || !selectedJob || submitting}
+          onPress={assign}
         >
-          {submitting ? (
-            <ActivityIndicator size="small" color={colors.white} />
-          ) : (
-            <Text style={styles.assignBtnText}>{t('company.workforce.assignWorker')}</Text>
-          )}
+          {submitting
+            ? <ActivityIndicator size="small" color={v3.colors.paper} />
+            : <Text style={styles.assignText}>Assign employee</Text>}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  content: { padding: 24 },
-  sectionTitle: { fontSize: 22, fontWeight: '800', color: colors.ink, marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: '700', color: colors.ink, marginBottom: 8, marginTop: 16 },
-  optionCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  optionCardActive: { borderColor: colors.amber },
-  optionCardDisabled: { opacity: 0.55 },
-  optionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: { fontSize: 16, fontWeight: '700', color: colors.white },
-  workerPhoto: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.lightGray },
-  optionName: { fontSize: 15, fontWeight: '700', color: colors.ink },
-  optionMeta: { fontSize: 12, color: colors.muted },
-  identityMeta: { fontSize: 11, fontWeight: '600', marginTop: 3 },
-  assignBtn: {
-    backgroundColor: colors.amber,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  assignBtnDisabled: { opacity: 0.5 },
-  assignBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
-  emptyText: { fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: 20 },
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 12 },
+  circle: { width: 40, height: 40, borderRadius: 20, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  circlePlaceholder: { width: 40 },
+  headerCopy: { flex: 1, marginLeft: 11 },
+  eyebrow: { ...v3.typography.smallBold, color: v3.colors.amberDark, letterSpacing: 0.8 },
+  title: { ...v3.typography.title, color: v3.colors.ink, marginTop: 1 },
+  content: { paddingHorizontal: 18, paddingBottom: 34 },
+  sectionTitle: { ...v3.typography.bodyLarge, color: v3.colors.ink, marginTop: 18, marginBottom: 8 },
+  option: { minHeight: 72, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
+  optionActive: { borderColor: v3.colors.amber, borderWidth: 2 },
+  optionIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  optionCopy: { flex: 1, marginLeft: 10 },
+  optionTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
+  optionMeta: { ...v3.typography.caption, color: v3.colors.textMuted, marginTop: 3 },
+  avatar: { width: 42, height: 42, borderRadius: 14, backgroundColor: v3.colors.textMuted, alignItems: 'center', justifyContent: 'center' },
+  avatarOnline: { backgroundColor: v3.colors.ink },
+  avatarText: { ...v3.typography.bodyBold, color: v3.colors.paper },
+  presence: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 4 },
+  online: { backgroundColor: v3.colors.successSoft },
+  offline: { backgroundColor: v3.colors.surfaceGray },
+  presenceText: { ...v3.typography.smallBold },
+  onlineText: { color: v3.colors.success },
+  offlineText: { color: v3.colors.textMuted },
+  empty: { borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, padding: 18, alignItems: 'center' },
+  emptyTitle: { ...v3.typography.bodyBold, color: v3.colors.ink, marginTop: 8 },
+  emptyText: { ...v3.typography.caption, color: v3.colors.textMuted, textAlign: 'center', lineHeight: 17, marginTop: 4 },
+  summary: { flexDirection: 'row', alignItems: 'center', backgroundColor: v3.colors.amberSoft, borderRadius: 17, padding: 14, marginTop: 14 },
+  summaryCopy: { flex: 1, marginLeft: 10 },
+  summaryTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
+  summaryText: { ...v3.typography.caption, color: v3.colors.amberDark, marginTop: 2 },
+  assignButton: { height: 54, borderRadius: 16, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
+  assignText: { ...v3.typography.bodyLarge, color: v3.colors.paper },
+  disabled: { opacity: 0.45 },
 })

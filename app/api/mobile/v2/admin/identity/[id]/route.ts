@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -80,7 +81,7 @@ export async function PATCH(
     const updated = await prisma.identityDocument.findUnique({ where: { id } })
     return NextResponse.json({ document: updated })
   } catch (error) {
-    console.error('Review identity error:', error)
+    logger.error('Legacy admin identity review failed unexpectedly', { err: error, route: '/api/mobile/v2/admin/identity/[id]' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

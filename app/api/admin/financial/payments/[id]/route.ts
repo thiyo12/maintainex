@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -244,7 +245,7 @@ export async function GET(
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM payment detail GET error:', error)
+    logger.error('CRM payment detail read failed unexpectedly', { err: error, route: '/api/admin/financial/payments/[id]', method: 'GET' })
     return NextResponse.json({ error: 'Failed to load payment detail' }, { status: 500 })
   }
 }
@@ -354,7 +355,7 @@ export async function PATCH(
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM payment reconciliation PATCH error:', error)
+    logger.error('CRM payment reconciliation failed unexpectedly', { err: error, route: '/api/admin/financial/payments/[id]', method: 'PATCH' })
     return NextResponse.json({ error: 'Failed to reconcile provider transaction' }, { status: 500 })
   }
 }

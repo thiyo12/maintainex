@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 
 const contactRateLimit = new Map<string, { count: number; lastReset: number }>()
 const RATE_LIMIT = 5
@@ -51,7 +52,7 @@ function isValidName(name: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const ip = getTrustedClientIp(request.headers)
     
     if (!checkRateLimit(ip)) {
       return NextResponse.json(
