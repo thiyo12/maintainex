@@ -50,8 +50,9 @@ describe('PayPal sandbox smoke deployment flag', () => {
       'ALLOW_PAYPAL_SANDBOX_SMOKE="${ALLOW_PAYPAL_SANDBOX_SMOKE:-false}"',
     )
     expect(preflight).toContain(SANDBOX_ERROR)
-    expect(preflight).toContain('PAYPALMODE|sandbox-smoke-authorized')
-    expect(preflight).toContain('PAYPALMODE|live')
+    expect(preflight).toContain('echo "PAYPALMODE|$PAYPALMODE"')
+    expect(preflight).toContain("PAYPALMODE='sandbox-smoke-authorized'")
+    expect(preflight).toContain("PAYPALMODE='live'")
     expect(preflight).toContain(SMOKE_WARNING)
     expect(preflight).toContain('paypal_mode=$PAYPALMODE')
   })

@@ -31,6 +31,7 @@ echo
 echo "=== 1/5 Verify service, current health, release identity and safe environment modes ==="
 "${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP='$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP' LEGACY_BOOTSTRAP_RELEASE_SHA='$LEGACY_BOOTSTRAP_RELEASE_SHA' sh -s" <<'REMOTE' > "$tmp"
 set -eu
+PAYPALMODE=''
 
 docker service inspect "$SERVICE" >/dev/null
 
@@ -88,13 +89,15 @@ if [ -n "$paypal_configured" ]; then
   done
   if [ "$(env_value PAYPAL_SANDBOX)" != "false" ]; then
     if [ "$ALLOW_PAYPAL_SANDBOX_SMOKE" = "true" ]; then
-      echo "PAYPALMODE|sandbox-smoke-authorized"
+      PAYPALMODE='sandbox-smoke-authorized'
+      echo "PAYPALMODE|$PAYPALMODE"
     else
       echo "ERROR|PayPal production configuration must explicitly disable sandbox"
       exit 1
     fi
   else
-    echo "PAYPALMODE|live"
+    PAYPALMODE='live'
+    echo "PAYPALMODE|$PAYPALMODE"
   fi
 fi
 
