@@ -180,6 +180,9 @@ describe('bootstrap flags stay runner-only in both tools', () => {
     expect(preflight).toContain(
       'case ",$PRE_ENROLLMENT_RELEASE_SHAS," in *",$release_sha,"*) true ;; *) false ;; esac; then',
     )
+    expect(preflight).toContain(
+      'case ",$PRE_ENROLLMENT_RELEASE_SHAS," in *",$bootstrap_deployed_sha,"*) ;; *) bootstrap_ok=0 ;; esac',
+    )
   })
 
   it('never persists either bootstrap flag into the service environment', () => {
