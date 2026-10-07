@@ -9,7 +9,10 @@ OUTPUT_DIR="${OUTPUT_DIR:-$HOME/maintainex-release}"
 CONFIRM_DB_CREDENTIAL_ROTATED="${CONFIRM_DB_CREDENTIAL_ROTATED:-no}"
 ALLOW_PAYPAL_SANDBOX_SMOKE="${ALLOW_PAYPAL_SANDBOX_SMOKE:-false}"
 ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP="${ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP:-false}"
-LEGACY_BOOTSTRAP_RELEASE_SHA="${LEGACY_BOOTSTRAP_RELEASE_SHA:-7c526b9401cc46b2c115006992e35735038719da}"
+# Comma-separated allowlist of production releases that cannot complete first-time
+# super-admin MFA enrollment on their own. Only these may use the one-time
+# bootstrap. Once enrollment is complete the gate passes with no allowance.
+PRE_ENROLLMENT_RELEASE_SHAS="${PRE_ENROLLMENT_RELEASE_SHAS:-7c526b9401cc46b2c115006992e35735038719da,d8e3bfafa980f7b4e7710cdafbe213510ddb069e}"
 
 if [ "$CONFIRM_DB_CREDENTIAL_ROTATED" != "yes" ]; then
   echo "ERROR: database credential rotation must be completed first." >&2
@@ -29,7 +32,7 @@ echo "Service: $SERVICE"
 echo
 
 echo "=== 1/5 Verify service, current health, release identity and safe environment modes ==="
-"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP='$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP' LEGACY_BOOTSTRAP_RELEASE_SHA='$LEGACY_BOOTSTRAP_RELEASE_SHA' sh -s" <<'REMOTE' > "$tmp"
+"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP='$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP' PRE_ENROLLMENT_RELEASE_SHAS='$PRE_ENROLLMENT_RELEASE_SHAS' sh -s" <<'REMOTE' > "$tmp"
 set -eu
 PAYPALMODE=''
 
@@ -200,7 +203,7 @@ if [ "$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP" = "true" ] \
     && [ "$MFA_ACTIVE_TEST_SEED" = "0" ] \
     && [ "$MFA_INACTIVE_TEST_SEED" -ge 18 ] \
     && [ "$MFA_INACTIVE_STAFF_SA" -ge 1 ] \
-    && [ "$release_sha" = "$LEGACY_BOOTSTRAP_RELEASE_SHA" ]; then
+    && case ",$PRE_ENROLLMENT_RELEASE_SHAS," in *",$release_sha,"*) true ;; *) false ;; esac; then
     legacy_release_bootstrap='authorized-once'
     echo "LEGACY_RELEASE_BOOTSTRAP|authorized-once"
   fi
