@@ -176,7 +176,7 @@ jobs:
 
       - name: Upload TypeScript diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: typescript-diagnostics
           path: /tmp/tsc.txt
@@ -194,7 +194,7 @@ jobs:
 
       - name: Upload schema test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: schema-test-diagnostics
           path: /tmp/schema-tests.txt
@@ -215,7 +215,7 @@ jobs:
 
       - name: Upload migration test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: migration-test-diagnostics
           path: /tmp/migration-tests.txt
@@ -228,7 +228,7 @@ jobs:
 
       - name: Upload invariant test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: invariant-test-diagnostics
           path: /tmp/invariant-tests.txt
@@ -250,7 +250,7 @@ jobs:
 
       - name: Upload Phase 9 security test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: phase9-security-test-diagnostics
           path: /tmp/phase9-security-tests.txt
@@ -259,7 +259,7 @@ jobs:
 
       - name: Upload security test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: security-test-diagnostics
           path: /tmp/security-tests.txt
@@ -293,7 +293,7 @@ jobs:
 
       - name: Upload core app lifecycle diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: core-app-lifecycle-diagnostics
           path: /tmp/core-app-lifecycle-tests.txt
@@ -321,7 +321,7 @@ jobs:
 
       - name: Upload financial flow test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: financial-flow-test-diagnostics
           path: /tmp/financial-flow-tests.txt
@@ -335,7 +335,7 @@ jobs:
 
       - name: Upload regression test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: regression-test-diagnostics
           path: /tmp/regression-tests.txt
@@ -380,7 +380,7 @@ jobs:
 
       - name: Upload build diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: build-diagnostics
           path: /tmp/build-output.txt
