@@ -13,6 +13,8 @@ SHORT_SHA="${RELEASE_SHA:0:12}"
 IMAGE_REPO="${IMAGE_REPO:-maintainex-mx-vcaohy}"
 RELEASE_IMAGE="${IMAGE_REPO}:release-${SHORT_SHA}"
 ALLOW_PAYPAL_SANDBOX_SMOKE="${ALLOW_PAYPAL_SANDBOX_SMOKE:-false}"
+ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP="${ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP:-false}"
+LEGACY_MFA_BOOTSTRAP_RELEASE_SHA="${LEGACY_MFA_BOOTSTRAP_RELEASE_SHA:-7c526b9401cc46b2c115006992e35735038719da}"
 
 echo "========================================"
 echo " MaintainEX immutable release deployment"
@@ -135,23 +137,53 @@ if [ -z "$container" ]; then
   exit 1
 fi
 
-SUPER_ADMIN_MFA_MISSING=$(docker exec "$container" node -e '
+SUPER_ADMIN_MFA_STATE=$(docker exec "$container" node -e '
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
-prisma.adminUser.count({
-  where: {
-    role: "SUPER_ADMIN",
-    isActive: true,
-    deletedAt: null,
-    OR: [{ totpEnabled: false }, { totpSecret: null }],
-  },
-}).then(count => {
-  process.stdout.write(String(count));
+Promise.all([
+  prisma.adminUser.count({
+    where: {
+      role: "SUPER_ADMIN",
+      isActive: true,
+      deletedAt: null,
+      OR: [{ totpEnabled: false }, { totpSecret: null }],
+    },
+  }),
+  prisma.adminUser.count({ where: { role: "SUPER_ADMIN", isActive: true } }),
+  prisma.adminUser.count({ where: { role: "SUPER_ADMIN", isActive: true, email: { endsWith: "@test.com" } } }),
+  prisma.adminUser.count({ where: { role: "SUPER_ADMIN", isActive: false, email: { endsWith: "@test.com" } } }),
+  prisma.adminUser.count({ where: { role: "SUPER_ADMIN", isActive: false, email: { endsWith: "@maintainex.lk" } } }),
+]).then(([missing, activeSuperAdmins, activeTestSeed, inactiveTestSeed, inactiveStaffSuperAdmin]) => {
+  process.stdout.write(
+    [missing, activeSuperAdmins, activeTestSeed, inactiveTestSeed, inactiveStaffSuperAdmin].join("|")
+  );
 }).finally(() => prisma.$disconnect());
 ')
+SUPER_ADMIN_MFA_MISSING=$(printf '%s' "$SUPER_ADMIN_MFA_STATE" | cut -d'|' -f1)
 if [ "$SUPER_ADMIN_MFA_MISSING" != "0" ]; then
-  echo "ERROR: active SUPER_ADMIN account is missing required MFA enrollment" >&2
-  exit 1
+  if [ "$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP" = "true" ]; then
+    # One-time bootstrap only. The legacy release cannot complete enrollment,
+    # so the single remaining owner must enroll immediately after this upgrade.
+    # Every condition must hold or this fails closed.
+    IFS='|' read -r _bs_missing MFA_ACTIVE_SA MFA_ACTIVE_TEST_SEED MFA_INACTIVE_TEST_SEED MFA_INACTIVE_STAFF_SA <<EOF
+$SUPER_ADMIN_MFA_STATE
+EOF
+    deployed_sha=$(env_value APP_RELEASE_SHA)
+    bootstrap_ok=1
+    [ "$MFA_ACTIVE_SA" = "1" ] || bootstrap_ok=0
+    [ "$MFA_ACTIVE_TEST_SEED" = "0" ] || bootstrap_ok=0
+    [ "$MFA_INACTIVE_TEST_SEED" -ge 18 ] || bootstrap_ok=0
+    [ "$MFA_INACTIVE_STAFF_SA" -ge 1 ] || bootstrap_ok=0
+    [ "$deployed_sha" = "$LEGACY_MFA_BOOTSTRAP_RELEASE_SHA" ] || bootstrap_ok=0
+    if [ "$bootstrap_ok" != "1" ]; then
+      echo "ERROR|initial owner MFA bootstrap conditions not satisfied (activeSA=$MFA_ACTIVE_SA activeTestSeed=$MFA_ACTIVE_TEST_SEED inactiveTestSeed=$MFA_INACTIVE_TEST_SEED inactiveStaff=$MFA_INACTIVE_STAFF_SA deployed=$deployed_sha)" >&2
+      exit 1
+    fi
+    echo "LEGACY_RELEASE_BOOTSTRAP|authorized-once"
+  else
+    echo "ERROR: active SUPER_ADMIN account is missing required MFA enrollment" >&2
+    exit 1
+  fi
 fi
 
 echo "Production environment modes: OK"
