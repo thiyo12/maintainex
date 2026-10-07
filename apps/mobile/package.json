@@ -63,6 +63,7 @@
   },
   "private": true,
   "overrides": {
-    "image-size": "2.0.4"
+    "image-size": "2.0.4",
+    "shell-quote": "1.12.0"
   }
 }
