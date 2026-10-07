@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmRequest, type CrmSecurityContext } from '@/lib/crm/security'
@@ -61,7 +62,7 @@ export async function GET(
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM profession get error:', error)
+    secureConsole.error('CRM profession get error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -143,7 +144,7 @@ export async function PATCH(
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server error'
     if (message.includes('Unique constraint')) return NextResponse.json({ error: 'Profession slug or i18nKey already exists' }, { status: 409 })
-    console.error('CRM profession update error:', error)
+    secureConsole.error('CRM profession update error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -185,7 +186,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Profession deactivated', profession })
   } catch (error) {
-    console.error('CRM profession deactivate error:', error)
+    secureConsole.error('CRM profession deactivate error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

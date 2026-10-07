@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Public runtime config error:', error)
+    secureConsole.error('Public runtime config error:', error)
     return NextResponse.json(
       {
         channels: { website: true, mobile: true, booking: false },

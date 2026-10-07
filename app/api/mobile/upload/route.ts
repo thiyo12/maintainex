@@ -4,12 +4,14 @@ import { writeFile, mkdir } from 'fs/promises'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import path from 'path'
 import { validateFileUpload, generateSecureFilename } from '@/lib/security/file-upload'
+import { checkRateLimit } from '@/lib/shared/rate-limit/middleware'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
+import { logger } from '@/lib/shared/observability/logger'
 const ALLOWED_MIMES = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'image/gif',
   'application/pdf',
 ])
 const MAX_SIZE = 10 * 1024 * 1024 // 10MB
-const uploadRateMap = new Map<string, { count: number; resetAt: number }>()
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,17 +22,13 @@ export async function POST(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const uploadIp = request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || user.id
-    const now = Date.now()
-    const entry = uploadRateMap.get(uploadIp)
-    if (entry && now < entry.resetAt && entry.count >= 10) {
-      return NextResponse.json({ error: 'Too many uploads. Try again later.' }, { status: 429 })
-    }
-    if (!entry || now > entry.resetAt) {
-      uploadRateMap.set(uploadIp, { count: 1, resetAt: now + 60000 })
-    } else {
-      entry.count++
-    }
+    const clientIp = getTrustedClientIp(request.headers)
+    const rateLimit = await checkRateLimit(request, {
+      policyName: 'UPLOAD',
+      keyPrefix: 'mobile_upload',
+      identifier: `${user.id}:${clientIp}`,
+    })
+    if (!rateLimit.allowed) return rateLimit.response!
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -89,7 +87,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url, filename })
   } catch (error) {
-    console.error('Upload error:', error)
+    logger.error('Mobile upload failed', {
+      err: error,
+      route: '/api/mobile/upload',
+      method: 'POST',
+    })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

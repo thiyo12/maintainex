@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
@@ -146,6 +147,10 @@ const services = [
 ]
 
 export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   try {
     // Only allow super admin
     const session = await getSession(request)
@@ -209,12 +214,16 @@ export async function POST(request: NextRequest) {
       message: `Created ${categoriesCreated} categories and ${servicesCreated} services`
     })
   } catch (error) {
-    console.error('Seed error:', error)
+    secureConsole.error('Seed error:', error)
     return NextResponse.json({ error: 'Failed to seed data' }, { status: 500 })
   }
 }
 
 export async function GET() {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   try {
     const categoryCount = await prisma.category.count()
     const serviceCount = await prisma.service.count()

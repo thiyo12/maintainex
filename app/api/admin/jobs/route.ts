@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmAction, guardCrmRequest, getCrmCountryCodes, getCrmCountryFilter, assertCrmCountryAllowed } from '@/lib/crm/security'
@@ -323,7 +324,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Jobs GET error:', error)
+    secureConsole.error('Jobs GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 })
   }
 }
@@ -604,7 +605,7 @@ export async function PATCH(request: NextRequest) {
     })
     return NextResponse.json({ job: { ...updated, source: 'V1' } })
   } catch (error) {
-    console.error('Jobs PATCH error:', error)
+    secureConsole.error('Jobs PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update job' }, { status: 500 })
   }
 }

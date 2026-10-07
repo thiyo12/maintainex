@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('Admin escrows error:', error)
+    secureConsole.error('Admin escrows error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -131,7 +132,7 @@ export async function PATCH(request: NextRequest) {
       { status: pendingExternal ? 202 : 200 }
     )
   } catch (error) {
-    console.error('Admin escrow action error:', error)
+    secureConsole.error('Admin escrow action error:', error)
     const message = error instanceof Error ? error.message : 'Server error'
     if (message.includes('already') || message.includes('concurrently') || message.includes('state changed')) {
       return NextResponse.json({ error: message }, { status: 409 })

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
+import { matchesSharedSecret } from '@/lib/security/secret-compare'
 
 function getInternalSyncSecret(): string {
   if (!process.env.INTERNAL_SYNC_SECRET) throw new Error('[SECURITY] INTERNAL_SYNC_SECRET env var is required')
@@ -31,9 +33,13 @@ function randomEmail(): string {
 }
 
 export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   try {
     const authHeader = request.headers.get('x-internal-sync')
-    if (!authHeader || authHeader !== getInternalSyncSecret()) {
+    if (!matchesSharedSecret(authHeader, getInternalSyncSecret())) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -172,7 +178,7 @@ export async function POST(request: NextRequest) {
       results,
     })
   } catch (error) {
-    console.error('Security seed error:', error)
+    logger.error('Security seed failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Seed failed' }, { status: 500 })
   }
 }

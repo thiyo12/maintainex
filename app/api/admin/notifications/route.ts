@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmRequest } from '@/lib/crm/security'
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM admin notifications GET error:', error)
+    secureConsole.error('CRM admin notifications GET error:', error)
     return NextResponse.json({ error: 'Failed to load notifications' }, { status: 500 })
   }
 }
@@ -79,7 +80,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true, unreadCount })
   } catch (error) {
-    console.error('CRM admin notifications PATCH error:', error)
+    secureConsole.error('CRM admin notifications PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update notifications' }, { status: 500 })
   }
 }

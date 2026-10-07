@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { updateMarketConfig } from '@/lib/domain/market-config'
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
     const config = await prisma.marketConfig.findUnique({ where: { countryCode } })
     return NextResponse.json({ config }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('CRM market config GET error:', error)
+    secureConsole.error('CRM market config GET error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -124,7 +125,7 @@ export async function PATCH(request: NextRequest) {
     if (message.includes('Concurrent modification')) {
       return NextResponse.json({ error: message }, { status: 409 })
     }
-    console.error('CRM market config PATCH error:', error)
+    secureConsole.error('CRM market config PATCH error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
@@ -13,7 +14,7 @@ export async function GET(
 ) {
   const { intentId } = await params
 
-  console.warn('[payments] blocked legacy PayHere checkout request', {
+  secureConsole.warn('[payments] blocked legacy PayHere checkout request', {
     intentId,
     reason: 'PAYHERE_DISABLED_FOR_NEW_CHECKOUT',
   })

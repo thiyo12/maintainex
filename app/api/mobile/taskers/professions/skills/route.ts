@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
     if (message.includes('inactive') || message.includes('does not belong')) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
-    console.error('Tasker profession skill add error:', error)
+    secureConsole.error('Tasker profession skill add error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

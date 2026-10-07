@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -9,6 +10,7 @@ import {
   claimTypeForDocument,
   recordStrongIdentityClaim,
 } from '@/lib/identity/identity-claims'
+import { resolveLocalKycFileReference } from '@/lib/security/kyc-storage'
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,7 +29,7 @@ export async function GET(request: NextRequest) {
       documents: docs,
     })
   } catch (error) {
-    console.error('Get identity error:', error)
+    logger.error('Identity read failed unexpectedly', { err: error, route: '/api/mobile/v2/identity', method: 'GET' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -54,6 +56,21 @@ export async function POST(request: NextRequest) {
 
     if (!docType || !side || !imageUrl) {
       return NextResponse.json({ error: 'Missing required fields: docType, side, imageUrl' }, { status: 400 })
+    }
+
+    const privateFile = resolveLocalKycFileReference(
+      String(imageUrl),
+      user.id,
+      request.nextUrl.origin,
+    )
+    if (!privateFile) {
+      return NextResponse.json(
+        {
+          error: 'Identity evidence must be uploaded through the protected MaintainEX file channel.',
+          code: 'INVALID_KYC_FILE_REFERENCE',
+        },
+        { status: 400 },
+      )
     }
 
     if (user.role === 'TASKER' && !fullName?.trim()) {
@@ -175,7 +192,7 @@ export async function POST(request: NextRequest) {
       highRiskIdentityMatch: result.claimAssessment?.highRisk || false,
     }, { status: 201 })
   } catch (error) {
-    console.error('Upload identity error:', error)
+    logger.error('Identity submission failed unexpectedly', { err: error, route: '/api/mobile/v2/identity', method: 'POST' })
     const message = error instanceof Error ? error.message : ''
 
     if (message === 'DOCUMENT_NUMBER_REQUIRED') {

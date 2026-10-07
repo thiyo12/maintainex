@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -139,7 +140,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {
-    console.error('CRM verified photo request GET error:', error)
+    logger.error('CRM verified photo request read failed unexpectedly', { err: error, route: '/api/admin/kyc/photo-changes', method: 'GET' })
     return NextResponse.json({ error: 'Failed to fetch verified photo requests' }, { status: 500 })
   }
 }
@@ -364,7 +365,7 @@ export async function PATCH(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('CRM verified photo request PATCH error:', error)
+    logger.error('CRM verified photo request update failed unexpectedly', { err: error, route: '/api/admin/kyc/photo-changes', method: 'PATCH' })
     return NextResponse.json({ error: 'Failed to review verified photo request' }, { status: 500 })
   }
 }

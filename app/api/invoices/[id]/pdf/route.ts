@@ -1,5 +1,7 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { guardCrmRequest } from '@/lib/crm/security'
+import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
 import { prisma } from '@/lib/prisma'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -9,10 +11,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'commission:view',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
 
     const { id } = await params
     const invoice = await prisma.invoice.findUnique({
@@ -24,9 +28,11 @@ export async function GET(
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
 
-    const isSuper = session.role === 'SUPER_ADMIN'
-    if (!isSuper && session.branchId !== invoice.branchId) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    if (!guard.context.isSuperAdmin) {
+      const scope = await resolveReportBranchScope(guard.context, invoice.branchId)
+      if (!scope.ok) {
+        return NextResponse.json({ error: scope.error }, { status: scope.status })
+      }
     }
 
     const doc = new jsPDF()
@@ -151,9 +157,8 @@ export async function GET(
     doc.text('Payment Details', 125, paymentY + 2)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
-    doc.text('Bank: Commercial Bank', 125, paymentY + 10)
-    doc.text('Account: 1234567890', 125, paymentY + 16)
-    doc.text('Branch: Colombo', 125, paymentY + 22)
+    doc.text('Use the payment instructions approved for this invoice.', 125, paymentY + 10)
+    doc.text('Never send funds to unverified account details.', 125, paymentY + 16)
 
     // Notes
     if (invoice.notes) {
@@ -182,7 +187,7 @@ export async function GET(
       }
     })
   } catch (error) {
-    console.error('Invoice PDF error:', error)
+    secureConsole.error('Invoice PDF error:', error)
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 })
   }
 }

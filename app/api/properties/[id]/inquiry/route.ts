@@ -1,16 +1,19 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { PUBLIC_REAL_ESTATE_STATUSES } from '@/lib/real-estate/visibility'
 
 const INQUIRY_TYPES = new Set(['chat', 'call', 'inquiry', 'viewing'])
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getSession(request)
+    const session = await authenticateMarketplaceUser(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(session)
+    if (blocked) return blocked
 
     const { id } = await params
     const body = await request.json().catch(() => ({}))
@@ -99,7 +102,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json({ success: true, data: result })
   } catch (error: any) {
-    console.error('Error creating inquiry:', error)
+    secureConsole.error('Error creating inquiry:', error)
     return NextResponse.json({ error: error?.message || 'Failed to create inquiry' }, { status: 500 })
   }
 }

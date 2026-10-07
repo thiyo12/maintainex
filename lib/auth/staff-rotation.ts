@@ -12,12 +12,19 @@ export function generateStaffRefreshToken(): { raw: string; secretHash: string }
 }
 
 export function parseStaffRefreshToken(token: string): { sessionId: string; secret: string } | null {
+  const expectedSecretLength = REFRESH_TOKEN_BYTES * 2
+  if (!token || token.length > 384) return null
+
   const dotIndex = token.indexOf('.')
-  if (dotIndex < 1) return null
+  if (dotIndex < 1 || token.indexOf('.', dotIndex + 1) !== -1) return null
+
   const sessionId = token.slice(0, dotIndex)
   const secret = token.slice(dotIndex + 1)
-  if (!sessionId || !secret) return null
-  if (secret.length < 32) return null
+  if (!sessionId || sessionId.length > 191) return null
+  if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) return null
+  if (secret.length !== expectedSecretLength) return null
+  if (!/^[0-9a-f]+$/.test(secret)) return null
+
   return { sessionId, secret }
 }
 
@@ -81,8 +88,29 @@ export async function rotateStaffRefreshToken(
 
   const adminUser = await prisma.adminUser.findUnique({
     where: { id: session.adminUserId },
+    select: {
+      id: true,
+      role: true,
+      isActive: true,
+      deletedAt: true,
+      lockedUntil: true,
+      totpEnabled: true,
+      totpSecret: true,
+    },
   })
-  if (!adminUser || !adminUser.isActive || adminUser.deletedAt) return null
+  if (
+    !adminUser ||
+    !adminUser.isActive ||
+    adminUser.deletedAt ||
+    (adminUser.lockedUntil && adminUser.lockedUntil > new Date()) ||
+    (adminUser.role === 'SUPER_ADMIN' && (!adminUser.totpEnabled || !adminUser.totpSecret))
+  ) {
+    await prisma.adminSession.updateMany({
+      where: { id: session.id, isRevoked: false },
+      data: { isRevoked: true, revokedAt: new Date() },
+    })
+    return null
+  }
 
   const newRefresh = generateStaffRefreshToken()
   const familyId = session.tokenFamilyId || session.id

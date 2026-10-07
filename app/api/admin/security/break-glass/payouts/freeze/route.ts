@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmAction } from '@/lib/crm/security'
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
       { status: 201, headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM break-glass payout freeze error:', error)
+    secureConsole.error('CRM break-glass payout freeze error:', error)
     return NextResponse.json({ error: 'Unable to activate payout freeze.' }, { status: 500 })
   }
 }

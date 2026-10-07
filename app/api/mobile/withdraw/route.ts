@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
       createdAt: payout.createdAt.toISOString(),
     }, { status: 201 })
   } catch (error) {
-    console.error('Withdraw error:', error)
+    secureConsole.error('Withdraw error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

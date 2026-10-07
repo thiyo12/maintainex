@@ -41,3 +41,46 @@ npm-debug.log*
 # IDE
 .vscode/
 .idea/
+
+# Security-sensitive material must never enter Docker build context
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+!**/.env.template
+**/.npmrc
+**/.netrc
+**/.pypirc
+**/secrets/
+**/credentials/
+credentials.json
+credentials.*.json
+*service-account*.json
+*firebase-adminsdk*.json
+id_rsa*
+id_ed25519*
+*.key
+*.p8
+*.p12
+*.pfx
+*.ppk
+*.jks
+*.keystore
+*.mobileprovision
+
+# Backups, exports and infrastructure state can contain credentials/data
+backups/
+backup/
+maintainex-backup/
+envs/
+*.dump
+*.backup
+*.backup.sql
+*.sql.gz
+*.tar.gz
+*.tgz
+*.zip
+.terraform/
+*.tfstate
+*.tfstate.*
+

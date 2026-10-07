@@ -1,10 +1,15 @@
 'use server'
 
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
 
 export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   try {
     const session = await getSession(request)
     if (!session || session.role !== 'SUPER_ADMIN') {
@@ -66,7 +71,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 
   } catch (error) {
-    console.error('Error in setup:', error)
+    secureConsole.error('Error in setup:', error)
     return NextResponse.json({ error: 'Setup failed' }, { status: 500 })
   }
 }

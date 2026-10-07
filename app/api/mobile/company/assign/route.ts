@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, assignmentId: result.assignmentId, assignedTo: workerUserId })
   } catch (err) {
-    console.error('Worker assignment error:', err)
+    secureConsole.error('Worker assignment error:', err)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,5 +1,5 @@
 import pino from 'pino'
-import { redactObject } from './redaction'
+import { redactObject, redactString } from './redaction'
 import { getRequestContext } from './request-context'
 
 const RELEASE_SHA = process.env.APP_RELEASE_SHA || 'unknown'
@@ -64,6 +64,36 @@ export interface AppLogger {
   error(message: string, context?: LogContext): void
 }
 
+function sanitizeErrorForLog(error: unknown): Record<string, unknown> | undefined {
+  if (!error) return undefined
+
+  if (error instanceof Error) {
+    const code = typeof (error as Error & { code?: unknown }).code === 'string'
+      ? (error as Error & { code?: string }).code
+      : undefined
+
+    if (ENVIRONMENT === 'production') {
+      return {
+        name: error.name || 'Error',
+        ...(code ? { code } : {}),
+        message: '[REDACTED]',
+      }
+    }
+
+    return {
+      name: error.name || 'Error',
+      ...(code ? { code } : {}),
+      message: redactString(error.message || ''),
+      ...(error.stack ? { stack: redactString(error.stack) } : {}),
+    }
+  }
+
+  return {
+    name: 'NonError',
+    message: ENVIRONMENT === 'production' ? '[REDACTED]' : redactString(String(error)),
+  }
+}
+
 function createLogger(): AppLogger {
   return {
     debug(message: string, context?: LogContext) {
@@ -91,10 +121,9 @@ function createLogger(): AppLogger {
       try {
         const { err, ...rest } = context || {}
         const enriched = enrichContext(rest)
-        if (err instanceof Error) {
-          baseLogger.error({ ...enriched, err }, message)
-        } else if (err) {
-          baseLogger.error({ ...enriched, err: String(err) }, message)
+        const safeError = sanitizeErrorForLog(err)
+        if (safeError) {
+          baseLogger.error({ ...enriched, error: safeError }, message)
         } else {
           baseLogger.error(enriched, message)
         }

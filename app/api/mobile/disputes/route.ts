@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
       createdAt: dispute.createdAt.toISOString(),
     })
   } catch (error) {
-    console.error('Dispute create error:', error)
+    secureConsole.error('Dispute create error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -173,7 +174,7 @@ export async function GET(request: NextRequest) {
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     )
   } catch (error) {
-    console.error('Disputes list error:', error)
+    secureConsole.error('Disputes list error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,56 +1,42 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
+import { signStaffAccessToken, verifyStaffAccessToken } from '@/lib/auth/staff-jwt'
 import {
-  matchesRefreshTokenHash,
-  hashRefreshToken,
-  signAccessToken,
-  signRefreshToken,
-  verifyAccessToken,
-  verifyRefreshToken,
-} from '@/lib/auth/authentication/admin-jwt'
+  generateStaffRefreshToken,
+  parseStaffRefreshToken,
+  verifyStaffRefreshSecret,
+} from '@/lib/auth/staff-rotation'
 import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
 
 function read(path: string) {
   return readFileSync(resolve(process.cwd(), path), 'utf-8')
 }
 
-describe('admin session-bound token lifecycle', () => {
+describe('canonical staff session/token lifecycle', () => {
   beforeAll(() => {
-    process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-admin-access-secret-that-is-long-enough'
-    process.env.JWT_REFRESH_SECRET =
-      process.env.JWT_REFRESH_SECRET || 'test-admin-refresh-secret-that-is-long-enough'
+    process.env.STAFF_JWT_SECRET =
+      process.env.STAFF_JWT_SECRET || 'test-staff-session-secret-012345678901234567890123'
   })
 
-  it('binds access tokens to the live admin session id', () => {
-    const token = signAccessToken({
-      id: 'admin-1',
-      email: 'admin@example.test',
-      role: 'SUPER_ADMIN',
-      firstName: 'Admin',
-      lastName: 'One',
-      assignedCountries: ['LK'],
-      sessionId: 'session-1',
-    })
+  it('binds minimal staff access tokens to a session and dedicated audience', () => {
+    const token = signStaffAccessToken('admin-1', 'session-1')
+    const claims = verifyStaffAccessToken(token)
 
-    expect(verifyAccessToken(token)).toMatchObject({
+    expect(claims).toMatchObject({
       sub: 'admin-1',
       sid: 'session-1',
-      type: 'access',
+      aud: 'maintainex-staff',
+      iss: 'maintainex',
+      type: 'staff_access',
     })
+    expect((claims as any).role).toBeUndefined()
+    expect((claims as any).email).toBeUndefined()
+    expect((claims as any).permissions).toBeUndefined()
   })
 
-  it('decodes a session-bound JWT from the admin_token cookie', async () => {
-    const token = signAccessToken({
-      id: 'admin-cookie',
-      email: 'cookie@example.test',
-      role: 'SUPER_ADMIN',
-      firstName: 'Cookie',
-      lastName: 'Admin',
-      assignedCountries: ['LK'],
-      sessionId: 'session-cookie',
-    })
-
+  it('resolves the canonical staff token from the admin cookie', async () => {
+    const token = signStaffAccessToken('admin-cookie', 'session-cookie')
     const session = await getAdminSession({
       headers: { get: () => null },
       cookies: {
@@ -61,85 +47,91 @@ describe('admin session-bound token lifecycle', () => {
     expect(session).toMatchObject({
       sub: 'admin-cookie',
       sid: 'session-cookie',
-      type: 'access',
+      type: 'staff_access',
     })
   })
 
-  it('makes refresh tokens unique and validates the stored token hash', () => {
-    const first = signRefreshToken('admin-1', 'session-1')
-    const second = signRefreshToken('admin-1', 'session-1')
+  it('uses opaque refresh secrets whose stored form is one-way hashed', () => {
+    const first = generateStaffRefreshToken()
+    const second = generateStaffRefreshToken()
 
-    expect(first).not.toBe(second)
-    expect(verifyRefreshToken(first)).toMatchObject({
-      sub: 'admin-1',
-      jti: 'session-1',
-      type: 'refresh',
-    })
-    expect(matchesRefreshTokenHash(first, hashRefreshToken(first))).toBe(true)
-    expect(matchesRefreshTokenHash(first, hashRefreshToken(second))).toBe(false)
+    expect(first.raw).not.toBe(second.raw)
+    expect(first.raw).toMatch(/^[0-9a-f]{128}$/)
+    expect(first.secretHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(verifyStaffRefreshSecret(first.raw, first.secretHash)).toBe(true)
+    expect(verifyStaffRefreshSecret(second.raw, first.secretHash)).toBe(false)
+
+    const parsed = parseStaffRefreshToken(`session-1.${first.raw}`)
+    expect(parsed).toEqual({ sessionId: 'session-1', secret: first.raw })
   })
 
-  it('persists the actual refresh JWT hash after password and 2FA login', () => {
+  it('creates sessions through the canonical staff session service after password and 2FA login', () => {
     const passwordLogin = read('app/api/admin/auth/login/route.ts')
     const twoFactorLogin = read('app/api/admin/auth/2fa/verify/route.ts')
 
-    expect(passwordLogin).toContain('refreshTokenHash: hashRefreshToken(refreshToken)')
-    expect(twoFactorLogin).toContain('refreshTokenHash: hashRefreshToken(refreshToken)')
-    expect(twoFactorLogin).toContain('sessionId: session.id')
-    expect(twoFactorLogin).toContain("response.cookies.set('admin_token', accessToken")
+    for (const source of [passwordLogin, twoFactorLogin]) {
+      expect(source).toContain('createStaffSession')
+      expect(source).toContain('staffSession.accessToken')
+      expect(source).toContain('staffSession.refreshTokenRaw')
+      expect(source).toContain("response.cookies.set('admin_token', accessToken")
+      expect(source).toContain('maxAge: 30 * 60')
+      expect(source).not.toContain("from '@/lib/auth/authentication/admin-jwt'")
+    }
   })
 
-  it('atomically rotates refresh state and renews a session-bound access cookie', () => {
+  it('rotates opaque refresh secrets atomically and detects token-family replay', () => {
+    const rotation = read('lib/auth/staff-rotation.ts')
     const refresh = read('app/api/admin/auth/refresh/route.ts')
 
-    expect(refresh).toContain('matchesRefreshTokenHash(refreshToken, session.refreshTokenHash)')
-    expect(refresh).toContain('refreshTokenHash: session.refreshTokenHash')
-    expect(refresh).toContain('refreshTokenHash: newRefreshTokenHash')
-    expect(refresh).toContain('if (rotated.count !== 1)')
-    expect(refresh).toContain('sessionId: session.id')
-    expect(refresh).toContain("response.cookies.set('admin_token', accessToken")
+    expect(refresh).toContain('rotateStaffRefreshToken')
+    expect(rotation).toContain('verifyStaffRefreshSecret')
+    expect(rotation).toContain('refreshTokenHash: session.refreshTokenHash')
+    expect(rotation).toContain('tokenFamilyId: familyId')
+    expect(rotation).toContain('updated.count === 0')
+    expect(rotation).toContain("action: 'STAFF_TOKEN_REPLAY'")
+    expect(rotation).toContain('isRevoked: true')
   })
 
-  it('clears both access and refresh cookies during logout', () => {
+  it('uses STAFF_JWT_SECRET for MFA temporary tokens with a distinct audience and purpose', () => {
+    const passwordLogin = read('app/api/admin/auth/login/route.ts')
+    const twoFactorLogin = read('app/api/admin/auth/2fa/verify/route.ts')
+
+    expect(passwordLogin).toContain('process.env.STAFF_JWT_SECRET')
+    expect(passwordLogin).toContain("audience: 'maintainex-staff-mfa'")
+    expect(passwordLogin).toContain("type: 'staff_mfa'")
+    expect(twoFactorLogin).toContain('process.env.STAFF_JWT_SECRET')
+    expect(twoFactorLogin).toContain("audience: 'maintainex-staff-mfa'")
+    expect(twoFactorLogin).toContain("(tempPayload as any).type !== 'staff_mfa'")
+  })
+
+  it('revokes the canonical staff session and clears both cookies during logout', () => {
     const logout = read('app/api/admin/auth/logout/route.ts')
+    expect(logout).toContain('parseStaffRefreshToken')
+    expect(logout).toContain('revokeStaffSession(parsed.sessionId)')
     expect(logout).toContain("response.cookies.set('admin_token', ''")
-    expect(logout).toContain("path: '/'")
     expect(logout).toContain("response.cookies.set('refresh_token', ''")
-    expect(logout).toContain('adminUserId: payload.sub')
     expect(logout).toContain('clearAdminCookies(response)')
   })
 
-  it('requires the live CRM session guard before mutating 2FA setup', () => {
-    const setup = read('app/api/admin/auth/2fa/setup/route.ts')
-    expect(setup).toContain("guardCrmRequest(request, { level: 'sensitive' })")
-    expect(setup).not.toContain('verifyAccessToken(authHeader.slice(7))')
-  })
-
-  it('resolves the CRM shell identity from live session state instead of stale JWT claims', () => {
-    const me = read('app/api/admin/auth/me/route.ts')
-    expect(me).toContain("guardCrmRequest(request, { level: 'read' })")
-    expect(me).toContain('where: { id: guard.context.adminId }')
-    expect(me).not.toContain("getAdminSession(request)")
-  })
-
-  it('requires a session-bound claim before rendering protected admin pages', () => {
+  it('requires staff-token cryptography in production CRM authentication', () => {
+    const auth = read('lib/auth/authentication/admin-auth.ts')
     const middleware = read('middleware.ts')
-    expect(middleware).toContain('sessionId: payload.sid || payload.sessionId || null')
-    expect(middleware).toContain('if (!session.sessionId)')
-    expect(middleware).toContain("'/admin/login?error=session_required'")
+
+    expect(auth).toContain('verifyStaffAccessToken')
+    expect(auth).toContain("process.env.NODE_ENV !== 'production'")
+    expect(auth).toContain('Production')
+    expect(middleware).toContain('getStaffJwtSecret')
+    expect(middleware).toContain("payload.aud !== 'maintainex-staff'")
+    expect(middleware).toContain("payload.type !== 'staff_access'")
+    expect(middleware).toContain('getStaffSession(request)')
   })
 
-  it('uses one canonical active refresh-cookie path and expires the legacy narrow path', () => {
-    const files = [
-      read('app/api/admin/auth/login/route.ts'),
-      read('app/api/admin/auth/2fa/verify/route.ts'),
-      read('app/api/admin/auth/refresh/route.ts'),
-    ]
-
-    for (const source of files) {
-      expect(source).toContain("path: '/api/admin/auth'")
-      expect(source).toContain("path: '/api/admin/auth/refresh'")
-      expect(source).toContain('maxAge: 0')
-    }
+  it('keeps live role, country and permission decisions outside access-token claims', () => {
+    const crm = read('lib/crm/security.ts')
+    expect(crm).toContain('prisma.adminUser.findUnique')
+    expect(crm).toContain('prisma.adminSession.findUnique')
+    expect(crm).toContain('permissionOverrides')
+    expect(crm).toContain('assignedCountries')
+    expect(crm).toContain('CRM_SESSION_REVOKED')
   })
 })

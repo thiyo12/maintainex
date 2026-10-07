@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -123,7 +124,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       } : null,
     })
   } catch (error) {
-    console.error('Job get error:', error)
+    secureConsole.error('Job get error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -359,7 +360,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         return NextResponse.json({ error: 'An active in-progress assignment is required' }, { status: 409 })
       }
     }
-    console.error('Job update error:', error)
+    secureConsole.error('Job update error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -393,7 +394,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await prisma.jobPosting.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Job delete error:', error)
+    secureConsole.error('Job delete error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
