@@ -48,8 +48,10 @@ SSH=(ssh -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInter
 RSYNC_SSH="ssh -i $SSH_KEY -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=5"
 
 echo "=== 1/7 Verify production service and safe environment modes ==="
-"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' sh -s" <<'REMOTE'
+"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP='$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP' LEGACY_MFA_BOOTSTRAP_RELEASE_SHA='$LEGACY_MFA_BOOTSTRAP_RELEASE_SHA' sh -s" <<'REMOTE'
 set -eu
+ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP="${ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP:-false}"
+LEGACY_MFA_BOOTSTRAP_RELEASE_SHA="${LEGACY_MFA_BOOTSTRAP_RELEASE_SHA:-}"
 
 docker service inspect "$SERVICE" >/dev/null
 service_env=$(docker service inspect "$SERVICE" --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}')
