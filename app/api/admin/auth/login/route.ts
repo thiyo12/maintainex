@@ -122,20 +122,32 @@ export async function POST(request: NextRequest) {
       adminUser.role === 'SUPER_ADMIN' &&
       (!adminUser.totpEnabled || !adminUser.totpSecret)
     ) {
+      // Password is verified. A super-admin that has never enrolled cannot be
+      // given a CRM session (the CRM guard requires totpEnabled), so issue a
+      // short-lived enrollment-only token instead of dead-ending the owner.
+      // This never becomes an AdminSession, access token or refresh token.
+      const { issueStaffMfaEnrollmentToken } = await import('@/lib/auth/staff-mfa-enrollment')
+      const enrollmentToken = issueStaffMfaEnrollmentToken({
+        adminUserId: adminUser.id,
+        email: adminUser.email,
+      })
+
       await recordLoginAttempt({
         adminUserId: adminUser.id,
         email,
         ipAddress: ip,
         userAgent,
-        success: false,
+        success: true,
         failureReason: 'MFA_ENROLLMENT_REQUIRED',
       })
+
       return NextResponse.json(
         {
-          error: 'Two-factor authentication must be enabled for super-admin accounts before sign-in.',
-          code: 'MFA_ENROLLMENT_REQUIRED',
+          requiresMfaEnrollment: true,
+          enrollmentToken,
+          email: adminUser.email,
         },
-        { status: 403 }
+        { headers: { 'Cache-Control': 'no-store' } }
       )
     }
 
