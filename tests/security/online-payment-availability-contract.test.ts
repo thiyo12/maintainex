@@ -127,6 +127,8 @@ describe('preflight treats intentionally absent PayPal as disabled', () => {
 
   it('keeps strict rules when PayPal is fully configured', () => {
     expect(preflight).toContain("PAYPALMODE='live'")
+    // The outer validation must accept the intentionally-disabled provider mode.
+    expect(preflight).toContain('live | disabled)')
     expect(preflight).toContain("PAYPALMODE='sandbox-smoke-authorized'")
     expect(preflight).toContain('ERROR|PayPal production configuration must explicitly disable sandbox')
   })
