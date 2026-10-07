@@ -1,20 +1,42 @@
+import { useEffect, useState } from 'react'
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Bank, CreditCard, Money, Plus, Wallet } from 'phosphor-react-native'
 import { useRouter } from 'expo-router'
 import { v3 } from '@/theme/v3/tokens'
 import V3PageHeader from '@/components/v3/V3PageHeader'
+import { v2Payments } from '@/api/v2-payments'
 import { V3SectionLabel, V3SettingsCard, V3SettingsRow } from '@/components/v3/V3SettingsUI'
 
 export default function PaymentScreen() {
   const router = useRouter()
+  // Online checkout availability is a server contract. A deployment without a
+  // configured online provider must not advertise a PayPal option.
+  const [onlinePaymentAvailable, setOnlinePaymentAvailable] = useState(true)
+
+  useEffect(() => {
+    v2Payments
+      .availability()
+      .then(res => setOnlinePaymentAvailable(Boolean(res?.onlinePaymentAvailable)))
+      .catch(() => setOnlinePaymentAvailable(false))
+  }, [])
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <V3PageHeader title="Payments" subtitle="Choose how you want to secure eligible bookings." />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <V3SectionLabel>Payment methods</V3SectionLabel>
         <V3SettingsCard>
-          <V3SettingsRow icon={CreditCard} title="PayPal online checkout" subtitle="Pay securely with PayPal for eligible online payments" value="Online" onPress={() => Alert.alert('PayPal', 'PayPal checkout opens when you confirm an eligible booking.')} />
+          <V3SettingsRow
+            icon={CreditCard}
+            title="PayPal online checkout"
+            subtitle={onlinePaymentAvailable ? 'Pay securely with PayPal for eligible online payments' : 'Online checkout is not configured for this deployment'}
+            value={onlinePaymentAvailable ? 'Online' : 'Unavailable'}
+            onPress={() =>
+              onlinePaymentAvailable
+                ? Alert.alert('PayPal', 'PayPal checkout opens when you confirm an eligible booking.')
+                : Alert.alert('Online payment unavailable', 'Online checkout is not configured. Cash payment remains available for eligible bookings.')
+            }
+          />
           <V3SettingsRow icon={Money} title="Cash" subtitle="Available for eligible jobs" value="Eligible" onPress={() => Alert.alert('Cash', 'Cash is shown only when the selected job supports it.')} />
           <V3SettingsRow icon={Wallet} title="MX Wallet" subtitle="Balance, top ups and refunds" onPress={() => router.push('/(customer)/wallet' as any)} />
           <V3SettingsRow icon={Bank} title="Payout / refund destination" subtitle="Manage where eligible refunds are returned" onPress={() => Alert.alert('Refund destination', 'Refund destination management is being connected to the payment provider.')} last />

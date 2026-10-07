@@ -74,13 +74,19 @@ if [ "$(env_value TRUSTED_PROXY_MODE)" != "cloudflare" ]; then
   exit 1
 fi
 
-paypal_configured=''
+# Online payment providers must be either fully configured or intentionally
+# absent. A partial credential set is always a configuration error.
+paypal_present=0
 for name in PAYPAL_CLIENT_ID PAYPAL_CLIENT_SECRET PAYPAL_WEBHOOK_ID; do
   if printf '%s\n' "$env_names" | grep -qx "$name"; then
-    paypal_configured=yes
+    paypal_present=1
   fi
 done
-if [ -n "$paypal_configured" ]; then
+
+if [ "$paypal_present" = "0" ]; then
+  PAYPALMODE='disabled'
+  echo "PAYPALMODE|$PAYPALMODE"
+else
   for name in PAYPAL_CLIENT_ID PAYPAL_CLIENT_SECRET PAYPAL_WEBHOOK_ID; do
     if ! printf '%s\n' "$env_names" | grep -qx "$name"; then
       echo "ERROR|incomplete PayPal production configuration"
@@ -187,7 +193,8 @@ fi
 # legacy release, only when the already-established MFA bootstrap conditions
 # all hold and PayPal sandbox smoke was explicitly authorized.
 legacy_release_bootstrap=''
-if [ "$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP" = "true" ] && [ "$PAYPALMODE" = "sandbox-smoke-authorized" ]; then
+if [ "$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP" = "true" ] \
+  && { [ "$PAYPALMODE" = "sandbox-smoke-authorized" ] || [ "$PAYPALMODE" = "disabled" ]; }; then
   if [ "$SUPER_ADMIN_MFA_MISSING" != "0" ] \
     && [ "$MFA_ACTIVE_SA" = "1" ] \
     && [ "$MFA_ACTIVE_TEST_SEED" = "0" ] \

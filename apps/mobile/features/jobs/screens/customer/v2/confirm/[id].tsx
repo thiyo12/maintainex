@@ -29,10 +29,19 @@ export default function V2ConfirmBookingScreen() {
   const [escrow, setEscrow] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
+  const [onlinePaymentAvailable, setOnlinePaymentAvailable] = useState(true)
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleSlot, setScheduleSlot] = useState('')
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null)
   const [paymentProvider, setPaymentProvider] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Online payment availability is a server contract, not a hardcoded label.
+    v2Payments
+      .availability()
+      .then(res => setOnlinePaymentAvailable(Boolean(res?.onlinePaymentAvailable)))
+      .catch(() => setOnlinePaymentAvailable(false))
+  }, [])
 
   useEffect(() => { loadData() }, [id])
 
@@ -190,20 +199,29 @@ export default function V2ConfirmBookingScreen() {
 
           {escrow?.status === 'PENDING_PAYMENT' && !['REFUND_REQUIRED', 'CHARGEDBACK'].includes(paymentStatus || '') && (
             <>
-              <TouchableOpacity
-                style={[styles.ctaBtn, actionLoading !== '' && { opacity: 0.6 }]}
-                onPress={handleDeposit}
-                disabled={actionLoading !== ''}
-                activeOpacity={0.8}
-              >
-                {actionLoading === 'escrow' ? (
-                  <ActivityIndicator color={CANVAS} />
-                ) : (
-                  <Text style={styles.ctaText}>
-                    {paymentStatus === 'PENDING' ? 'Continue Secure Payment' : 'Pay Securely with PayPal'}
+              {onlinePaymentAvailable ? (
+                <TouchableOpacity
+                  style={[styles.ctaBtn, actionLoading !== '' && { opacity: 0.6 }]}
+                  onPress={handleDeposit}
+                  disabled={actionLoading !== ''}
+                  activeOpacity={0.8}
+                >
+                  {actionLoading === 'escrow' ? (
+                    <ActivityIndicator color={CANVAS} />
+                  ) : (
+                    <Text style={styles.ctaText}>
+                      {paymentStatus === 'PENDING' ? 'Continue Secure Payment' : 'Pay Securely with PayPal'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.ctaBtn, styles.onlineUnavailable, actionLoading !== '' && { opacity: 0.6 }]}>
+                  <Text style={styles.ctaText}>Online payment is not available</Text>
+                  <Text style={styles.onlineUnavailableText}>
+                    Pay securely with cash directly to your provider.
                   </Text>
-                )}
-              </TouchableOpacity>
+                </View>
+              )}
               <TouchableOpacity
                 style={[styles.ctaBtn, styles.cashBtn, actionLoading !== '' && { opacity: 0.6 }]}
                 onPress={handleCash}
@@ -446,6 +464,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fonts.bodyMedium,
     color: CANVAS,
+  },
+  onlineUnavailable: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  onlineUnavailableText: {
+    marginTop: 4,
+    fontSize: 11,
+    fontFamily: fonts.body,
+    color: 'rgba(255,255,255,0.75)',
   },
   cashBtn: {
     backgroundColor: 'transparent',

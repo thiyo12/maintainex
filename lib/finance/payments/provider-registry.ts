@@ -32,6 +32,47 @@ export function isCashPaymentAvailableForMarket(
     currency.trim().toUpperCase() === 'LKR'
 }
 
+/**
+ * Canonical online-payment availability.
+ *
+ * Online checkout is only offered when the provider is actually configured for
+ * this deployment. When the deployment intentionally runs cash-only (for
+ * example an initial production test with no online provider configured), the
+ * contract reports that so clients never present a payment option the backend
+ * would reject with PAYMENT_PROVIDER_NOT_AVAILABLE.
+ *
+ * This is derived from configuration only. It never weakens the fail-closed
+ * server-side enforcement in the payment routes.
+ */
+export function isPayPalConfigured(): boolean {
+  return Boolean(
+    process.env.PAYPAL_CLIENT_ID &&
+    process.env.PAYPAL_CLIENT_SECRET &&
+    process.env.PAYPAL_WEBHOOK_ID
+  )
+}
+
+export type OnlinePaymentAvailability = {
+  onlinePaymentAvailable: boolean
+  provider: 'PAYPAL' | null
+  reason: 'not_configured' | 'available'
+}
+
+export function onlinePaymentAvailability(): OnlinePaymentAvailability {
+  if (!isPayPalConfigured()) {
+    return {
+      onlinePaymentAvailable: false,
+      provider: null,
+      reason: 'not_configured',
+    }
+  }
+  return {
+    onlinePaymentAvailable: true,
+    provider: 'PAYPAL',
+    reason: 'available',
+  }
+}
+
 export function isProviderSelectableForNewCheckout(provider: string): boolean {
   const normalized = provider.trim().toUpperCase()
   return (NEW_ONLINE_CHECKOUT_PROVIDER_CODES as readonly string[]).includes(normalized)
