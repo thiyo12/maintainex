@@ -14,7 +14,9 @@ IMAGE_REPO="${IMAGE_REPO:-maintainex-mx-vcaohy}"
 RELEASE_IMAGE="${IMAGE_REPO}:release-${SHORT_SHA}"
 ALLOW_PAYPAL_SANDBOX_SMOKE="${ALLOW_PAYPAL_SANDBOX_SMOKE:-false}"
 ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP="${ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP:-false}"
-LEGACY_MFA_BOOTSTRAP_RELEASE_SHA="${LEGACY_MFA_BOOTSTRAP_RELEASE_SHA:-7c526b9401cc46b2c115006992e35735038719da}"
+# Comma-separated allowlist of production releases that cannot complete
+# first-time super-admin MFA enrollment on their own.
+PRE_ENROLLMENT_RELEASE_SHAS="${PRE_ENROLLMENT_RELEASE_SHAS:-7c526b9401cc46b2c115006992e35735038719da,d8e3bfafa980f7b4e7710cdafbe213510ddb069e}"
 
 echo "========================================"
 echo " MaintainEX immutable release deployment"
@@ -48,10 +50,10 @@ SSH=(ssh -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInter
 RSYNC_SSH="ssh -i $SSH_KEY -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=5"
 
 echo "=== 1/7 Verify production service and safe environment modes ==="
-"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP='$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP' LEGACY_MFA_BOOTSTRAP_RELEASE_SHA='$LEGACY_MFA_BOOTSTRAP_RELEASE_SHA' sh -s" <<'REMOTE'
+"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP='$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP' PRE_ENROLLMENT_RELEASE_SHAS='$PRE_ENROLLMENT_RELEASE_SHAS' sh -s" <<'REMOTE'
 set -eu
 ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP="${ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP:-false}"
-LEGACY_MFA_BOOTSTRAP_RELEASE_SHA="${LEGACY_MFA_BOOTSTRAP_RELEASE_SHA:-}"
+PRE_ENROLLMENT_RELEASE_SHAS="${PRE_ENROLLMENT_RELEASE_SHAS:-}"
 
 docker service inspect "$SERVICE" >/dev/null
 service_env=$(docker service inspect "$SERVICE" --format '{{range .Spec.TaskTemplate.ContainerSpec.Env}}{{println .}}{{end}}')
@@ -176,7 +178,7 @@ EOF
     [ "$MFA_ACTIVE_TEST_SEED" = "0" ] || bootstrap_ok=0
     [ "$MFA_INACTIVE_TEST_SEED" -ge 18 ] || bootstrap_ok=0
     [ "$MFA_INACTIVE_STAFF_SA" -ge 1 ] || bootstrap_ok=0
-    [ "$deployed_sha" = "$LEGACY_MFA_BOOTSTRAP_RELEASE_SHA" ] || bootstrap_ok=0
+    case ",$PRE_ENROLLMENT_RELEASE_SHAS," in *",$deployed_sha,"*) ;; *) bootstrap_ok=0 ;; esac
     if [ "$bootstrap_ok" != "1" ]; then
       echo "ERROR|initial owner MFA bootstrap conditions not satisfied (activeSA=$MFA_ACTIVE_SA activeTestSeed=$MFA_ACTIVE_TEST_SEED inactiveTestSeed=$MFA_INACTIVE_TEST_SEED inactiveStaff=$MFA_INACTIVE_STAFF_SA deployed=$deployed_sha)" >&2
       exit 1

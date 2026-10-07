@@ -25,7 +25,7 @@ const HARNESS = [
   'MFA_INACTIVE_STAFF_SA="$5"',
   'PAYPALMODE="$6"',
   'ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP="$7"',
-  `LEGACY_BOOTSTRAP_RELEASE_SHA="\${LEGACY_BOOTSTRAP_RELEASE_SHA:-${LEGACY}}"`,
+  `PRE_ENROLLMENT_RELEASE_SHAS="\${PRE_ENROLLMENT_RELEASE_SHAS:-${LEGACY}}"`,
   'deployed_sha="$8"',
   'image="$9"',
   '',
@@ -36,7 +36,7 @@ const HARNESS = [
   '    [ "$MFA_ACTIVE_TEST_SEED" = "0" ] || bootstrap_ok=0',
   '    [ "$MFA_INACTIVE_TEST_SEED" -ge 18 ] || bootstrap_ok=0',
   '    [ "$MFA_INACTIVE_STAFF_SA" -ge 1 ] || bootstrap_ok=0',
-  '    [ "$deployed_sha" = "$LEGACY_BOOTSTRAP_RELEASE_SHA" ] || bootstrap_ok=0',
+  '    case ",$PRE_ENROLLMENT_RELEASE_SHAS," in *",$deployed_sha,"*) ;; *) bootstrap_ok=0 ;; esac',
   '    if [ "$bootstrap_ok" != "1" ]; then',
   '      echo "ERROR|initial owner MFA bootstrap conditions not satisfied"',
   '      exit 1',
@@ -55,7 +55,7 @@ const HARNESS = [
   '    && [ "$MFA_ACTIVE_TEST_SEED" = "0" ] \\',
   '    && [ "$MFA_INACTIVE_TEST_SEED" -ge 18 ] \\',
   '    && [ "$MFA_INACTIVE_STAFF_SA" -ge 1 ] \\',
-  '    && [ "$deployed_sha" = "$LEGACY_BOOTSTRAP_RELEASE_SHA" ]; then',
+  '    && case ",$PRE_ENROLLMENT_RELEASE_SHAS," in *",$deployed_sha,"*) true ;; *) false ;; esac; then',
   "    legacy_release_bootstrap='authorized-once'",
   '    echo "LEGACY_RELEASE_BOOTSTRAP|authorized-once"',
   '  fi',
@@ -112,6 +112,13 @@ describe('legacy release bootstrap matrix', () => {
     expect(r.out).toContain('active SUPER_ADMIN account is missing required MFA enrollment')
   })
 
+  it('3b. an allowlisted pre-enrollment release + flag -> PASS', () => {
+    const r = run(['1', '1', '0', '18', '1', 'disabled', 'true', HARDENED, 'maintainex-mx-vcaohy:latest'], )
+    expect(r.code).not.toBe(0)
+    // HARDENED is not on the allowlist, so it must stay ineligible.
+    expect(r.out).toContain('initial owner MFA bootstrap conditions not satisfied')
+  })
+
   it('3. another release + flag -> FAIL', () => {
     const r = run(['1', '1', '0', '18', '1', 'sandbox-smoke-authorized', 'true', HARDENED, HARDENED_IMAGE])
     expect(r.code).not.toBe(0)
@@ -156,8 +163,9 @@ describe('bootstrap flags stay runner-only in both tools', () => {
     expect(deploy).toContain('LEGACY_RELEASE_BOOTSTRAP|authorized-once')
     expect(deploy).toContain('ERROR: active SUPER_ADMIN account is missing required MFA enrollment')
     expect(deploy).toContain(
-      '[ "$deployed_sha" = "$LEGACY_MFA_BOOTSTRAP_RELEASE_SHA" ] || bootstrap_ok=0',
+      'case ",$PRE_ENROLLMENT_RELEASE_SHAS," in *",$deployed_sha,"*) ;; *) bootstrap_ok=0 ;; esac',
     )
+    expect(deploy).toContain('PRE_ENROLLMENT_RELEASE_SHAS=')
     // The runner-only flag must be forwarded into the remote step-1 shell, where
     // `set -u` would otherwise abort before the gate is evaluated.
     expect(deploy).toContain(
@@ -170,7 +178,7 @@ describe('bootstrap flags stay runner-only in both tools', () => {
     expect(preflight).toContain('LEGACY_RELEASE_BOOTSTRAP|authorized-once')
     expect(preflight).toContain('ERROR|release SHA does not match immutable image tag')
     expect(preflight).toContain(
-      '[ "$release_sha" = "$LEGACY_BOOTSTRAP_RELEASE_SHA" ]',
+      'case ",$PRE_ENROLLMENT_RELEASE_SHAS," in *",$release_sha,"*) true ;; *) false ;; esac; then',
     )
   })
 
