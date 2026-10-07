@@ -52,6 +52,7 @@ const NAVIGATION: NavItem[] = [
   { name: 'App & Web', href: '/admin/platform', icon: FiMonitor, permissions: ['markets:view'] },
   { name: 'Real Estate', href: '/admin/real-estate', icon: FiHome, permissions: ['realestate:view'] },
   { name: 'Staff', href: '/admin/admins', icon: FiUserCheck, permissions: ['staff:view'] },
+  { name: 'My security', href: '/admin/security/mfa', icon: FiShield },
   { name: 'Settings', href: '/admin/settings', icon: FiSettings, permissions: ['settings:view'] },
 ]
 

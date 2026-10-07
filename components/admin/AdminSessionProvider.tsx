@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface AdminUser {
@@ -24,9 +24,14 @@ interface AdminUser {
 interface SessionContextType {
   user: AdminUser | null
   loading: boolean
+  refresh: () => Promise<void>
 }
 
-const SessionContext = createContext<SessionContextType>({ user: null, loading: true })
+const SessionContext = createContext<SessionContextType>({
+  user: null,
+  loading: true,
+  refresh: async () => undefined,
+})
 
 export function useAdminSession() {
   return useContext(SessionContext)
@@ -37,29 +42,30 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
-  useEffect(() => {
-    async function fetchSession() {
-      try {
-        const res = await fetch('/api/admin/auth/me', { credentials: 'include' })
-        if (res.ok) {
-          const data = await res.json()
-          setUser(data.user)
-        } else {
-          setUser(null)
-          router.push('/admin/login')
-        }
-      } catch {
+  const fetchSession = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/auth/me', { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setUser(data.user)
+      } else {
         setUser(null)
         router.push('/admin/login')
-      } finally {
-        setLoading(false)
       }
+    } catch {
+      setUser(null)
+      router.push('/admin/login')
+    } finally {
+      setLoading(false)
     }
-    fetchSession()
   }, [router])
 
+  useEffect(() => {
+    void fetchSession()
+  }, [fetchSession])
+
   return (
-    <SessionContext.Provider value={{ user, loading }}>
+    <SessionContext.Provider value={{ user, loading, refresh: fetchSession }}>
       {children}
     </SessionContext.Provider>
   )

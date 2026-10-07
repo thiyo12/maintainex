@@ -8,6 +8,7 @@ REMOTE_BACKUPS="${REMOTE_BACKUPS:-/root/maintainex-backups}"
 OUTPUT_DIR="${OUTPUT_DIR:-$HOME/maintainex-release}"
 CONFIRM_DB_CREDENTIAL_ROTATED="${CONFIRM_DB_CREDENTIAL_ROTATED:-no}"
 ALLOW_PAYPAL_SANDBOX_SMOKE="${ALLOW_PAYPAL_SANDBOX_SMOKE:-false}"
+ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP="${ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP:-false}"
 
 if [ "$CONFIRM_DB_CREDENTIAL_ROTATED" != "yes" ]; then
   echo "ERROR: database credential rotation must be completed first." >&2
@@ -27,7 +28,7 @@ echo "Service: $SERVICE"
 echo
 
 echo "=== 1/5 Verify service, current health, release identity and safe environment modes ==="
-"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' sh -s" <<'REMOTE' > "$tmp"
+"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP='$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP' sh -s" <<'REMOTE' > "$tmp"
 set -eu
 
 docker service inspect "$SERVICE" >/dev/null
@@ -116,23 +117,55 @@ if [ -n "$payhere_configured" ]; then
 fi
 
 
-SUPER_ADMIN_MFA_MISSING=$(docker exec "$container" node -e '
+MFA_STATE=$(docker exec "$container" node -e '
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
-prisma.adminUser.count({
-  where: {
-    role: "SUPER_ADMIN",
-    isActive: true,
-    deletedAt: null,
-    OR: [{ totpEnabled: false }, { totpSecret: null }],
-  },
-}).then(count => {
-  process.stdout.write(String(count));
+Promise.all([
+  prisma.adminUser.count({
+    where: {
+      role: "SUPER_ADMIN",
+      isActive: true,
+      deletedAt: null,
+      OR: [{ totpEnabled: false }, { totpSecret: null }],
+    },
+  }),
+  prisma.adminUser.count({ where: { role: "SUPER_ADMIN", isActive: true } }),
+  prisma.adminUser.count({ where: { role: "SUPER_ADMIN", isActive: true, email: { endsWith: "@test.com" } } }),
+  prisma.adminUser.count({ where: { role: "SUPER_ADMIN", isActive: false, email: { endsWith: "@test.com" } } }),
+  prisma.adminUser.count({ where: { role: "SUPER_ADMIN", isActive: false, email: { endsWith: "@maintainex.lk" } } }),
+]).then(([missing, activeSuperAdmins, activeTestSeed, inactiveTestSeed, inactiveStaffSuperAdmin]) => {
+  process.stdout.write(
+    [missing, activeSuperAdmins, activeTestSeed, inactiveTestSeed, inactiveStaffSuperAdmin].join("|")
+  );
 }).finally(() => prisma.$disconnect());
 ')
+
+IFS='|' read -r MFA_MISSING MFA_ACTIVE_SA MFA_ACTIVE_TEST_SEED MFA_INACTIVE_TEST_SEED MFA_INACTIVE_STAFF_SA <<EOF
+$MFA_STATE
+EOF
+SUPER_ADMIN_MFA_MISSING=$MFA_MISSING
+
 if [ "$SUPER_ADMIN_MFA_MISSING" != "0" ]; then
-  echo "ERROR|active SUPER_ADMIN account is missing required MFA enrollment"
-  exit 1
+  if [ "$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP" = "true" ]; then
+    # One-time bootstrap only. The currently deployed legacy release cannot
+    # complete enrollment, so the single remaining owner must enroll
+    # immediately after the upgrade. Every condition must hold or fail closed.
+    bootstrap_deployed_sha=$(env_value APP_RELEASE_SHA)
+    bootstrap_ok=1
+    [ "$MFA_ACTIVE_SA" = "1" ] || bootstrap_ok=0
+    [ "$MFA_ACTIVE_TEST_SEED" = "0" ] || bootstrap_ok=0
+    [ "$MFA_INACTIVE_TEST_SEED" -ge 18 ] || bootstrap_ok=0
+    [ "$MFA_INACTIVE_STAFF_SA" -ge 1 ] || bootstrap_ok=0
+    [ "$bootstrap_deployed_sha" = "7c526b9401cc46b2c115006992e35735038719da" ] || bootstrap_ok=0
+    if [ "$bootstrap_ok" != "1" ]; then
+      echo "ERROR|initial owner MFA bootstrap conditions not satisfied (activeSA=$MFA_ACTIVE_SA activeTestSeed=$MFA_ACTIVE_TEST_SEED inactiveTestSeed=$MFA_INACTIVE_TEST_SEED inactiveStaff=$MFA_INACTIVE_STAFF_SA deployed=$bootstrap_deployed_sha)"
+      exit 1
+    fi
+    echo "MFA_BOOTSTRAP|authorized-once-for-single-unenrolled-owner"
+  else
+    echo "ERROR|active SUPER_ADMIN account is missing required MFA enrollment"
+    exit 1
+  fi
 fi
 
 release_sha=$(env_value APP_RELEASE_SHA)
@@ -180,6 +213,8 @@ CURRENT_RELEASE_SHA=$(awk -F'|' '$1=="RELEASE"{print $2}' "$tmp")
 CURRENT_HEALTH=$(awk -F'|' '$1=="HEALTH"{print $2}' "$tmp")
 CURRENT_USER=$(awk -F'|' '$1=="USER"{print $2}' "$tmp")
 PAYPALMODE=$(awk -F'|' '$1=="PAYPALMODE"{print $2}' "$tmp")
+MFA_BOOTSTRAP_MODE=$(awk -F'|' '$1=="MFA_BOOTSTRAP"{print $2}' "$tmp")
+[ -n "$MFA_BOOTSTRAP_MODE" ] || MFA_BOOTSTRAP_MODE=not-authorized
 
 if [ "$PAYPALMODE" = "sandbox-smoke-authorized" ]; then
   echo "PayPal sandbox explicitly authorized for controlled production smoke testing"
@@ -326,6 +361,7 @@ echo "=== 5/5 Write non-secret preflight receipt ==="
   echo "public_health=ok"
   echo "readiness_auth_boundary=ok"
   echo "paypal_mode=$PAYPALMODE"
+  echo "mfa_bootstrap=$MFA_BOOTSTRAP_MODE"
   echo "db_credential_rotation_confirmed=yes"
 } > "$RECEIPT"
 
