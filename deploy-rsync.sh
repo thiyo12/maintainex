@@ -12,6 +12,7 @@ RELEASE_SHA="${RELEASE_SHA:-$(git -C "$SRC" rev-parse HEAD)}"
 SHORT_SHA="${RELEASE_SHA:0:12}"
 IMAGE_REPO="${IMAGE_REPO:-maintainex-mx-vcaohy}"
 RELEASE_IMAGE="${IMAGE_REPO}:release-${SHORT_SHA}"
+ALLOW_PAYPAL_SANDBOX_SMOKE="${ALLOW_PAYPAL_SANDBOX_SMOKE:-false}"
 
 echo "========================================"
 echo " MaintainEX immutable release deployment"
@@ -45,7 +46,7 @@ SSH=(ssh -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInter
 RSYNC_SSH="ssh -i $SSH_KEY -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=5"
 
 echo "=== 1/7 Verify production service and safe environment modes ==="
-"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' sh -s" <<'REMOTE'
+"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' sh -s" <<'REMOTE'
 set -eu
 
 docker service inspect "$SERVICE" >/dev/null
@@ -92,8 +93,12 @@ if [ -n "$paypal_configured" ]; then
     fi
   done
   if [ "$(env_value PAYPAL_SANDBOX)" != "false" ]; then
-    echo "ERROR: PayPal production configuration must explicitly disable sandbox" >&2
-    exit 1
+    if [ "$ALLOW_PAYPAL_SANDBOX_SMOKE" = "true" ]; then
+      echo "WARNING: PayPal sandbox explicitly authorized for controlled production smoke testing" >&2
+    else
+      echo "ERROR: PayPal production configuration must explicitly disable sandbox" >&2
+      exit 1
+    fi
   fi
 fi
 
@@ -115,6 +120,14 @@ if [ -n "$payhere_configured" ]; then
     exit 1
   fi
 fi
+
+service_mounts=$(docker service inspect "$SERVICE" --format '{{range .Spec.TaskTemplate.ContainerSpec.Mounts}}{{println .Source "->" .Target}}{{end}}')
+for want in "/var/lib/maintainex/public-uploads -> /app/public/uploads" "/var/lib/maintainex/private-uploads -> /app/uploads"; do
+  if ! printf '%s\n' "$service_mounts" | grep -qxF "$want"; then
+    echo "ERROR: required production upload mount missing: $want (uploads must not live on container overlay)" >&2
+    exit 1
+  fi
+done
 
 container=$(docker ps --filter "name=$SERVICE" --format '{{.ID}}' | head -1)
 if [ -z "$container" ]; then
