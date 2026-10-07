@@ -9,6 +9,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-$HOME/maintainex-release}"
 CONFIRM_DB_CREDENTIAL_ROTATED="${CONFIRM_DB_CREDENTIAL_ROTATED:-no}"
 ALLOW_PAYPAL_SANDBOX_SMOKE="${ALLOW_PAYPAL_SANDBOX_SMOKE:-false}"
 ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP="${ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP:-false}"
+LEGACY_BOOTSTRAP_RELEASE_SHA="${LEGACY_BOOTSTRAP_RELEASE_SHA:-7c526b9401cc46b2c115006992e35735038719da}"
 
 if [ "$CONFIRM_DB_CREDENTIAL_ROTATED" != "yes" ]; then
   echo "ERROR: database credential rotation must be completed first." >&2
@@ -28,7 +29,7 @@ echo "Service: $SERVICE"
 echo
 
 echo "=== 1/5 Verify service, current health, release identity and safe environment modes ==="
-"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP='$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP' sh -s" <<'REMOTE' > "$tmp"
+"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP='$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP' LEGACY_BOOTSTRAP_RELEASE_SHA='$LEGACY_BOOTSTRAP_RELEASE_SHA' sh -s" <<'REMOTE' > "$tmp"
 set -eu
 
 docker service inspect "$SERVICE" >/dev/null
@@ -175,7 +176,27 @@ if [ -z "$release_sha" ]; then
 elif [ ${#release_sha} -ne 40 ] || ! printf '%s' "$release_sha" | grep -Eq '^[0-9a-f]{40}$'; then
   echo "ERROR|APP_RELEASE_SHA must be a lowercase 40-character git SHA"
   exit 1
-else
+fi
+
+# Legacy release identity bootstrap. The pre-hardening release ran a mutable
+# image tag with no baked release SHA, so these two checks can never pass until
+# a hardened release is deployed. They may be skipped ONCE, only for the exact
+# legacy release, only when the already-established MFA bootstrap conditions
+# all hold and PayPal sandbox smoke was explicitly authorized.
+legacy_release_bootstrap=''
+if [ "$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP" = "true" ] && [ "$PAYPALMODE" = "sandbox-smoke-authorized" ]; then
+  if [ "$SUPER_ADMIN_MFA_MISSING" != "0" ] \
+    && [ "$MFA_ACTIVE_SA" = "1" ] \
+    && [ "$MFA_ACTIVE_TEST_SEED" = "0" ] \
+    && [ "$MFA_INACTIVE_TEST_SEED" -ge 18 ] \
+    && [ "$MFA_INACTIVE_STAFF_SA" -ge 1 ] \
+    && [ "$release_sha" = "$LEGACY_BOOTSTRAP_RELEASE_SHA" ]; then
+    legacy_release_bootstrap='authorized-once'
+    echo "LEGACY_RELEASE_BOOTSTRAP|authorized-once"
+  fi
+fi
+
+if [ -z "$legacy_release_bootstrap" ]; then
   short_release=$(printf '%s' "$release_sha" | cut -c1-12)
   case "$image" in
     *"release-$short_release"*) ;;
@@ -184,16 +205,16 @@ else
       exit 1
       ;;
   esac
-fi
-baked_sha=$(docker exec "$container" cat /app/.release-sha 2>/dev/null | tr -d ' \t\r\n' || true)
-if [ -n "$baked_sha" ]; then
-  if ! printf '%s' "$baked_sha" | grep -Eq '^[0-9a-f]{40}$'; then
-    echo "ERROR|baked release SHA is malformed"
-    exit 1
-  fi
-  if [ "$release_sha" != "$baked_sha" ]; then
-    echo "ERROR|service APP_RELEASE_SHA does not match baked image SHA"
-    exit 1
+  baked_sha=$(docker exec "$container" cat /app/.release-sha 2>/dev/null | tr -d ' \t\r\n' || true)
+  if [ -n "$baked_sha" ]; then
+    if ! printf '%s' "$baked_sha" | grep -Eq '^[0-9a-f]{40}$'; then
+      echo "ERROR|baked release SHA is malformed"
+      exit 1
+    fi
+    if [ "$release_sha" != "$baked_sha" ]; then
+      echo "ERROR|service APP_RELEASE_SHA does not match baked image SHA"
+      exit 1
+    fi
   fi
 fi
 echo "IMAGE|$image"
