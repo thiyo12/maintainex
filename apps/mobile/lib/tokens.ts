@@ -1,5 +1,3 @@
-import { Platform } from 'react-native'
-
 export const spacing = {
   xxs: 2,
   xs: 4,

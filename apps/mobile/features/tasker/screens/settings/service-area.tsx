@@ -2,22 +2,16 @@ import { useState, useEffect, useMemo } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { MapPin } from 'phosphor-react-native'
+import { MapPin, NavigationArrow, CaretLeft, Check } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
-import { fonts } from '@/lib/fonts'
 import * as Location from 'expo-location'
 import { v2TaskerProfile } from '@/api/v2-taskers'
-import { LOCATIONS, getLocationName, type LocationArea } from '@/lib/locations'
+import { LOCATIONS } from '@/lib/locations'
+import { fonts } from '@/lib/fonts'
+import { v3 } from '@/theme/v3/tokens'
 
-const SERVICE_RADII = [
-  { value: 5 },
-  { value: 10 },
-  { value: 15 },
-  { value: 25 },
-  { value: 50 },
-]
+const SERVICE_RADII = [5, 10, 15, 25, 50]
 
 interface FlatArea {
   id: string
@@ -84,22 +78,18 @@ export default function ServiceAreaScreen() {
     }
     try {
       const loc = await Location.getCurrentPositionAsync({})
-      const [place] = await Location.reverseGeocodeAsync({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      })
+      const [place] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude })
       if (place) {
-        const label = `${place.name || place.street || ''}, ${place.city || place.region || ''}`.trim()
-        setDetectedLocation(label)
+        const label = `${place.name || place.street || ''}, ${place.city || place.region || ''}`.replace(/^,\s*|,\s*$/g, '').trim()
+        setDetectedLocation(label || t('serviceArea.detectedLocation'))
       }
     } catch {
+      Alert.alert(t('common.error'), t('errors.generic'))
     }
   }
 
   const toggleArea = (areaId: string) => {
-    setSelectedAreas((prev) =>
-      prev.includes(areaId) ? prev.filter((a) => a !== areaId) : [...prev, areaId]
-    )
+    setSelectedAreas((prev) => prev.includes(areaId) ? prev.filter((a) => a !== areaId) : [...prev, areaId])
   }
 
   const handleSave = async () => {
@@ -109,10 +99,7 @@ export default function ServiceAreaScreen() {
     }
     setSaving(true)
     try {
-      await v2TaskerProfile.update({
-        serviceAreas: selectedAreas,
-        serviceRadius: radius,
-      })
+      await v2TaskerProfile.update({ serviceAreas: selectedAreas, serviceRadius: radius })
       Alert.alert(t('serviceArea.title'), t('serviceArea.saved'), [
         { text: t('common.ok'), onPress: () => router.back() },
       ])
@@ -135,67 +122,74 @@ export default function ServiceAreaScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loading}><ActivityIndicator size="small" color={v3.colors.ink} /></View>
       </SafeAreaView>
     )
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-        <Text style={styles.heading}>{t('serviceArea.title')}</Text>
-        <Text style={styles.subtitle}>{t('serviceArea.subtitle')}</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.backButton} activeOpacity={0.72} onPress={() => router.back()}>
+          <CaretLeft size={17} color={v3.colors.ink} weight="bold" />
+        </TouchableOpacity>
+        <Text style={styles.topTitle}>Service area</Text>
+        <View style={styles.placeholder} />
+      </View>
 
-        {/* Auto-detect */}
-        <TouchableOpacity style={styles.detectBtn} onPress={detectLocation} activeOpacity={0.7}>
-          <Ionicons name="locate-outline" size={20} color={colors.amberDark} />
-          <Text style={styles.detectBtnText}>{t('serviceArea.detectedLocation')}</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <Text style={styles.hero}>Where do you work?</Text>
+        <Text style={styles.subtitle}>Choose the areas where you want to receive MaintainEX job matches.</Text>
+
+        <TouchableOpacity style={styles.locationButton} activeOpacity={0.72} onPress={detectLocation}>
+          <NavigationArrow size={17} color={v3.colors.ink} weight="fill" />
+          <View style={styles.locationCopy}>
+            <Text style={styles.locationTitle}>Use current location</Text>
+            <Text style={styles.locationSub}>{detectedLocation || 'Detect your location to help set the service area.'}</Text>
+          </View>
         </TouchableOpacity>
 
-        {detectedLocation && (
-          <View style={styles.detectedCard}>
-            <MapPin size={16} color={colors.amberDark} weight="fill" />
-            <Text style={styles.detectedText}>{detectedLocation}</Text>
-          </View>
-        )}
-
-        {/* Radius selection */}
-        <Text style={styles.sectionTitle}>{t('serviceArea.radius')}</Text>
+        <Text style={styles.sectionLabel}>TRAVEL RADIUS</Text>
         <View style={styles.radiusRow}>
-          {SERVICE_RADII.map((r) => (
-            <TouchableOpacity
-              key={r.value}
-              style={[styles.radiusBtn, radius === r.value && styles.radiusBtnSelected]}
-              onPress={() => setRadius(r.value)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.radiusBtnText, radius === r.value && styles.radiusBtnTextSelected]}>
-                {t('serviceArea.radiusKm', { n: r.value })}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {SERVICE_RADII.map((value) => {
+            const selected = radius === value
+            return (
+              <TouchableOpacity
+                key={value}
+                style={[styles.radiusButton, selected && styles.radiusButtonSelected]}
+                activeOpacity={0.72}
+                onPress={() => setRadius(value)}
+              >
+                <Text style={[styles.radiusText, selected && styles.radiusTextSelected]}>{value} km</Text>
+              </TouchableOpacity>
+            )
+          })}
         </View>
 
-        {/* Area selection grouped by province */}
-        <Text style={styles.sectionTitle}>{t('serviceArea.currentArea')}</Text>
+        <View style={styles.selectionSummary}>
+          <MapPin size={16} color={v3.colors.info} weight="fill" />
+          <Text style={styles.selectionText}>{selectedAreas.length} {selectedAreas.length === 1 ? 'area' : 'areas'} selected · {radius} km radius</Text>
+        </View>
+
+        <Text style={styles.sectionLabel}>AREAS</Text>
         {Array.from(groupedByState.entries()).map(([stateName, areas]) => (
           <View key={stateName} style={styles.stateGroup}>
             <Text style={styles.stateLabel}>{stateName}</Text>
             {areas.map((area) => {
-              const isSelected = selectedAreas.includes(area.id)
+              const selected = selectedAreas.includes(area.id)
               return (
                 <TouchableOpacity
                   key={area.id}
-                  style={[styles.areaBtn, isSelected && styles.areaBtnSelected]}
+                  style={styles.areaRow}
+                  activeOpacity={0.72}
                   onPress={() => toggleArea(area.id)}
-                  activeOpacity={0.7}
                 >
-                  <View style={[styles.areaRadio, isSelected && styles.areaRadioSelected]}>
-                    {isSelected && <View style={styles.areaRadioInner} />}
+                  <View style={[styles.areaCheck, selected && styles.areaCheckSelected]}>
+                    {selected ? <Check size={12} color={v3.colors.paper} weight="bold" /> : null}
                   </View>
-                  <View style={styles.areaBody}>
-                    <Text style={[styles.areaName, isSelected && styles.areaNameSelected]}>{area.name}</Text>
+                  <View style={styles.areaCopy}>
+                    <Text style={styles.areaName}>{area.name}</Text>
                     <Text style={styles.areaCity}>{area.cityName}</Text>
                   </View>
                 </TouchableOpacity>
@@ -204,74 +198,50 @@ export default function ServiceAreaScreen() {
           </View>
         ))}
 
-        {/* Save */}
         <TouchableOpacity
-          style={[styles.saveBtn, (selectedAreas.length === 0 || saving) && styles.saveBtnDisabled]}
+          style={[styles.saveButton, (selectedAreas.length === 0 || saving) && styles.disabled]}
+          activeOpacity={0.78}
           onPress={handleSave}
           disabled={selectedAreas.length === 0 || saving}
-          activeOpacity={0.7}
         >
-          {saving ? (
-            <ActivityIndicator size="small" color={colors.white} />
-          ) : (
-            <Text style={styles.saveBtnText}>{t('serviceArea.save')}</Text>
-          )}
+          {saving ? <ActivityIndicator size="small" color={v3.colors.paper} /> : <Text style={styles.saveText}>Save service area</Text>}
         </TouchableOpacity>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  scroll: { paddingHorizontal: 24 },
-  heading: { fontSize: 24, fontWeight: '800', color: colors.ink, marginTop: 16 },
-  subtitle: { fontSize: 14, color: colors.muted, marginTop: 4, marginBottom: 20, lineHeight: 20 },
-
-  detectBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.white,
-    padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: colors.amberLight, marginBottom: 12,
-  },
-  detectBtnText: { fontSize: 14, fontWeight: '600', color: colors.amberDark },
-  detectedCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#D1FAE5',
-    padding: 12, borderRadius: 12, marginBottom: 20,
-  },
-  detectedText: { fontSize: 13, color: '#065F46', fontWeight: '600', flex: 1 },
-
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.ink, marginBottom: 10, marginTop: 8 },
-
-  radiusRow: { flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' },
-  radiusBtn: {
-    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border,
-  },
-  radiusBtnSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  radiusBtnText: { fontSize: 13, fontWeight: '600', color: colors.muted },
-  radiusBtnTextSelected: { color: colors.amberDark },
-
+const makeStyles = (_colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  topBar: { height: 70, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  backButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  placeholder: { width: 38, height: 38 },
+  topTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  content: { paddingHorizontal: 18, paddingBottom: 34 },
+  hero: { marginTop: 8, fontSize: 27, lineHeight: 33, fontFamily: fonts.heading, color: v3.colors.ink, letterSpacing: -0.35 },
+  subtitle: { marginTop: 6, maxWidth: 330, fontSize: 10.5, lineHeight: 16, fontFamily: fonts.bodySemiBold, color: v3.colors.textSecondary },
+  locationButton: { minHeight: 72, marginTop: 22, padding: 13, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  locationCopy: { flex: 1, marginLeft: 10 },
+  locationTitle: { fontSize: 10.8, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  locationSub: { marginTop: 3, fontSize: 8.6, lineHeight: 13, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  sectionLabel: { marginTop: 23, marginBottom: 8, fontSize: 9, letterSpacing: 0.6, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  radiusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  radiusButton: { minWidth: 59, height: 38, paddingHorizontal: 12, borderRadius: 12, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  radiusButtonSelected: { backgroundColor: v3.colors.ink, borderColor: v3.colors.ink },
+  radiusText: { fontSize: 9.2, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  radiusTextSelected: { color: v3.colors.paper },
+  selectionSummary: { minHeight: 54, marginTop: 14, paddingHorizontal: 13, borderRadius: 14, backgroundColor: v3.colors.infoSoft, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  selectionText: { fontSize: 9.2, fontFamily: fonts.bodySemiBold, color: '#4F4F4F' },
   stateGroup: { marginBottom: 16 },
-  stateLabel: { fontSize: 12, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 },
-
-  areaBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,
-    padding: 14, borderRadius: 12, marginBottom: 6, borderWidth: 1.5, borderColor: colors.border,
-  },
-  areaBtnSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  areaRadio: {
-    width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center', marginRight: 12,
-  },
-  areaRadioSelected: { borderColor: colors.amber },
-  areaRadioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.amber },
-  areaBody: { flex: 1 },
-  areaName: { fontSize: 14, fontWeight: '600', color: colors.ink },
-  areaNameSelected: { color: colors.amberDark },
-  areaCity: { fontSize: 12, color: colors.muted, marginTop: 2 },
-
-  saveBtn: { backgroundColor: colors.amber, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 20 },
-  saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: colors.ink },
+  stateLabel: { marginBottom: 6, fontSize: 9.2, fontFamily: fonts.headingBold, color: v3.colors.textSecondary },
+  areaRow: { minHeight: 56, marginBottom: 7, paddingHorizontal: 12, borderRadius: 15, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  areaCheck: { width: 21, height: 21, borderRadius: 7, borderWidth: 1.5, borderColor: '#C7C7C7', alignItems: 'center', justifyContent: 'center' },
+  areaCheckSelected: { backgroundColor: v3.colors.ink, borderColor: v3.colors.ink },
+  areaCopy: { flex: 1, marginLeft: 10 },
+  areaName: { fontSize: 10.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  areaCity: { marginTop: 2, fontSize: 8.5, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  saveButton: { height: 54, marginTop: 18, borderRadius: 16, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  disabled: { opacity: 0.45 },
+  saveText: { fontSize: 13, fontFamily: fonts.headingBold, color: v3.colors.paper },
 })

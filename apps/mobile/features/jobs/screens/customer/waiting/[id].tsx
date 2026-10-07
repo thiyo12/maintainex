@@ -1,10 +1,10 @@
-import { Component, useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
-  View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Animated, FlatList,
+  View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Animated,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Hourglass, UsersThree, ChatCircleDots, MapPin, Wallet, CheckCircle, ArrowRight, CaretLeft, Sparkle, Star, WarningCircle } from 'phosphor-react-native'
+import { Hourglass, UsersThree, ChatCircleDots, MapPin, Wallet, ArrowRight, CaretLeft, Sparkle, Star, WarningCircle } from 'phosphor-react-native'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { getAuthToken } from '@/api/token'
@@ -40,21 +40,12 @@ interface JobData {
   escalatedAt?: string | null
 }
 
-function useSlideIn(delay = 0) {
-  const anim = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    Animated.spring(anim, { toValue: 1, friction: 6, tension: 80, delay, useNativeDriver: true }).start()
-  }, [])
-  return anim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] })
-}
-
 export default function WaitingScreen() {
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
   const params = useLocalSearchParams<{ id: string }>()
   const jobId = params.id
-  const slideAnim = useSlideIn()
 
   const [loading, setLoading] = useState(true)
   const [job, setJob] = useState<JobData | null>(null)
@@ -98,9 +89,6 @@ export default function WaitingScreen() {
         responseDeadline: j.responseDeadline || null,
         escalatedAt: j.escalatedAt || null,
       })
-      if (j.status !== 'OPEN') {
-        // Job progressed (accepted/completed) — stop polling, let user act
-      }
     } catch {
       setError('Network error while checking your job.')
     } finally {
@@ -147,10 +135,6 @@ export default function WaitingScreen() {
     return <SafeAreaView style={styles.container}><ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} /></SafeAreaView>
   }
 
-  if (!job) {
-    return <SafeAreaView style={styles.container}><ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} /></SafeAreaView>
-  }
-
   const rotation = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] })
   const pulseOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] })
 
@@ -164,7 +148,7 @@ export default function WaitingScreen() {
         <View style={styles.backBtn} />
       </View>
 
-      <Animated.ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} style={{ transform: [{ translateY: slideAnim }] }}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.statusArea}>
           <View style={styles.radarWrap}>
             <View style={[styles.radarRing, { borderColor: colors.amber }]} />
@@ -233,9 +217,9 @@ export default function WaitingScreen() {
           </View>
         ) : (
           <>
-            {job.quotes.map((q) => (
+            {(job?.quotes || []).map((q) => (
               <TouchableOpacity key={q.id} style={[styles.quoteCard, { backgroundColor: colors.white, borderColor: colors.border }]}
-                onPress={() => router.push(`/(customer)/jobs/v2/quotes/${job.id}?highlight=${q.id}`)}>
+                onPress={() => router.push(`/(customer)/jobs/v2/quotes/${job?.id || jobId}?highlight=${q.id}`)}>
                 <View style={styles.quoteTop}>
                   <View style={styles.quoteAvatar}>
                     <Text style={[styles.quoteAvatarText, { color: colors.amberDark }]}>
@@ -284,7 +268,7 @@ export default function WaitingScreen() {
 
         <View style={styles.actions}>
           <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.amber }]}
-            onPress={() => router.push(`/(customer)/jobs/v2/quotes/${job.id}`)}>
+            onPress={() => router.push(`/(customer)/jobs/v2/quotes/${job?.id || jobId}`)}>
             <ArrowRight size={18} color="#111827" weight="bold" />
             <Text style={styles.primaryBtnTextDark}>{quoteCount > 0 ? `Review ${quoteCount} quote${quoteCount > 1 ? 's' : ''}` : 'Go to quotes'}</Text>
           </TouchableOpacity>
@@ -293,7 +277,7 @@ export default function WaitingScreen() {
             <Text style={[styles.secondaryBtnText, { color: colors.ink }]}>View my jobs</Text>
           </TouchableOpacity>
         </View>
-      </Animated.ScrollView>
+      </ScrollView>
     </SafeAreaView>
   )
 }

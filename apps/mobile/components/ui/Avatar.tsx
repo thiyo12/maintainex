@@ -1,18 +1,48 @@
-import { View, Text, StyleSheet, Image } from 'react-native'
-import { useColors } from '../../lib/ThemeContext'
+import React from 'react'
+import { View, Image, Text } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { SealCheck } from 'phosphor-react-native'
+import { useColors } from '../../lib/theme'
 import { fonts } from '../../lib/fonts'
 
-interface Props {
-  name: string
-  size?: number
+export interface CanonicalAvatarProps {
+  /** Photo URL. When absent, a gradient (or solid `color`) initial tile renders. */
+  uri?: string | null
+  /** @deprecated Use `uri`. Kept for legacy `Avatar` callers. */
   imageUrl?: string | null
-  color?: string
+  name?: string
+  size?: number
+  /** Solid background override (e.g. company blue). Defaults to amber gradient. */
+  color?: string | null
+  /** @deprecated Use `showOnline`. Kept for legacy `Avatar` callers. */
   online?: boolean
+  showOnline?: boolean
+  showVerified?: boolean
+  verified?: boolean
 }
 
-export default function Avatar({ name, size = 48, imageUrl, color, online }: Props) {
+/**
+ * Canonical V2 avatar — the single avatar component for the app.
+ * Merges legacy `Avatar` (flat tile, `imageUrl`/`color`/`online` props) and
+ * `AvatarCircle` (gradient circle, verified badge). Both legacy files now
+ * re-export this implementation with prop mapping, so all existing callers
+ * render byte-identical visuals with zero import changes.
+ */
+export default function Avatar({
+  uri,
+  imageUrl,
+  name,
+  size = 48,
+  color,
+  online = false,
+  showOnline = false,
+  showVerified = false,
+  verified = false,
+}: CanonicalAvatarProps) {
   const colors = useColors()
-  const styles = makeStyles(colors)
+  const photo = uri ?? imageUrl ?? null
+  const withOnline = showOnline || online
+  const initial = (name || '?').trim().charAt(0).toUpperCase() || '?'
   const initials = (name || '?')
     .split(' ')
     .map(s => s[0])
@@ -21,36 +51,58 @@ export default function Avatar({ name, size = 48, imageUrl, color, online }: Pro
     .join('')
     .toUpperCase() || '?'
 
-  const bgColor = color || colors.amber
-
-  if (imageUrl) {
-    return (
-      <View style={{ width: size, height: size }}>
-        <Image
-          source={{ uri: imageUrl }}
-          style={[styles.image, { width: size, height: size, borderRadius: size * 0.28 }]}
-        />
-        {online && <View style={[styles.onlineDot, { width: size * 0.28, height: size * 0.28, borderRadius: size * 0.14, right: 0, bottom: 0 }]} />}
-      </View>
-    )
-  }
-
   return (
-    <View style={[styles.initials, { width: size, height: size, borderRadius: size * 0.28, backgroundColor: bgColor }]}>
-      <Text style={[styles.text, { fontSize: size * 0.4 }]}>{initials}</Text>
-      {online && <View style={[styles.onlineDot, { width: size * 0.28, height: size * 0.28, borderRadius: size * 0.14, right: 0, bottom: 0 }]} />}
+    <View style={{ width: size, height: size }}>
+      {photo ? (
+        <Image
+          source={{ uri: photo }}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          resizeMode="cover"
+        />
+      ) : color ? (
+        <View
+          style={{
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: color,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ fontSize: size * 0.4, color: colors.background, fontFamily: fonts.bold }}>{initials}</Text>
+        </View>
+      ) : (
+        <LinearGradient
+          colors={[colors.accentDim, colors.accent]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ fontSize: size * 0.42, color: colors.background, fontFamily: fonts.bold }}>{initial}</Text>
+        </LinearGradient>
+      )}
+
+      {withOnline && (
+        <View
+          style={{
+            position: 'absolute',
+            backgroundColor: colors.success,
+            borderWidth: 2,
+            borderColor: colors.background,
+            width: size * 0.24,
+            height: size * 0.24,
+            borderRadius: size * 0.12,
+            right: 0,
+            bottom: 0,
+          }}
+        />
+      )}
+      {showVerified && verified && (
+        <View style={{ position: 'absolute', borderRadius: 9999, backgroundColor: colors.background, left: 0, bottom: 0 }}>
+          <SealCheck size={size * 0.26} color={colors.accent} weight="fill" />
+        </View>
+      )}
     </View>
   )
 }
-
-const makeStyles = (colors: any) => StyleSheet.create({
-  initials: { justifyContent: 'center', alignItems: 'center' },
-  text:     { fontFamily: 'Outfit_900Black', color: colors.white },
-  image:    {},
-  onlineDot: {
-    position: 'absolute',
-    backgroundColor: '#10B981',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-})

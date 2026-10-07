@@ -1,159 +1,129 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { useTranslation } from 'react-i18next'
-import { useColors } from '@/lib/ThemeContext'
+import { useRouter } from 'expo-router'
+import { CaretLeft, MagnifyingGlass, MapPin } from 'phosphor-react-native'
 import { v2Jobs } from '@/api/v2-jobs'
-import { V2Job } from '@/api/v2-types'
-import { getAuthToken } from '@/api/token'
-import { getActiveCompanyId } from '@/api/companies'
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
+import type { V2Job } from '@/api/v2-types'
+import { v3 } from '@/theme/v3/tokens'
 
 export default function CompanyBrowseJobsScreen() {
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const { t } = useTranslation()
   const [jobs, setJobs] = useState<V2Job[]>([])
+  const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [filterArea, setFilterArea] = useState<string | null>(null)
-  const [filterCity, setFilterCity] = useState<string | null>(null)
-  const [inited, setInited] = useState(false)
 
-  const loadJobs = useCallback(async (area?: string | null) => {
+  const load = useCallback(async () => {
     try {
-      const companyId = await getActiveCompanyId()
-      if (!companyId) throw new Error('No active company membership')
-      let params = `role=provider&context=company&companyId=${encodeURIComponent(companyId)}`
-      if (area) params += `&areaId=${encodeURIComponent(area)}`
-      const res = await v2Jobs.list(params)
-      setJobs(res.jobs)
-    } catch (e) {
-      console.error('Browse jobs error:', e)
+      const response = await v2Jobs.list('role=provider')
+      setJobs(response.jobs || [])
+    } catch {
+      setJobs([])
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
   }, [])
 
-  useEffect(() => {
-    ;(async () => {
-      try {
-        const token = await getAuthToken()
-        const res = await fetch(`${API_URL}/api/mobile/user/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          const city = data.cityId || null
-          const area = data.areaId || null
-          if (city) setFilterCity(city)
-          if (area) setFilterArea(area)
-          await loadJobs(area)
-        } else {
-          await loadJobs(null)
-        }
-      } catch (e) {
-        console.error('Profile load error:', e)
-        await loadJobs(null)
-      }
-      setInited(true)
-    })()
-  }, [])
+  useEffect(() => { load() }, [load])
 
-  useEffect(() => {
-    if (inited) {
-      setLoading(true)
-      loadJobs(filterArea)
-    }
-  }, [filterArea, inited])
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return jobs
+    return jobs.filter((job) => `${job.title} ${job.description}`.toLowerCase().includes(q))
+  }, [jobs, query])
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('tasker.browse')}</Text>
-        <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterArea(null)} activeOpacity={0.7}>
-          <Ionicons name={filterArea ? 'funnel' : 'funnel-outline'} size={20} color={colors.amber} />
-        </TouchableOpacity>
+        <TouchableOpacity style={styles.back} onPress={() => router.back()}><CaretLeft size={18} color={v3.colors.ink} weight="bold" /></TouchableOpacity>
+        <View style={styles.headerCopy}><Text style={styles.eyebrow}>MATCHED TO YOUR SERVICES</Text><Text style={styles.title}>Opportunities</Text></View>
+        <View style={styles.count}><Text style={styles.countText}>{jobs.length}</Text></View>
       </View>
 
-      <View style={styles.locationBanner}>
-        <Ionicons name="location-outline" size={16} color={colors.amber} />
-        <Text style={styles.locationText}>{t('location.showing')} {filterCity || t('location.all')}</Text>
+      <View style={styles.search}>
+        <MagnifyingGlass size={18} color={v3.colors.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search matched jobs"
+          placeholderTextColor={v3.colors.textPlaceholder}
+        />
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
-      ) : jobs.length === 0 ? (
-        <View style={styles.empty}>
-          <Ionicons name="search-outline" size={48} color={colors.muted} style={{ marginBottom: 16 }} />
-          <Text style={styles.emptyTitle}>{t('jobs.noJobs')}</Text>
-          <Text style={styles.emptySub}>{t('jobs.checkLater')}</Text>
-        </View>
+        <View style={styles.loading}><ActivityIndicator color={v3.colors.ink} /></View>
       ) : (
         <ScrollView
-          style={styles.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadJobs(filterArea) }} tintColor={colors.amber} />}
+          contentContainerStyle={styles.content}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} />}
         >
-          {jobs.map((job) => (
-            <TouchableOpacity
-              key={job.id}
-              style={styles.jobCard}
-              onPress={() => router.push(`/(company)/jobs/v2/quote/${job.id}` as any)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardHeader}>
-                <View style={styles.budgetBadge}>
-                  <Text style={styles.budgetBadgeText}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
-                </View>
-                <Text style={styles.budgetType}>{job.budgetType}</Text>
+          {filtered.length ? filtered.map((job) => (
+            <TouchableOpacity key={job.id} style={styles.card} activeOpacity={0.74} onPress={() => router.push(`/(company)/jobs/v2/quote/${job.id}` as any)}>
+              <View style={styles.cardTop}>
+                <View style={styles.openPill}><Text style={styles.openText}>OPEN</Text></View>
+                <Text style={styles.budget}>{job.budgetAmount ? `LKR ${Number(job.budgetAmount).toLocaleString()}` : 'Quotes requested'}</Text>
               </View>
-              <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-              <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
-              <View style={styles.cardFooter}>
-                <Text style={styles.jobDate}>{t('jobs.posted')} {new Date(job.createdAt).toLocaleDateString()}</Text>
-                <View style={styles.quoteBtn}>
-                  <Text style={styles.quoteBtnText}>{t('quotes.quote')} →</Text>
-                </View>
+              <Text style={styles.jobTitle}>{job.title}</Text>
+              <Text style={styles.description} numberOfLines={2}>{job.description}</Text>
+              <View style={styles.metaRow}>
+                <View style={styles.meta}><MapPin size={13} color={v3.colors.textMuted} /><Text style={styles.metaText}>{job.areaId || job.postalCode || 'Customer location'}</Text></View>
+                <Text style={styles.date}>{new Date(job.createdAt).toLocaleDateString()}</Text>
               </View>
+              <View style={styles.quoteButton}><Text style={styles.quoteButtonText}>Review & send quote</Text></View>
             </TouchableOpacity>
-          ))}
+          )) : (
+            <View style={styles.empty}>
+              <MagnifyingGlass size={30} color={v3.colors.textMuted} />
+              <Text style={styles.emptyTitle}>No matching opportunities</Text>
+              <Text style={styles.emptyText}>Your company only sees jobs that match its services and country. Add services in Company Profile to improve matching.</Text>
+            </View>
+          )}
         </ScrollView>
       )}
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
-  filterBtn: { backgroundColor: colors.white, width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-  locationBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingBottom: 12 },
-  locationText: { fontSize: 13, color: colors.muted, fontWeight: '500' },
-
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.ink, marginBottom: 8 },
-  emptySub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 22 },
-
-  list: { flex: 1, padding: 16, paddingTop: 4 },
-  jobCard: { backgroundColor: colors.white, borderRadius: 16, padding: 18, marginBottom: 12, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  budgetBadge: { backgroundColor: colors.amberBg, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
-  budgetBadgeText: { fontSize: 14, fontWeight: '700', color: colors.amberDark },
-  budgetType: { fontSize: 12, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  jobTitle: { fontSize: 17, fontWeight: '700', color: colors.ink, marginBottom: 6 },
-  jobDesc: { fontSize: 13, color: colors.ink, opacity: 0.6, lineHeight: 20, marginBottom: 14 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  jobDate: { fontSize: 12, color: colors.muted },
-  quoteBtn: { backgroundColor: colors.amber, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 },
-  quoteBtnText: { fontSize: 13, fontWeight: '700', color: colors.ink },
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 12 },
+  back: { width: 38, height: 38, borderRadius: 19, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, marginLeft: 11 },
+  eyebrow: { ...v3.typography.smallBold, color: v3.colors.amberDark, letterSpacing: 0.7 },
+  title: { ...v3.typography.h5, color: v3.colors.ink },
+  count: { minWidth: 38, height: 38, borderRadius: 19, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  countText: { ...v3.typography.bodyBold, color: v3.colors.paper },
+  search: { marginHorizontal: 18, height: 50, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 },
+  searchInput: { flex: 1, marginLeft: 8, color: v3.colors.ink, fontFamily: 'Outfit_500Medium', fontSize: 13 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: { padding: 18, paddingTop: 12, paddingBottom: 34 },
+  card: { backgroundColor: v3.colors.paper, borderRadius: 20, borderWidth: 1, borderColor: v3.colors.line, padding: 16, marginBottom: 10 },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  openPill: { backgroundColor: v3.colors.successSoft, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  openText: { ...v3.typography.smallBold, color: v3.colors.success },
+  budget: { ...v3.typography.bodyBold, color: v3.colors.ink },
+  jobTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 11 },
+  description: { ...v3.typography.caption, color: v3.colors.textSecondary, lineHeight: 17, marginTop: 4 },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
+  metaText: { ...v3.typography.small, color: v3.colors.textMuted },
+  date: { ...v3.typography.small, color: v3.colors.textMuted },
+  quoteButton: { height: 45, borderRadius: 14, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center', marginTop: 13 },
+  quoteButtonText: { ...v3.typography.bodyBold, color: v3.colors.paper },
+  empty: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 70 },
+  emptyTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 12 },
+  emptyText: { ...v3.typography.caption, color: v3.colors.textMuted, textAlign: 'center', lineHeight: 17, marginTop: 5 },
 })

@@ -12,6 +12,7 @@ interface Props {
   scaleTo?: number
   disabled?: boolean
   activeOpacity?: never
+  testID?: string
 }
 
 export default function PressableScale({
@@ -22,6 +23,7 @@ export default function PressableScale({
   pressedStyle,
   scaleTo = 0.96,
   disabled,
+  testID,
 }: Props) {
   const scale = useSharedValue(1)
   const disabledRef = React.useRef(disabled)
@@ -47,6 +49,7 @@ export default function PressableScale({
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       disabled={disabled}
+      testID={testID}
       style={style}
     >
       <Animated.View style={[animatedStyle, pressedStyle]}>{children}</Animated.View>
