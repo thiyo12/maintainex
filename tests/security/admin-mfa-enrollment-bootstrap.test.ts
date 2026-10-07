@@ -79,9 +79,12 @@ describe('Initial owner MFA bootstrap deployment allowance', () => {
     expect(preflight).toContain('[ "$MFA_ACTIVE_TEST_SEED" = "0" ] || bootstrap_ok=0')
     expect(preflight).toContain('[ "$MFA_INACTIVE_TEST_SEED" -ge 18 ] || bootstrap_ok=0')
     expect(preflight).toContain('[ "$MFA_INACTIVE_STAFF_SA" -ge 1 ] || bootstrap_ok=0')
+    // The deployed-release condition is an exact-match allowlist of
+    // pre-enrollment releases; anything else fails closed.
     expect(preflight).toContain(
-      '[ "$bootstrap_deployed_sha" = "7c526b9401cc46b2c115006992e35735038719da" ] || bootstrap_ok=0',
+      'case ",$PRE_ENROLLMENT_RELEASE_SHAS," in *",$bootstrap_deployed_sha,"*) ;; *) bootstrap_ok=0 ;; esac',
     )
+    expect(preflight).toContain('PRE_ENROLLMENT_RELEASE_SHAS=')
     expect(preflight).toContain(
       'ERROR|initial owner MFA bootstrap conditions not satisfied',
     )
