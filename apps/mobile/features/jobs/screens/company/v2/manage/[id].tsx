@@ -77,7 +77,7 @@ export default function CompanyManageJobScreen() {
   )
 
   const accepted = myQuote?.status === 'ACCEPTED'
-  const protectedPayment = ['PROTECTED', 'CASH_CONFIRMED'].includes(job?.escrow?.status)
+  const protectedPayment = !!job && ['PROTECTED', 'CASH_CONFIRMED'].includes(job.escrow?.status)
   const isReadyToTravel = accepted && protectedPayment && progress === 'ACCEPTED'
   const isInProgress = progress === 'IN_PROGRESS'
   const isWaitingCustomer = progress === 'COMPLETION_REQUESTED'
