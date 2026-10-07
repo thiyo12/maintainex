@@ -158,6 +158,12 @@ describe('bootstrap flags stay runner-only in both tools', () => {
     expect(deploy).toContain(
       '[ "$deployed_sha" = "$LEGACY_MFA_BOOTSTRAP_RELEASE_SHA" ] || bootstrap_ok=0',
     )
+    // The runner-only flag must be forwarded into the remote step-1 shell, where
+    // `set -u` would otherwise abort before the gate is evaluated.
+    expect(deploy).toContain(
+      "ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP='$ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP'",
+    )
+    expect(deploy).toContain('ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP="${ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP:-false}"')
   })
 
   it('preflight only skips legacy release identity inside the same bootstrap', () => {
