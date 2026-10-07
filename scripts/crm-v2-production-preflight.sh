@@ -169,7 +169,7 @@ if [ "$SUPER_ADMIN_MFA_MISSING" != "0" ]; then
     [ "$MFA_ACTIVE_TEST_SEED" = "0" ] || bootstrap_ok=0
     [ "$MFA_INACTIVE_TEST_SEED" -ge 18 ] || bootstrap_ok=0
     [ "$MFA_INACTIVE_STAFF_SA" -ge 1 ] || bootstrap_ok=0
-    [ "$bootstrap_deployed_sha" = "7c526b9401cc46b2c115006992e35735038719da" ] || bootstrap_ok=0
+    case ",$PRE_ENROLLMENT_RELEASE_SHAS," in *",$bootstrap_deployed_sha,"*) ;; *) bootstrap_ok=0 ;; esac
     if [ "$bootstrap_ok" != "1" ]; then
       echo "ERROR|initial owner MFA bootstrap conditions not satisfied (activeSA=$MFA_ACTIVE_SA activeTestSeed=$MFA_ACTIVE_TEST_SEED inactiveTestSeed=$MFA_INACTIVE_TEST_SEED inactiveStaff=$MFA_INACTIVE_STAFF_SA deployed=$bootstrap_deployed_sha)"
       exit 1
