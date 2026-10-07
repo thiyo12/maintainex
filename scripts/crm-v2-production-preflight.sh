@@ -7,6 +7,7 @@ SERVICE="${SERVICE:-maintainex-mx-vcaohy}"
 REMOTE_BACKUPS="${REMOTE_BACKUPS:-/root/maintainex-backups}"
 OUTPUT_DIR="${OUTPUT_DIR:-$HOME/maintainex-release}"
 CONFIRM_DB_CREDENTIAL_ROTATED="${CONFIRM_DB_CREDENTIAL_ROTATED:-no}"
+ALLOW_PAYPAL_SANDBOX_SMOKE="${ALLOW_PAYPAL_SANDBOX_SMOKE:-false}"
 
 if [ "$CONFIRM_DB_CREDENTIAL_ROTATED" != "yes" ]; then
   echo "ERROR: database credential rotation must be completed first." >&2
@@ -26,7 +27,7 @@ echo "Service: $SERVICE"
 echo
 
 echo "=== 1/5 Verify service, current health, release identity and safe environment modes ==="
-"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' sh -s" <<'REMOTE' > "$tmp"
+"${SSH[@]}" "$VPS" "SERVICE='$SERVICE' ALLOW_PAYPAL_SANDBOX_SMOKE='$ALLOW_PAYPAL_SANDBOX_SMOKE' sh -s" <<'REMOTE' > "$tmp"
 set -eu
 
 docker service inspect "$SERVICE" >/dev/null
@@ -84,8 +85,14 @@ if [ -n "$paypal_configured" ]; then
     fi
   done
   if [ "$(env_value PAYPAL_SANDBOX)" != "false" ]; then
-    echo "ERROR|PayPal production configuration must explicitly disable sandbox"
-    exit 1
+    if [ "$ALLOW_PAYPAL_SANDBOX_SMOKE" = "true" ]; then
+      echo "PAYPALMODE|sandbox-smoke-authorized"
+    else
+      echo "ERROR|PayPal production configuration must explicitly disable sandbox"
+      exit 1
+    fi
+  else
+    echo "PAYPALMODE|live"
   fi
 fi
 
@@ -172,6 +179,14 @@ CURRENT_IMAGE=$(awk -F'|' '$1=="IMAGE"{print $2}' "$tmp")
 CURRENT_RELEASE_SHA=$(awk -F'|' '$1=="RELEASE"{print $2}' "$tmp")
 CURRENT_HEALTH=$(awk -F'|' '$1=="HEALTH"{print $2}' "$tmp")
 CURRENT_USER=$(awk -F'|' '$1=="USER"{print $2}' "$tmp")
+PAYPALMODE=$(awk -F'|' '$1=="PAYPALMODE"{print $2}' "$tmp")
+
+if [ "$PAYPALMODE" = "sandbox-smoke-authorized" ]; then
+  echo "PayPal sandbox explicitly authorized for controlled production smoke testing"
+elif [ "$PAYPALMODE" != "live" ]; then
+  echo "ERROR: PayPal production mode could not be determined." >&2
+  exit 1
+fi
 
 if [ "$CURRENT_HEALTH" != "healthy" ]; then
   echo "ERROR: current production container is not healthy." >&2
@@ -310,6 +325,7 @@ echo "=== 5/5 Write non-secret preflight receipt ==="
   echo "backup_size_bytes=$BACKUP_SIZE"
   echo "public_health=ok"
   echo "readiness_auth_boundary=ok"
+  echo "paypal_mode=$PAYPALMODE"
   echo "db_credential_rotation_confirmed=yes"
 } > "$RECEIPT"
 
