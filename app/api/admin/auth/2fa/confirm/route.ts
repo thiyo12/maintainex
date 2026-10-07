@@ -3,15 +3,61 @@ import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import { verifyTotp } from '@/lib/admin-2fa'
 import { guardCrmRequest } from '@/lib/crm/security'
+import { getIp } from '@/lib/auth/authorization/admin-rbac'
 
 export async function POST(request: NextRequest) {
   try {
-    const guard = await guardCrmRequest(request, { level: 'sensitive' })
-    if (!guard.ok) return guard.response
-    const security = guard.context
-
     const body = await request.json().catch(() => ({}))
     const totpCode = typeof body?.totpCode === 'string' ? body.totpCode.trim() : ''
+    const enrollmentToken =
+      typeof body?.enrollmentToken === 'string' ? body.enrollmentToken : null
+
+    const { verifyStaffMfaEnrollmentToken, resolveEnrollmentSubject } =
+      await import('@/lib/auth/staff-mfa-enrollment')
+    const enrollmentClaims = verifyStaffMfaEnrollmentToken(enrollmentToken)
+
+    // Subject resolution: the enrollment token identifies the account only for
+    // first enrollment of a super-admin that has never enrolled.
+    let security: {
+      adminId: string
+      email: string
+      role: string
+      sessionId: string
+      ipAddress: string
+      userAgent: string | null
+    }
+
+    if (enrollmentClaims) {
+      const resolved = await resolveEnrollmentSubject(enrollmentClaims.sub)
+      if (!resolved.ok) {
+        return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+      }
+      security = {
+        adminId: resolved.adminUser.id,
+        email: resolved.adminUser.email,
+        role: resolved.adminUser.role,
+        sessionId: '',
+        ipAddress: getIp(request),
+        userAgent: request.headers.get('user-agent'),
+      }
+    } else if (enrollmentToken) {
+      // A token was supplied but did not verify: never fall back to a session.
+      return NextResponse.json(
+        { error: 'Invalid or expired enrollment token' },
+        { status: 401 }
+      )
+    } else {
+      const guard = await guardCrmRequest(request, { level: 'sensitive' })
+      if (!guard.ok) return guard.response
+      security = {
+        adminId: guard.context.adminId,
+        email: guard.context.email,
+        role: guard.context.role,
+        sessionId: guard.context.sessionId,
+        ipAddress: guard.context.ipAddress,
+        userAgent: guard.context.userAgent,
+      }
+    }
 
     if (!/^\d{6}$/.test(totpCode)) {
       return NextResponse.json(
@@ -90,17 +136,19 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      await tx.adminSession.updateMany({
-        where: {
-          adminUserId: security.adminId,
-          id: { not: security.sessionId },
-          isRevoked: false,
-        },
-        data: {
-          isRevoked: true,
-          revokedAt: now,
-        },
-      })
+      if (security.sessionId) {
+        await tx.adminSession.updateMany({
+          where: {
+            adminUserId: security.adminId,
+            id: { not: security.sessionId },
+            isRevoked: false,
+          },
+          data: {
+            isRevoked: true,
+            revokedAt: now,
+          },
+        })
+      }
 
       await tx.securityAudit.create({
         data: {

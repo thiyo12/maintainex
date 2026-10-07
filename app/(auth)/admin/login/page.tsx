@@ -13,9 +13,18 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [step, setStep] = useState<'login' | '2fa'>('login')
+  const [step, setStep] = useState<'login' | '2fa' | 'enroll'>('login')
   const [tempToken, setTempToken] = useState('')
   const [totpCode, setTotpCode] = useState('')
+  // First-time super-admin MFA enrollment. These values live only in this
+  // component's memory: never written to localStorage/sessionStorage/cookies.
+  const [enrollmentToken, setEnrollmentToken] = useState('')
+  const [enrollPassword, setEnrollPassword] = useState('')
+  const [enrollSecret, setEnrollSecret] = useState('')
+  const [enrollUri, setEnrollUri] = useState('')
+  const [enrollQr, setEnrollQr] = useState('')
+  const [enrollCode, setEnrollCode] = useState('')
+  const [enrollRevealKey, setEnrollRevealKey] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,6 +38,17 @@ export default function AdminLogin() {
         body: JSON.stringify({ email, password }),
       })
       const mpData = await mpRes.json()
+
+      if (mpRes.ok && mpData.requiresMfaEnrollment) {
+        // Password verified, but this super-admin has never enrolled. Enter the
+        // enrollment flow in place; do not enter the CRM.
+        setEnrollmentToken(mpData.enrollmentToken)
+        setEnrollPassword(password)
+        setPassword('')
+        setStep('enroll')
+        await startEnrollment(mpData.enrollmentToken, password)
+        return
+      }
 
       if (mpRes.ok && mpData.requires2fa) {
         setTempToken(mpData.tempToken)
@@ -58,6 +78,79 @@ export default function AdminLogin() {
       return
     } catch {
       toast.error('Something went wrong')
+      setIsLoading(false)
+    }
+  }
+
+  const clearEnrollment = () => {
+    setEnrollSecret('')
+    setEnrollUri('')
+    setEnrollQr('')
+    setEnrollCode('')
+    setEnrollPassword('')
+    setEnrollRevealKey(false)
+  }
+
+  const startEnrollment = async (token: string, currentPassword: string) => {
+    try {
+      const res = await fetch('/api/admin/auth/2fa/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enrollmentToken: token, currentPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Could not start two-factor setup.')
+        clearEnrollment()
+        setEnrollmentToken('')
+        setStep('login')
+        return
+      }
+      setEnrollSecret(String(data.secret || ''))
+      setEnrollUri(String(data.uri || ''))
+      const QRCode = (await import('qrcode')).default
+      const canvasData = await QRCode.toDataURL(String(data.uri || ''), {
+        width: 208,
+        margin: 2,
+        errorCorrectionLevel: 'M',
+      })
+      setEnrollQr(canvasData)
+    } catch {
+      toast.error('Could not start two-factor setup.')
+      clearEnrollment()
+      setEnrollmentToken('')
+      setStep('login')
+    }
+  }
+
+  const confirmEnrollment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!/^\d{6}$/.test(enrollCode.trim())) return
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/admin/auth/2fa/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enrollmentToken, totpCode: enrollCode.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Could not confirm two-factor setup.')
+        setIsLoading(false)
+        return
+      }
+
+      // Enrollment complete. Consume everything and require a fresh login so the
+      // normal MFA sign-in path is proven independently of enrollment.
+      clearEnrollment()
+      setEnrollmentToken('')
+      setTotpCode('')
+      setStep('login')
+      setIsLoading(false)
+      toast.success('Two-factor authentication enabled successfully. Please sign in again.')
+      window.location.href = '/admin/login'
+    } catch {
+      toast.error('Could not confirm two-factor setup.')
       setIsLoading(false)
     }
   }
@@ -96,6 +189,86 @@ export default function AdminLogin() {
       toast.error('Something went wrong')
       setIsLoading(false)
     }
+  }
+
+  if (step === 'enroll') {
+    return (
+      <div className="min-h-screen gradient-bg flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <Link href="/" className="inline-flex items-center space-x-2 mb-4">
+              <Image src="/logo.JPEG" alt="Maintainex" width={48} height={48} className="object-contain" />
+              <span className="text-2xl font-bold text-dark-900">
+                Main<span className="text-primary-600">tainex</span>
+              </span>
+            </Link>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-xl p-8">
+            <h2 className="text-xl font-bold text-dark-900 mb-1">Set up two-factor authentication</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Your super-admin account must enable two-factor authentication before you can sign in.
+            </p>
+
+            <ol className="space-y-2 text-sm text-gray-700 mb-6">
+              <li>1. Scan the QR code with your authenticator app.</li>
+              <li>2. Enter the 6-digit code it shows.</li>
+            </ol>
+
+            {enrollQr && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={enrollQr} alt="Authenticator QR code" width={208} height={208} className="mx-auto mb-4" />
+            )}
+
+            {enrollSecret && (
+              <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Manual setup key</p>
+                {enrollRevealKey ? (
+                  <code className="mt-1 block break-all text-xs text-gray-800">{enrollSecret}</code>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEnrollRevealKey(true)}
+                    className="mt-1 text-xs font-semibold text-gray-700 underline"
+                  >
+                    Reveal setup key
+                  </button>
+                )}
+              </div>
+            )}
+
+            <form onSubmit={confirmEnrollment} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  6-digit authenticator code
+                </label>
+                <input
+                  value={enrollCode}
+                  onChange={e => setEnrollCode(e.target.value.replace(/\D/g, ''))}
+                  maxLength={6}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none tracking-widest"
+                  placeholder="000000"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading || !/^\d{6}$/.test(enrollCode.trim())}
+                className="w-full py-3 rounded-lg bg-primary-600 text-white font-semibold hover:bg-primary-700 transition disabled:opacity-50"
+              >
+                {isLoading ? 'Confirming\u2026' : 'Confirm and enable'}
+              </button>
+            </form>
+
+            <p className="mt-4 text-xs text-gray-500">
+              After enabling, you will be asked to sign in again with your authenticator code.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (step === '2fa') {

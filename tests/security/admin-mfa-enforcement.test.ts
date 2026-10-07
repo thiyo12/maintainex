@@ -7,12 +7,28 @@ function source(path: string) {
 }
 
 describe('mandatory super-admin MFA', () => {
-  it('blocks password-only SUPER_ADMIN login when MFA is not enrolled', () => {
+  it('never grants CRM access to an unenrolled SUPER_ADMIN at login', () => {
     const login = source('app/api/admin/auth/login/route.ts')
     expect(login).toContain("adminUser.role === 'SUPER_ADMIN'")
     expect(login).toContain('!adminUser.totpEnabled || !adminUser.totpSecret')
     expect(login).toContain("failureReason: 'MFA_ENROLLMENT_REQUIRED'")
-    expect(login).toContain("code: 'MFA_ENROLLMENT_REQUIRED'")
+
+    // The unenrolled super-admin is routed into first-time enrollment with a
+    // short-lived, enrollment-only token. It must never become a CRM session,
+    // access token or refresh token.
+    expect(login).toContain('requiresMfaEnrollment: true')
+    const branch = login.slice(
+      login.indexOf('requiresMfaEnrollment: true') - 900,
+      login.indexOf('requiresMfaEnrollment: true') + 200
+    )
+    expect(branch).not.toContain('createStaffSession')
+    expect(branch).not.toContain('accessToken')
+    expect(branch).not.toContain('refreshToken')
+    expect(branch).not.toContain('admin_token')
+
+    // Enrollment can only be completed by a real verified authenticator code.
+    const confirm = source('app/api/admin/auth/2fa/confirm/route.ts')
+    expect(confirm).toContain('verifyTotp(totpCode, adminUser.totpSecret)')
   })
 
   it('revokes refresh access if a SUPER_ADMIN loses MFA enrollment', () => {
