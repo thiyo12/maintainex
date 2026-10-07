@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { LOCATIONS } from '@/lib/locations'
@@ -118,7 +119,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM locations GET error:', error)
+    secureConsole.error('CRM locations GET error:', error)
     return NextResponse.json({ error: 'Failed to load locations' }, { status: 500 })
   }
 }
@@ -324,7 +325,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ item: created, countryCode }, { status: 201 })
   } catch (error) {
-    console.error('CRM locations POST error:', error)
+    secureConsole.error('CRM locations POST error:', error)
     return NextResponse.json({ error: 'Failed to create location' }, { status: 500 })
   }
 }
@@ -393,7 +394,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ item: updated, countryCode })
   } catch (error) {
-    console.error('CRM locations PATCH error:', error)
+    secureConsole.error('CRM locations PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update location' }, { status: 500 })
   }
 }

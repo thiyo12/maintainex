@@ -18,6 +18,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -46,13 +49,16 @@ jobs:
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: phase07-ci-nextauth-secret-0123456789
       MARKETPLACE_JWT_SECRET: phase07-ci-marketplace-jwt-secret-01234567890123456789
+      STAFF_JWT_SECRET: phase07-ci-staff-jwt-secret-012345678901234567890
       JWT_SECRET: phase07-ci-jwt-secret-01234567890123456789
       JWT_REFRESH_SECRET: phase07-ci-refresh-secret-0123456789012345
       PASSWORD_PEPPER: phase07-ci-pepper-012345678901234567890
       IDENTITY_CLAIM_PEPPER: phase07-ci-identity-claim-pepper-0123456789012345
       CRON_SECRET: phase07-ci-cron-secret-012345678901234567
       INTERNAL_SYNC_SECRET: phase07-ci-sync-secret-01234567890123456
+      APP_RELEASE_SHA: ${{ github.sha }}
       ALLOW_TEST_OTP: "true"
+      TRUSTED_PROXY_MODE: "cloudflare"
       VPS_INTEGRATION: "true"
       CLOUDINARY_CLOUD_NAME: test
       CLOUDINARY_API_KEY: test
@@ -63,10 +69,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 20
           cache: npm
@@ -79,6 +85,12 @@ jobs:
 
       - name: Install mobile dependencies
         run: npm ci --prefix apps/mobile
+
+      - name: Audit web production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit mobile production dependencies
+        run: node scripts/mobile-production-audit.mjs
 
       - name: Generate Prisma client
         run: npx prisma generate
@@ -164,7 +176,7 @@ jobs:
 
       - name: Upload TypeScript diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: typescript-diagnostics
           path: /tmp/tsc.txt
@@ -182,12 +194,20 @@ jobs:
 
       - name: Upload schema test diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: schema-test-diagnostics
           path: /tmp/schema-tests.txt
           if-no-files-found: ignore
           retention-days: 3
+
+      - name: CRM catalog and mobile taxonomy security gates
+        run: >-
+          npx vitest run
+          tests/security/crm-catalog-v2.test.ts
+          tests/security/mobile-taxonomy-source-v2.test.ts
+          --reporter=verbose
+        if: always()
 
       - name: Migration preservation tests
         run: npx vitest run tests/structural/migration-preservation.test.ts --reporter=verbose 2>&1 | tee /tmp/migration-tests.txt
@@ -195,7 +215,7 @@ jobs:
 
       - name: Upload migration test diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: migration-test-diagnostics
           path: /tmp/migration-tests.txt
@@ -208,7 +228,7 @@ jobs:
 
       - name: Upload invariant test diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: invariant-test-diagnostics
           path: /tmp/invariant-tests.txt
@@ -219,13 +239,18 @@ jobs:
         run: npx vitest run tests/security/negative-security.test.ts --reporter=verbose 2>&1 | tee /tmp/security-tests.txt
         if: always()
 
-      - name: Phase 9 security tests
-        run: npx vitest run tests/security/phase11-offer-redemption.test.ts tests/security/crm-subscriptions-v2.test.ts tests/security/real-estate-public-privacy.test.ts tests/security/crm-real-estate-v2.test.ts tests/security/crm-three-layer-security.test.ts tests/security/crm-selected-market-control-plane.test.ts tests/security/crm-market-config-v2.test.ts tests/security/crm-catalog-v2.test.ts tests/security/crm-promotions-v2.test.ts tests/security/crm-settings-registry-v2.test.ts tests/security/crm-profession-taxonomy-v2.test.ts tests/security/crm-locations-v2.test.ts tests/security/mobile-taxonomy-source-v2.test.ts tests/security/crm-governance-policy.test.ts tests/security/crm-refund-approval-boundary.test.ts tests/security/crm-payment-escrow-control-boundary.test.ts tests/security/payment-provider-control-plane.test.ts tests/security/crm-financial-ledger-boundary.test.ts tests/security/crm-commission-control-boundary.test.ts tests/security/crm-approval-engine.test.ts tests/security/crm-approval-service.test.ts tests/security/crm-step-up-proof.test.ts tests/security/crm-permission-overrides.test.ts tests/security/crm-permission-catalog.test.ts tests/security/crm-staff-session-invalidation.test.ts tests/security/crm-staff-sessions-v2.test.ts tests/security/crm-staff-role-session-hardening.test.ts tests/security/crm-staff-step-up-enforcement.test.ts tests/security/crm-global-search-scope.test.ts tests/security/crm-platform-runtime-v2.test.ts tests/security/admin-staff-password-hashing.test.ts tests/security/admin-login-identity-boundary.test.ts tests/security/admin-session-token-lifecycle.test.ts tests/security/admin-totp-verification.test.ts tests/security/crm-kyc-privacy-boundary.test.ts tests/security/marketplace-lifecycle-bypass-regression.test.ts tests/security/legacy-marketplace-route-security.test.ts tests/security/payment-public-origin.test.ts tests/security/paypal-only-payment-strategy.test.ts --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
+      - name: Blocking security regression suite
+        run: >-
+          npx vitest run
+          tests/security
+          tests/auth/staff-jwt.test.ts
+          tests/auth/staff-auth-verification.test.ts
+          --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
         if: always()
 
       - name: Upload Phase 9 security test diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: phase9-security-test-diagnostics
           path: /tmp/phase9-security-tests.txt
@@ -234,7 +259,7 @@ jobs:
 
       - name: Upload security test diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: security-test-diagnostics
           path: /tmp/security-tests.txt
@@ -268,7 +293,7 @@ jobs:
 
       - name: Upload core app lifecycle diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: core-app-lifecycle-diagnostics
           path: /tmp/core-app-lifecycle-tests.txt
@@ -296,7 +321,7 @@ jobs:
 
       - name: Upload financial flow test diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: financial-flow-test-diagnostics
           path: /tmp/financial-flow-tests.txt
@@ -310,7 +335,7 @@ jobs:
 
       - name: Upload regression test diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: regression-test-diagnostics
           path: /tmp/regression-tests.txt
@@ -341,19 +366,21 @@ jobs:
           grep -q 'pg_dump' deploy-rsync.sh
           grep -q 'gzip -t' deploy-rsync.sh
           grep -q 'PREVIOUS_IMAGE' deploy-rsync.sh
-          grep -q 'docker service update --force --image' deploy-rsync.sh
+          grep -Eq 'docker service update --force .*--image' deploy-rsync.sh
+          grep -q 'APP_RELEASE_SHA' deploy-rsync.sh
           ! grep -q 'sed -i.*provider' deploy-rsync.sh
           ! grep -q 'docker cp.*CONTAINER:/app' deploy-rsync.sh
 
       - name: Production build
         env:
           NODE_ENV: production
+          ALLOW_TEST_OTP: "false"
         run: npm run build 2>&1 | tee /tmp/build-output.txt
         if: always()
 
       - name: Upload build diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: build-diagnostics
           path: /tmp/build-output.txt
@@ -363,6 +390,7 @@ jobs:
       - name: Docker build
         run: |
           docker build \
+            --build-arg GIT_SHA=${GITHUB_SHA} \
             -t maintainex:phase9-ci-${GITHUB_SHA} \
             .
         if: always()
@@ -374,16 +402,20 @@ jobs:
             --add-host=host.docker.internal:host-gateway \
             -p 3199:3000 \
             -e DATABASE_URL="postgresql://maintainex:maintainex_ci@host.docker.internal:5432/maintainex_test_phase07_ci" \
+            -e DIRECT_URL="postgresql://maintainex:maintainex_ci@host.docker.internal:5432/maintainex_test_phase07_ci" \
             -e NEXTAUTH_URL="http://localhost:3199" \
             -e NEXTAUTH_SECRET="phase07-ci-nextauth-secret-0123456789" \
             -e MARKETPLACE_JWT_SECRET="phase07-ci-marketplace-jwt-secret-01234567890123456789" \
+            -e STAFF_JWT_SECRET="phase07-ci-staff-jwt-secret-012345678901234567890" \
             -e JWT_SECRET="phase07-ci-jwt-secret-01234567890123456789" \
             -e JWT_REFRESH_SECRET="phase07-ci-refresh-secret-0123456789012345" \
             -e PASSWORD_PEPPER="phase07-ci-pepper-012345678901234567890" \
             -e IDENTITY_CLAIM_PEPPER="phase07-ci-identity-claim-pepper-0123456789012345" \
             -e CRON_SECRET="phase07-ci-cron-secret-012345678901234567" \
             -e INTERNAL_SYNC_SECRET="phase07-ci-sync-secret-01234567890123456" \
-            -e ALLOW_TEST_OTP="true" \
+            -e APP_RELEASE_SHA="${GITHUB_SHA}" \
+            -e ALLOW_TEST_OTP="false" \
+            -e TRUSTED_PROXY_MODE="cloudflare" \
             -e CLOUDINARY_CLOUD_NAME="test" \
             -e CLOUDINARY_API_KEY="test" \
             -e CLOUDINARY_API_SECRET="test" \
@@ -415,6 +447,7 @@ jobs:
             HTTP_CODE=$(curl -s -o /tmp/health-response.json -w "%{http_code}" http://localhost:3199/api/health 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
               echo "Health check PASSED (HTTP $HTTP_CODE)"
+              node -e 'const fs=require("fs"); const h=JSON.parse(fs.readFileSync("/tmp/health-response.json","utf8")); if(h.release !== process.env.GITHUB_SHA){console.error("release SHA mismatch"); process.exit(1)}; if(h.testOtpMode !== "disabled"){console.error("test OTP unexpectedly enabled"); process.exit(1)}'
               cat /tmp/health-response.json
               exit 0
             fi

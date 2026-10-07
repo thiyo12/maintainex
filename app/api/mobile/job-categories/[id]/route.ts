@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { safeParseJsonArr } from '@/lib/db-utils'
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       })),
     })
   } catch (error) {
-    console.error('Job category get error:', error)
+    secureConsole.error('Job category get error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

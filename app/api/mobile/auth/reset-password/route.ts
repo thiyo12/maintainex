@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { revokeAllUserSessions } from '@/lib/auth/sessions'
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
       message: 'Password reset successful. Please sign in again.',
     })
   } catch (error) {
-    console.error('Mobile reset password error:', error)
+    logger.error('Mobile password reset failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

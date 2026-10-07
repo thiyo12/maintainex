@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -106,7 +107,7 @@ export async function POST(
           : 'Escrow released.',
     })
   } catch (error: any) {
-    console.error('Release escrow error:', error)
+    logger.error('Escrow release failed unexpectedly', { err: error, route: '/api/mobile/v2/jobs/[id]/release-escrow', method: 'POST' })
     const message = error?.message || 'Server error'
     if (message.includes('Only the customer')) return NextResponse.json({ error: message }, { status: 403 })
     if (message.includes('not found') || message.includes('No protected') || message.includes('No releasable')) return NextResponse.json({ error: message }, { status: 404 })

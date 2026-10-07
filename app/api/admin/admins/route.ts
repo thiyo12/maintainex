@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { checkPasswordStrength, hashPassword } from '@/lib/security/password'
@@ -151,7 +152,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM admins GET error:', error)
+    secureConsole.error('CRM admins GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch admins' }, { status: 500 })
   }
 }
@@ -268,7 +269,7 @@ export async function POST(request: NextRequest) {
       },
     }, { status: 201 })
   } catch (error) {
-    console.error('CRM admins POST error:', error)
+    secureConsole.error('CRM admins POST error:', error)
     return NextResponse.json({ error: 'Failed to create admin' }, { status: 500 })
   }
 }
@@ -427,7 +428,7 @@ export async function PATCH(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('CRM admins PATCH error:', error)
+    secureConsole.error('CRM admins PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update admin' }, { status: 500 })
   }
 }
@@ -508,7 +509,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('CRM admins DELETE error:', error)
+    secureConsole.error('CRM admins DELETE error:', error)
     return NextResponse.json({ error: 'Failed to delete admin' }, { status: 500 })
   }
 }

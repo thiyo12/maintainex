@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
         : null,
     })
   } catch (error) {
-    console.error('Company subscription get error:', error)
+    secureConsole.error('Company subscription get error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -156,7 +157,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
       }
     }
-    console.error('Company subscription create error:', error)
+    secureConsole.error('Company subscription create error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -206,7 +207,7 @@ export async function DELETE(request: NextRequest) {
     if (error instanceof Error && error.message === 'COMPANY_PROFILE_NOT_FOUND') {
       return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
     }
-    console.error('Company subscription cancel error:', error)
+    secureConsole.error('Company subscription cancel error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

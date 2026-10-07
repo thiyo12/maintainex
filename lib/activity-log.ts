@@ -2,6 +2,7 @@
 
 import { prisma } from './prisma'
 import { headers } from 'next/headers'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 
 export type ActionType = 
   | 'CREATE'
@@ -38,7 +39,7 @@ interface LogActivityParams {
 export async function logActivity(params: LogActivityParams) {
   try {
     const headersList = await headers()
-    const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown'
+    const ipAddress = getTrustedClientIp(headersList)
     const userAgent = headersList.get('user-agent') || 'unknown'
 
     await prisma.activityLog.create({

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCrmCountryCodes, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
@@ -234,7 +235,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM dashboard API error:', error)
+    secureConsole.error('CRM dashboard API error:', error)
     return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 })
   }
 }

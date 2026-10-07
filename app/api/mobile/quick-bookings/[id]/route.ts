@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       createdAt: booking.createdAt.toISOString(),
     })
   } catch (error) {
-    console.error('Quick booking get error:', error)
+    logger.error('Quick booking read failed unexpectedly', { err: error, route: '/api/mobile/quick-bookings/[id]', method: 'GET' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

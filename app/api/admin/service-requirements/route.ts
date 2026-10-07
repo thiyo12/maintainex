@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM service requirements GET error:', error)
+    secureConsole.error('CRM service requirements GET error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -171,7 +172,7 @@ export async function POST(request: NextRequest) {
     if (message.includes('inactive') || message.includes('does not belong')) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
-    console.error('CRM service requirement POST error:', error)
+    secureConsole.error('CRM service requirement POST error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

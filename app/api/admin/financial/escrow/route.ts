@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -193,7 +194,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM escrow queue GET error:', error)
+    logger.error('CRM escrow queue read failed unexpectedly', { err: error, route: '/api/admin/financial/escrow', method: 'GET' })
     return NextResponse.json({ error: 'Failed to load escrow queue' }, { status: 500 })
   }
 }
@@ -323,7 +324,7 @@ export async function PATCH(request: NextRequest) {
         { status: error.status }
       )
     }
-    console.error('CRM escrow queue PATCH error:', error)
+    logger.error('CRM escrow queue update failed unexpectedly', { err: error, route: '/api/admin/financial/escrow', method: 'PATCH' })
     return NextResponse.json({ error: 'Failed to process escrow action' }, { status: 500 })
   }
 }

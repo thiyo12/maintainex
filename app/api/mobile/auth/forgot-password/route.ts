@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { randomInt } from 'crypto'
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
       try {
         await sendOtpEmail(user.email, code)
       } catch (error) {
-        console.error('Password reset OTP delivery failed:', error)
+        logger.error('Password reset OTP delivery failed', { err: error })
         await prisma.oTP.updateMany({
           where: { id: otpRecord.id, isUsed: false },
           data: { isUsed: true },
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
       message: 'If an account exists with that email, a reset code has been sent.',
     })
   } catch (error) {
-    console.error('Mobile forgot password error:', error)
+    logger.error('Mobile forgot-password request failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

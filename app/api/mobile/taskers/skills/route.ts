@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ categories: categoriesOut })
   } catch (error) {
-    console.error('Tasker skills list error:', error)
+    secureConsole.error('Tasker skills list error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -191,7 +192,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ saved })
   } catch (error) {
-    console.error('Tasker skills save error:', error)
+    secureConsole.error('Tasker skills save error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

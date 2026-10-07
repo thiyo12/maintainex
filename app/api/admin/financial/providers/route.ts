@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -157,7 +158,7 @@ export async function GET(request: NextRequest) {
       canManage: security.isSuperAdmin,
     }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('CRM payment provider GET error:', error)
+    secureConsole.error('CRM payment provider GET error:', error)
     return NextResponse.json({ error: 'Failed to load payment providers' }, { status: 500 })
   }
 }
@@ -324,7 +325,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true, config: serializeConfig(config) }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('CRM payment provider PATCH error:', error)
+    secureConsole.error('CRM payment provider PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update payment provider configuration' }, { status: 500 })
   }
 }

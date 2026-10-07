@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
       total: result.total,
     })
   } catch (error) {
-    console.error('List assignments error:', error)
+    secureConsole.error('List assignments error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,6 +1,7 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import {
   isPublicRealEstateStatus,
   isSafePropertyMediaRef,
@@ -12,7 +13,7 @@ import {
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const session = await getSession(request)
+    const session = await authenticateMarketplaceUser(request)
 
     const listing = await prisma.realEstateListing.findUnique({
       where: { id },
@@ -57,17 +58,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error: any) {
-    console.error('Error fetching property:', error)
+    secureConsole.error('Error fetching property:', error)
     return NextResponse.json({ error: error?.message || 'Failed to fetch property' }, { status: 500 })
   }
 }
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getSession(request)
+    const session = await authenticateMarketplaceUser(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(session)
+    if (blocked) return blocked
 
     const { id } = await params
     const body = await request.json().catch(() => ({}))
@@ -166,17 +169,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({ success: true, data: updated })
   } catch (error: any) {
-    console.error('Error updating property:', error)
+    secureConsole.error('Error updating property:', error)
     return NextResponse.json({ error: error?.message || 'Failed to update property' }, { status: 500 })
   }
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getSession(request)
+    const session = await authenticateMarketplaceUser(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(session)
+    if (blocked) return blocked
 
     const { id } = await params
 
@@ -193,7 +198,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error('Error deleting property:', error)
+    secureConsole.error('Error deleting property:', error)
     return NextResponse.json({ error: error?.message || 'Failed to delete property' }, { status: 500 })
   }
 }

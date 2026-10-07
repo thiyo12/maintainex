@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -68,7 +69,7 @@ export async function POST(
       alreadyConfirmed: result.alreadyConfirmed,
     })
   } catch (error) {
-    console.error('Cash payment selection error:', error)
+    logger.error('Cash payment selection failed unexpectedly', { err: error, route: '/api/mobile/v2/jobs/[id]/cash-payment', method: 'POST' })
     const message = error instanceof Error ? error.message : 'Cash payment selection failed'
 
     if (message === 'CASH_PAYMENT_NOT_AVAILABLE_FOR_MARKET') {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { guardCrmRequest } from '@/lib/crm/security'
 import { uploadToCloudinary } from '@/lib/cloudinary'
+import { validateFileUpload } from '@/lib/security/file-upload'
+import { checkRateLimit } from '@/lib/rate-limit/middleware'
 
 export async function GET() {
   return NextResponse.json({
@@ -11,17 +13,19 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession(request)
+    const guard = await guardCrmRequest(request, {
+      allowedRoles: ['SUPER_ADMIN'],
+      permission: 'catalog:edit',
+      level: 'mutation',
+    })
+    if (!guard.ok) return guard.response
 
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized', reason: 'No valid session' }, { status: 401 })
-    }
-
-    const isSuper = session.role === 'SUPER_ADMIN'
-
-    if (!isSuper) {
-      return NextResponse.json({ error: 'Only Super Admin can upload images' }, { status: 403 })
-    }
+    const rateLimit = await checkRateLimit(request, {
+      policyName: 'UPLOAD',
+      keyPrefix: 'service_asset_upload',
+      identifier: guard.context.adminId,
+    })
+    if (!rateLimit.allowed) return rateLimit.response!
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -42,6 +46,10 @@ export async function POST(request: NextRequest) {
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
+    const validation = validateFileUpload(buffer, file.type === 'image/jpg' ? 'image/jpeg' : file.type, file.name)
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
 
     const result = await uploadToCloudinary(buffer, 'services', file.name)
 

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
 import { getAIPropertyPriceEstimate } from '@/lib/property-pricing'
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: estimate })
   } catch (error: any) {
-    console.error('Error estimating price:', error)
+    secureConsole.error('Error estimating price:', error)
     return NextResponse.json({ error: error?.message || 'Failed to estimate price' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -43,7 +44,7 @@ export async function GET(
     const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: id } })
     return NextResponse.json({ workspace: workspace || null })
   } catch (error) {
-    console.error('Get workspace error:', error)
+    secureConsole.error('Get workspace error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -101,7 +102,7 @@ export async function PATCH(
 
     return NextResponse.json({ workspace: updated })
   } catch (error: any) {
-    console.error('Update workspace error:', error)
+    secureConsole.error('Update workspace error:', error)
     const message = error?.message || 'Server error'
     if (
       message.includes('cannot transition') ||

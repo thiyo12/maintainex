@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { randomInt } from 'crypto'
@@ -15,7 +17,7 @@ function normalizePhone(value: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown'
+    const ip = getTrustedClientIp(request.headers)
     const userAgent = request.headers.get('user-agent') ?? ''
     const { allowed } = checkRateLimit(ip, 5)
     if (!allowed) {
@@ -255,7 +257,7 @@ export async function POST(request: NextRequest) {
       try {
         await sendOtpSms(phone, otp, countryCode)
       } catch (error) {
-        console.error('Registration SMS error:', error)
+        logger.error('Registration SMS delivery failed', { err: error })
         return NextResponse.json({
           error: 'We could not send the SMS verification code. Please try again shortly.',
           code: 'SMS_DELIVERY_FAILED',
@@ -271,7 +273,7 @@ export async function POST(request: NextRequest) {
       testMode: isCertRegistration,
     })
   } catch (error) {
-    console.error('Register error:', error)
+    logger.error('Mobile registration failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

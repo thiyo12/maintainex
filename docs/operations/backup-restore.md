@@ -1,128 +1,121 @@
 # Operations — Backup & Restore
 
-## Backup Architecture
+This runbook describes the current MaintainEX backup and recovery controls. It is the operational source of truth; older plaintext archive instructions are retired.
 
-### Full Backup Script (`backup.sh`)
+## Backup classes
 
-A comprehensive 5-part backup producing a single timestamped `.tar.gz` archive:
+### 1. Full encrypted backup — canonical archival backup
 
-| Part | Source | Method |
-|------|--------|--------|
-| **Source code** | Git HEAD | `git archive --format=tar HEAD` |
-| **Database** | Live PostgreSQL on VPS | derive DB identity from running app `DATABASE_URL`, then `pg_dump` via SSH → PostgreSQL container |
-| **Uploads** | `public/uploads/` | Direct `cp -r` |
-| **Environment files** | `.env.example`, `mobile/.env` | Direct copy |
-| **Docker config** | `Dockerfile`, `nixpacks.toml`, `.dockerignore` | Direct copy |
+Use `backup.sh`.
 
-**Archive**: `$HOME/maintainex-backup/maintainex-full-backup-YYYY-MM-DD.tar.gz`
+The script:
 
-### Database Backup Module (`lib/backup/index.ts`)
+- sets `umask 077`;
+- stages source, the live PostgreSQL dump, uploads, non-secret restore metadata, and Docker/build metadata in a private temporary directory;
+- intentionally excludes production environment secret values;
+- validates the live database identity and table count before accepting the dump;
+- encrypts the archive with AES-256-CBC + PBKDF2;
+- writes only `.tar.gz.enc` output with mode `0600`;
+- verifies decryption and tar integrity before reporting success;
+- removes plaintext staging files on exit.
 
-Programmatic backup with gzip compression:
-
-```typescript
-import { createDatabaseBackup, listBackups, cleanupOldBackups, verifyBackup } from '@/lib/backup'
-```
-
-**Configuration** (environment variables):
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | — | PostgreSQL connection string |
-| `BACKUP_DIR` | `/var/backups/maintainex` | Output directory |
-| `BACKUP_RETENTION_DAYS` | `30` | Days before old backups are deleted |
-
-**Output format**: `maintainex-db-{timestamp}.sql.gz` (gzip-compressed SQL dump)
-
-**Safety**: Database URL masked in logs: `config.databaseUrl.replace(/:[^@]+@/, ':***@')`
-
-## Backup Configuration
-
-### Environment Variables
+Required operator inputs:
 
 ```bash
-DATABASE_URL=postgresql://user:pass@host:5432/dbname
-BACKUP_DIR=/var/backups/maintainex
-BACKUP_RETENTION_DAYS=30
-INTERNAL_SYNC_SECRET=<internal-sync-secret>
+export SERVER=<ssh-user>@<vps-host>
+export SSH_KEY="$HOME/.ssh/id_ed25519"
+export BACKUP_ENCRYPTION_KEY_FILE=/path/to/protected/backup.key
+./backup.sh
 ```
 
-### Retention Policy
+The encryption key must be stored separately from the backup archive. Never commit it, copy it into the archive, or paste it into tickets/chat.
 
-- Default: 30 days
-- Cleanup runs via `cleanupOldBackups()` — deletes files matching `maintainex-db-*.sql.gz` older than `BACKUP_RETENTION_DAYS`
+### 2. Pre-release production snapshot — rollback safety only
 
-## Restore Procedure
+`scripts/crm-v2-production-preflight.sh` creates a short-lived production database snapshot before a release.
 
-### From Full Archive
+The preflight:
+
+- derives the database identity from the running application instead of assuming a database name;
+- verifies migration state and application release identity;
+- writes the remote backup directory as `0700`;
+- creates the snapshot under `umask 077`;
+- writes the snapshot as `0600`;
+- validates gzip integrity, Prisma migration presence, and table count;
+- writes a non-secret preflight receipt as `0600`.
+
+This snapshot is a release-safety control, not a substitute for an encrypted off-host archival backup.
+
+### 3. Programmatic database-only backup
+
+`lib/backup/index.ts` is a private database-only helper.
+
+It invokes `pg_dump` with an argument array rather than shell interpolation, streams output through gzip, creates the backup directory as `0700`, writes files as `0600`, and deletes partial files when a dump fails.
+
+Database-only `.sql.gz` files are sensitive production data. Keep them only on an approved protected host and do not treat them as portable archival backups.
+
+## Prohibited backup practices
+
+Do not:
+
+- copy `.env`, `.env.*`, mobile environment files, private keys, tokens, or credential files into a backup;
+- place a production database dump in world-readable `/tmp`;
+- email or upload an unencrypted production database dump;
+- derive the target database from a hard-coded `postgres/postgres` assumption;
+- restore a production dump over the live production database as a test;
+- disable encryption or file-permission checks to make a backup command pass.
+
+## Encrypted restore drill
+
+A restore drill must use an isolated non-production database and isolated filesystem.
+
+1. Create a private workspace.
 
 ```bash
-# 1. Extract archive
-tar -xzf maintainex-full-backup-YYYY-MM-DD.tar.gz
-cd code/
-
-# 2. Install dependencies
-npm install
-
-# 3. Restore database (on VPS)
-psql -U <db_user> -d <db_name> < database/maintainex-live-dump.sql
-
-# 4. Rebuild and deploy
-npm run build
-# Follow deployment process in REBUILD.md
+umask 077
+RESTORE_DIR="$(mktemp -d)"
 ```
 
-### From Database-Only Backup
+2. Decrypt and extract the full archive without creating a second persistent plaintext archive.
 
 ```bash
-# Decompress
-gunzip maintainex-db-TIMESTAMP.sql.gz
-
-# Restore
-psql -U <db_user> -d <db_name> < maintainex-db-TIMESTAMP.sql
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+  -in /path/to/maintainex-full-backup-YYYY-MM-DD.tar.gz.enc \
+  -pass file:"$BACKUP_ENCRYPTION_KEY_FILE" \
+  | tar -xzf - -C "$RESTORE_DIR"
 ```
 
-### Prisma Migration Status Check
+3. Restore the database dump only into a dedicated restore-test PostgreSQL database. Never point the restore command at production.
 
-After restore, verify migration state:
+4. Verify the restored database contains `_prisma_migrations`, expected core tables, and no unfinished migration rows.
 
-```sql
-SELECT COUNT(*) FROM "_prisma_migrations" WHERE "finished_at" IS NULL;
-```
+5. Point an isolated application instance at the restored database and run:
 
-If pending migrations exist, run:
+- Prisma migration status;
+- application health/readiness checks;
+- authentication smoke tests;
+- job/payment/escrow/wallet/commission integrity tests;
+- the current security and regression suites.
 
-```bash
-npx prisma migrate deploy
-```
+6. Record a non-secret restore receipt containing the backup identifier, restore-test database identifier, verification results, and operator/date. Do not record credentials.
 
-## Verification Steps
+7. Destroy the plaintext restore workspace and restore-test database after the drill unless retention is explicitly required.
 
-### Backup Integrity Check
+## Production recovery
 
-```typescript
-const result = await verifyBackup(filepath)
-// { valid: true, size: 1234567 }
-```
+A real production restore is an incident operation. Before changing production:
 
-Checks:
-1. File size > 100 bytes
-2. Valid gzip magic bytes (`0x1f 0x8b`)
+1. identify the exact deployed release SHA and rollback image;
+2. take a new protected backup if the database is still readable;
+3. confirm the incident scope and the selected recovery point;
+4. restore only from a verified backup;
+5. verify migrations before serving traffic;
+6. reconcile financial state and audit continuity;
+7. rotate credentials if compromise is suspected;
+8. record the recovery evidence in the security incident record.
 
-### Post-Restore Verification
+Do not use `prisma db push`, `migrate reset`, or `--accept-data-loss` on production.
 
-1. **Database connectivity**: `curl http://localhost:3000/api/internal/readiness -H "x-internal-sync: $SECRET"` — expect `database: "ok"`, `migrations: "ok"`
-2. **Application health**: `curl http://localhost:3000/api/health` — expect `{ "status": "healthy" }`
-3. **User count**: `SELECT COUNT(*) FROM "User"` — verify expected user count
-4. **Admin login**: Attempt login at `/admin/login` with known credentials
+## Verification evidence required for Phase 28
 
-## Financial Reconciliation Checklist
-
-After any database restore, verify financial integrity:
-
-1. **Escrow balances**: `SELECT SUM("escrowAmount") FROM "JobEscrow" WHERE "status" IN ('FUNDED', 'PARTIALLY_RELEASED')`
-2. **Wallet balances**: `SELECT SUM(balance) FROM "ProviderWallet"` and `SELECT SUM(balance) FROM "CustomerWallet"`
-3. **Settlement status**: Check no settlements are in inconsistent states
-4. **Transaction log**: Verify `WalletTransaction` entries match wallet balance changes
-5. **Commission calculations**: Spot-check recent `CommissionSettlement` entries
-6. **Audit log continuity**: Verify `AuditLog` entries exist for recent admin actions
+Phase 28 can be marked GREEN only after a real isolated restore drill succeeds. Repository tests prove the backup controls exist; they do not prove a production backup can actually be restored.

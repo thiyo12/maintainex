@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -232,7 +233,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM disputes GET error:', error)
+    secureConsole.error('CRM disputes GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch disputes' }, { status: 500 })
   }
 }
@@ -730,7 +731,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ dispute: updated })
   } catch (error) {
-    console.error('CRM disputes PATCH error:', error)
+    secureConsole.error('CRM disputes PATCH error:', error)
     const message = error instanceof Error ? error.message : 'Failed to update dispute'
     if (
       message.includes('already') ||

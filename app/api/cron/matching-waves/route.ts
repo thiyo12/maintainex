@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
 import { resolveMatchingConfig } from '@/lib/matching'
 import { expireOpportunities, advanceMatchingWave, shouldStopWaves } from '@/lib/matching/waves'
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
       expired,
     })
   } catch (error) {
-    console.error('[CRON] Wave matching error:', error)
+    logger.error('Wave matching cron failed unexpectedly', { err: error })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

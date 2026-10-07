@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -129,7 +130,7 @@ export async function GET(request: NextRequest) {
       })
     )
   } catch (error) {
-    console.error('Conversations list error:', error)
+    logger.error('Conversation list failed unexpectedly', { err: error, route: '/api/mobile/conversations', method: 'GET' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -280,7 +281,7 @@ export async function POST(request: NextRequest) {
       messageSent: Boolean(safeInitialMessage),
     })
   } catch (error) {
-    console.error('Conversation create error:', error)
+    logger.error('Conversation create failed unexpectedly', { err: error, route: '/api/mobile/conversations', method: 'POST' })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

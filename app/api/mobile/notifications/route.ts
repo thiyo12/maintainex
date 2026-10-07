@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
       }))
     )
   } catch (error) {
-    console.error('Notifications list error:', error)
+    secureConsole.error('Notifications list error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Push register error:', error)
+    secureConsole.error('Push register error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -92,7 +93,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, updated: updated.count })
   } catch (error) {
-    console.error('Notifications mark-all error:', error)
+    secureConsole.error('Notifications mark-all error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -110,7 +111,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Push unregister error:', error)
+    secureConsole.error('Push unregister error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
     const professions = await getTaskerProfessions(prisma, tasker.id)
     return NextResponse.json({ professions })
   } catch (error) {
-    console.error('Tasker professions list error:', error)
+    secureConsole.error('Tasker professions list error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ error: 'Profession already assigned' }, { status: 409 })
     }
-    console.error('Tasker profession assign error:', error)
+    secureConsole.error('Tasker profession assign error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -44,7 +45,7 @@ export async function POST(
       )
       await notifyQuoteAccepted(result.job.id, notificationUserId, result.job.title)
     } catch (notificationError) {
-      console.error('Quote accepted notification failed after successful acceptance:', notificationError)
+      secureConsole.error('Quote accepted notification failed after successful acceptance:', notificationError)
     }
 
     const currency = getCurrencyForCountry(result.job.countryCode)
@@ -59,7 +60,7 @@ export async function POST(
       },
     })
   } catch (error: any) {
-    console.error('Select quote error:', error)
+    secureConsole.error('Select quote error:', error)
     const message = error?.message || 'Server error'
     if (message.includes('Only the customer')) return NextResponse.json({ error: message }, { status: 403 })
     if (message.includes('not found')) return NextResponse.json({ error: message }, { status: 404 })

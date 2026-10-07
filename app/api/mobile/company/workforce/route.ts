@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
@@ -202,7 +203,7 @@ export async function PATCH(request: NextRequest) {
         )
       }
     }
-    console.error('Workforce management error:', err)
+    secureConsole.error('Workforce management error:', err)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

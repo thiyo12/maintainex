@@ -1,70 +1,69 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { guardCrmRequest } from '@/lib/crm/security'
+import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
 import { getProvinceFromDistrict } from '@/lib/provinces'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
+    const guard = await guardCrmRequest(request, {
+      permission: 'jobs:view',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const serviceId = searchParams.get('serviceId')
-    const branchId = searchParams.get('branchId')
+    const requestedBranchId = searchParams.get('branchId')
     const district = searchParams.get('district')
 
-    const isSuper = session.role === 'SUPER_ADMIN'
-    const userBranchId = session.branchId
-    const userRegion = session.region
+    const scopeResult = await resolveReportBranchScope(guard.context, requestedBranchId)
+    if (!scopeResult.ok) {
+      return NextResponse.json({ error: scopeResult.error }, { status: scopeResult.status })
+    }
 
     const where: any = serviceId ? { serviceId } : {}
     if (status) where.status = status
+    if (district) where.district = district
 
-    if (userRegion && !isSuper) {
-      where.region = userRegion
+    if (scopeResult.scope.branchIds !== null) {
+      where.branchId = { in: scopeResult.scope.branchIds }
     }
 
-    if (!isSuper && userBranchId) {
-      where.branchId = userBranchId
-    } else if (branchId && isSuper) {
-      where.branchId = branchId
-    }
-
-    // Handle NULL serviceId - fetch all bookings and handle null service gracefully
     const bookingsRaw = await prisma.booking.findMany({
       where,
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     })
-    
-    // Map bookings to include service and branch only if they exist
+
     const bookings = await Promise.all(bookingsRaw.map(async (booking: any) => {
       let service = null
       let branch = null
-      
+
       if (booking.serviceId) {
         service = await prisma.service.findUnique({
           where: { id: booking.serviceId },
-          include: { category: true }
+          include: { category: true },
         })
       }
-      
+
       if (booking.branchId) {
         branch = await prisma.branch.findUnique({
           where: { id: booking.branchId },
-          select: { id: true, name: true, location: true, province: true }
+          select: { id: true, name: true, location: true, province: true },
         })
       }
-      
+
       return { ...booking, budgetMin: booking.budgetMin, budgetMax: booking.budgetMax, service, branch }
     }))
 
     return NextResponse.json(bookings)
   } catch (error) {
-    console.error('Bookings fetch error:', error)
-    return NextResponse.json({ error: 'Failed to fetch bookings', details: String(error) }, { status: 500 })
+    secureConsole.error('Bookings fetch error:', error)
+    return NextResponse.json({ error: 'Failed to fetch bookings' }, { status: 500 })
   }
 }
 
@@ -144,18 +143,29 @@ export async function POST(request: NextRequest) {
       serviceId = generalService?.id || null
     }
 
-    // Find branch by province (region-aware)
-    let branchId = body.branchId
+    // Never trust a client-provided branch across market boundaries.
+    let branchId = typeof body.branchId === 'string' ? body.branchId : null
+    if (branchId) {
+      const requestedBranch = await prisma.branch.findFirst({
+        where: { id: branchId, region, isActive: true },
+        select: { id: true },
+      })
+      if (!requestedBranch) {
+        return NextResponse.json({ error: 'Invalid branch for selected region' }, { status: 400 })
+      }
+      branchId = requestedBranch.id
+    }
+
     if (!branchId && province) {
       const branch = await prisma.branch.findFirst({
-        where: { province, region, isActive: true }
+        where: { province, region, isActive: true },
       })
       branchId = branch?.id || null
     }
-    // Fallback: if no branch found by province, use first active branch in same region
+
     if (!branchId) {
       const anyBranch = await prisma.branch.findFirst({
-        where: { region, isActive: true }
+        where: { region, isActive: true },
       })
       branchId = anyBranch?.id || null
     }

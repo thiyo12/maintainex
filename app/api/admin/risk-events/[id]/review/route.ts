@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
@@ -84,7 +85,7 @@ export async function PATCH(
     if (message.includes('Reason is required')) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
-    console.error('CRM risk event review error:', error)
+    secureConsole.error('CRM risk event review error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

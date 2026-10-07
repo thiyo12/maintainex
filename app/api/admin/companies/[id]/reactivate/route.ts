@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmRequest, assertCrmCountryAllowed } from '@/lib/crm/security'
@@ -67,7 +68,7 @@ export async function POST(
     if (message.includes('not found')) {
       return NextResponse.json({ error: message }, { status: 404 })
     }
-    console.error('CRM company reactivate error:', error)
+    secureConsole.error('CRM company reactivate error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

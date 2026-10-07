@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { guardCrmRequest } from '@/lib/crm/security'
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM profession submissions GET error:', error)
+    secureConsole.error('CRM profession submissions GET error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from '@/lib/shared/observability/logger'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -140,7 +141,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM KYC GET error:', error)
+    logger.error('CRM KYC queue read failed unexpectedly', { err: error, route: '/api/admin/kyc', method: 'GET' })
     return NextResponse.json({ error: 'Failed to fetch KYC submissions' }, { status: 500 })
   }
 }
@@ -242,7 +243,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ document: updated })
   } catch (error) {
-    console.error('CRM KYC PATCH error:', error)
+    logger.error('CRM KYC review failed unexpectedly', { err: error, route: '/api/admin/kyc', method: 'PATCH' })
     return NextResponse.json({ error: 'Failed to update KYC document' }, { status: 500 })
   }
 }

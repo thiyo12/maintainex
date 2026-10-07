@@ -158,9 +158,13 @@ describe('Refresh Token — Malformed Input Tests', () => {
 
   it('parseRefreshToken rejects oversized token', () => {
     const huge = 'x.' + 'a'.repeat(10000)
-    const result = parseRefreshToken(huge)
-    expect(result).not.toBeNull()
-    expect(result!.secret.length).toBe(10000)
+    expect(parseRefreshToken(huge)).toBeNull()
+  })
+
+  it('parseRefreshToken requires the generated 128-character hex secret shape', () => {
+    expect(parseRefreshToken('session-id.' + 'a'.repeat(127))).toBeNull()
+    expect(parseRefreshToken('session-id.' + 'z'.repeat(128))).toBeNull()
+    expect(parseRefreshToken('session.id.' + 'a'.repeat(128))).toBeNull()
   })
 
   it('parseRefreshToken rejects garbage input', () => {

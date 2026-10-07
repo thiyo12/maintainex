@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
@@ -133,7 +134,7 @@ export async function PATCH(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Change order transition error:', error)
+    secureConsole.error('Change order transition error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -176,7 +177,7 @@ export async function GET(
 
     return NextResponse.json({ changeOrder })
   } catch (error) {
-    console.error('Get change order error:', error)
+    secureConsole.error('Get change order error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

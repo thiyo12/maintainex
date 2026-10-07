@@ -1,3 +1,4 @@
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
@@ -140,7 +141,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    console.error('CRM subscriptions GET error:', error)
+    secureConsole.error('CRM subscriptions GET error:', error)
     return NextResponse.json({ error: 'Failed to load subscription controls' }, { status: 500 })
   }
 }
@@ -223,7 +224,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ plan: planDto(plan) }, { status: 201 })
   } catch (error) {
-    console.error('CRM subscriptions POST error:', error)
+    secureConsole.error('CRM subscriptions POST error:', error)
     return NextResponse.json({ error: 'Failed to create subscription plan' }, { status: 500 })
   }
 }
@@ -283,7 +284,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ plan: planDto(updated) })
   } catch (error) {
-    console.error('CRM subscriptions PATCH error:', error)
+    secureConsole.error('CRM subscriptions PATCH error:', error)
     return NextResponse.json({ error: 'Failed to update subscription plan' }, { status: 500 })
   }
 }

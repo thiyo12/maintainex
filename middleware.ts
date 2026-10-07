@@ -1,12 +1,28 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getInMemoryRateLimit } from '@/lib/shared/rate-limit/ip-fixed-window'
-import { ADMIN_ROLES } from '@/lib/auth/rbac/permissions'
+import { getTrustedClientIp } from '@/lib/security/client-ip'
 
-function getJwtSecret(): string {
+function getLegacyJwtSecret(): string {
   const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
   if (!secret) {
     throw new Error('JWT_SECRET environment variable is required')
+  }
+  return secret
+}
+
+function getMarketplaceJwtSecret(): string {
+  const secret = process.env.MARKETPLACE_JWT_SECRET
+  if (!secret) {
+    throw new Error('MARKETPLACE_JWT_SECRET environment variable is required')
+  }
+  return secret
+}
+
+function getStaffJwtSecret(): string {
+  const secret = process.env.STAFF_JWT_SECRET
+  if (!secret) {
+    throw new Error('STAFF_JWT_SECRET environment variable is required')
   }
   return secret
 }
@@ -58,13 +74,18 @@ function b64UrlDecode(str: string): string {
   return new TextDecoder().decode(new Uint8Array(out))
 }
 
-async function verifyJwtSignature(headerB64: string, payloadB64: string, signatureB64: string): Promise<boolean> {
+async function verifyJwtSignature(
+  headerB64: string,
+  payloadB64: string,
+  signatureB64: string,
+  secret: string,
+): Promise<boolean> {
   try {
     const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`)
     const signature = Uint8Array.from(atob(signatureB64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
     const key = await crypto.subtle.importKey(
       'raw',
-      new TextEncoder().encode(getJwtSecret()),
+      new TextEncoder().encode(secret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['verify']
@@ -75,12 +96,17 @@ async function verifyJwtSignature(headerB64: string, payloadB64: string, signatu
   }
 }
 
-async function verifySimpleToken(token: string): Promise<any> {
+async function verifyLegacyToken(token: string): Promise<any> {
   try {
     const parts = token.split('.')
     if (parts.length === 3) {
       const [headerB64, payloadB64, signatureB64] = parts
-      const signatureValid = await verifyJwtSignature(headerB64, payloadB64, signatureB64)
+      const signatureValid = await verifyJwtSignature(
+        headerB64,
+        payloadB64,
+        signatureB64,
+        getLegacyJwtSecret(),
+      )
       if (!signatureValid) return null
       const payload = JSON.parse(b64UrlDecode(payloadB64))
       if (payload.exp && Date.now() / 1000 > payload.exp) return null
@@ -99,7 +125,7 @@ async function verifySimpleToken(token: string): Promise<any> {
     }
     const [encoded, legacySig] = parts
     if (!encoded) return null
-    const expectedSig = Buffer.from(getJwtSecret() + encoded).toString('base64').slice(0, 32)
+    const expectedSig = Buffer.from(getLegacyJwtSecret() + encoded).toString('base64').slice(0, 32)
     if (legacySig !== expectedSig) return null
     const payload = JSON.parse(b64UrlDecode(encoded))
     const maxAge = 30 * 24 * 60 * 60 * 1000
@@ -110,42 +136,136 @@ async function verifySimpleToken(token: string): Promise<any> {
   }
 }
 
+async function verifyMarketplaceToken(token: string): Promise<{ id: string; sessionId: string } | null> {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const [headerB64, payloadB64, signatureB64] = parts
+    const signatureValid = await verifyJwtSignature(
+      headerB64,
+      payloadB64,
+      signatureB64,
+      getMarketplaceJwtSecret(),
+    )
+    if (!signatureValid) return null
+
+    const payload = JSON.parse(b64UrlDecode(payloadB64))
+    if (payload.exp && Date.now() / 1000 > payload.exp) return null
+    if (payload.aud !== 'maintainex-marketplace') return null
+    if (payload.iss !== 'maintainex') return null
+    if (payload.type !== 'marketplace_access') return null
+    if (typeof payload.sub !== 'string' || !payload.sub) return null
+    if (typeof payload.sid !== 'string' || !payload.sid) return null
+
+    return { id: payload.sub, sessionId: payload.sid }
+  } catch {
+    return null
+  }
+}
+
+async function verifyStaffToken(token: string): Promise<{ id: string; sessionId: string } | null> {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const [headerB64, payloadB64, signatureB64] = parts
+    const signatureValid = await verifyJwtSignature(
+      headerB64,
+      payloadB64,
+      signatureB64,
+      getStaffJwtSecret(),
+    )
+    if (!signatureValid) return null
+
+    const payload = JSON.parse(b64UrlDecode(payloadB64))
+    if (payload.exp && Date.now() / 1000 > payload.exp) return null
+    if (payload.aud !== 'maintainex-staff') return null
+    if (payload.iss !== 'maintainex') return null
+    if (payload.type !== 'staff_access') return null
+    if (typeof payload.sub !== 'string' || !payload.sub) return null
+    if (typeof payload.sid !== 'string' || !payload.sid) return null
+
+    return { id: payload.sub, sessionId: payload.sid }
+  } catch {
+    return null
+  }
+}
+
+async function getStaffSession(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    return verifyStaffToken(authHeader.slice(7))
+  }
+
+  const token = request.cookies.get('admin_token')?.value
+  if (!token) return null
+  return verifyStaffToken(token)
+}
+
 async function getSession(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7)
-    const payload = await verifySimpleToken(token)
-    if (payload && payload.id && payload.email && payload.role) {
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7)
+
+    const marketplace = await verifyMarketplaceToken(token)
+    if (marketplace) {
+      return {
+        id: marketplace.id,
+        sessionId: marketplace.sessionId,
+        authType: 'MARKETPLACE' as const,
+      }
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      const payload = await verifyLegacyToken(token)
+      if (payload?.id) {
+        return {
+          id: payload.id,
+          email: payload.email || null,
+          role: payload.role || null,
+          branchId: payload.branchId || null,
+          province: payload.province || null,
+          region: payload.region || null,
+          name: payload.name || null,
+          canEditServices: payload.canEditServices || false,
+          authType: 'LEGACY' as const,
+          sessionId: payload.sessionId || payload.sid || null,
+        }
+      }
+    }
+    return null
+  }
+
+  const token = request.cookies.get('admin_token')?.value
+  if (!token) return null
+
+  const staff = await verifyStaffToken(token)
+  if (staff) {
+    return {
+      id: staff.id,
+      sessionId: staff.sessionId,
+      authType: 'STAFF' as const,
+    }
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    const payload = await verifyLegacyToken(token)
+    if (payload?.id) {
       return {
         id: payload.id,
-        email: payload.email,
-        role: payload.role,
+        email: payload.email || null,
+        role: payload.role || null,
         branchId: payload.branchId || null,
         province: payload.province || null,
         region: payload.region || null,
         name: payload.name || null,
         canEditServices: payload.canEditServices || false,
-        authType: payload.authType || 'admin',
-        sessionId: payload.sessionId || null,
+        authType: 'LEGACY' as const,
+        sessionId: payload.sessionId || payload.sid || null,
       }
     }
   }
-  const token = request.cookies.get('admin_token')?.value
-  if (!token) return null
-  const payload = await verifySimpleToken(token)
-  if (!payload) return null
-  return {
-    id: payload.id,
-    email: payload.email,
-    role: payload.role,
-    branchId: payload.branchId,
-    province: payload.province || null,
-    region: payload.region || null,
-    name: payload.name,
-    canEditServices: payload.canEditServices || false,
-    authType: payload.authType || 'admin',
-    sessionId: payload.sessionId || payload.sid || null,
-  }
+
+  return null
 }
 
 const IP_BLOCKLIST = new Set<string>()
@@ -269,17 +389,15 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(response)
   }
 
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
-             request.headers.get('x-real-ip') ||
-             'unknown'
+  const ip = getTrustedClientIp(request.headers)
 
   await syncIPBlocklist(request)
 
   if (isIpBlocked(ip)) {
-    return applyRequestId(new NextResponse(
+    return applySecurityHeaders(applyRequestId(new NextResponse(
       JSON.stringify({ error: 'Access denied', code: 'IP_BLOCKED' }),
       { status: 403, headers: { 'Content-Type': 'application/json' } }
-    ), requestId)
+    ), requestId))
   }
 
   const isLoginRoute = pathname.startsWith('/api/admin/auth')
@@ -287,7 +405,7 @@ export async function middleware(request: NextRequest) {
   const rateLimit = getInMemoryRateLimit(ip, rateLimitType)
 
   if (rateLimit.limited) {
-    return applyRequestId(new NextResponse(
+    return applySecurityHeaders(applyRequestId(new NextResponse(
       JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }),
       {
         status: 429,
@@ -298,7 +416,7 @@ export async function middleware(request: NextRequest) {
           'X-RateLimit-Reset': Math.floor(rateLimit.resetAt.getTime() / 1000).toString(),
         },
       }
-    ), requestId)
+    ), requestId))
   }
 
   let response: NextResponse
@@ -338,10 +456,10 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/api/seed/')) {
     if (process.env.NODE_ENV === 'production') {
-      return applyRequestId(new NextResponse(
+      return applySecurityHeaders(applyRequestId(new NextResponse(
         JSON.stringify({ error: 'Not available in production' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
-      ), requestId)
+      ), requestId))
     }
     response = NextResponse.next()
     applyRequestId(response, requestId)
@@ -350,13 +468,13 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/setup') || pathname.startsWith('/api/industries/init')) {
     if (process.env.NODE_ENV === 'production') {
-      return applyRequestId(new NextResponse(
+      return applySecurityHeaders(applyRequestId(new NextResponse(
         JSON.stringify({ error: 'Not available in production' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
-      ), requestId)
+      ), requestId))
     }
     const session = await getSession(request)
-    if (!session || session.role !== 'SUPER_ADMIN') {
+    if (!session || !('role' in session) || session.role !== 'SUPER_ADMIN') {
       const loginUrl = new URL('/admin/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
       response = NextResponse.redirect(loginUrl)
@@ -369,7 +487,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
-    const session = await getSession(request)
+    // Middleware performs only the cryptographic staff-token boundary. Every
+    // CRM API request revalidates the live AdminUser + AdminSession + RBAC
+    // state through guardCrmRequest; role/country permissions are never
+    // trusted from access-token claims.
+    const session = await getStaffSession(request)
     if (!session) {
       const loginUrl = new URL('/admin/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
@@ -378,29 +500,9 @@ export async function middleware(request: NextRequest) {
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
 
-    const validWebRoles = Object.keys(ADMIN_ROLES)
-
-    if (!validWebRoles.includes(session.role)) {
-      response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
-      applyRequestId(response, requestId)
-      return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
-    }
-
-    if (!session.sessionId) {
-      response = NextResponse.redirect(new URL('/admin/login?error=session_required', request.url))
-      applyRequestId(response, requestId)
-      return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
-    }
-
     response = NextResponse.next()
     response.headers.set('X-Admin-Id', session.id)
-    response.headers.set('X-Admin-Role', session.role)
     applyRequestId(response, requestId)
-
-    if (pathname.startsWith('/admin/api/') || pathname.startsWith('/api/')) {
-      response.headers.set('Cache-Control', 'no-store, must-revalidate')
-    }
-
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
@@ -438,7 +540,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/api/mobile/')) {
     if (rateLimit.limited) {
-      return applyRequestId(new NextResponse(
+      return applySecurityHeaders(applyRequestId(new NextResponse(
         JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }),
         {
           status: 429,
@@ -449,13 +551,19 @@ export async function middleware(request: NextRequest) {
             'X-RateLimit-Reset': Math.floor(rateLimit.resetAt.getTime() / 1000).toString(),
           },
         }
-      ), requestId)
+      ), requestId))
     }
     response = NextResponse.next()
     applySecurityHeaders(response)
     applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt)
     applyRequestId(response, requestId)
-    response.headers.set('Access-Control-Allow-Origin', process.env.MOBILE_CORS_ORIGIN || '*')
+    const configuredMobileOrigin = process.env.MOBILE_CORS_ORIGIN?.trim()
+    if (configuredMobileOrigin) {
+      response.headers.set('Access-Control-Allow-Origin', configuredMobileOrigin)
+      response.headers.set('Vary', 'Origin')
+    } else if (process.env.NODE_ENV !== 'production') {
+      response.headers.set('Access-Control-Allow-Origin', '*')
+    }
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
     if (request.method === 'OPTIONS') {
@@ -503,7 +611,10 @@ export async function middleware(request: NextRequest) {
     }
     response = NextResponse.next()
     response.headers.set('X-User-Id', session.id)
-    response.headers.set('X-User-Role', session.role)
+    response.headers.set('X-Auth-Type', session.authType)
+    if ('role' in session && typeof session.role === 'string') {
+      response.headers.set('X-User-Role', session.role)
+    }
     applyRequestId(response, requestId)
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
