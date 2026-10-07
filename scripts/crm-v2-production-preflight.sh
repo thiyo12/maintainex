@@ -247,12 +247,17 @@ PAYPALMODE=$(awk -F'|' '$1=="PAYPALMODE"{print $2}' "$tmp")
 MFA_BOOTSTRAP_MODE=$(awk -F'|' '$1=="MFA_BOOTSTRAP"{print $2}' "$tmp")
 [ -n "$MFA_BOOTSTRAP_MODE" ] || MFA_BOOTSTRAP_MODE=not-authorized
 
-if [ "$PAYPALMODE" = "sandbox-smoke-authorized" ]; then
-  echo "PayPal sandbox explicitly authorized for controlled production smoke testing"
-elif [ "$PAYPALMODE" != "live" ]; then
-  echo "ERROR: PayPal production mode could not be determined." >&2
-  exit 1
-fi
+case "$PAYPALMODE" in
+  sandbox-smoke-authorized)
+    echo "PayPal sandbox explicitly authorized for controlled production smoke testing"
+    ;;
+  live | disabled)
+    ;;
+  *)
+    echo "ERROR: PayPal production mode could not be determined." >&2
+    exit 1
+    ;;
+esac
 
 if [ "$CURRENT_HEALTH" != "healthy" ]; then
   echo "ERROR: current production container is not healthy." >&2
