@@ -166,6 +166,16 @@ describe('bootstrap flags stay runner-only in both tools', () => {
       'case ",$PRE_ENROLLMENT_RELEASE_SHAS," in *",$deployed_sha,"*) ;; *) bootstrap_ok=0 ;; esac',
     )
     expect(deploy).toContain('PRE_ENROLLMENT_RELEASE_SHAS=')
+    // Every known pre-enrollment production release is explicitly allowlisted;
+    // membership is exact-match, so anything else fails closed.
+    for (const sha of [
+      '7c526b9401cc46b2c115006992e35735038719da',
+      'd8e3bfafa980f7b4e7710cdafbe213510ddb069e',
+      '3b096e18c194c4b35b7fc83a34b02c07eec305db',
+    ]) {
+      expect(deploy).toContain(sha)
+      expect(preflight).toContain(sha)
+    }
     // The runner-only flag must be forwarded into the remote step-1 shell, where
     // `set -u` would otherwise abort before the gate is evaluated.
     expect(deploy).toContain(

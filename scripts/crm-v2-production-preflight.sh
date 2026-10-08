@@ -12,7 +12,7 @@ ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP="${ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP:-false}"
 # Comma-separated allowlist of production releases that cannot complete first-time
 # super-admin MFA enrollment on their own. Only these may use the one-time
 # bootstrap. Once enrollment is complete the gate passes with no allowance.
-PRE_ENROLLMENT_RELEASE_SHAS="${PRE_ENROLLMENT_RELEASE_SHAS:-7c526b9401cc46b2c115006992e35735038719da,d8e3bfafa980f7b4e7710cdafbe213510ddb069e}"
+PRE_ENROLLMENT_RELEASE_SHAS="${PRE_ENROLLMENT_RELEASE_SHAS:-7c526b9401cc46b2c115006992e35735038719da,d8e3bfafa980f7b4e7710cdafbe213510ddb069e,3b096e18c194c4b35b7fc83a34b02c07eec305db}"
 
 if [ "$CONFIRM_DB_CREDENTIAL_ROTATED" != "yes" ]; then
   echo "ERROR: database credential rotation must be completed first." >&2
