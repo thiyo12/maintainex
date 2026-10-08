@@ -89,6 +89,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Current password is incorrect.' }, { status: 401 })
     }
 
+    // Always overwrite: a previous unconfirmed secret (for example one that was
+    // displayed but never confirmed) must never become the owner's live secret.
     const secret = generateTotpSecret()
     const uri = generateTotpUri(secret, adminUser.email)
 

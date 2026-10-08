@@ -5,7 +5,34 @@ import { verifyTotp } from '@/lib/admin-2fa'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { getIp } from '@/lib/auth/authorization/admin-rbac'
 
+export const dynamic = 'force-dynamic'
+
+/** Hard bound for any single database stage so a stuck call cannot hang the request. */
+const STAGE_TIMEOUT_MS = 8000
+
+function withTimeout<T>(label: string, work: Promise<T>, requestId: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      logger.error('2FA enrollment stage timed out', { stage: label, requestId })
+      reject(new Error('stage-timeout'))
+    }, STAGE_TIMEOUT_MS)
+    work.then(
+      value => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      error => {
+        clearTimeout(timer)
+        reject(error)
+      }
+    )
+  })
+}
+
 export async function POST(request: NextRequest) {
+  const requestId = crypto.randomUUID()
+  const startedAt = Date.now()
+  logger.info('2FA enrollment confirm started', { requestId })
   try {
     const body = await request.json().catch(() => ({}))
     const totpCode = typeof body?.totpCode === 'string' ? body.totpCode.trim() : ''
@@ -15,6 +42,11 @@ export async function POST(request: NextRequest) {
     const { verifyStaffMfaEnrollmentToken, resolveEnrollmentSubject } =
       await import('@/lib/auth/staff-mfa-enrollment')
     const enrollmentClaims = verifyStaffMfaEnrollmentToken(enrollmentToken)
+    logger.info('2FA enrollment token verified', {
+      requestId,
+      valid: Boolean(enrollmentClaims),
+      hasToken: Boolean(enrollmentToken),
+    })
 
     // Subject resolution: the enrollment token identifies the account only for
     // first enrollment of a super-admin that has never enrolled.
@@ -28,7 +60,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (enrollmentClaims) {
-      const resolved = await resolveEnrollmentSubject(enrollmentClaims.sub)
+      const resolved = await withTimeout(
+        'resolve-enrollment-subject',
+        resolveEnrollmentSubject(enrollmentClaims.sub),
+        requestId
+      )
+      logger.info('2FA enrollment live account resolved', {
+        requestId,
+        ok: Boolean(resolved.ok),
+      })
       if (!resolved.ok) {
         return NextResponse.json({ error: resolved.error }, { status: resolved.status })
       }
@@ -90,9 +130,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (adminUser.totpEnabled) {
+      // Deterministic outcome. This is what a retry looks like when the
+      // transaction committed but the browser never saw the response.
+      logger.info('2FA enrollment already completed for this account', { requestId })
       return NextResponse.json(
-        { error: 'Two-factor authentication is already enabled.' },
-        { status: 409 }
+        {
+          success: true,
+          alreadyEnabled: true,
+          totpEnabled: true,
+          error: 'Two-factor authentication is already enabled.',
+        },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } }
       )
     }
 
@@ -103,7 +151,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const totpStartedAt = Date.now()
     const valid = await verifyTotp(totpCode, adminUser.totpSecret)
+    logger.info('2FA enrollment TOTP verification finished', {
+      requestId,
+      valid,
+      durationMs: Date.now() - totpStartedAt,
+    })
     if (!valid) {
       await prisma.securityAudit.create({
         data: {
@@ -127,7 +181,10 @@ export async function POST(request: NextRequest) {
 
     const now = new Date()
 
-    await prisma.$transaction(async tx => {
+    const txStartedAt = Date.now()
+    await withTimeout(
+      'enrollment-transaction',
+      prisma.$transaction(async tx => {
       await tx.adminUser.update({
         where: { id: security.adminId },
         data: {
@@ -166,6 +223,12 @@ export async function POST(request: NextRequest) {
           isSuspicious: false,
         },
       })
+      }),
+      requestId
+    )
+    logger.info('2FA enrollment transaction committed', {
+      requestId,
+      durationMs: Date.now() - txStartedAt,
     })
 
     return NextResponse.json(
@@ -173,9 +236,13 @@ export async function POST(request: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
-    logger.error('2FA enrollment confirmation failed unexpectedly', { err: error })
+    logger.error('2FA enrollment confirmation failed', {
+      err: error,
+      requestId,
+      durationMs: Date.now() - startedAt,
+    })
     return NextResponse.json(
-      { error: 'Unable to confirm two-factor authentication.' },
+      { error: 'Unable to confirm two-factor authentication.', requestId },
       { status: 500 }
     )
   }
