@@ -46,10 +46,11 @@ describe('enrollment token issuance and verification', () => {
     expect(decoded.sid).toBeUndefined()
     expect(decoded.sessionId).toBeUndefined()
 
-    // Max 5 minute lifetime.
+    // Bounded 10 minute lifetime.
     const ttl = Number(decoded.exp) - Number(decoded.iat)
     expect(ttl).toBeGreaterThan(0)
-    expect(ttl).toBeLessThanOrEqual(5 * 60)
+    // Bounded 10 minutes: enough to scan + enter the first real code.
+    expect(ttl).toBeLessThanOrEqual(10 * 60)
   })
 
   it('2. cannot be accepted as a normal staff access token', async () => {

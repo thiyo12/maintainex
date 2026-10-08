@@ -92,13 +92,22 @@ export default function AdminLogin() {
   }
 
   const startEnrollment = async (token: string, currentPassword: string) => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 12000)
     try {
       const res = await fetch('/api/admin/auth/2fa/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({ enrollmentToken: token, currentPassword }),
       })
-      const data = await res.json()
+      const raw = await res.text().catch(() => '')
+      let data: Record<string, any> = {}
+      try {
+        data = raw ? JSON.parse(raw) : {}
+      } catch {
+        data = {}
+      }
       if (!res.ok) {
         toast.error(data.error || 'Could not start two-factor setup.')
         clearEnrollment()
@@ -120,6 +129,9 @@ export default function AdminLogin() {
       clearEnrollment()
       setEnrollmentToken('')
       setStep('login')
+    } finally {
+      clearTimeout(timeout)
+      setIsLoading(false)
     }
   }
 
@@ -127,16 +139,35 @@ export default function AdminLogin() {
     e.preventDefault()
     if (!/^\d{6}$/.test(enrollCode.trim())) return
     setIsLoading(true)
+
+    // Hard client-side bound: a stalled request must never leave the button
+    // stuck on "Confirming...".
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 12000)
+
     try {
       const res = await fetch('/api/admin/auth/2fa/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({ enrollmentToken, totpCode: enrollCode.trim() }),
       })
-      const data = await res.json()
+
+      // Never assume a proxy error page is JSON.
+      const raw = await res.text().catch(() => '')
+      let data: Record<string, unknown> = {}
+      try {
+        data = raw ? JSON.parse(raw) : {}
+      } catch {
+        data = {}
+      }
+
       if (!res.ok) {
-        toast.error(data.error || 'Could not confirm two-factor setup.')
-        setIsLoading(false)
+        const message =
+          typeof data.error === 'string' && data.error
+            ? data.error
+            : `Could not confirm two-factor setup (HTTP ${res.status}).`
+        toast.error(message)
         return
       }
 
@@ -146,11 +177,18 @@ export default function AdminLogin() {
       setEnrollmentToken('')
       setTotpCode('')
       setStep('login')
-      setIsLoading(false)
       toast.success('Two-factor authentication enabled successfully. Please sign in again.')
       window.location.href = '/admin/login'
-    } catch {
-      toast.error('Could not confirm two-factor setup.')
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') {
+        toast.error(
+          'Confirmation timed out. No MFA status was assumed. Please check your account state and try again.'
+        )
+      } else {
+        toast.error('Could not confirm two-factor setup.')
+      }
+    } finally {
+      clearTimeout(timeout)
       setIsLoading(false)
     }
   }

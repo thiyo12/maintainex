@@ -19,7 +19,12 @@ import jwt from 'jsonwebtoken'
 export const STAFF_MFA_ENROLLMENT_AUDIENCE = 'maintainex-staff-mfa-enrollment'
 export const STAFF_MFA_ENROLLMENT_TYPE = 'staff_mfa_enrollment'
 export const STAFF_MFA_ENROLLMENT_PURPOSE = '2fa_enroll'
-export const STAFF_MFA_ENROLLMENT_TTL_SECONDS = 5 * 60
+/**
+ * Bounded lifetime. Ten minutes covers scanning, adding the account in the
+ * authenticator and entering the first real code, without becoming a durable
+ * credential. Still enrollment-only: wrong audience, wrong type, no session id.
+ */
+export const STAFF_MFA_ENROLLMENT_TTL_SECONDS = 10 * 60
 
 export type StaffMfaEnrollmentClaims = {
   sub: string
