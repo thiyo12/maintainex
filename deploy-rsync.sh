@@ -16,7 +16,7 @@ ALLOW_PAYPAL_SANDBOX_SMOKE="${ALLOW_PAYPAL_SANDBOX_SMOKE:-false}"
 ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP="${ALLOW_INITIAL_OWNER_MFA_BOOTSTRAP:-false}"
 # Comma-separated allowlist of production releases that cannot complete
 # first-time super-admin MFA enrollment on their own.
-PRE_ENROLLMENT_RELEASE_SHAS="${PRE_ENROLLMENT_RELEASE_SHAS:-7c526b9401cc46b2c115006992e35735038719da,d8e3bfafa980f7b4e7710cdafbe213510ddb069e}"
+PRE_ENROLLMENT_RELEASE_SHAS="${PRE_ENROLLMENT_RELEASE_SHAS:-7c526b9401cc46b2c115006992e35735038719da,d8e3bfafa980f7b4e7710cdafbe213510ddb069e,3b096e18c194c4b35b7fc83a34b02c07eec305db}"
 
 echo "========================================"
 echo " MaintainEX immutable release deployment"
