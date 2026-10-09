@@ -91,6 +91,15 @@ export async function POST(request: NextRequest) {
       countryCode: market,
     })
 
+    // A country-specific estimate must never silently inherit a different
+    // currency from GLOBAL or a misconfigured market rule.
+    if (estimate.currency !== expectedCurrency) {
+      return NextResponse.json(
+        { error: 'Pricing currency does not match the selected market' },
+        { status: 422 },
+      )
+    }
+
     return NextResponse.json({
       estimate: {
         baseAmount: estimate.baseAmount.toString(),
