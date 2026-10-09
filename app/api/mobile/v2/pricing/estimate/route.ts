@@ -74,6 +74,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const requestedUrgency = typeof urgency === 'string' ? urgency.toUpperCase() : 'NORMAL'
+    if (!['NORMAL', 'URGENT', 'EMERGENCY'].includes(requestedUrgency)) {
+      return NextResponse.json({ error: 'Invalid urgency' }, { status: 400 })
+    }
+
     const quantity = parsePositiveNumber(body.quantity)
     const durationMinutes = parsePositiveNumber(body.durationMinutes)
     if (quantity === null || durationMinutes === null) {
@@ -85,7 +90,7 @@ export async function POST(request: NextRequest) {
       categoryId: categoryId.trim(),
       serviceTemplateId: typeof serviceTemplateId === 'string' && serviceTemplateId.trim() ? serviceTemplateId.trim() : undefined,
       mode: 'QUOTE',
-      urgency: (typeof urgency === 'string' ? urgency.toUpperCase() : 'NORMAL') as 'NORMAL' | 'URGENT' | 'EMERGENCY',
+      urgency: requestedUrgency as 'NORMAL' | 'URGENT' | 'EMERGENCY',
       quantity,
       durationMinutes,
       countryCode: market,
