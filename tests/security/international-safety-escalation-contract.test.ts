@@ -5,6 +5,14 @@ import { resolve } from 'node:path'
 const source = readFileSync(resolve(process.cwd(), 'app/api/mobile/disputes/route.ts'), 'utf8')
 
 describe('V2 job safety escalation integration', () => {
+  it('rejects malformed or oversized report data before writing', () => {
+    expect(source).toContain("typeof jobId !== 'string'")
+    expect(source).toContain("typeof reason !== 'string'")
+    expect(source).toContain("typeof description !== 'string'")
+    expect(source).toContain('reason.length > 120')
+    expect(source).toContain('description.length > 5000')
+    expect(source.indexOf("typeof jobId !== 'string'")).toBeLessThan(source.indexOf('raiseJobDispute('))
+  })
   it('keeps job participant authorization before safety escalation', () => {
     const auth = source.indexOf('if (!actorType)')
     const safety = source.indexOf('const safetyReasons = new Set')
