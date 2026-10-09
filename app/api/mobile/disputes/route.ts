@@ -17,8 +17,15 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const { jobId, reason, description } = await request.json()
-    if (!jobId || !reason || !description) {
-      return NextResponse.json({ error: 'jobId, reason, and description required' }, { status: 400 })
+    if (
+      typeof jobId !== 'string' || !jobId.trim() || jobId.length > 128 ||
+      typeof reason !== 'string' || !reason.trim() || reason.length > 120 ||
+      typeof description !== 'string' || !description.trim() || description.length > 5000
+    ) {
+      return NextResponse.json(
+        { error: 'Valid jobId, reason (max 120), and description (max 5000) required' },
+        { status: 400 },
+      )
     }
 
     const marketplaceJob = await prisma.marketplaceJob.findUnique({
