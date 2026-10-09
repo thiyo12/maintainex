@@ -334,6 +334,19 @@ export default function LiveTrackingScreen() {
             ) : null}
           </View>
 
+          {/* Initial safety entry point: reuse the existing authenticated job
+              report flow. Emergency assistance and case management must be
+              added and verified before the Safety Centre is launch-complete. */}
+          <PressableScale
+            onPress={() => router.push(`/(customer)/jobs/dispute/${id}` as any)}
+            scaleTo={0.97}
+            style={styles.safetyPress}
+          >
+            <View style={styles.safetyBtn}>
+              <Text style={styles.safetyText}>Report a job concern</Text>
+            </View>
+          </PressableScale>
+
           {step < 2 ? (
             <View style={styles.waitCard}>
               <Timer size={16} color={colors.amber} weight="fill" />
@@ -476,6 +489,12 @@ const makeStyles = (colors: any) => StyleSheet.create({
   },
   completeText: { fontFamily: fonts.bodyMedium, color: colors.ink, fontSize: 15 },
 
+  safetyPress: { marginTop: 12 },
+  safetyBtn: {
+    borderRadius: 14, borderWidth: 1, borderColor: colors.border,
+    paddingVertical: 14, alignItems: 'center', backgroundColor: colors.surface,
+  },
+  safetyText: { fontFamily: fonts.bodyMedium, color: colors.ink, fontSize: 14 },
   waitCard: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: colors.amberBg, borderRadius: 15, padding: 12, marginTop: 16,
