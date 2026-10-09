@@ -3,6 +3,7 @@ import { aiSearch, getAutocompleteSuggestions } from '@/lib/ai-search'
 import { logSearch, getPopularSearches } from '@/lib/search-engine'
 import { prisma } from '@/lib/prisma'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
+import { isCatalogAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,27 +44,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ results })
     }
 
-    const marketEnabled = (stored: string): boolean => {
-      try {
-        const countries: unknown = JSON.parse(stored)
-        return Array.isArray(countries) && countries.includes(market)
-      } catch {
-        return false
-      }
-    }
 
     const dbCategories = await prisma.jobCategory.findMany({
       where: { isActive: true },
       select: { id: true, slug: true, name: true, countries: true },
     })
-    const eligibleCategories = dbCategories.filter(c => marketEnabled(c.countries))
+    const eligibleCategories = dbCategories.filter(c => isCatalogAvailableInMarket(c.countries, market))
     const bySlug = new Map(eligibleCategories.filter(c => c.slug).map(c => [c.slug!, c]))
     const eligibleJobs = await prisma.templateJob.findMany({
       where: { isActive: true, categoryId: { in: eligibleCategories.map(c => c.id) } },
       select: { id: true, name: true, categoryId: true, countries: true },
     })
     const byCategoryAndName = new Map(
-      eligibleJobs.filter(j => marketEnabled(j.countries))
+      eligibleJobs.filter(j => isCatalogAvailableInMarket(j.countries, market))
         .map(j => [j.categoryId + ':' + j.name.toLowerCase(), j]),
     )
 
@@ -81,7 +74,7 @@ export async function GET(request: NextRequest) {
       // or categories; do not leak Canada-only suggestions to LK.
       const allowedNames = new Set([
         ...eligibleCategories.map(c => c.name.toLowerCase()),
-        ...eligibleJobs.filter(j => marketEnabled(j.countries)).map(j => j.name.toLowerCase()),
+        ...eligibleJobs.filter(j => isCatalogAvailableInMarket(j.countries, market)).map(j => j.name.toLowerCase()),
       ])
       const suggestions = getAutocompleteSuggestions(q).filter(name => allowedNames.has(name.toLowerCase()))
       return NextResponse.json({ query: q, suggestions })
