@@ -24,6 +24,7 @@ describe('Active V2 mobile safety report to CRM escalation', () => {
     expect(route).toContain('await raiseJobDispute(')
   })
   it('rejects oversized safety report fields and avoids claiming escrow is always held', () => {
+    expect(route).toContain("!body.reason.trim()")
     expect(route).toContain("body.reason.trim().length > 120")
     expect(route).toContain("body.description.length > 5000")
     expect(route).toContain("error: 'Invalid dispute reason'")
