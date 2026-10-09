@@ -50,13 +50,24 @@ export async function POST(request: NextRequest) {
         '/admin/jobs/disputes',
       )
 
+      // Escalate explicit safety concerns through the existing authenticated
+      // staff work queue. This is NOT emergency dispatch or 24/7 monitoring.
+      const safetyReasons = new Set([
+        'SAFETY_IMMEDIATE_DANGER',
+        'SAFETY_THREAT_OR_HARASSMENT',
+        'SAFETY_INJURY',
+        'SAFETY_UNSAFE_WORK',
+        'SAFETY_IDENTITY_MISMATCH',
+      ])
+      const safetyReport = safetyReasons.has(reason)
       await createWorkItem({
-        category: 'dispute',
-        title: `Dispute: ${reason}`,
+        category: safetyReport ? 'tasker_escalation' : 'dispute',
+        severity: safetyReport ? 'critical' : 'high',
+        title: `${safetyReport ? 'Safety report' : 'Dispute'}: ${reason}`,
         description: `${user.name || user.email} raised a dispute on job "${marketplaceJob.title}". ${description}`,
         targetTable: 'MarketplaceDispute',
         targetId: marketplaceDispute.disputeId,
-        priority: 'high',
+        priority: safetyReport ? 'critical' : 'high',
       })
 
       return NextResponse.json({
