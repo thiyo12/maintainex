@@ -181,7 +181,7 @@ export async function POST(
         return NextResponse.json({ error: 'Dispute is only available after work has started' }, { status: 409 })
       }
 
-      if (body.reason !== undefined && (typeof body.reason !== 'string' || body.reason.trim().length > 120)) {
+      if (body.reason !== undefined && (typeof body.reason !== 'string' || !body.reason.trim() || body.reason.trim().length > 120)) {
         return NextResponse.json({ error: 'Invalid dispute reason' }, { status: 400 })
       }
       if (body.description !== undefined && (typeof body.description !== 'string' || body.description.length > 5000)) {
