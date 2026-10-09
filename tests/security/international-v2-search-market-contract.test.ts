@@ -12,8 +12,8 @@ describe('V2 search market eligibility source invariants', () => {
   })
 
   it('filters both categories and jobs against their country lists', () => {
-    expect(route).toContain('marketEnabled(c.countries)')
-    expect(route).toContain('marketEnabled(j.countries)')
+    expect(route).toContain('isCatalogAvailableInMarket(c.countries, market)')
+    expect(route).toContain('isCatalogAvailableInMarket(j.countries, market)')
   })
 
   it('does not use unscoped search results directly in response lists', () => {
