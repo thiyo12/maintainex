@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       const category = bySlug.get(r.categoryId)
       if (!category) return false
       return r.type === 'category' ||
-        byCategoryAndName.has(category.id + ':' + r.subServiceName.toLowerCase())
+        byCategoryAndName.has(category.id + ':' + (r.subServiceName || '').toLowerCase())
     })
 
     if (suggest === 'true' && q) {
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
       .filter(r => r.type === 'subService')
       .map(r => {
         const categoryId = bySlug.get(r.categoryId)!.id
-        const job = byCategoryAndName.get(categoryId + ':' + r.subServiceName.toLowerCase())!
+        const job = byCategoryAndName.get(categoryId + ':' + (r.subServiceName || '').toLowerCase())!
         return {
           id: job.id,
           name: job.name,
