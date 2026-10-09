@@ -181,9 +181,15 @@ export async function POST(
         return NextResponse.json({ error: 'Dispute is only available after work has started' }, { status: 409 })
       }
 
+      if (body.reason !== undefined && (typeof body.reason !== 'string' || body.reason.trim().length > 120)) {
+        return NextResponse.json({ error: 'Invalid dispute reason' }, { status: 400 })
+      }
+      if (body.description !== undefined && (typeof body.description !== 'string' || body.description.length > 5000)) {
+        return NextResponse.json({ error: 'Invalid dispute description' }, { status: 400 })
+      }
       const reason =
         typeof body.reason === 'string' && body.reason.trim()
-          ? body.reason.trim().slice(0, 1000)
+          ? body.reason.trim()
           : null
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
       const disputeRecipientIds = isCustomer
@@ -222,14 +228,16 @@ export async function POST(
         notifyAllAdmins(
           'dispute_raised',
           `New Dispute: ${reason || 'Job dispute'}`,
-          `A marketplace dispute was raised on "${job.title}" and escrow is now on hold.`,
+          `${isSafetyReport ? 'An urgent job safety concern' : 'A marketplace dispute'} was raised on "${job.title}". Review the job and payment state.`,
           '/admin/jobs/disputes',
         ),
         createWorkItem({
           category: isSafetyReport ? 'tasker_escalation' : 'dispute',
           severity: isSafetyReport ? 'critical' : 'high',
           title: `${isSafetyReport ? 'Safety report' : 'Marketplace dispute'}: ${reason || job.title}`,
-          description: `Escrow is on hold for "${job.title}". Review the dispute and choose release-to-provider or refund-customer.`,
+          description: isSafetyReport
+            ? `Urgent job safety concern on "${job.title}". Review immediately, verify participants and coordinate appropriate response. Confirm escrow state separately.`
+            : `Review the dispute on "${job.title}", verify escrow status and choose an authorized resolution.`,
           targetTable: 'MarketplaceDispute',
           targetId: dispute.disputeId,
           priority: isSafetyReport ? 'critical' : 'high',
