@@ -19,6 +19,10 @@ describe('International launch: preview pricing market safety', () => {
     expect(route).toContain('A locally priced service is required for a Canadian estimate')
     expect(route).toContain("config?.defaultCurrency !== 'CAD'")
   })
+  it('rejects a resolved price calculated in the wrong currency', () => {
+    expect(route).toContain('estimate.currency !== expectedCurrency')
+    expect(route).toContain('Pricing currency does not match the selected market')
+  })
   it('passes validated market to the existing canonical price engine', () => {
     expect(route).toContain('countryCode: market,')
     expect(route).toContain('calculatePrice(prisma')
