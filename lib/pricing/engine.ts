@@ -53,9 +53,14 @@ export async function validatePricingIdentifiers(
   if (serviceTemplateId) {
     const template = await client.serviceTemplate.findUnique({
       where: { id: serviceTemplateId },
-      select: { id: true, jobCategoryId: true, templateJobId: true },
+      select: { id: true, jobCategoryId: true, templateJobId: true, countryCode: true, currency: true },
     })
     if (!template) throw new PricingInputError('Service template not found')
+    // A saved job's country is authoritative. Avoid pricing a Canadian job
+    // using an LKR-only service template (or vice versa).
+    if (countryCode && template.countryCode && template.countryCode !== countryCode) {
+      throw new PricingInputError('Service template country does not match job country')
+    }
     serviceTemplateCategoryId = template.jobCategoryId
 
     if (template.templateJobId) {
