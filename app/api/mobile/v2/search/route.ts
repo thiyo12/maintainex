@@ -9,6 +9,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const q = searchParams.get('q')
+    if (q !== null && q.length > 160) {
+      return NextResponse.json({ error: 'Search query exceeds 160 characters' }, { status: 400 })
+    }
     const lang = (searchParams.get('lang') as 'en' | 'si' | 'ta') || 'en'
     const type = searchParams.get('type') || 'all'
     const popular = searchParams.get('popular')
