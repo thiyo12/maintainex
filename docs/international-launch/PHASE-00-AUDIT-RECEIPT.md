@@ -34,3 +34,12 @@ Status: **IN PROGRESS — no functional edits or tests executed yet**.
 - Pricing estimate guards: `ad3cca6` rejects unsupported countries, missing CA pricing configuration, and LKR templates for CAD prices; contract test `e8980f1`.
 - **All code/tests above are pushed but executable tests were not run in this connector-only environment. None of the phase exit gates are green.**
 - Further required: actual booking-address country binding, Vancouver coordinate geofence, live pricing benchmark audit, legacy consumer analysis, runtime test suite, current DB snapshot and safe feature activation.
+
+## Continuation receipt — 2026-10-09, safety access + estimate controls
+
+- Pricing estimate urgency allowlist implemented `20f1838`; contract test updated `a9ea8d8`.
+- Initial customer job-concern reporting entry point reuses existing authenticated dispute journey from native tracking `e8fc07b` and web tracking `1a11691`.
+- Safety entry-point source contract test `5b3bd52`; CI includes test after `0cb5779`.
+- This is **not** the complete Safety Centre: urgent emergency dialer, identity incident categories, tasker/company-worker entry points, discreet exit, case severity, staffed escalation, evidence retention, safety-specific CRM and real-world response protocols remain open.
+- Existing booking/payment processes MUST NOT be declared safe or release-ready based on button presence.
+- CI currently auto-cancels earlier PR runs when another push arrives. Wait for the latest-head check before reporting pass/fail; no phase has received full 12-phase exit certification.
