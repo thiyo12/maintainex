@@ -43,3 +43,11 @@ Status: **IN PROGRESS — no functional edits or tests executed yet**.
 - This is **not** the complete Safety Centre: urgent emergency dialer, identity incident categories, tasker/company-worker entry points, discreet exit, case severity, staffed escalation, evidence retention, safety-specific CRM and real-world response protocols remain open.
 - Existing booking/payment processes MUST NOT be declared safe or release-ready based on button presence.
 - CI currently auto-cancels earlier PR runs when another push arrives. Wait for the latest-head check before reporting pass/fail; no phase has received full 12-phase exit certification.
+
+## Phase-by-phase build checkpoint — 2026-10-09
+
+- Current phase method: keep 12 release gates independent; source-only checks are not a substitute for runtime tests.
+- Created shared fail-closed V2 catalogue country eligibility (`lib/domain/catalog-market-eligibility.ts`) and reused it in the active V2 search API (`app/api/mobile/v2/search/route.ts`). This reduces competing market parser behavior.
+- Added executable behavioral coverage for LK/CA visibility, malformed JSON, invalid country values (`tests/domain/catalog-market-eligibility.test.ts`) and added it to the existing PR validation workflow.
+- Latest phase remains **NOT GREEN**: real database catalogue inventory, quote/payment country binding, Vancouver municipal boundary verification, mobile UI integration tests, and full CI result are still required.
+- The latest main-to-branch changes must be tested before merge; no Mac synchronization or production change was performed.
