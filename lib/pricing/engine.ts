@@ -61,6 +61,12 @@ export async function validatePricingIdentifiers(
     if (countryCode && template.countryCode && template.countryCode !== countryCode) {
       throw new PricingInputError('Service template country does not match job country')
     }
+    if (countryCode === 'LK' && template.currency !== 'LKR') {
+      throw new PricingInputError('Service template currency does not match job country')
+    }
+    if (countryCode === 'CA' && template.currency !== 'CAD') {
+      throw new PricingInputError('Service template currency does not match job country')
+    }
     serviceTemplateCategoryId = template.jobCategoryId
 
     if (template.templateJobId) {
