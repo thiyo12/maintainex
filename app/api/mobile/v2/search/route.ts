@@ -30,17 +30,17 @@ export async function GET(request: NextRequest) {
       }, { headers: { 'Cache-Control': 'no-store' } })
     }
 
-    if (popular === 'true') {
-      const results = await getPopularSearches()
-      return NextResponse.json({ results })
-    }
-
     // Search is a discovery hint, not an authorization boundary. Nevertheless,
     // never suggest an inactive or wrong-market job. The actual booking still
     // needs the confirmed-address and provider-eligibility checks.
     const market = (country || 'LK').trim().toUpperCase()
     if (market !== 'LK' && market !== 'CA') {
       return NextResponse.json({ query: q || '', lang, categories: [], subServices: [], totalResults: 0, unavailable: true })
+    }
+
+    if (popular === 'true') {
+      const results = await getPopularSearches(market)
+      return NextResponse.json({ results })
     }
 
     const marketEnabled = (stored: string): boolean => {
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
     const bestMatch = eligibleResults[0]
     const correctedQuery = bestMatch?.score && bestMatch.score < 85 ? bestMatch.correctedQuery : undefined
 
-    await logSearch(null, q.trim(), null, bestMatch?.score || 0, null)
+    await logSearch(null, q.trim(), null, bestMatch?.score || 0, null, market)
 
     return NextResponse.json({
       query: q,
