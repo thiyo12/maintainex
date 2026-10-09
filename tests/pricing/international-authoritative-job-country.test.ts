@@ -44,6 +44,22 @@ describe('authoritative pricing job market', () => {
     })).rejects.toThrow('Service template country does not match job country')
   })
 
+  it('rejects an LKR-priced template on a Canadian job even with CA country metadata', async () => {
+    const db = client('CA')
+    db.marketplaceJob.findUnique = async () => ({
+      categoryId, serviceTemplateId: 'template-1', countryCode: 'CA',
+    })
+    db.serviceTemplate = {
+      findUnique: async () => ({
+        id: 'template-1', jobCategoryId: categoryId, templateJobId: null,
+        countryCode: 'CA', currency: 'LKR',
+      }),
+    }
+    await expect(validatePricingIdentifiers(db, {
+      jobId, categoryId, serviceTemplateId: 'template-1',
+    })).rejects.toThrow('Service template currency does not match job country')
+  })
+
   it('allows matching supplied job market', async () => {
     await expect(validatePricingIdentifiers(client('LK'), {
       jobId, categoryId, countryCode: 'LK',
