@@ -23,6 +23,11 @@ describe('International launch: preview pricing market safety', () => {
     expect(route).toContain('estimate.currency !== expectedCurrency')
     expect(route).toContain('Pricing currency does not match the selected market')
   })
+  it('rejects unknown urgency before pricing', () => {
+    expect(route).toContain("['NORMAL', 'URGENT', 'EMERGENCY'].includes(requestedUrgency)")
+    expect(route).toContain("error: 'Invalid urgency'")
+  })
+
   it('passes validated market to the existing canonical price engine', () => {
     expect(route).toContain('countryCode: market,')
     expect(route).toContain('calculatePrice(prisma')
