@@ -23,6 +23,14 @@ describe('Active V2 mobile safety report to CRM escalation', () => {
     expect(route.indexOf("if (!isCustomer && !providerActor)")).toBeLessThan(route.indexOf('const safetyReasons = new Set'))
     expect(route).toContain('await raiseJobDispute(')
   })
+  it('rejects oversized safety report fields and avoids claiming escrow is always held', () => {
+    expect(route).toContain("body.reason.trim().length > 120")
+    expect(route).toContain("body.description.length > 5000")
+    expect(route).toContain("error: 'Invalid dispute reason'")
+    expect(route).toContain("error: 'Invalid dispute description'")
+    expect(route).toContain('Confirm escrow state separately.')
+    expect(route).not.toContain('and escrow is now on hold.')
+  })
   it('routes urgent incidents to the existing critical-priority staff queue', () => {
     expect(route).toContain("category: isSafetyReport ? 'tasker_escalation' : 'dispute'")
     expect(route).toContain("severity: isSafetyReport ? 'critical' : 'high'")
