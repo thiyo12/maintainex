@@ -206,6 +206,15 @@ export async function POST(
         job.id
       )
 
+      const safetyReasons = new Set([
+        'SAFETY_IMMEDIATE_DANGER',
+        'SAFETY_THREAT_OR_HARASSMENT',
+        'SAFETY_INJURY',
+        'SAFETY_UNSAFE_WORK',
+        'SAFETY_IDENTITY_MISMATCH',
+      ])
+      const isSafetyReport = reason ? safetyReasons.has(reason) : false
+
       await Promise.all([
         ...disputeRecipientIds.map(recipientId =>
           notifyDisputeRaised(job.id, recipientId, job.title)
@@ -217,12 +226,13 @@ export async function POST(
           '/admin/jobs/disputes',
         ),
         createWorkItem({
-          category: 'dispute',
-          title: `Marketplace dispute: ${reason || job.title}`,
+          category: isSafetyReport ? 'tasker_escalation' : 'dispute',
+          severity: isSafetyReport ? 'critical' : 'high',
+          title: `${isSafetyReport ? 'Safety report' : 'Marketplace dispute'}: ${reason || job.title}`,
           description: `Escrow is on hold for "${job.title}". Review the dispute and choose release-to-provider or refund-customer.`,
           targetTable: 'MarketplaceDispute',
           targetId: dispute.disputeId,
-          priority: 'high',
+          priority: isSafetyReport ? 'critical' : 'high',
         }),
       ])
 
