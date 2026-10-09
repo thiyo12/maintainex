@@ -22,6 +22,11 @@ describe('V2 search market eligibility source invariants', () => {
     expect(route).toContain("const subServices = eligibleResults")
   })
 
+  it('partitions popular searches and new search logs by market', () => {
+    expect(route).toContain('getPopularSearches(market)')
+    expect(route).toContain('null, market)')
+  })
+
   it('returns canonical template job identifiers', () => {
     expect(route).toContain('id: job.id')
   })
