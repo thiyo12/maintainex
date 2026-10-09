@@ -31,6 +31,10 @@ describe('Active V2 mobile safety report to CRM escalation', () => {
     expect(route).toContain('Confirm escrow state separately.')
     expect(route).not.toContain('and escrow is now on hold.')
   })
+  it('does not falsely promise escrow is held in the mobile success receipt', () => {
+    expect(screen).not.toContain("t('dispute.escrowHeld')")
+    expect(screen).toContain('Payment status and next steps will be reviewed')
+  })
   it('routes urgent incidents to the existing critical-priority staff queue', () => {
     expect(route).toContain("category: isSafetyReport ? 'tasker_escalation' : 'dispute'")
     expect(route).toContain("severity: isSafetyReport ? 'critical' : 'high'")
