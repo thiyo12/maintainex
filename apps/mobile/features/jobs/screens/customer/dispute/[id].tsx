@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { FileText, Lock, WarningCircle } from 'phosphor-react-native'
+import { FileText, WarningCircle } from 'phosphor-react-native'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { useTranslation } from 'react-i18next'
@@ -114,8 +114,9 @@ export default function DisputeScreen() {
             <Text style={styles.ticketId}>#{disputeId}</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 32 }}>
-            <Lock size={14} color="#6F6B6B" weight="regular" />
-            <Text style={styles.refundNote}>{t('dispute.escrowHeld')}</Text>
+            <Text style={styles.refundNote}>
+              Your report was submitted. Payment status and next steps will be reviewed by MaintainEX support.
+            </Text>
           </View>
           <TouchableOpacity
             style={styles.homeBtn}
