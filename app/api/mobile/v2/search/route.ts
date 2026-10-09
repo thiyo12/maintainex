@@ -3,11 +3,15 @@ import { aiSearch, getAutocompleteSuggestions } from '@/lib/ai-search'
 import { logSearch, getPopularSearches } from '@/lib/search-engine'
 import { prisma } from '@/lib/prisma'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
+import { isCatalogAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const q = searchParams.get('q')
+    if (q !== null && q.length > 160) {
+      return NextResponse.json({ error: 'Search query exceeds 160 characters' }, { status: 400 })
+    }
     const lang = (searchParams.get('lang') as 'en' | 'si' | 'ta') || 'en'
     const type = searchParams.get('type') || 'all'
     const popular = searchParams.get('popular')
@@ -30,13 +34,52 @@ export async function GET(request: NextRequest) {
       }, { headers: { 'Cache-Control': 'no-store' } })
     }
 
+    // Search is a discovery hint, not an authorization boundary. Nevertheless,
+    // never suggest an inactive or wrong-market job. The actual booking still
+    // needs the confirmed-address and provider-eligibility checks.
+    const market = (country || 'LK').trim().toUpperCase()
+    if (market !== 'LK' && market !== 'CA') {
+      return NextResponse.json({ query: q || '', lang, categories: [], subServices: [], totalResults: 0, unavailable: true })
+    }
+
     if (popular === 'true') {
-      const results = await getPopularSearches()
+      const results = await getPopularSearches(market)
       return NextResponse.json({ results })
     }
 
+
+    const dbCategories = await prisma.jobCategory.findMany({
+      where: { isActive: true },
+      select: { id: true, slug: true, name: true, countries: true },
+    })
+    const eligibleCategories = dbCategories.filter(c => isCatalogAvailableInMarket(c.countries, market))
+    const bySlug = new Map(eligibleCategories.filter(c => c.slug).map(c => [c.slug!, c]))
+    const eligibleJobs = await prisma.templateJob.findMany({
+      where: { isActive: true, categoryId: { in: eligibleCategories.map(c => c.id) } },
+      select: { id: true, name: true, categoryId: true, countries: true },
+    })
+    const byCategoryAndName = new Map(
+      eligibleJobs.filter(j => isCatalogAvailableInMarket(j.countries, market))
+        .map(j => [j.categoryId + ':' + j.name.toLowerCase(), j]),
+    )
+
+    const results = q?.trim() ? aiSearch(q.trim()) : []
+    const eligibleResults = results.filter(r => {
+      const category = bySlug.get(r.categoryId)
+      if (!category) return false
+      return r.type === 'category' ||
+        byCategoryAndName.has(category.id + ':' + (r.subServiceName || '').toLowerCase())
+    })
+
     if (suggest === 'true' && q) {
-      const suggestions = getAutocompleteSuggestions(q)
+      // The old autocomplete operated over an unscoped static dictionary.
+      // Keep its ranking, but only expose names belonging to eligible jobs
+      // or categories; do not leak Canada-only suggestions to LK.
+      const allowedNames = new Set([
+        ...eligibleCategories.map(c => c.name.toLowerCase()),
+        ...eligibleJobs.filter(j => isCatalogAvailableInMarket(j.countries, market)).map(j => j.name.toLowerCase()),
+      ])
+      const suggestions = getAutocompleteSuggestions(q).filter(name => allowedNames.has(name.toLowerCase()))
       return NextResponse.json({ query: q, suggestions })
     }
 
@@ -44,22 +87,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'q parameter is required' }, { status: 400 })
     }
 
-    const results = aiSearch(q.trim())
-
-    const slugToId = new Map<string, string>()
-    try {
-      const dbCategories = await prisma.jobCategory.findMany({
-        where: { isActive: true },
-        select: { id: true, slug: true },
-      })
-      for (const c of dbCategories) if (c.slug) slugToId.set(c.slug, c.id)
-    } catch {}
-    const resolveId = (slugOrId: string) => slugToId.get(slugOrId) ?? slugOrId
-
-    const categories = results
+    const categories = eligibleResults
       .filter(r => r.type === 'category')
       .map(r => ({
-        id: resolveId(r.categoryId),
+        id: bySlug.get(r.categoryId)!.id,
         name: r.categoryName,
         icon: r.categoryIcon,
         colorHex: r.categoryColor,
@@ -67,22 +98,26 @@ export async function GET(request: NextRequest) {
         correctedQuery: r.correctedQuery,
       }))
 
-    const subServices = results
+    const subServices = eligibleResults
       .filter(r => r.type === 'subService')
-      .map(r => ({
-        id: r.subServiceId,
-        name: r.subServiceName,
-        categoryId: resolveId(r.categoryId),
-        categoryName: r.categoryName,
-        categoryIcon: r.categoryIcon,
-        categoryColor: r.categoryColor,
-        score: r.score,
-      }))
+      .map(r => {
+        const categoryId = bySlug.get(r.categoryId)!.id
+        const job = byCategoryAndName.get(categoryId + ':' + (r.subServiceName || '').toLowerCase())!
+        return {
+          id: job.id,
+          name: job.name,
+          categoryId,
+          categoryName: r.categoryName,
+          categoryIcon: r.categoryIcon,
+          categoryColor: r.categoryColor,
+          score: r.score,
+        }
+      })
 
-    const bestMatch = results[0]
+    const bestMatch = eligibleResults[0]
     const correctedQuery = bestMatch?.score && bestMatch.score < 85 ? bestMatch.correctedQuery : undefined
 
-    await logSearch(null, q.trim(), null, bestMatch?.score || 0, null)
+    await logSearch(null, q.trim(), null, bestMatch?.score || 0, null, market)
 
     return NextResponse.json({
       query: q,

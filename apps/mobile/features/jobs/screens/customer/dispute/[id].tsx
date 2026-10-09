@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { FileText, Lock, WarningCircle } from 'phosphor-react-native'
+import { FileText, WarningCircle } from 'phosphor-react-native'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { useTranslation } from 'react-i18next'
@@ -66,7 +66,14 @@ export default function DisputeScreen() {
   }
 
   const reasonLabels = t('dispute.reasons', { returnObjects: true }) as string[]
-  const disputeReasons = reasonLabels.map((label, i) => ({ key: ['incomplete', 'quality', 'damage', 'price', 'behavior', 'other'][i], label }))
+  const disputeReasons = [
+    ...reasonLabels.map((label, i) => ({ key: ['incomplete', 'quality', 'damage', 'price', 'behavior', 'other'][i], label })),
+    { key: 'SAFETY_IMMEDIATE_DANGER', label: 'Immediate danger or threat' },
+    { key: 'SAFETY_THREAT_OR_HARASSMENT', label: 'Threats or harassment' },
+    { key: 'SAFETY_INJURY', label: 'Injury during the job' },
+    { key: 'SAFETY_UNSAFE_WORK', label: 'Unsafe work or hazardous conditions' },
+    { key: 'SAFETY_IDENTITY_MISMATCH', label: 'Worker identity does not match profile' },
+  ]
 
   const taskerName = job?.acceptedQuote?.provider?.name || t('dispute.tasker')
   const jobTitle = job?.title || t('dispute.job')
@@ -107,8 +114,9 @@ export default function DisputeScreen() {
             <Text style={styles.ticketId}>#{disputeId}</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 32 }}>
-            <Lock size={14} color="#6F6B6B" weight="regular" />
-            <Text style={styles.refundNote}>{t('dispute.escrowHeld')}</Text>
+            <Text style={styles.refundNote}>
+              Your report was submitted. Payment status and next steps will be reviewed by MaintainEX support.
+            </Text>
           </View>
           <TouchableOpacity
             style={styles.homeBtn}

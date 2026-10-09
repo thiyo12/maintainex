@@ -188,6 +188,9 @@ jobs:
           cd apps/mobile
           npx tsc --noEmit
 
+      - name: International launch market regression checks
+        run: npx vitest run tests/regions/international-launch-regions.test.ts tests/security/international-v2-search-market-contract.test.ts tests/domain/catalog-market-eligibility.test.ts tests/pricing/international-estimate-market-contract.test.ts tests/pricing/international-authoritative-job-country.test.ts tests/security/international-tracking-issue-report-contract.test.ts tests/security/international-safety-escalation-contract.test.ts tests/security/international-active-v2-safety-report-contract.test.ts
+
       - name: Schema integrity tests
         run: npx vitest run tests/structural/schema-integrity.test.ts tests/structural/migration-validation.test.ts tests/structural/crm-legacy-role-retirement.test.ts tests/structural/crm-app-web-v2.test.ts tests/structural/crm-legacy-customer-api-retirement.test.ts tests/structural/crm-v2-shell-permissions.test.ts tests/structural/crm-v2-visual-contract.test.ts tests/structural/crm-reference-parity-all-pages.test.ts tests/structural/crm-global-readability.test.ts tests/structural/crm-v2-migrated-page-contract.test.ts tests/structural/crm-v2-shell.test.ts tests/structural/crm-phase14-v2.test.ts tests/structural/crm-phase15-legacy-demolition.test.ts --reporter=verbose 2>&1 | tee /tmp/schema-tests.txt
         if: always()
