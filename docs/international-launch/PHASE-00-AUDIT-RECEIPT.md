@@ -25,3 +25,12 @@ Status: **IN PROGRESS — no functional edits or tests executed yet**.
 - No production deploy, DB writes, replacement catalogues, parallel negotiation engine, broad frontend reconstruction, or unsafe claims until verified.
 - Subsequent commits append per-phase evidence and tests.
 - Final Mac sync is a manual git operation; remote GitHub writes do not change /Users/thiyoth/Documents/NEWM/maintainex.
+
+## Implementation checkpoint — 2026-10-09
+
+- Vancouver-only legacy region options: `f034b02`; regression test `c52f54b`.
+- V2 search market filtering and canonical IDs: `e54cc5e`; optional string fix `0cf39d3`; regression `a70ed4d`.
+- Popular searches and search logs scoped to country: `25cb54c`, mobile client `21b4eb8`, test `4a15fe2`.
+- Pricing estimate guards: `ad3cca6` rejects unsupported countries, missing CA pricing configuration, and LKR templates for CAD prices; contract test `e8980f1`.
+- **All code/tests above are pushed but executable tests were not run in this connector-only environment. None of the phase exit gates are green.**
+- Further required: actual booking-address country binding, Vancouver coordinate geofence, live pricing benchmark audit, legacy consumer analysis, runtime test suite, current DB snapshot and safe feature activation.
