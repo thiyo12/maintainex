@@ -30,4 +30,8 @@ describe('V2 search market eligibility source invariants', () => {
   it('returns canonical template job identifiers', () => {
     expect(route).toContain('id: job.id')
   })
+  it('rejects oversized discovery inputs before catalogue matching', () => {
+    expect(route).toContain("q.length > 160")
+    expect(route).toContain("Search query exceeds 160 characters")
+  })
 })
