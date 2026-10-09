@@ -66,7 +66,14 @@ export default function DisputeScreen() {
   }
 
   const reasonLabels = t('dispute.reasons', { returnObjects: true }) as string[]
-  const disputeReasons = reasonLabels.map((label, i) => ({ key: ['incomplete', 'quality', 'damage', 'price', 'behavior', 'other'][i], label }))
+  const disputeReasons = [
+    ...reasonLabels.map((label, i) => ({ key: ['incomplete', 'quality', 'damage', 'price', 'behavior', 'other'][i], label })),
+    { key: 'SAFETY_IMMEDIATE_DANGER', label: 'Immediate danger or threat' },
+    { key: 'SAFETY_THREAT_OR_HARASSMENT', label: 'Threats or harassment' },
+    { key: 'SAFETY_INJURY', label: 'Injury during the job' },
+    { key: 'SAFETY_UNSAFE_WORK', label: 'Unsafe work or hazardous conditions' },
+    { key: 'SAFETY_IDENTITY_MISMATCH', label: 'Worker identity does not match profile' },
+  ]
 
   const taskerName = job?.acceptedQuote?.provider?.name || t('dispute.tasker')
   const jobTitle = job?.title || t('dispute.job')
