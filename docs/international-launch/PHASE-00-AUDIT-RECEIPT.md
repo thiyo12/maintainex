@@ -69,3 +69,9 @@ Status: **IN PROGRESS — no functional edits or tests executed yet**.
 5. **Gap disposition:** reconcile outstanding defects and establish a verified migration/backout plan for each active high-impact writer.
 
 **Phase 00 verdict: BLOCKED / PARTIALLY VERIFIED.** No production writes or deployment made for this receipt. No later phase can be certified based only on these CI checks.
+
+## Phase 00 inventory implementation — 2026-10-12
+
+- Added `lib/domain/catalog-inventory.ts`: **read-only** aggregate JobCategory/TemplateJob/ServiceTemplate/TaskerSkill counts; LK/CA active eligibility counts; orphan-reference detection; no identifiers or personal records in output.
+- Added executable mock-backed `tests/domain/catalog-inventory.test.ts` proving per-market filtering, orphan counts and no write operations, and included it in `.github/workflows/phase0-7-validation.yml`.
+- This is inventory **code**, not a live production inventory result; live DB read access and recorded counts are still needed before Phase 00 GREEN. CI at latest commit must pass before this change is verified.
