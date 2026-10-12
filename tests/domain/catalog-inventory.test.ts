@@ -32,6 +32,21 @@ describe('Phase 00 read-only catalogue inventory', () => {
       { countryCode: 'CA', activeCategories: 1, activeJobs: 1, activeServiceTemplates: 1 },
     ])
   })
+  it('flags a single-currency job offered in two different markets', async () => {
+    const db = {
+      jobCategory: { findMany: async () => [
+        { id: 'shared', isActive: true, countries: '["LK","CA"]' },
+      ] },
+      templateJob: { findMany: async () => [
+        { id: 'shared-job', categoryId: 'shared', isActive: true, countries: '["LK","CA"]', currency: 'LKR' },
+      ] },
+      serviceTemplate: { findMany: async () => [] },
+      taskerSkill: { count: async () => 0 },
+    }
+    const result = await collectCatalogInventory(db as any)
+    expect(result.wrongMarketJobCurrencies).toBe(1)
+  })
+
   it('does not perform any database mutation', async () => {
     const mutations: string[] = []
     const db = {
