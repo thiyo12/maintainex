@@ -36,6 +36,16 @@ export async function collectCatalogInventory(db: Pick<PrismaClient, 'jobCategor
     orphanedCategoryReferences: jobs.filter(j => !categoryIds.has(j.categoryId)).length,
     orphanedServiceCategoryReferences: templates.filter(t => !categoryIds.has(t.jobCategoryId)).length,
     orphanedServiceJobReferences: templates.filter(t => t.templateJobId && !jobIds.has(t.templateJobId)).length,
+    mismatchedServiceCategoryLinks: templates.filter(t => t.templateJobId &&
+      jobs.some(j => j.id === t.templateJobId && j.categoryId !== t.jobCategoryId)).length,
+    wrongMarketJobCurrencies: jobs.filter(j =>
+      (isCatalogAvailableInMarket(j.countries, 'LK') && j.currency !== 'LKR') ||
+      (isCatalogAvailableInMarket(j.countries, 'CA') && j.currency !== 'CAD')
+    ).length,
+    wrongMarketTemplateCurrencies: templates.filter(t =>
+      (t.countryCode === 'LK' && t.currency !== 'LKR') ||
+      (t.countryCode === 'CA' && t.currency !== 'CAD')
+    ).length,
     markets,
   }
 }
