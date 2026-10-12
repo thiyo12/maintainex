@@ -1,11 +1,19 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { isCatalogAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q') || ''
+    const market = (searchParams.get('country') || 'LK').trim().toUpperCase()
+    if (market !== 'LK' && market !== 'CA') {
+      return NextResponse.json({ error: 'Unsupported market' }, { status: 400 })
+    }
+    if (query.length > 160) {
+      return NextResponse.json({ error: 'Search query exceeds 160 characters' }, { status: 400 })
+    }
 
     if (!query.trim()) {
       return NextResponse.json([])
@@ -20,11 +28,15 @@ export async function GET(request: NextRequest) {
         ],
       },
       include: { category: true },
-      take: 20,
+      take: 200,
       orderBy: { name: 'asc' },
     })
 
-    return NextResponse.json(jobs.map(j => ({
+    const eligible = jobs.filter(j => j.category.isActive &&
+      isCatalogAvailableInMarket(j.countries, market) &&
+      isCatalogAvailableInMarket(j.category.countries, market))
+
+    return NextResponse.json(eligible.slice(0, 20).map(j => ({
       id: j.id,
       categoryId: j.categoryId,
       name: j.name,
