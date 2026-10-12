@@ -38,10 +38,15 @@ export async function collectCatalogInventory(db: Pick<PrismaClient, 'jobCategor
     orphanedServiceJobReferences: templates.filter(t => t.templateJobId && !jobIds.has(t.templateJobId)).length,
     mismatchedServiceCategoryLinks: templates.filter(t => t.templateJobId &&
       jobs.some(j => j.id === t.templateJobId && j.categoryId !== t.jobCategoryId)).length,
-    wrongMarketJobCurrencies: jobs.filter(j =>
-      (isCatalogAvailableInMarket(j.countries, 'LK') && j.currency !== 'LKR') ||
-      (isCatalogAvailableInMarket(j.countries, 'CA') && j.currency !== 'CAD')
-    ).length,
+    wrongMarketJobCurrencies: jobs.filter(j => {
+      const hasLK = isCatalogAvailableInMarket(j.countries, 'LK')
+      const hasCA = isCatalogAvailableInMarket(j.countries, 'CA')
+      // Cross-market templates require independently priced market-specific variants.
+      // One shared currency field cannot safely price a job in both currencies.
+      return (hasLK && hasCA) ||
+        (hasLK && j.currency !== 'LKR') ||
+        (hasCA && j.currency !== 'CAD')
+    }).length,
     wrongMarketTemplateCurrencies: templates.filter(t =>
       (t.countryCode === 'LK' && t.currency !== 'LKR') ||
       (t.countryCode === 'CA' && t.currency !== 'CAD')
