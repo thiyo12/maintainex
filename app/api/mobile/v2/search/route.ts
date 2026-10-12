@@ -56,10 +56,11 @@ export async function GET(request: NextRequest) {
     const bySlug = new Map(eligibleCategories.filter(c => c.slug).map(c => [c.slug!, c]))
     const eligibleJobs = await prisma.templateJob.findMany({
       where: { isActive: true, categoryId: { in: eligibleCategories.map(c => c.id) } },
-      select: { id: true, name: true, categoryId: true, countries: true },
+      select: { id: true, name: true, categoryId: true, countries: true, currency: true },
     })
+    const expectedCurrency = market === 'LK' ? 'LKR' : 'CAD'
     const byCategoryAndName = new Map(
-      eligibleJobs.filter(j => isCatalogAvailableInMarket(j.countries, market))
+      eligibleJobs.filter(j => j.currency === expectedCurrency && isCatalogAvailableInMarket(j.countries, market))
         .map(j => [j.categoryId + ':' + j.name.toLowerCase(), j]),
     )
 
@@ -128,6 +129,6 @@ export async function GET(request: NextRequest) {
       totalResults: categories.length + subServices.length,
     })
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Search failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Search failed' }, { status: 500 })
   }
 }
