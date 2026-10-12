@@ -22,7 +22,8 @@ export async function GET(request: NextRequest) {
       orderBy: [{ isPopular: 'desc' }, { name: 'asc' }],
     })
 
-    jobs = jobs.filter(j => j.category.isActive &&
+    const expectedCurrency = country === 'LK' ? 'LKR' : 'CAD'
+    jobs = jobs.filter(j => j.currency === expectedCurrency && j.category.isActive &&
       isCatalogAvailableInMarket(j.countries, country) &&
       isCatalogAvailableInMarket(j.category.countries, country))
 
