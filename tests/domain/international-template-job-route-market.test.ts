@@ -11,6 +11,10 @@ describe('legacy-consumer V2 template job country isolation', () => {
       expect(source).toContain("market !== 'LK' && market !== 'CA'".replaceAll('market', name === 'list' ? 'country' : 'market'))
       expect(source).toContain("error: 'Unsupported market'")
     })
+    it(`${name} rejects job prices denominated in a different market currency`, () => {
+      expect(source).toContain("const expectedCurrency = ")
+      expect(source).toContain("j.currency === expectedCurrency")
+    })
     it(`${name} checks both job and active parent category market grants`, () => {
       expect(source).toContain('j.category.isActive')
       expect(source).toContain('isCatalogAvailableInMarket(j.countries,')
