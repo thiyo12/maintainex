@@ -16,12 +16,13 @@ describe('Phase 00 read-only catalogue inventory', () => {
       serviceTemplate: { findMany: async () => [
         { jobCategoryId: 'category-ca', templateJobId: 'job-ca', countryCode: 'CA', currency: 'CAD', isActive: true },
         { jobCategoryId: 'category-ca', templateJobId: 'missing', countryCode: 'CA', currency: 'CAD', isActive: true },
+        { jobCategoryId: 'category-lk', templateJobId: 'job-lk', countryCode: 'CA', currency: 'CAD', isActive: true },
       ] },
       taskerSkill: { count: async () => 12 },
     }
     const result = await collectCatalogInventory(db as any)
     expect(result).toMatchObject({
-      categories: 2, jobs: 3, serviceTemplates: 2, taskerSkillLinks: 12,
+      categories: 2, jobs: 3, serviceTemplates: 3, taskerSkillLinks: 12,
       orphanedCategoryReferences: 1, orphanedServiceJobReferences: 1,
     })
     expect(result.markets).toEqual([
