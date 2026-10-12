@@ -23,7 +23,10 @@ export async function collectCatalogInventory(db: Pick<PrismaClient, 'jobCategor
       isCatalogAvailableInMarket(categoryById.get(j.categoryId)!.countries, countryCode)).length,
     activeServiceTemplates: templates.filter(t => t.isActive && t.countryCode === countryCode &&
       t.currency === (countryCode === 'LK' ? 'LKR' : 'CAD') &&
-      categoryIds.has(t.jobCategoryId) && (!t.templateJobId || jobIds.has(t.templateJobId))).length,
+      !!categoryById.get(t.jobCategoryId)?.isActive &&
+      isCatalogAvailableInMarket(categoryById.get(t.jobCategoryId)!.countries, countryCode) &&
+      (!t.templateJobId || jobs.some(j => j.id === t.templateJobId && j.categoryId === t.jobCategoryId &&
+        j.isActive && isCatalogAvailableInMarket(j.countries, countryCode)))).length,
   }))
   return {
     categories: categories.length,
