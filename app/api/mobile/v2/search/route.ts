@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
       // or categories; do not leak Canada-only suggestions to LK.
       const allowedNames = new Set([
         ...eligibleCategories.map(c => c.name.toLowerCase()),
-        ...eligibleJobs.filter(j => isCatalogAvailableInMarket(j.countries, market)).map(j => j.name.toLowerCase()),
+        ...eligibleJobs.filter(j => j.currency === expectedCurrency && isCatalogAvailableInMarket(j.countries, market)).map(j => j.name.toLowerCase()),
       ])
       const suggestions = getAutocompleteSuggestions(q).filter(name => allowedNames.has(name.toLowerCase()))
       return NextResponse.json({ query: q, suggestions })
