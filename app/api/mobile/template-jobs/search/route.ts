@@ -19,9 +19,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([])
     }
 
+    const expectedCurrency = market === 'LK' ? 'LKR' : 'CAD'
     const jobs = await prisma.templateJob.findMany({
       where: {
         isActive: true,
+        currency: expectedCurrency,
+        category: { is: { isActive: true } },
         OR: [
           { name: { contains: query } },
           { description: { contains: query } },
@@ -32,7 +35,6 @@ export async function GET(request: NextRequest) {
       orderBy: { name: 'asc' },
     })
 
-    const expectedCurrency = market === 'LK' ? 'LKR' : 'CAD'
     const eligible = jobs.filter(j => j.currency === expectedCurrency && j.category.isActive &&
       isCatalogAvailableInMarket(j.countries, market) &&
       isCatalogAvailableInMarket(j.category.countries, market))
