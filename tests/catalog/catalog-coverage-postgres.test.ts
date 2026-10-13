@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  parseCountryList,
   summariseCatalogueCoverage,
   validateCatalogueIntegrity,
   type CatalogueCategory,
@@ -71,8 +72,8 @@ describe.skipIf(!isPostgres)('service catalogue integrity (database-backed)', ()
   it('only advertises launch markets (Sri Lanka and Canada)', () => {
     const markets = new Set<string>()
     for (const row of [...categories, ...jobs]) {
-      for (const country of (row.countries || '').split(',').map(c => c.trim()).filter(Boolean)) {
-        markets.add(country.toUpperCase())
+      for (const country of parseCountryList(row.countries)) {
+        markets.add(country)
       }
     }
     for (const market of markets) {
@@ -83,10 +84,7 @@ describe.skipIf(!isPostgres)('service catalogue integrity (database-backed)', ()
   it('prices Canadian services in CAD and Sri Lankan services in LKR', () => {
     const mismatches = jobs.filter(job => {
       const currency = (job.currency || '').trim().toUpperCase()
-      const countries = (job.countries || '')
-        .split(',')
-        .map(c => c.trim().toUpperCase())
-        .filter(Boolean)
+      const countries = parseCountryList(job.countries)
       if (countries.includes('LK') && currency !== 'LKR') return true
       if (countries.includes('CA') && currency !== 'CAD') return true
       return false
