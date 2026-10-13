@@ -420,4 +420,16 @@ export const PROPOSED_SKILLS: ProposedSkill[] = [
   // ---- renovation ----
   { slug: 'closet-and-storage-design', name: 'Closet and storage design', description: 'Design fitted storage and closet systems', department: 'home-renovation-and-interiors' },
   { slug: 'waterproofing-certification', name: 'Waterproofing certification', description: 'Certified in wet-area and tank waterproofing', department: 'home-renovation-and-interiors' },
+
+  // ---- glass ----
+  { slug: 'glass-partition-installation', name: 'Glass partition installation', description: 'Install framed glass partition walls', department: 'glass-and-aluminium' },
+
+  // ---- locksmith ----
+  { slug: 'door-unlocking', name: 'Door unlocking', description: 'Open locked doors without damage where possible', department: 'locksmith-services' },
+  { slug: 'key-duplication', name: 'Key duplication', description: 'Cut and duplicate keys', department: 'locksmith-services' },
+  { slug: 'emergency-locksmith-service', name: 'Emergency locksmith service', description: 'Out-of-hours lockout response', department: 'locksmith-services' },
+
+  // ---- curtains ----
+  { slug: 'curtain-repair', name: 'Curtain repair', description: 'Repair and alter curtains and drapes', department: 'curtains-blinds-and-upholstery' },
+  { slug: 'curtain-track-installation', name: 'Curtain track installation', description: 'Install curtain tracks and rails', department: 'curtains-blinds-and-upholstery' },
 ]

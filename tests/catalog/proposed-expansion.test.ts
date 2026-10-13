@@ -132,6 +132,21 @@ describe('proposed catalogue coverage', () => {
     )
   })
 
+  it('exactly closes the approved 27 department / 548 service gap', () => {
+    expect(coverage.resultingDepartments).toBe(27)
+    expect(coverage.resultingServices).toBe(548)
+    expect(coverage.servicesShortfall).toBe(0)
+  })
+
+  it('covers every department in the live catalogue and adds the three missing ones', () => {
+    const covered = new Set(PROPOSED_SERVICES.map(s => s.department))
+    const expected = new Set([
+      ...EXISTING.departments.map(d => d.slug),
+      ...PROPOSED_DEPARTMENTS.map(d => d.slug),
+    ])
+    expect([...expected].filter(slug => !covered.has(slug))).toEqual([])
+  })
+
   it('splits Sri Lankan and Vancouver eligibility deliberately', () => {
     expect(Object.keys(coverage.markets).sort()).toEqual(['CA', 'LK'])
   })
