@@ -124,9 +124,11 @@ describe('authoritative market resolution from the service address', () => {
     expect(lk.ok).toBe(true)
     if (lk.ok) expect(lk.countryCode).toBe('LK')
 
+    // Canadian postal codes are metro-wide and cannot prove Vancouver, so they
+    // must never grant the Canadian market on their own.
     const ca = resolveMarketFromServiceAddress({ postalCode: 'V6B 1A1' })
-    expect(ca.ok).toBe(true)
-    if (ca.ok) expect(ca.countryCode).toBe('CA')
+    expect(ca.ok).toBe(false)
+    if (!ca.ok) expect(ca.code).toBe('ADDRESS_REQUIRES_VERIFICATION')
 
     const bad = resolveMarketFromServiceAddress({ postalCode: 'NOT-A-CODE' })
     expect(bad.ok).toBe(false)
@@ -134,12 +136,22 @@ describe('authoritative market resolution from the service address', () => {
   })
 
   it('does not treat an unsupported claimed country as authorization', () => {
+    // Claiming an unsupported country must never widen access, and a foreign
+    // postal code must not resolve into a launch market.
     const result = resolveMarketFromServiceAddress({
       postalCode: 'V6B 1A1',
       claimedCountryCode: 'US',
     })
-    expect(result.ok).toBe(true)
-    if (result.ok) expect(result.countryCode).toBe('CA')
+    expect(result.ok).toBe(false)
+
+    // A Sri Lankan postal code stays in Sri Lanka even when the client claims
+    // another country, because the claimed value is advisory only.
+    const lk = resolveMarketFromServiceAddress({
+      postalCode: '00100',
+      claimedCountryCode: 'US',
+    })
+    expect(lk.ok).toBe(true)
+    if (lk.ok) expect(lk.countryCode).toBe('LK')
   })
 })
 

@@ -15,6 +15,11 @@
  * the default market.
  */
 
+import {
+  VANCOUVER_BOUNDARY_VERSION,
+  evaluateVancouverBoundary,
+} from './vancouver-boundary'
+
 export type CountryCode = 'LK' | 'CA'
 
 export interface MarketConfig {
@@ -61,7 +66,15 @@ export const LAUNCH_MARKETS: Record<string, MarketConfig> = {
     currency: 'CAD',
     // Vancouver municipal limits only. Other Metro Vancouver municipalities
     // (Richmond, Burnaby, Surrey, New Westminster...) are intentionally out of
-    // launch scope and are rejected by the bounding envelope below.
+    // launch scope.
+    //
+    // The bounding envelope is a cheap pre-filter only; the official municipal
+    // polygon in lib/geography/vancouver-boundary.ts makes the final decision.
+    //
+    // NOTE: Canadian postal codes are metro-wide. Burnaby (V5K), Richmond
+    // (V6X/V6Y) and North Vancouver (V7P/V7R) all match the pattern below, so a
+    // postal code can never grant the Canadian market on its own: validated
+    // coordinates are mandatory.
     districts: ['Vancouver'],
     bounds: {
       minLatitude: 49.2,
@@ -122,6 +135,8 @@ export type MarketResolution =
       countryCode: CountryCode
       district: string | null
       source: 'coordinates' | 'postal' | 'coordinates+postal'
+      /** Version of the municipal boundary used to validate this address. */
+      boundaryVersion: string | null
     }
   | {
       ok: false
@@ -130,6 +145,9 @@ export type MarketResolution =
         | 'ADDRESS_OUTSIDE_LAUNCH_GEOGRAPHY'
         | 'ADDRESS_OUTSIDE_MARKET'
         | 'POSTAL_CODE_INVALID'
+        | 'ADDRESS_OUTSIDE_VANCOUVER'
+        | 'ADDRESS_REQUIRES_VERIFICATION'
+        | 'BOUNDARY_DATA_UNAVAILABLE'
       error: string
     }
 
@@ -165,6 +183,43 @@ export function resolveMarketFromServiceAddress(input: ServiceAddressInput): Mar
 
     // Coordinates can only ever narrow to a single launch market.
     const market = candidates[0]
+
+    // The bounding envelope only narrows the candidates. For Canada the official
+    // municipal polygon is the final authority on whether a service location is
+    // inside the City of Vancouver.
+    let boundaryVersion: string | null = null
+    if (market.countryCode === 'CA') {
+      const boundary = evaluateVancouverBoundary(
+        input.latitude as number,
+        input.longitude as number,
+      )
+      if (boundary === 'OUTSIDE') {
+        return {
+          ok: false,
+          code: 'ADDRESS_OUTSIDE_VANCOUVER',
+          error:
+            'This service address is outside the City of Vancouver. MaintainEX is not available at this location yet.',
+        }
+      }
+      if (boundary === 'NEAR_BOUNDARY') {
+        return {
+          ok: false,
+          code: 'ADDRESS_REQUIRES_VERIFICATION',
+          error:
+            'This service address is very close to the City of Vancouver boundary and needs verification before it can be booked.',
+        }
+      }
+      if (boundary !== 'INSIDE') {
+        return {
+          ok: false,
+          code: 'BOUNDARY_DATA_UNAVAILABLE',
+          error:
+            'We could not verify this service address against the City of Vancouver boundary. Booking is unavailable until it can be verified.',
+        }
+      }
+      boundaryVersion = VANCOUVER_BOUNDARY_VERSION
+    }
+
     const postal = (input.postalCode || '').trim()
 
     if (postal) {
@@ -180,6 +235,7 @@ export function resolveMarketFromServiceAddress(input: ServiceAddressInput): Mar
         countryCode: market.countryCode,
         district: matchDistrict(market, input.district),
         source: 'coordinates+postal',
+        boundaryVersion,
       }
     }
 
@@ -188,6 +244,7 @@ export function resolveMarketFromServiceAddress(input: ServiceAddressInput): Mar
       countryCode: market.countryCode,
       district: matchDistrict(market, input.district),
       source: 'coordinates',
+      boundaryVersion,
     }
   }
 
@@ -216,11 +273,24 @@ export function resolveMarketFromServiceAddress(input: ServiceAddressInput): Mar
   }
 
   const market = matched[0]
+
+  if (market.countryCode === 'CA') {
+    // Metro-wide postal codes cannot distinguish Vancouver from Burnaby, Richmond
+    // or North Vancouver, so Canadian access requires validated coordinates.
+    return {
+      ok: false,
+      code: 'ADDRESS_REQUIRES_VERIFICATION',
+      error:
+        'A validated service location is required for Vancouver addresses. Postal codes are shared across neighbouring municipalities.',
+    }
+  }
+
   return {
     ok: true,
     countryCode: market.countryCode,
     district: matchDistrict(market, input.district),
     source: 'postal',
+    boundaryVersion: null,
   }
 }
 
