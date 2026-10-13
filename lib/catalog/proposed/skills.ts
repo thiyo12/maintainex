@@ -406,4 +406,18 @@ export const PROPOSED_SKILLS: ProposedSkill[] = [
 
   // ---- it ----
   { slug: 'data-backup-and-recovery', name: 'Data backup and recovery', description: 'Back up and recover data from failed devices', department: 'it-and-electronics-repair' },
+
+  // ---- event ----
+  { slug: 'food-hygiene-certification', name: 'Food hygiene certification', description: 'Certified in safe food handling and preparation', department: 'event-and-party-services' },
+
+  // ---- personal care ----
+  { slug: 'massage-therapy-at-home', name: 'Massage therapy', description: 'Professional massage delivered at the client location', department: 'personal-care-and-wellness' },
+  { slug: 'haircut-and-styling-at-home', name: 'Haircut and styling', description: 'Haircutting, styling and finishing services', department: 'personal-care-and-wellness' },
+  { slug: 'solar-water-heater-installation', name: 'Solar water heater installation', description: 'Install solar water heating systems', department: 'solar-and-energy-solutions' },
+  { slug: 'energy-audit-and-consultation', name: 'Energy audit', description: 'Assess energy consumption and efficiency', department: 'solar-and-energy-solutions' },
+  { slug: 'battery-storage-system-setup', name: 'Battery storage setup', description: 'Install and configure battery storage systems', department: 'solar-and-energy-solutions' },
+
+  // ---- renovation ----
+  { slug: 'closet-and-storage-design', name: 'Closet and storage design', description: 'Design fitted storage and closet systems', department: 'home-renovation-and-interiors' },
+  { slug: 'waterproofing-certification', name: 'Waterproofing certification', description: 'Certified in wet-area and tank waterproofing', department: 'home-renovation-and-interiors' },
 ]
