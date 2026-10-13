@@ -1,4 +1,5 @@
 import { logger } from '@/lib/shared/observability/logger'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { NextRequest, NextResponse } from 'next/server'
 import { createPaymentIntent, getPaymentStatus } from '@/lib/payment/payment-service'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -100,6 +101,13 @@ export async function GET(
       }),
     ])
 
+    // Phase 02: payment follows the authoritative service-address market.
+    const jobMarket = requireJobMarket(job)
+    if (!jobMarket.ok) {
+      return NextResponse.json({ error: jobMarket.error, code: jobMarket.code }, { status: 409 })
+    }
+    const authoritativeCountryCode = jobMarket.countryCode
+
     let onlineProvider: Awaited<ReturnType<typeof resolvePaymentProviderForMarket>> = null
     let cashFinanciallyAllowed = false
     let onlineFinanciallyAllowed = false
@@ -110,7 +118,7 @@ export async function GET(
       (acceptedQuote.providerType === 'INDIVIDUAL' || acceptedQuote.providerType === 'COMPANY')
     ) {
       onlineProvider = await resolvePaymentProviderForMarket({
-        countryCode: job.countryCode,
+        countryCode: authoritativeCountryCode,
         currency: escrow.currency,
       })
 
@@ -118,12 +126,12 @@ export async function GET(
         const identity = await ensureProviderIdentity(tx, {
           providerId: acceptedQuote.providerId,
           providerType: acceptedQuote.providerType as 'INDIVIDUAL' | 'COMPANY',
-          countryCode: job.countryCode,
+          countryCode: authoritativeCountryCode,
         })
         return evaluateStoredProviderFinancialStanding(tx, {
           providerIdentityId: identity.id,
           providerType: acceptedQuote.providerType as 'INDIVIDUAL' | 'COMPANY',
-          countryCode: job.countryCode,
+          countryCode: authoritativeCountryCode,
           currency: escrow.currency,
         })
       })
@@ -134,12 +142,12 @@ export async function GET(
 
     const cashMarketAvailable = Boolean(
       escrow &&
-      isCashPaymentAvailableForMarket(job.countryCode, escrow.currency)
+      isCashPaymentAvailableForMarket(authoritativeCountryCode, escrow.currency)
     )
     const onlineMarketAvailable = Boolean(onlineProvider)
 
     const options = {
-      countryCode: job.countryCode,
+      countryCode: authoritativeCountryCode,
       currency: escrow?.currency || null,
       cash: {
         available: cashMarketAvailable && cashFinanciallyAllowed,

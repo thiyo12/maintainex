@@ -262,3 +262,26 @@ export function resolveJobMarket(job: {
   if (isSupportedMarket(job.countryCode)) return job.countryCode!.toUpperCase() as CountryCode
   return null
 }
+/**
+ * Authoritative market guard for job-scoped commercial operations.
+ *
+ * Discovery, quoting, quote acceptance, booking, payment and refund paths must
+ * all derive the market from the job's validated service address rather than
+ * from a caller-supplied or stored country value alone.
+ */
+export function requireJobMarket(job: {
+  countryCode?: string | null
+  latitude?: number | null
+  longitude?: number | null
+}):
+  | { ok: true; countryCode: CountryCode }
+  | { ok: false; code: 'JOB_MARKET_UNRESOLVED'; error: string } {
+  const countryCode = resolveJobMarket(job)
+  if (countryCode) return { ok: true, countryCode }
+  return {
+    ok: false,
+    code: 'JOB_MARKET_UNRESOLVED',
+    error:
+      'This job has no valid service address in a supported launch market and cannot be quoted, booked or paid.',
+  }
+}
