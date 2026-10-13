@@ -4,6 +4,7 @@ import { createHash } from 'crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
+import { resolveMarketFromServiceAddress } from '@/lib/geography/market-engine'
 import { blastJobToTaskers } from '@/lib/job-blast'
 import { calculatePrice } from '@/lib/pricing/engine'
 import { getSetting } from '@/lib/settings'
@@ -144,7 +145,29 @@ export async function POST(request: NextRequest) {
     }
 
     const finalPreferredTimeSlot = ['morning', 'afternoon', 'evening', 'anytime'].includes(preferredTimeSlot) ? preferredTimeSlot : null
-    const finalCountryCode = typeof countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(countryCode) ? countryCode.toUpperCase() : 'LK'
+    const claimedCountryCode = typeof countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(countryCode) ? countryCode.toUpperCase() : null
+
+    // Phase 02 authority rule: the validated service address decides the market.
+    // A client-supplied country value is advisory only and can never authorize
+    // a market on its own.
+    const addressResolution = resolveMarketFromServiceAddress({
+      latitude: typeof latitude === 'number' && Number.isFinite(latitude) ? latitude : null,
+      longitude: typeof longitude === 'number' && Number.isFinite(longitude) ? longitude : null,
+      postalCode: typeof postalCode === 'string' ? postalCode : null,
+      claimedCountryCode,
+    })
+
+    if (!addressResolution.ok) {
+      return NextResponse.json(
+        {
+          error: addressResolution.error,
+          code: addressResolution.code,
+        },
+        { status: 400 }
+      )
+    }
+
+    const finalCountryCode = addressResolution.countryCode
     const currency = getCurrencyForCountry(finalCountryCode)
     const budgetProvided = budgetAmount !== undefined && budgetAmount !== null && budgetAmount !== ''
     const budgetMinor = budgetProvided ? parseMajorUnitsInput(budgetAmount, currency) : null
