@@ -565,7 +565,12 @@ async function evaluateServiceArea(
   providerId: string,
   job: MatchingInput,
 ): Promise<boolean> {
-  if (!job.countryCode) return true
+  // A job whose market cannot be established must match nobody. Returning true
+  // here would surface providers from any country, including providers who cannot
+  // legally or practically serve the address.
+  if (!job.countryCode) return false
+
+  const jobCountry = job.countryCode.toUpperCase()
 
   const target = await client.marketplaceJob.findUnique({
     where: { id: job.jobId },
@@ -590,8 +595,8 @@ async function evaluateServiceArea(
       }),
     ])
 
-    const providerCountry = profile?.countryCode || user?.countryCode
-    if (providerCountry !== job.countryCode) return false
+    const providerCountry = (profile?.countryCode || user?.countryCode || '').toUpperCase()
+    if (providerCountry !== jobCountry) return false
 
     if (
       target?.latitude != null && target.longitude != null &&
@@ -617,8 +622,8 @@ async function evaluateServiceArea(
   })
   if (!company) return false
 
-  const providerCountry = company.countryCode || company.user?.countryCode
-  if (providerCountry !== job.countryCode) return false
+  const providerCountry = (company.countryCode || company.user?.countryCode || '').toUpperCase()
+  if (providerCountry !== jobCountry) return false
 
   if (
     target?.latitude != null && target.longitude != null &&
