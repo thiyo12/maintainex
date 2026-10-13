@@ -391,4 +391,6 @@ export const PROPOSED_SKILLS: ProposedSkill[] = [
   { slug: 'pet-and-child-care-combined', name: 'Combined family care', description: 'Care for children and pets together safely', department: 'childcare-and-family-support' },
   { slug: 'safeguarding-trained-carer', name: 'Safeguarding trained carer', description: 'Completed verified safeguarding and first aid training', department: 'childcare-and-family-support' },
   { slug: 'childcare-provider', name: 'Childcare provider', description: 'Identity-verified and reference-checked carer', department: 'childcare-and-family-support' },
+  { slug: 'weed-control', name: 'Weed control', description: 'Targeted weed identification and treatment', department: 'gardening-and-landscaping' },
+  { slug: 'garden-lighting-installation', name: 'Garden lighting installation', description: 'Install and aim low-voltage garden lighting', department: 'gardening-and-landscaping' },
 ]

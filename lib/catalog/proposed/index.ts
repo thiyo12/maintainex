@@ -1,5 +1,6 @@
 import { SERVICES_BATCH_1 } from './services-batch-1'
 import { SERVICES_BATCH_2 } from './services-batch-2'
+import { SERVICES_BATCH_3 } from './services-batch-3'
 
 import type { ProposedService } from '../proposed-expansion'
 
@@ -12,4 +13,5 @@ import type { ProposedService } from '../proposed-expansion'
 export const PROPOSED_SERVICES: ProposedService[] = [
   ...SERVICES_BATCH_1,
   ...SERVICES_BATCH_2,
+  ...SERVICES_BATCH_3,
 ]
