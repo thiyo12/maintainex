@@ -1,4 +1,5 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
+import { getMarketConfig } from '@/lib/geography/market-engine'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
@@ -35,6 +36,7 @@ export async function GET() {
       ...fallbackCountries,
     ]
       .filter(country => availableMarkets.size === 0 || availableMarkets.has(country.code.toUpperCase()))
+      .map(country => restrictToLaunchMarket(country))
       .sort((a, b) => a.name.localeCompare(b.name))
 
     const source =
@@ -63,4 +65,30 @@ export async function GET() {
       }
     )
   }
+}
+
+type CountryWithRegions = {
+  code: string
+  states?: Array<{ cities?: Array<{ name: string }> }>
+}
+
+/**
+ * Phase 02: only locations inside a launch market may be offered. Canada is
+ * restricted to the City of Vancouver, so neighbouring municipalities must
+ * never appear in the address picker even when present in the database.
+ */
+function restrictToLaunchMarket<T extends CountryWithRegions>(country: T): T {
+  const market = getMarketConfig(country.code)
+  if (!market || !country.states) return country
+
+  const allowed = new Set(market.districts.map(district => district.toLowerCase()))
+  return {
+    ...country,
+    states: country.states
+      .map(state => ({
+        ...state,
+        cities: (state.cities || []).filter(city => allowed.has(city.name.toLowerCase())),
+      }))
+      .filter(state => (state.cities || []).length > 0),
+  } as T
 }

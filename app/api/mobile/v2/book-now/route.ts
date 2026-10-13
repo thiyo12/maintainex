@@ -1,4 +1,5 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
+import { resolveMarketFromServiceAddress } from '@/lib/geography/market-engine'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { createBookNowJob } from '@/lib/domain/book-now'
@@ -44,11 +45,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'providerType must be INDIVIDUAL or COMPANY' }, { status: 400 })
     }
 
-    const requestedCountryCode = typeof countryCode === 'string' && countryCode.trim()
-      ? countryCode.trim().toUpperCase()
-      : user.countryCode
+    // Phase 02: the service address decides the market. The client-claimed
+    // country is advisory only and can never authorize a booking.
+    const market = resolveMarketFromServiceAddress({
+      district: String(district).trim(),
+      latitude: typeof latitude === 'number' ? latitude : undefined,
+      longitude: typeof longitude === 'number' ? longitude : undefined,
+      claimedCountryCode: typeof countryCode === 'string' ? countryCode : user.countryCode,
+    })
 
-    if (requestedCountryCode !== user.countryCode) {
+    if (!market.ok) {
+      return NextResponse.json({ error: market.error, code: market.code }, { status: 400 })
+    }
+
+    const requestedCountryCode = market.countryCode
+
+    if (user.countryCode && requestedCountryCode !== user.countryCode.toUpperCase()) {
       return NextResponse.json({
         error: 'Country mismatch: you cannot create jobs in a different country',
         code: 'COUNTRY_MISMATCH',
