@@ -54,3 +54,73 @@ export async function collectCatalogInventory(db: Pick<PrismaClient, 'jobCategor
     markets,
   }
 }
+
+/**
+ * Read-only provider association inventory (Phase 01 exit gate).
+ *
+ * The catalogue is only useful if providers stay linked to the services they
+ * can actually deliver. These aggregate checks prove that catalogue work never
+ * silently strands a provider, without exposing any personal information.
+ */
+export async function collectProviderAssociations(
+  db: Pick<PrismaClient, 'templateJob' | 'jobCategory' | 'taskerSkill' | 'taskerProfile'>,
+) {
+  const [jobs, categories, skills, taskerCount] = await Promise.all([
+    db.templateJob.findMany({
+      select: {
+        id: true,
+        categoryId: true,
+        isActive: true,
+        countries: true,
+        _count: { select: { taskerSkills: true } },
+      },
+    }),
+    db.jobCategory.findMany({ select: { id: true, isActive: true } }),
+    db.taskerSkill.findMany({ select: { id: true, jobId: true, taskerId: true, currency: true } }),
+    db.taskerProfile.count(),
+  ])
+
+  const jobIds = new Set(jobs.map(j => j.id))
+  const categoryById = new Map(categories.map(c => [c.id, c]))
+  const linkedTaskers = new Set(skills.map(s => s.taskerId))
+
+  const providerLinksPerJob = new Map<string, number>()
+  for (const skill of skills) {
+    providerLinksPerJob.set(skill.jobId, (providerLinksPerJob.get(skill.jobId) ?? 0) + 1)
+  }
+
+  const jobsWithNoProviders = jobs.filter(j => (providerLinksPerJob.get(j.id) ?? 0) === 0)
+
+  return {
+    taskers: taskerCount,
+    taskersWithCatalogueSkills: linkedTaskers.size,
+    taskersWithoutCatalogueSkills: Math.max(0, taskerCount - linkedTaskers.size),
+    providerSkillLinks: skills.length,
+    jobsWithProviders: jobs.length - jobsWithNoProviders.length,
+    jobsWithNoProviders: jobsWithNoProviders.length,
+    /** Provider links that point at a template job that no longer exists. */
+    orphanedProviderLinks: skills.filter(s => !jobIds.has(s.jobId)).length,
+    /** Provider links whose job belongs to a now inactive department. */
+    providerLinksInInactiveDepartments: skills.filter(s => {
+      const job = jobs.find(j => j.id === s.jobId)
+      return !!job && categoryById.get(job.categoryId)?.isActive === false
+    }).length,
+    /** Provider links whose job is inactive, so they cannot be discovered. */
+    providerLinksOnInactiveJobs: skills.filter(s => {
+      const job = jobs.find(j => j.id === s.jobId)
+      return !!job && job.isActive === false
+    }).length,
+    /** Provider rate currencies that contradict the job's market. */
+    providerLinksWithWrongCurrency: skills.filter(s => {
+      const job = jobs.find(j => j.id === s.jobId)
+      if (!job) return false
+      const hasLK = isCatalogAvailableInMarket(job.countries, 'LK')
+      const hasCA = isCatalogAvailableInMarket(job.countries, 'CA')
+      return (hasLK && s.currency !== 'LKR') || (hasCA && s.currency !== 'CAD')
+    }).length,
+    topUnstaffedJobs: jobsWithNoProviders.slice(0, 25).map(j => ({
+      id: j.id,
+      providerLinks: 0,
+    })),
+  }
+}
