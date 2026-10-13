@@ -21,6 +21,11 @@ describe('legacy-consumer V2 template job country isolation', () => {
       expect(source).toContain('isCatalogAvailableInMarket(j.category.countries,')
     })
   }
+  it('applies currency and parent activity at database query time before the search cap', () => {
+    expect(search).toContain('currency: expectedCurrency,')
+    expect(search).toContain('category: { is: { isActive: true } },')
+    expect(search.indexOf('currency: expectedCurrency,')).toBeLessThan(search.indexOf('take: 200'))
+  })
   it('caps search inputs and checks eligibility before returning the first 20 matches', () => {
     expect(search).toContain('query.length > 160')
     expect(search).toContain('eligible.slice(0, 20)')
