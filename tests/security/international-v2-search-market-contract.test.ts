@@ -23,6 +23,10 @@ describe('V2 search market eligibility source invariants', () => {
     expect(route).not.toContain("error?.message || 'Search failed'")
   })
 
+  it('restricts autocomplete suggestions to currency-safe market jobs', () => {
+    expect(route).toContain('...eligibleJobs.filter(j => j.currency === expectedCurrency && isCatalogAvailableInMarket(j.countries, market)).map(j => j.name.toLowerCase())')
+  })
+
   it('does not use unscoped search results directly in response lists', () => {
     expect(route).toContain('const eligibleResults = results.filter')
     expect(route).toContain("const categories = eligibleResults")
