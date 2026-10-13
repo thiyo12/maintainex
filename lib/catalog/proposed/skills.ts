@@ -393,4 +393,17 @@ export const PROPOSED_SKILLS: ProposedSkill[] = [
   { slug: 'childcare-provider', name: 'Childcare provider', description: 'Identity-verified and reference-checked carer', department: 'childcare-and-family-support' },
   { slug: 'weed-control', name: 'Weed control', description: 'Targeted weed identification and treatment', department: 'gardening-and-landscaping' },
   { slug: 'garden-lighting-installation', name: 'Garden lighting installation', description: 'Install and aim low-voltage garden lighting', department: 'gardening-and-landscaping' },
+
+  // ---- security ----
+  { slug: 'cameras-and-cctv', name: 'Cameras and CCTV', description: 'Design, install and configure camera systems', department: 'home-security-and-automation' },
+  { slug: 'electric-fence-installation', name: 'Electric fence installation', description: 'Install and service perimeter electric fencing', department: 'home-security-and-automation' },
+  { slug: 'gate-automation', name: 'Gate automation', description: 'Automate gates and barriers with safety controls', department: 'home-security-and-automation' },
+  { slug: 'fire-alarm-certification', name: 'Fire alarm certification', description: 'Certified to install and certify fire alarm systems', department: 'home-security-and-automation' },
+
+  // ---- moving ----
+  { slug: 'packing-service', name: 'Packing service', description: 'Professional wrapping and packing of belongings', department: 'moving-and-packing' },
+  { slug: 'furniture-assembly', name: 'Furniture assembly', description: 'Assemble and disassemble furniture safely', department: 'moving-and-packing' },
+
+  // ---- it ----
+  { slug: 'data-backup-and-recovery', name: 'Data backup and recovery', description: 'Back up and recover data from failed devices', department: 'it-and-electronics-repair' },
 ]
