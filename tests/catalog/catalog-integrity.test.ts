@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CATALOGUE_TARGETS,
+  parseCountryList,
   summariseCatalogueCoverage,
   validateCatalogueIntegrity,
   type CatalogueCategory,
@@ -29,6 +30,26 @@ function job(overrides: Partial<CatalogueJob> = {}): CatalogueJob {
     ...overrides,
   }
 }
+
+describe('parseCountryList', () => {
+  it('parses JSON-encoded market arrays as stored by the seeds', () => {
+    expect(parseCountryList('["LK"]')).toEqual(['LK'])
+    expect(parseCountryList('["LK","CA"]')).toEqual(['LK', 'CA'])
+    expect(parseCountryList('["lk"," ca "]')).toEqual(['LK', 'CA'])
+  })
+
+  it('parses plain comma lists', () => {
+    expect(parseCountryList('LK,CA')).toEqual(['LK', 'CA'])
+    expect(parseCountryList('lk')).toEqual(['LK'])
+  })
+
+  it('handles empty and malformed values safely', () => {
+    expect(parseCountryList('')).toEqual([])
+    expect(parseCountryList(null)).toEqual([])
+    expect(parseCountryList(undefined)).toEqual([])
+    expect(parseCountryList('["LK"')).toEqual(['["LK"'])
+  })
+})
 
 describe('catalogue integrity validators', () => {
   it('accepts a well-formed catalogue', () => {
@@ -114,6 +135,15 @@ describe('catalogue integrity validators', () => {
   it('flags inactive services left inside an active department', () => {
     const violations = validateCatalogueIntegrity([category()], [job({ isActive: false })])
     expect(violations.map(v => v.code)).toContain('INACTIVE_JOB_IN_ACTIVE_CATEGORY')
+  })
+
+  it('accepts JSON-encoded market assignments as seeded', () => {
+    expect(
+      validateCatalogueIntegrity(
+        [category({ countries: '["LK"]' })],
+        [job({ countries: '["LK"]' }), job({ id: 'job-ca', name: 'Vancouver Clean', categoryId: 'cat-1', countries: '["CA"]', currency: 'CAD' })],
+      ),
+    ).toEqual([])
   })
 
   it('rejects a service with no market assignment', () => {

@@ -42,8 +42,30 @@ function normalize(value: string | null | undefined): string {
   return (value || '').trim().toLowerCase()
 }
 
-function parseCountryList(value: string | null | undefined): string[] {
-  return (value || '')
+/**
+ * Catalogue market assignments are persisted as a String column in two shapes
+ * depending on the seed: a JSON array (`["LK","CA"]`, used by
+ * prisma/seed-job-section.ts and seed-new-menu-categories.ts) or a plain comma
+ * list (`LK,CA`). Both must parse identically or seeded rows read as invalid.
+ */
+export function parseCountryList(value: string | null | undefined): string[] {
+  const raw = (value || '').trim()
+  if (!raw) return []
+
+  if (raw.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(entry => String(entry).trim().toUpperCase())
+          .filter(Boolean)
+      }
+    } catch {
+      // Fall through to comma splitting for malformed values.
+    }
+  }
+
+  return raw
     .split(',')
     .map(part => part.trim().toUpperCase())
     .filter(Boolean)
