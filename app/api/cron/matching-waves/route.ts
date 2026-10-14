@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
+import { requireJobMarket } from '@/lib/geography/market-engine'
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { resolveMatchingConfig } from '@/lib/matching'
 import { expireOpportunities, advanceMatchingWave, shouldStopWaves } from '@/lib/matching/waves'
 import { findCandidates } from '@/lib/matching'
@@ -58,11 +60,19 @@ export async function GET(request: NextRequest) {
       })
       if (!job) continue
 
+      // Phase 03: a background wave must not push providers for a job whose
+      // market cannot be established from its validated service address.
+      const jobMarket = requireJobMarket(job)
+      if (!jobMarket.ok) {
+        secureConsole.warn('Matching wave skipped: unresolved job market', { jobId })
+        continue
+      }
+
       const matchResult = await findCandidates(prisma, {
         jobId,
         categoryId: job.categoryId,
         serviceTemplateId: job.serviceTemplateId || undefined,
-        countryCode: job.countryCode || 'GLOBAL',
+        countryCode: jobMarket.countryCode,
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
         preferredDate: job.preferredDate,

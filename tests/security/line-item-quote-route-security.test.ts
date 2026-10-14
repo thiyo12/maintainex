@@ -39,11 +39,22 @@ describe('Line-item quote route security invariants', () => {
   })
 
   it('binds country, currency, and service template to the authoritative job', () => {
-    expect(routeSource).toContain('const canonicalCountry = (job.countryCode')
+    // Phase 03 strengthened this: the market is resolved from the validated
+    // service address through requireJobMarket instead of trusting the stored
+    // country with a hardcoded 'LK' fallback. The client country is still
+    // compared against the authoritative value, never trusted as the decision.
+    expect(routeSource).toContain('requireJobMarket(job)')
+    expect(routeSource).toContain('const canonicalCountry = jobMarket.countryCode')
+    expect(routeSource).not.toContain("job.countryCode || 'LK'")
     expect(routeSource).toContain('countryCode.toUpperCase() !== canonicalCountry')
     expect(routeSource).toContain('getCurrencyForCountry(canonicalCountry)')
     expect(routeSource).toContain('currency.toUpperCase() !== canonicalCurrency')
     expect(routeSource).toContain('serviceTemplateId !== canonicalTemplateId')
+  })
+
+  it('fails closed when the job market cannot be established', () => {
+    expect(routeSource).toContain('jobMarket.ok')
+    expect(routeSource).toContain('jobMarket.code')
   })
 
   it('requires an owned PENDING parent before revising a quote', () => {
