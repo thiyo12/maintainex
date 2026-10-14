@@ -2,13 +2,7 @@ import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
-import { getRegionFromHost } from '@/lib/regions'
-
-function requestCountry(request: NextRequest): string {
-  const requested = new URL(request.url).searchParams.get('country')?.trim().toUpperCase()
-  if (requested && /^[A-Z]{2}$/.test(requested)) return requested
-  return getRegionFromHost(request.headers.get('host') || '')
-}
+import { requestCountry } from '@/lib/api/request-country'
 
 function serializeService(service: {
   id: string
