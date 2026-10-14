@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import { getSetting } from './settings'
 import { haversineKm } from './distance'
 import { createNotification } from './notifications'
+import { requireJobMarket } from './geography/market-engine'
 
 /**
  * Called when a customer confirms an offer booking.
@@ -18,12 +19,32 @@ export async function matchOfferBooking(bookingId: string): Promise<{ matched: b
   const maxActive = await getSetting('matching.max_active_jobs', 3)
 
   // Get all enrolled taskers for this template
+  // Phase 03: an instant offer may only reach providers in the booking's own
+  // market. Booking coordinates are validated against the market engine; for
+  // legacy bookings without coordinates the customer account market is used.
+  const bookingCustomer = await prisma.user.findUnique({
+    where: { id: booking.customerId },
+    select: { countryCode: true },
+  })
+  const bookingMarket = requireJobMarket({
+    countryCode: bookingCustomer?.countryCode,
+    latitude: booking.latitude,
+    longitude: booking.longitude,
+  })
+  if (!bookingMarket.ok) {
+    await prisma.offerBooking.update({
+      where: { id: bookingId },
+      data: { status: 'no_tasker_available' },
+    }).catch(() => {})
+    return { matched: false }
+  }
+
   const enrollments = await prisma.offerEnrollment.findMany({
     where: { templateId: booking.templateId, status: 'active' },
     include: {
       tasker: {
         include: {
-          user: { select: { id: true, name: true, pushToken: true, isSuspended: true } },
+          user: { select: { id: true, name: true, pushToken: true, isSuspended: true, countryCode: true } },
         },
       },
     },
@@ -39,8 +60,10 @@ export async function matchOfferBooking(bookingId: string): Promise<{ matched: b
       longitude: e.tasker.longitude,
       compositeScore: e.tasker.compositeScore ?? 0,
       isSuspended: e.tasker.user.isSuspended,
+      countryCode: (e.tasker.countryCode || e.tasker.user.countryCode || '').toUpperCase(),
     }))
     .filter(t => !t.isSuspended)
+    .filter(t => t.countryCode === bookingMarket.countryCode)
 
   // Filter by distance
   const bLat = booking.latitude
@@ -111,6 +134,40 @@ export async function notifyNextOfferCandidate(bookingId: string): Promise<void>
         data: { status: 'no_tasker_available' },
       })
     }
+    return
+  }
+
+  // Phase 03: this function is also reachable from the offer-timeouts cron,
+  // which bypasses matchOfferBooking. The market must therefore be re-verified
+  // here, and a cross-market candidate must never receive a booking request.
+  const [candidateProfile, offerBooking, candidateUser] = await Promise.all([
+    prisma.taskerProfile.findUnique({ where: { id: candidate.taskerId }, select: { countryCode: true } }),
+    prisma.offerBooking.findUnique({
+      where: { id: bookingId },
+      select: { latitude: true, longitude: true, customerId: true },
+    }),
+    prisma.user.findUnique({ where: { id: candidate.tasker.userId }, select: { countryCode: true } }),
+  ])
+  const bookingOwner = offerBooking
+    ? await prisma.user.findUnique({ where: { id: offerBooking.customerId }, select: { countryCode: true } })
+    : null
+  const offerMarket = requireJobMarket({
+    countryCode: bookingOwner?.countryCode,
+    latitude: offerBooking?.latitude,
+    longitude: offerBooking?.longitude,
+  })
+  const candidateCountry = (candidateProfile?.countryCode || candidateUser?.countryCode || '')
+    .trim()
+    .toUpperCase()
+
+  if (!offerMarket.ok || candidateCountry !== offerMarket.countryCode) {
+    // Retire this candidate from the queue rather than notifying them, so the
+    // sweep moves on to a provider who can actually serve the booking.
+    await prisma.offerMatchQueue.update({
+      where: { bookingId_taskerId: { bookingId, taskerId: candidate.taskerId } },
+      data: { status: 'expired' },
+    })
+    await notifyNextOfferCandidate(bookingId)
     return
   }
 

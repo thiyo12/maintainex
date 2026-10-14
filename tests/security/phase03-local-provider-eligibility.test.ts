@@ -162,3 +162,39 @@ describe('Phase 03 — provider discovery never crosses markets', () => {
     expect(providerEligibility).not.toContain('workerCountry !== job.countryCode')
   })
 })
+
+const offerMatcher = source('lib/offer-matcher.ts')
+const matchingIndex2 = source('lib/matching/index.ts')
+
+describe('Phase 03 — instant offers and matching queries fail closed', () => {
+  it('the instant-offer matcher only draws from the booking market', () => {
+    expect(offerMatcher).toContain('requireJobMarket')
+    expect(offerMatcher).toContain('bookingMarket.countryCode')
+    expect(offerMatcher).toContain('t.countryCode === bookingMarket.countryCode')
+    expect(offerMatcher).toContain('no_tasker_available')
+  })
+
+  it('the cron-reachable notify path re-verifies the market', () => {
+    // notifyNextOfferCandidate is reachable from app/api/cron/offer-timeouts and
+    // bypasses matchOfferBooking, so it must not trust an already-ranked queue.
+    const notifyIndex = offerMatcher.indexOf('export async function notifyNextOfferCandidate')
+    expect(notifyIndex).toBeGreaterThan(-1)
+    const notifyBody = offerMatcher.slice(notifyIndex)
+    expect(notifyBody).toContain('requireJobMarket')
+    expect(notifyBody).toContain('candidateCountry !== offerMarket.countryCode')
+    expect(notifyBody).toContain("status: 'expired'")
+  })
+
+  it('matching queries never widen to every market when no market is established', () => {
+    expect(matchingIndex2).not.toContain(
+      'user: canonicalInput.countryCode ? { countryCode: canonicalInput.countryCode } : undefined',
+    )
+    expect(matchingIndex2).toContain("equals: canonicalInput.countryCode || '__none__'")
+    expect(matchingIndex2).toContain("mode: 'insensitive'")
+  })
+
+  it('market comparison is case-insensitive so casing cannot hide a local provider', () => {
+    expect(matchingIndex2).toContain("mode: 'insensitive'")
+    expect(eligibility).toContain('.toUpperCase()')
+  })
+})

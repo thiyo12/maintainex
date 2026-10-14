@@ -168,7 +168,15 @@ export async function findCandidates(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: canonicalInput.countryCode ? { countryCode: canonicalInput.countryCode } : undefined,
+      // Phase 03: an unresolved market must not load every verified provider on
+      // the platform. '__none__' matches no real country, so the query fails
+      // closed instead of silently widening to every market.
+      user: {
+        countryCode: {
+          equals: canonicalInput.countryCode || '__none__',
+          mode: 'insensitive',
+        },
+      },
     },
     include: {
       user: { select: { id: true, email: true, isSuspended: true, isBanned: true, identityStatus: true, createdAt: true, countryCode: true } },
@@ -218,7 +226,15 @@ export async function findCandidates(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: canonicalInput.countryCode ? { countryCode: canonicalInput.countryCode } : undefined,
+      // Phase 03: an unresolved market must not load every verified provider on
+      // the platform. '__none__' matches no real country, so the query fails
+      // closed instead of silently widening to every market.
+      user: {
+        countryCode: {
+          equals: canonicalInput.countryCode || '__none__',
+          mode: 'insensitive',
+        },
+      },
     },
     include: {
       user: { select: { id: true, email: true, isSuspended: true, isBanned: true, countryCode: true, createdAt: true } },
@@ -457,7 +473,8 @@ export async function getEligibleTaskers(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: job.countryCode ? { countryCode: job.countryCode } : undefined,
+      // Fail closed: an unresolved market must not widen to every provider.
+      user: { countryCode: { equals: job.countryCode || '__none__', mode: 'insensitive' } },
     },
     select: { userId: true },
   })
@@ -502,7 +519,8 @@ export async function getEligibleCompanies(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: job.countryCode ? { countryCode: job.countryCode } : undefined,
+      // Fail closed: an unresolved market must not widen to every provider.
+      user: { countryCode: { equals: job.countryCode || '__none__', mode: 'insensitive' } },
     },
     select: { id: true },
   })

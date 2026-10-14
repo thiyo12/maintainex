@@ -165,14 +165,20 @@ describe('Part W — Negative Security Tests', () => {
 
   describe('Matching engine filters by country at DB level', () => {
     it('canonical matching filters provider candidates by countryCode in Prisma where', () => {
+      // Phase 03 strengthened this: the filter is mandatory rather than dropped
+      // when no market is established. '__none__' matches no real country, so an
+      // unresolved market returns nobody instead of every provider on the platform.
       const engine = readFile('lib/matching/index.ts')
-      expect(engine).toContain('user: canonicalInput.countryCode ? { countryCode: canonicalInput.countryCode } : undefined')
-      expect(engine.match(/user: canonicalInput\.countryCode \? \{ countryCode: canonicalInput\.countryCode \} : undefined/g)?.length).toBe(2)
+      expect(engine).not.toContain('countryCode: canonicalInput.countryCode } : undefined')
+      expect(engine).toContain("equals: canonicalInput.countryCode || '__none__'")
+      expect(engine.match(/equals: canonicalInput\.countryCode \|\| '__none__'/g)?.length).toBe(2)
     })
 
     it('canonical matching applies job countryCode to scoped queries in Prisma where', () => {
       const matcher = readFile('lib/matching/index.ts')
-      expect(matcher).toContain('user: job.countryCode ? { countryCode: job.countryCode } : undefined')
+      expect(matcher).not.toContain('countryCode: job.countryCode } : undefined')
+      expect(matcher).toContain("equals: job.countryCode || '__none__'")
+      expect(matcher.match(/equals: job\.countryCode \|\| '__none__'/g)?.length).toBe(2)
     })
   })
 })
