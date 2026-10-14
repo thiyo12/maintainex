@@ -1,7 +1,7 @@
 import { logger } from '@/lib/shared/observability/logger'
 import { requireJobMarket } from '@/lib/geography/market-engine'
 import { NextRequest, NextResponse } from 'next/server'
-import { createPaymentIntent, getPaymentStatus } from '@/lib/payment/payment-service'
+import { createPaymentIntent, getPaymentStatus, resolvePaymentMarketForIntent } from '@/lib/payment/payment-service'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { resolvePaymentPublicOrigin } from '@/lib/finance/payments/public-origin'
@@ -29,6 +29,27 @@ export async function POST(
 
     const rateLimitResponse = await requireFinancialRateLimit(request, 'payment-intent')
     if (rateLimitResponse) return rateLimitResponse
+
+    // Phase 02/03: payment creation follows the same authoritative market as the
+    // display path. Previously POST created intents from the stored job country
+    // alone, so a job whose validated address disagreed with its stored country
+    // could still start checkout.
+    const paymentJob = await prisma.marketplaceJob.findUnique({
+      where: { id },
+      select: { id: true, customerId: true, countryCode: true, latitude: true, longitude: true },
+    })
+    if (!paymentJob) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    if (paymentJob.customerId !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const paymentMarket = resolvePaymentMarketForIntent(paymentJob)
+    if (!paymentMarket.ok) {
+      return NextResponse.json(
+        { error: paymentMarket.error, code: paymentMarket.code },
+        { status: 409 }
+      )
+    }
 
     const baseUrl = resolvePaymentPublicOrigin(request.url)
     if (!baseUrl) {
@@ -75,12 +96,18 @@ export async function GET(
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    // Phase 02/03: coordinates MUST be selected here. Without them
+    // requireJobMarket falls back to the stored country, which would let GET
+    // report cash/online availability for a job whose validated address sits
+    // outside the authorized market.
     const job = await prisma.marketplaceJob.findUnique({
       where: { id },
       select: {
         id: true,
         customerId: true,
         countryCode: true,
+        latitude: true,
+        longitude: true,
       },
     })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
