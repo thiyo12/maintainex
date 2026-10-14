@@ -1,6 +1,7 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { isSupportedMarket } from '@/lib/geography/market-engine'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { matchTaskerCandidates, resolveJobCategoryKeys } from '@/lib/job-matching'
 import { getSetting } from '@/lib/settings'
@@ -50,10 +51,16 @@ export async function GET(request: NextRequest) {
     }
     const radiusKm = Math.min(requestedRadius, 100)
 
+    // Phase 03: the browse market must be a supported launch market. A client
+    // cannot widen discovery by passing an arbitrary country code.
     const requestedCountry =
       typeof countryParam === 'string' && /^[A-Za-z]{2,3}$/.test(countryParam)
         ? countryParam.toUpperCase()
-        : user.countryCode
+        : (user.countryCode || '').toUpperCase()
+
+    if (!isSupportedMarket(requestedCountry)) {
+      return NextResponse.json({ error: 'Provider browse is unavailable for this market', code: 'MARKET_NOT_SUPPORTED', candidates: [] }, { status: 200 })
+    }
 
     const candidates = await matchTaskerCandidates({
       matchKeys: keys,

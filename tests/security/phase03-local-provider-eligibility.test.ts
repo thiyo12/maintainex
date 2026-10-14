@@ -113,3 +113,52 @@ describe('Phase 03 — quote acceptance can no longer fail open', () => {
     expect(jobLifecycle).toContain('const jobCountry = jobMarket.countryCode')
   })
 })
+
+const taskerDirectory = source('app/api/mobile/taskers/route.ts')
+const findTaskerRoute = source('app/api/mobile/find-tasker/route.ts')
+const deprecatedMatcher = source('lib/job-matching.ts')
+const providerEligibility = source('lib/phase6/provider-eligibility.ts')
+
+describe('Phase 03 — provider discovery never crosses markets', () => {
+  it('the provider directory is market scoped and fails closed', () => {
+    // Previously: `where = { isVerified: true }` with no market filter at all.
+    expect(taskerDirectory).not.toMatch(/const where: any = \{ isVerified: true \}/)
+    expect(taskerDirectory).toContain('resolveDirectoryMarket')
+    expect(taskerDirectory).toContain('isSupportedMarket')
+    expect(taskerDirectory).toContain('MARKET_NOT_SUPPORTED')
+  })
+
+  it('the directory filters providers by market in the query itself', () => {
+    expect(taskerDirectory).toContain('countryCode: market')
+    expect(taskerDirectory).toContain('user: { countryCode: market }')
+  })
+
+  it('the browse endpoint rejects an unsupported market instead of defaulting', () => {
+    expect(findTaskerRoute).toContain('isSupportedMarket(requestedCountry)')
+    expect(findTaskerRoute).toContain('MARKET_NOT_SUPPORTED')
+  })
+
+  it('the deprecated matcher never drops its market filter', () => {
+    // Previously the filter was omitted entirely when countryCode was falsy.
+    expect(deprecatedMatcher).not.toContain(
+      "...(input.countryCode ? { countryCode: input.countryCode } : {})",
+    )
+    expect(deprecatedMatcher).toContain('const marketFilter =')
+    expect(deprecatedMatcher).toContain('...marketFilter')
+    expect(deprecatedMatcher).toContain("{ countryCode: '__none__' }")
+  })
+
+  it('company worker assignment is gated on the job market', () => {
+    // Assignment overwrites the job's target provider, so it must not accept a
+    // worker from another market.
+    expect(providerEligibility).toContain('requireJobMarket(job)')
+    expect(providerEligibility).toContain('Worker market does not match the job market')
+    expect(providerEligibility).toContain('Worker market is unknown')
+    expect(providerEligibility).toContain('Job service address is not in a supported market')
+  })
+
+  it('the worker market gate reads the validated job address, not stored metadata', () => {
+    expect(providerEligibility).toContain('workerCountry !== jobMarket.countryCode')
+    expect(providerEligibility).not.toContain('workerCountry !== job.countryCode')
+  })
+})

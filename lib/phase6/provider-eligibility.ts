@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { readStoredList } from '@/lib/db-utils'
 
 export interface ProviderEligibility {
@@ -122,11 +123,41 @@ export async function checkWorkerEligibility(
         preferredDate: true,
         preferredTimeSlot: true,
         workerIdentityCheckRequired: true,
+        countryCode: true,
+        latitude: true,
+        longitude: true,
       },
     })
     if (!job) {
       reasons.push('Job not found')
     } else {
+      // Phase 03: a company worker may only be assigned to a job in their own
+      // market. Assignment overwrites the job's target provider, so this must be
+      // decided from the validated service address, not from stored metadata.
+      const jobMarket = requireJobMarket(job)
+      if (!jobMarket.ok) {
+        reasons.push('Job service address is not in a supported market')
+      } else {
+        const workerProfile = await prisma.taskerProfile.findUnique({
+          where: { userId },
+          select: { countryCode: true },
+        })
+        const workerUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { countryCode: true },
+        })
+        const workerCountry = (workerProfile?.countryCode || workerUser?.countryCode || '')
+          .trim()
+          .toUpperCase()
+        if (!workerCountry) {
+          reasons.push('Worker market is unknown')
+        } else if (workerCountry !== jobMarket.countryCode) {
+          reasons.push('Worker market does not match the job market')
+        }
+      }
+    }
+
+    if (job) {
       const [profile, category, template] = await Promise.all([
         prisma.taskerProfile.findUnique({
           where: { userId },
