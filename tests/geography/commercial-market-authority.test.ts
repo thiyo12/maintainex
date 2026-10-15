@@ -17,8 +17,14 @@ const COMMERCIAL_ROUTES = [
 describe('commercial operations follow the authoritative market', () => {
   it.each(COMMERCIAL_ROUTES)('%s resolves the market through the geography engine', path => {
     const code = source(path)
-    expect(code).toContain("import { requireJobMarket } from '@/lib/geography/market-engine'")
-    expect(code).toContain('requireJobMarket(')
+    // A route may resolve the market directly, or through the payment-intent
+    // resolver, which is stricter (it also rejects a stored-country /
+    // validated-coordinate disagreement) and delegates to requireJobMarket.
+    const resolvesViaEngine =
+      (code.includes("from '@/lib/geography/market-engine'") && code.includes('requireJobMarket(')) ||
+      (code.includes('resolvePaymentMarketForIntent(') &&
+        source('lib/finance/payments/payment-service.ts').includes('requireJobMarket('))
+    expect(resolvesViaEngine).toBe(true)
     // Routes surface the guard's code rather than re-declaring it.
     expect(code).toContain('jobMarket.code')
   })

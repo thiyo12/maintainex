@@ -28,7 +28,10 @@ describe('Phase 02 geographic enforcement is wired into every commercial surface
 
   it('payment is bound to the authoritative market', () => {
     const code = source('app/api/mobile/v2/jobs/[id]/payment/route.ts')
-    expect(code).toContain('requireJobMarket')
+    // Phase 03 aligned GET with POST on the stricter intent resolver; the
+    // geography engine is still the single source of market truth.
+    expect(code).toMatch(/requireJobMarket|resolvePaymentMarketForIntent/)
+    expect(source('lib/finance/payments/payment-service.ts')).toContain('requireJobMarket')
     expect(code).toContain('const authoritativeCountryCode = jobMarket.countryCode')
   })
 

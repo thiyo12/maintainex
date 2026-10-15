@@ -320,7 +320,9 @@ describe('NEGATIVE: GET must not report availability from stored country alone',
     const getBody = paymentRoute.slice(getStart)
     const ownerIdx = getBody.indexOf('job.customerId !== user.id')
     // Match the actual call, not the explanatory comment that names the helper.
-    const guardIdx = getBody.indexOf('const jobMarket = requireJobMarket(job)')
+    // Phase 03 aligned GET with POST on resolvePaymentMarketForIntent, which
+    // also detects a stored-country / validated-coordinate disagreement.
+    const guardIdx = getBody.indexOf('const jobMarket = resolvePaymentMarketForIntent(job)')
     expect(ownerIdx).toBeGreaterThan(-1)
     expect(guardIdx).toBeGreaterThan(-1)
     expect(ownerIdx).toBeLessThan(guardIdx)

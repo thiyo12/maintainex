@@ -1,5 +1,4 @@
 import { logger } from '@/lib/shared/observability/logger'
-import { requireJobMarket } from '@/lib/geography/market-engine'
 import { NextRequest, NextResponse } from 'next/server'
 import { createPaymentIntent, getPaymentStatus, resolvePaymentMarketForIntent } from '@/lib/payment/payment-service'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -96,10 +95,10 @@ export async function GET(
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // Phase 02/03: coordinates MUST be selected here. Without them
-    // requireJobMarket falls back to the stored country, which would let GET
-    // report cash/online availability for a job whose validated address sits
-    // outside the authorized market.
+    // Phase 02/03: coordinates MUST be selected here. Without them the market
+    // resolver falls back to the stored country, which would let GET report
+    // cash/online availability for a job whose validated address sits outside
+    // the authorized market.
     const job = await prisma.marketplaceJob.findUnique({
       where: { id },
       select: {
@@ -128,10 +127,21 @@ export async function GET(
       }),
     ])
 
-    // Phase 02: payment follows the authoritative service-address market.
-    const jobMarket = requireJobMarket(job)
+    // Phase 02/03: payment display uses the SAME resolver as payment intent
+    // creation, so GET and POST can never disagree about whether a job's market
+    // is valid. Previously GET used the coordinate-only resolver and would offer
+    // cash/online options for a job POST refuses on a market mismatch.
+    const jobMarket = resolvePaymentMarketForIntent(job)
     if (!jobMarket.ok) {
-      return NextResponse.json({ error: jobMarket.error, code: jobMarket.code }, { status: 409 })
+      // An unconfirmable market must never yield payment options, but it must not
+      // hide settled financial history either: the owning customer still needs to
+      // read what was already paid. Refunds, captures, and reconciliation run
+      // through their own escrow/admin workflows and are unaffected.
+      return NextResponse.json({
+        payment,
+        options: null,
+        market: { valid: false, code: jobMarket.code, error: jobMarket.error },
+      })
     }
     const authoritativeCountryCode = jobMarket.countryCode
 
