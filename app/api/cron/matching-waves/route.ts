@@ -48,25 +48,32 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      const result = await advanceMatchingWave(prisma, jobId, config)
-      if (!result.advanced) continue
-
-      advanced++
-
-      // Find candidates for next wave and create opportunities
+      // Find candidates for next wave and create opportunities.
+      // Phase 03: coordinates must be selected here. The previous query omitted
+      // them, so requireJobMarket silently fell back to the stored country and
+      // the guard never actually evaluated the validated address.
       const job = await prisma.marketplaceJob.findUnique({
         where: { id: jobId },
-        select: { categoryId: true, serviceTemplateId: true, countryCode: true, preferredDate: true },
+        select: {
+          categoryId: true, serviceTemplateId: true, countryCode: true,
+          latitude: true, longitude: true, preferredDate: true,
+        },
       })
       if (!job) continue
 
-      // Phase 03: a background wave must not push providers for a job whose
-      // market cannot be established from its validated service address.
+      // Validate the authoritative market BEFORE any market-dependent wave
+      // mutation or provider dispatch. Advancing first would have created and
+      // expired wave state for a job we then refuse to dispatch.
       const jobMarket = requireJobMarket(job)
       if (!jobMarket.ok) {
         secureConsole.warn('Matching wave skipped: unresolved job market', { jobId })
         continue
       }
+
+      const result = await advanceMatchingWave(prisma, jobId, config)
+      if (!result.advanced) continue
+
+      advanced++
 
       const matchResult = await findCandidates(prisma, {
         jobId,

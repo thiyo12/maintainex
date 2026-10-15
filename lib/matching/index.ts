@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import {
   MatchingInput, MatchResult, MatchCandidate, ExcludedProvider,
   MatchingConfig, ScoreComponents, MatchExclusionReason,
@@ -134,6 +135,18 @@ export async function findCandidates(
     return emptyResult(input.jobId, fallbackConfig.matchingVersion)
   }
 
+  // Phase 03: the job's validated service address decides the market. Previously
+  // `job.countryCode || input.countryCode` let a stored or caller-supplied
+  // country override coordinates that had already established the market.
+  // Coordinate-less legacy jobs keep their stored-country behaviour because the
+  // shared resolver deliberately falls back to it.
+  const jobMarket = requireJobMarket(job)
+  if (!jobMarket.ok) {
+    // Unresolvable or contradictory market: match nobody.
+    const fallbackConfig = await resolveMatchingConfig(client, job.countryCode || 'GLOBAL')
+    return emptyResult(input.jobId, fallbackConfig.matchingVersion)
+  }
+
   const canonicalInput: MatchingInput = {
     ...input,
     categoryId: job.categoryId,
@@ -141,9 +154,9 @@ export async function findCandidates(
     latitude: job.latitude ?? input.latitude,
     longitude: job.longitude ?? input.longitude,
     urgency: ((job.urgency || input.urgency || 'NORMAL').toUpperCase()) as MatchingInput['urgency'],
-    countryCode: job.countryCode || input.countryCode,
+    countryCode: jobMarket.countryCode,
   }
-  const config = await resolveMatchingConfig(client, canonicalInput.countryCode || 'GLOBAL')
+  const config = await resolveMatchingConfig(client, jobMarket.countryCode)
 
   const jobReqs = await resolveJobRequirements(client, job.categoryId, job.serviceTemplateId, job.templateJobId)
   if (!jobReqs) return emptyResult(input.jobId, config.matchingVersion)

@@ -28,9 +28,14 @@ describe('Phase 03 — discovery only returns eligible local providers', () => {
     expect(matchRoute).not.toContain('countryCode: job.countryCode')
   })
 
-  it('persisted job market still wins over caller-supplied matching fields', () => {
-    expect(matchingIndex).toContain('countryCode: job.countryCode || input.countryCode')
+  it('the persisted job decides the market, and coordinates outrank stored country', () => {
+    // Phase 03 strengthened this: the persisted job is still the authority over
+    // caller-supplied fields, but its validated coordinates now outrank its own
+    // stored country, via the shared market resolver.
     expect(matchingIndex).toContain('const job = await client.marketplaceJob.findUnique')
+    expect(matchingIndex).toContain('requireJobMarket(job)')
+    expect(matchingIndex).toContain('countryCode: jobMarket.countryCode')
+    expect(matchingIndex).not.toContain('countryCode: job.countryCode || input.countryCode')
   })
 
   it('service-area eligibility fails closed when no market can be established', () => {

@@ -1,4 +1,5 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -180,6 +181,31 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
         const taskerId = typeof body.taskerId === 'string' ? body.taskerId.trim() : ''
         if (!taskerId) throw new Error('V1_TASKER_REQUIRED')
+
+        // Phase 03 defence in depth: the legacy write gate is normally closed,
+        // but if ALLOW_LEGACY_MARKETPLACE_WRITES is deliberately enabled this
+        // path must still not bypass market authorization. Both the job and the
+        // tasker market are resolved from validated data, never from the client.
+        const legacyJob = await tx.marketplaceJob.findUnique({
+          where: { id },
+          select: { countryCode: true, latitude: true, longitude: true },
+        })
+        const legacyMarket = requireJobMarket(legacyJob ?? {})
+        if (!legacyMarket.ok) throw new Error('V1_ASSIGN_MARKET_UNRESOLVED')
+
+        const legacyTasker = await tx.taskerProfile.findUnique({
+          where: { id: taskerId },
+          select: {
+            countryCode: true,
+            user: { select: { countryCode: true } },
+          },
+        })
+        const taskerCountry = (legacyTasker?.countryCode || legacyTasker?.user?.countryCode || '')
+          .trim()
+          .toUpperCase()
+        if (!taskerCountry || taskerCountry !== legacyMarket.countryCode) {
+          throw new Error('V1_ASSIGN_MARKET_MISMATCH')
+        }
 
         const bid = await tx.bid.findUnique({
           where: { jobId_taskerId: { jobId: id, taskerId } },
