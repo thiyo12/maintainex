@@ -11,8 +11,15 @@ export const v2Payments = {
       gateway: string
     }>(`/api/mobile/v2/jobs/${jobId}/payment`, { method: 'POST' }),
 
+  // Phase 03: GET is a read. `options` is null when the server cannot confirm a
+  // payable market (it still returns `payment` so settled history stays visible),
+  // and `market` then carries the reason. A failed request is NOT a valid market.
   status: (jobId: string) =>
-    v2Request<{ payment: V2PaymentStatus | null; options: V2PaymentOptions }>(`/api/mobile/v2/jobs/${jobId}/payment`),
+    v2Request<{
+      payment: V2PaymentStatus | null
+      options: V2PaymentOptions | null
+      market?: { valid: boolean; code: string; error: string }
+    }>(`/api/mobile/v2/jobs/${jobId}/payment`),
 
   // Canonical availability contract. Online payment is only offered when the
   // deployment actually has a configured provider, so a cash-only deployment
