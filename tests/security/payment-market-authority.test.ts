@@ -121,8 +121,26 @@ describe('HISTORICAL PATHS: refunds and committed accounting stay unchanged', ()
     expect(capture).not.toMatch(/requireJobMarket/)
   })
 
-  it('escrow cash confirmation still uses the stored market as before', () => {
-    expect(escrowService).toContain("isCashPaymentAvailableForMarket(job.countryCode || 'LK', escrow.currency)")
+  it('escrow cash confirmation validates the market from the locked job row', () => {
+    // Phase 03 security correction. This previously asserted the stored-country
+    // lookup, which let a job stored LK with Vancouver coordinates select cash.
+    expect(escrowService).toContain('resolvePaymentMarketForIntent')
+    // No implicit Sri Lanka fallback anywhere in the cash confirmation path.
+    expect(escrowService).not.toMatch(/isCashPaymentAvailableForMarket\(job\.countryCode/)
+    // Scope the fallback check to confirmCashPayment: releaseEscrow and
+    // completeAndReleaseEscrow legitimately keep their existing handling.
+    const confirmCashPaymentSource = escrowService.slice(
+      escrowService.indexOf('export async function confirmCashPayment'),
+      escrowService.indexOf('export async function', escrowService.indexOf('export async function confirmCashPayment') + 1)
+    )
+    expect(confirmCashPaymentSource).not.toMatch(/countryCode: job\.countryCode \|\| 'LK'/)
+    expect(confirmCashPaymentSource).not.toContain("job.countryCode || 'LK'")
+    // The locked row must carry the market columns it is validated from.
+    expect(escrowService).toContain('SELECT id, "customerId", status, "countryCode", latitude, longitude')
+    // Both the cash gate and the provider financial check use the same validated
+    // market, not the pre-lock preview.
+    expect(escrowService).toContain('isCashPaymentAvailableForMarket(authoritativeCountryCode, escrow.currency)')
+    expect(escrowService).toContain('countryCode: authoritativeCountryCode')
   })
 })
 

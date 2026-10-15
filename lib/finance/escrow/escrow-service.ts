@@ -14,6 +14,7 @@ import {
 import type { TransitionContext } from '@/lib/domain/job-lifecycle'
 import { resolveEscrowFundingSource } from '@/lib/finance/payments/funding-source'
 import { isCashPaymentAvailableForMarket } from '@/lib/finance/payments/provider-registry'
+import { resolvePaymentMarketForIntent } from '@/lib/finance/payments/payment-service'
 
 export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
@@ -154,10 +155,10 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
     throw new Error('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
   }
 
-  if (!isCashPaymentAvailableForMarket(job.countryCode || 'LK', escrow.currency)) {
-    throw new Error('CASH_PAYMENT_NOT_AVAILABLE_FOR_MARKET')
-  }
-
+  // Historical cash selections stay readable and idempotent even if the job's
+  // location metadata has since become inconsistent. This runs BEFORE any market
+  // gate so an already-settled cash payment never becomes inaccessible, and it
+  // never relaxes the restriction on a NEW selection below.
   if (escrow.paymentMethod === 'CASH' && escrow.status === 'CASH_CONFIRMED') {
     return {
       success: true,
@@ -173,8 +174,17 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
 
   const confirmedAt = new Date()
   await prisma.$transaction(async tx => {
-    const lockedJobs = await tx.$queryRaw<Array<{ id: string; customerId: string; status: string }>>`
-      SELECT id, "customerId", status
+    const lockedJobs = await tx.$queryRaw<
+      Array<{
+        id: string
+        customerId: string
+        status: string
+        countryCode: string | null
+        latitude: number | null
+        longitude: number | null
+      }>
+    >`
+      SELECT id, "customerId", status, "countryCode", latitude, longitude
       FROM "MarketplaceJob"
       WHERE id = ${jobId}
       FOR UPDATE
@@ -184,10 +194,27 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
     if (lockedJob.customerId !== ctx.actorId) throw new Error('Only the customer can select cash payment')
     if (lockedJob.status !== 'QUOTE_ACCEPTED') throw new Error('Job is not ready for cash payment')
 
+    // Phase 03: the cash market is revalidated from the LOCKED job row. The
+    // pre-lock preview is not trusted, stored country alone does not prove
+    // geographic eligibility, and there is no implicit Sri Lanka fallback.
+    const lockedJobMarket = resolvePaymentMarketForIntent({
+      countryCode: lockedJob.countryCode,
+      latitude: lockedJob.latitude,
+      longitude: lockedJob.longitude,
+    })
+    if (!lockedJobMarket.ok) {
+      throw new Error('CASH_PAYMENT_NOT_AVAILABLE_FOR_MARKET')
+    }
+    const authoritativeCountryCode = lockedJobMarket.countryCode
+
+    if (!isCashPaymentAvailableForMarket(authoritativeCountryCode, escrow.currency)) {
+      throw new Error('CASH_PAYMENT_NOT_AVAILABLE_FOR_MARKET')
+    }
+
     await assertProviderCashEligible(tx, {
       providerId: quote.providerId,
       providerType: quote.providerType as 'INDIVIDUAL' | 'COMPANY',
-      countryCode: job.countryCode || 'LK',
+      countryCode: authoritativeCountryCode,
       currency: escrow.currency,
     })
 
