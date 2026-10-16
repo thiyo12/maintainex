@@ -561,10 +561,13 @@ export async function completeAssignment(
     return { success: false, error: `Cannot complete: current status is ${assignment.status}` }
   }
 
-  await prisma.companyJobAssignment.updateMany({
+  const claimed = await prisma.companyJobAssignment.updateMany({
     where: { id: assignmentId, companyId, status: 'IN_PROGRESS' },
     data: { status: 'COMPLETED', completedAt: new Date() },
   })
+  if (claimed.count !== 1) {
+    return { success: false, error: 'Assignment state changed before completion' }
+  }
 
   return { success: true, assignmentId }
 }
