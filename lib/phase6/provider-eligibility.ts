@@ -2,6 +2,13 @@ import { prisma } from '@/lib/prisma'
 import { requireJobMarket } from '@/lib/geography/market-engine'
 import { readStoredList } from '@/lib/db-utils'
 
+/** Legacy capabilities can be JSON lists or old comma-separated labels.
+ * An empty JSON array is NOT a declared capability, even if the string is truthy.
+ */
+export function hasDeclaredProviderCapabilities(stored: string | null | undefined): boolean {
+  return readStoredList(stored).some(value => value.trim().length > 0)
+}
+
 export interface ProviderEligibility {
   eligible: boolean
   reasons: string[]
@@ -33,7 +40,7 @@ export async function checkIndividualProviderEligibility(userId: string): Promis
   if (profile.verificationStatus !== 'VERIFIED') reasons.push('Provider verification not approved')
   if (!profile.isVerified) reasons.push('Provider not marked as verified')
 
-  const hasLegacySkills = profile.skills && profile.skills !== '[]' && profile.skills !== ''
+  const hasLegacySkills = hasDeclaredProviderCapabilities(profile.skills)
   if (!hasLegacySkills) {
     const relationalSkillCount = await prisma.taskerSkill.count({ where: { taskerId: profile.id } })
     if (relationalSkillCount === 0) {
@@ -64,7 +71,7 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
   if (company.verificationStatus !== 'VERIFIED') reasons.push('Company verification not approved')
   if (!company.isVerified) reasons.push('Company not marked as verified')
 
-  const hasLegacyServices = company.services && company.services !== ''
+  const hasLegacyServices = hasDeclaredProviderCapabilities(company.services)
   if (!hasLegacyServices) {
     const relationalSpecialtyCount = await prisma.companySpecialty.count({ where: { companyId } })
     if (relationalSpecialtyCount === 0) {
