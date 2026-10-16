@@ -188,6 +188,32 @@ jobs:
           cd apps/mobile
           npx tsc --noEmit
 
+      - name: International launch Phases 04-11 blocking acceptance gates
+        if: always()
+        run: |
+          set -euo pipefail
+          npx vitest run \
+            tests/security/phase04-vancouver-company-onboarding.test.ts \
+            tests/security/phase04-company-invitation-market.test.ts \
+            tests/security/phase07-company-work-start-authorization.test.ts \
+            tests/security/crm-canonical-catalog.test.ts \
+            tests/finance/phase05-price-input-isolation.test.ts \
+            tests/pricing/phase05-market-price-estimate.test.ts \
+            tests/quotes/quote-revision.test.ts \
+            tests/security/quote-revision-route-security.test.ts \
+            tests/domain/phase08-seasonal-offer-market.test.ts \
+            apps/mobile/lib/i18n/__tests__/french-locale.test.ts \
+            tests/structural/phase11-launch-gate-contract.test.ts \
+            --reporter=verbose 2>&1 | tee /tmp/international-launch-phase-gates.txt
+
+      - name: Upload international launch acceptance diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: international-launch-acceptance-diagnostics
+          path: /tmp/international-launch-phase-gates.txt
+          if-no-files-found: ignore
+          retention-days: 3
       - name: International launch market regression checks
         run: npx vitest run tests/regions/international-launch-regions.test.ts tests/security/international-v2-search-market-contract.test.ts tests/domain/catalog-market-eligibility.test.ts tests/domain/catalog-inventory.test.ts tests/domain/international-template-job-route-market.test.ts tests/pricing/international-estimate-market-contract.test.ts tests/pricing/international-authoritative-job-country.test.ts tests/security/international-tracking-issue-report-contract.test.ts tests/security/international-safety-escalation-contract.test.ts tests/security/international-active-v2-safety-report-contract.test.ts
 
