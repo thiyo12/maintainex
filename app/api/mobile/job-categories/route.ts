@@ -8,6 +8,12 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const country = (searchParams.get('country') || 'LK').trim().toUpperCase()
+    // Public/onboarding catalogue must never fall back to LKR for a new,
+    // unsupported market. Canadian templates are CAD-only and LK LKR-only.
+    const expectedCurrency = country === 'CA' ? 'CAD' : country === 'LK' ? 'LKR' : null
+    if (!expectedCurrency) {
+      return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } })
+    }
     const runtime = await getPlatformRuntimeConfig(country)
     if (
       runtime.maintenance.enabled ||
@@ -37,7 +43,11 @@ export async function GET(request: NextRequest) {
       sortOrder: c.sortOrder,
       countries: safeParseJsonArr(c.countries),
       isActive: c.isActive,
-      jobs: c.jobs.map(j => ({
+      jobs: c.jobs
+        .filter(j =>
+          storedListIncludes(j.countries, country) && j.currency === expectedCurrency
+        )
+        .map(j => ({
         id: j.id,
         categoryId: j.categoryId,
         name: j.name,
