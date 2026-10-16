@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     const countryFilter = getCrmCountryFilter(security)
 
-    const [categories, services, templates, jobCategories] = await Promise.all([
+    const [categories, services, templates, templateJobs, jobCategories] = await Promise.all([
       prisma.category.findMany({
         where: countryFilter,
         select: {
@@ -101,6 +101,23 @@ export async function GET(request: NextRequest) {
         },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
+      prisma.templateJob.findMany({
+        select: {
+          id: true,
+          categoryId: true,
+          name: true,
+          description: true,
+          currency: true,
+          priceMin: true,
+          priceMax: true,
+          countries: true,
+          isPopular: true,
+          isCompanyOnly: true,
+          isActive: true,
+          typicalDurationMinutes: true,
+        },
+        orderBy: [{ name: 'asc' }],
+      }),
       prisma.jobCategory.findMany({
         select: {
           id: true,
@@ -131,8 +148,22 @@ export async function GET(request: NextRequest) {
           )
         )
 
+    // Template jobs are scoped the same way: an admin only sees jobs whose
+    // declared markets are within their country scope.
+    const allowedTemplateJobs = scopedCountryCodes === null
+      ? templateJobs
+      : templateJobs.filter(job =>
+          scopedCountryCodes.some(country => job.countries.includes(country))
+        )
+
     return NextResponse.json(
-      { categories, services, templates, jobCategories: allowedJobCategories },
+      {
+        categories,
+        services,
+        templates,
+        templateJobs: allowedTemplateJobs,
+        jobCategories: allowedJobCategories,
+      },
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
@@ -184,7 +215,8 @@ export async function POST(request: NextRequest) {
       const countriesJson = JSON.stringify(countries.map(c => c.toUpperCase()))
       // Activation requires the publish permission; creation does not publish.
       const publishAllowed = canPublishCatalog(security)
-      const isActive = publishAllowed && requestedActive === true
+      const explicitlyActive = body?.isActive === true
+      const isActive = publishAllowed && explicitlyActive
 
       if (type === 'jobCategory') {
         const created = await prisma.jobCategory.create({
@@ -227,11 +259,57 @@ export async function POST(request: NextRequest) {
       if (!assertCrmCountriesAllowed(security, parent.countries)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
+
+      let parentCountries: string[] = []
+      try {
+        const parsedParent: unknown = JSON.parse(parent.countries)
+        if (Array.isArray(parsedParent)) {
+          parentCountries = parsedParent.filter((c): c is string => typeof c === 'string').map(c => c.toUpperCase())
+        }
+      } catch {
+        parentCountries = []
+      }
+      // A job may not claim a market its parent category does not cover.
+      const outsideParent = countries
+        .map(c => c.toUpperCase())
+        .filter(c => !parentCountries.includes(c))
+      if (outsideParent.length > 0) {
+        return NextResponse.json(
+          { error: `Country scope exceeds the parent category: ${outsideParent.join(', ')}` },
+          { status: 400 }
+        )
+      }
+
       const priceMin = Number(body?.priceMin ?? 0)
       const priceMax = Number(body?.priceMax ?? priceMin)
       if (!Number.isFinite(priceMin) || !Number.isFinite(priceMax) || priceMin < 0 || priceMax < priceMin) {
         return NextResponse.json({ error: 'Invalid price range' }, { status: 400 })
       }
+
+      // Price currency must match the market it is quoted in. Independent
+      // Sri Lankan and Canadian pricing: never one derived from the other.
+      const currency = typeof body?.currency === 'string'
+        ? body.currency.trim().toUpperCase().slice(0, 8)
+        : ''
+      const MARKET_CURRENCY: Record<string, string> = { LK: 'LKR', CA: 'CAD' }
+      const declaredMarkets = countries.map(c => c.toUpperCase())
+      if (currency !== 'LKR' && currency !== 'CAD') {
+        return NextResponse.json(
+          { error: 'currency must be LKR for Sri Lanka or CAD for Canada' },
+          { status: 400 }
+        )
+      }
+      const mismatchedMarket = declaredMarkets.find(m => MARKET_CURRENCY[m] !== currency)
+      if (mismatchedMarket) {
+        return NextResponse.json(
+          { error: `currency ${currency} does not match market ${mismatchedMarket}` },
+          { status: 400 }
+        )
+      }
+
+      // Publication is a separate, explicit decision. Creating an item never
+      // publishes it; only an administrator holding the publish permission who
+      // explicitly asks for an active item gets one.
       const created = await prisma.templateJob.create({
         data: {
           categoryId,
@@ -243,7 +321,7 @@ export async function POST(request: NextRequest) {
             : 0,
           priceMin,
           priceMax,
-          currency: typeof body?.currency === 'string' ? body.currency.trim().toUpperCase().slice(0, 8) : 'LKR',
+          currency,
           isPopular: Boolean(body?.isPopular),
           isCompanyOnly: Boolean(body?.isCompanyOnly),
           countries: countriesJson,
@@ -423,7 +501,8 @@ export async function PATCH(request: NextRequest) {
     } else {
       oldValue = await prisma.templateJob.findUnique({ where: { id } })
       if (!oldValue) return NextResponse.json({ error: 'Template job not found' }, { status: 404 })
-      if (!assertCrmCountryAllowed(security, oldValue.countryCode)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      // TemplateJob stores its markets as a JSON list, not a countryCode column.
+      if (!assertCrmCountriesAllowed(security, oldValue.countries)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       updated = await prisma.templateJob.update({ where: { id }, data: { isActive } })
     }
 
