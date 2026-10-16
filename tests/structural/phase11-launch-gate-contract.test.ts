@@ -54,4 +54,18 @@ describe('Phase 11 — international release gates are blocking and observable',
     expect(selector).toContain("code: 'fr', name: 'Français (bêta)'")
     expect(selector).toContain("AsyncStorage.setItem('app-language', code)")
   })
+  it('blocks release if running Docker catalogue leaks LK/LKR into CA/CAD', () => {
+    const smoke = readFileSync(
+      resolve(process.cwd(), 'scripts/international-catalogue-smoke.mjs'),
+      'utf8',
+    )
+    expect(workflow).toContain('International launch running-container market-isolation smoke')
+    expect(workflow).toContain('node scripts/international-catalogue-smoke.mjs --self-test')
+    expect(workflow).toContain('node scripts/international-catalogue-smoke.mjs http://127.0.0.1:3199')
+    expect(smoke).toContain("CA: 'CAD'")
+    expect(smoke).toContain("LK: 'LKR'")
+    expect(smoke).toContain("Unsupported market")
+    expect(smoke).toContain("Only a local isolated app container may be checked")
+    expect(smoke).toContain('No authorization header, customer data, mutation, payments, deployment,')
+  })
 })

@@ -497,6 +497,12 @@ jobs:
           exit 1
         if: always()
 
+      - name: International launch running-container market-isolation smoke
+        run: |
+          set -euo pipefail
+          node scripts/international-catalogue-smoke.mjs --self-test
+          node scripts/international-catalogue-smoke.mjs http://127.0.0.1:3199
+        if: always()
       - name: Verify non-root user
         run: |
           RUNNING=$(docker inspect -f '{{.State.Running}}' phase9-ci-test 2>/dev/null || echo "false")
