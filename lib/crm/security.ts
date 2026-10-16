@@ -562,9 +562,11 @@ export function assertCrmCountriesAllowed(
   } catch {
     return false
   }
-  const list = Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
-  if (list.length === 0) return false
-  return list.every(code => assertCrmCountryAllowed(context, code))
+  // Reject malformed/partial market arrays rather than silently discarding
+  // unauthorized elements and accepting the remaining strings.
+  if (!Array.isArray(parsed) || parsed.length === 0) return false
+  if (!parsed.every((value): value is string => typeof value === 'string' && value.trim().length > 0)) return false
+  return parsed.every(code => assertCrmCountryAllowed(context, code))
 }
 
 

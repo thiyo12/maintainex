@@ -243,6 +243,56 @@ describe('canonical catalogue administration', () => {
     }
   })
 
+
+  it('does not reveal a shared LK+CA category to an LK-only CRM administrator', async () => {
+    const shared = await makeCategory(['LK', 'CA'])
+    CTX.assignedCountries = ['LK']
+    try {
+      const list = await call('GET')
+      expect(list.status).toBe(200)
+      expect(list.body.jobCategories.some((category: any) => category.id === shared.id)).toBe(false)
+
+      const patch = await call('PATCH', {
+        type: 'jobCategory', id: shared.id, isActive: false,
+      })
+      expect(patch.status).toBe(403)
+    } finally {
+      CTX.assignedCountries = null
+    }
+  })
+
+  it('does not reveal a historical shared-market canonical job to a single-market admin', async () => {
+    const shared = await makeCategory(['LK', 'CA'])
+    const legacyMixed = await prisma.templateJob.create({
+      data: {
+        categoryId: shared.id,
+        name: 'Historical shared job ' + ts,
+        description: 'Legacy multi-market entry',
+        whatIsIncluded: '[]',
+        typicalDurationMinutes: 60,
+        countries: '["LK","CA"]',
+        currency: 'LKR',
+        priceMin: 100,
+        priceMax: 150,
+        isActive: false,
+      },
+    })
+    created.push(legacyMixed.id)
+    CTX.assignedCountries = ['LK']
+    try {
+      const list = await call('GET')
+      expect(list.status).toBe(200)
+      expect(list.body.templateJobs.some((job: any) => job.id === legacyMixed.id)).toBe(false)
+
+      const patch = await call('PATCH', {
+        type: 'templateJob', id: legacyMixed.id, isActive: true,
+      })
+      expect(patch.status).toBe(403)
+    } finally {
+      CTX.assignedCountries = null
+    }
+  })
+
   it('lists template jobs so the CRM can manage them', async () => {
     const category = await makeCategory(['LK'])
     await call('POST', {

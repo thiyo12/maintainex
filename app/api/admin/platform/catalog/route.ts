@@ -141,21 +141,16 @@ export async function GET(request: NextRequest) {
     ])
 
     const scopedCountryCodes = getCrmCountryCodes(security)
+    // Read scope must match write scope. A market-limited CRM operator must
+    // never see an entity that also covers a country outside their grant.
+    // JSON substring/any-country matches are insufficient authorization.
     const allowedJobCategories = scopedCountryCodes === null
       ? jobCategories
-      : jobCategories.filter(category =>
-          scopedCountryCodes.some(country =>
-            category.countries.includes(country)
-          )
-        )
+      : jobCategories.filter(category => assertCrmCountriesAllowed(security, category.countries))
 
-    // Template jobs are scoped the same way: an admin only sees jobs whose
-    // declared markets are within their country scope.
     const allowedTemplateJobs = scopedCountryCodes === null
       ? templateJobs
-      : templateJobs.filter(job =>
-          scopedCountryCodes.some(country => job.countries.includes(country))
-        )
+      : templateJobs.filter(job => assertCrmCountriesAllowed(security, job.countries))
 
     return NextResponse.json(
       {
@@ -523,7 +518,11 @@ export async function PATCH(request: NextRequest) {
       userId: security.adminId,
       userEmail: security.email,
       userRole: security.role,
-      entityType: type === 'category' ? 'Category' : type === 'service' ? 'Service' : 'ServiceTemplate',
+      entityType: type === 'category' ? 'Category'
+        : type === 'service' ? 'Service'
+        : type === 'jobCategory' ? 'JobCategory'
+        : type === 'templateJob' ? 'TemplateJob'
+        : 'ServiceTemplate',
       entityId: id,
       entityName: oldValue.name,
       description: `CRM catalog item ${isActive ? 'activated' : 'deactivated'}`,
