@@ -46,6 +46,19 @@ describe('Phase 11 — aggregate-only provider coverage audit', () => {
     expect(source).toContain("tm.role = 'COMPANY_OWNER' AND tm.status = 'ACTIVE'")
   })
 
+  it('does not count serialized empty capability arrays as eligible services', () => {
+    // A nonempty comma between empty JSON strings must not pass eligibility.
+    for (const empty of ['[]', '[""]', '["",""]', '[" ", " "]']) {
+      const normalized = empty.replace(/[\[\]"{}]/g, '').split(',')
+      expect(normalized.some(token => token.trim().length > 0)).toBe(false)
+    }
+    const sql = source.split("<<'SQL'")[1] || ''
+    expect(sql).not.toContain("btrim(translate(COALESCE(t.skills")
+    expect(sql).not.toContain("btrim(translate(COALESCE(c.services")
+    expect((sql.match(/AS capability\(token\)/g) || [])).toHaveLength(2)
+    expect((sql.match(/WHERE btrim\(capability.token\) <> ''/g) || [])).toHaveLength(2)
+  })
+
   it('distinguishes explicit area coverage from radius-based eligibility', () => {
     expect(source).toContain('District counts measure EXPLICIT named service-area declarations only.')
     expect(source).toContain('NOT proof of geospatial matchability')

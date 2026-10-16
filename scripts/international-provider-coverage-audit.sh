@@ -54,7 +54,13 @@ eligible AS (
     AND u."isBanned" = FALSE AND u."identityStatus" = 'VERIFIED'
     AND t."isVerified" = TRUE AND t."verificationStatus" = 'VERIFIED'
     AND (
-      btrim(translate(COALESCE(t.skills, ''), '[]"{}', '')) <> ''
+      EXISTS (
+        SELECT 1
+        FROM regexp_split_to_table(
+          translate(COALESCE(t.skills, ''), '[]"{}', ''), ','
+        ) AS capability(token)
+        WHERE btrim(capability.token) <> ''
+      )
       OR EXISTS (SELECT 1 FROM "TaskerSkill" ts WHERE ts."taskerId" = t.id)
     )
   UNION ALL
@@ -71,7 +77,13 @@ eligible AS (
     AND c."isVerified" = TRUE AND c."verificationStatus" = 'VERIFIED'
     AND c."subscriptionStatus" <> 'CANCELLED'
     AND (
-      btrim(translate(COALESCE(c.services, ''), '[]"{}', '')) <> ''
+      EXISTS (
+        SELECT 1
+        FROM regexp_split_to_table(
+          translate(COALESCE(c.services, ''), '[]"{}', ''), ','
+        ) AS capability(token)
+        WHERE btrim(capability.token) <> ''
+      )
       OR EXISTS (SELECT 1 FROM "CompanySpecialty" cs WHERE cs."companyId" = c.id)
     )
     AND EXISTS (

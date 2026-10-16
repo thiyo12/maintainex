@@ -8,6 +8,7 @@ on:
       - 'apps/mobile/**'
       - 'lib/**'
       - 'tests/**'
+      - 'scripts/international-provider-coverage-audit.sh'
       - 'prisma/**'
       - '.github/workflows/international-fast-gates.yml'
   workflow_dispatch:
@@ -66,5 +67,11 @@ jobs:
         run: npm ci
       - name: Generate Prisma client
         run: npx prisma generate
-      - name: Fast authorization regressions
-        run: npx vitest run tests/auth/work-start-auth.test.ts tests/security/phase07-company-work-start-authorization.test.ts --reporter=verbose
+      - name: Fast authorization and launch-evidence regressions
+        run: |
+          npx vitest run \
+            tests/auth/work-start-auth.test.ts \
+            tests/security/phase07-company-work-start-authorization.test.ts \
+            tests/security/phase11-inactive-company-owner-matching.test.ts \
+            tests/regions/phase11-provider-coverage-audit-contract.test.ts \
+            --reporter=verbose
