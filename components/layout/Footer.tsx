@@ -34,15 +34,15 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-              One Partner for All Your Property Maintenance Needs. Professional services for homes and businesses across {region.countryName}.
+              Connecting customers with trusted professionals for personal, business and local tasks across {region.countryName}.
             </p>
           </div>
 
           <div>
             <h4 className="text-xs uppercase tracking-[0.12em] font-semibold text-muted-foreground mb-4">Product</h4>
             <ul className="space-y-2">
-              <li><Link href="/services" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Services</Link></li>
-              <li><Link href="/booking" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Booking</Link></li>
+              <li><Link href="/#features" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Services</Link></li>
+              <li><Link href="/waitlist" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Join Waitlist</Link></li>
               <li><Link href="/vision" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Vision</Link></li>
             </ul>
           </div>

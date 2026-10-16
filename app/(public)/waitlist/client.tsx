@@ -4,14 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { FiArrowRight, FiCheck } from 'react-icons/fi'
 
-type SelectedService = {
-  name?: string
-  category?: string
-}
-
 export default function WaitlistPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', role: 'SEEKER', location: '', countryCode: '+94' })
-  const [selectedService, setSelectedService] = useState<SelectedService | null>(null)
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
@@ -25,15 +19,7 @@ export default function WaitlistPage() {
       setForm((current) => ({ ...current, role: normalizedRole }))
     }
 
-    const storedService = window.localStorage.getItem('selectedService')
-    if (storedService) {
-      try {
-        const parsed = JSON.parse(storedService) as SelectedService
-        if (parsed?.name) setSelectedService(parsed)
-      } catch {
-        window.localStorage.removeItem('selectedService')
-      }
-    }
+
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,13 +81,6 @@ export default function WaitlistPage() {
           Choose how you plan to use MaintainEX. We&apos;ll keep your selected path ready for the public mobile launch.
         </p>
 
-        {selectedService?.name && form.role === 'SEEKER' && (
-          <div className="mb-8 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-            <div className="text-xs font-bold uppercase tracking-wider text-amber-400">Selected service</div>
-            <div className="mt-1 font-bold text-white">{selectedService.name}</div>
-            {selectedService.category && <div className="mt-1 text-sm text-gray-400">{selectedService.category}</div>}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>

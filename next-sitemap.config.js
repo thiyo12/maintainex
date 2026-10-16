@@ -3,7 +3,7 @@ module.exports = {
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL || 'https://maintainex.lk',
   generateRobotsTxt: false,
   outDir: 'public',
-  exclude: ['/admin/*', '/api/*', '/booking/confirmation', '/maintenance'],
+  exclude: ['/admin/*', '/api/*', '/booking/confirmation', '/maintenance', '/services', '/services/*'],
   alternateRefs: [
     {
       href: 'https://maintainex.lk',

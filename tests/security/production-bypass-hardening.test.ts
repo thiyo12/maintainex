@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 function source(path: string) {
@@ -155,9 +155,7 @@ describe('production seed/setup endpoints are independently disabled', () => {
     'app/api/industries/init/route.ts',
     'app/api/industries/setup/route.ts',
     'app/api/mobile/v2/admin/seed-categories/route.ts',
-    'app/api/seed/auto/route.ts',
     'app/api/seed/real-estate/route.ts',
-    'app/api/seed/services/route.ts',
     'app/api/seed/test-data/route.ts',
   ]
 
@@ -168,6 +166,16 @@ describe('production seed/setup endpoints are independently disabled', () => {
       expect(code).toMatch(/status:\s*(?:403|404)/)
     })
   }
+
+  it('retired V1 service seeding endpoints are absent instead of reachable in production', () => {
+    const retiredRoutes = [
+      'app/api/seed/auto/route.ts',
+      'app/api/seed/services/route.ts',
+    ]
+    for (const route of retiredRoutes) {
+      expect(existsSync(resolve(process.cwd(), route))).toBe(false)
+    }
+  })
 
   it('production preflight refuses an unknown release identity', () => {
     const preflight = source('scripts/crm-v2-production-preflight.sh')

@@ -11,6 +11,17 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // Retired V1 public catalog. The current public experience is the marketplace landing page.
+      {
+        source: '/services',
+        destination: '/#features',
+        permanent: true,
+      },
+      {
+        source: '/services/:path*',
+        destination: '/#features',
+        permanent: true,
+      },
       {
         source: '/booking',
         destination: '/waitlist',
