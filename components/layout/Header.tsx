@@ -11,7 +11,7 @@ import AppStoreModal from './AppStoreModal'
 
 const navigation = [
   { name: 'Home', href: '/' },
-  { name: 'Services', href: '/services' },
+  { name: 'Services', href: '/#features' },
   { name: 'How It Works', href: '/#how-it-works' },
   { name: 'About', href: '/about' },
   { name: 'Vision', href: '/vision' },
