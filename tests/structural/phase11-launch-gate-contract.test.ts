@@ -30,6 +30,9 @@ describe('Phase 11 — international release gates are blocking and observable',
     expect(target).toContain('tests/security/phase04-vancouver-company-onboarding.test.ts')
     expect(target).toContain('tests/security/phase04-company-invitation-market.test.ts')
     expect(target).toContain('tests/security/phase07-company-work-start-authorization.test.ts')
+    expect(target).toContain('tests/security/phase11-inactive-company-owner-matching.test.ts')
+    expect(target).toContain('tests/regions/phase11-provider-coverage-audit-contract.test.ts')
+    expect(target).toContain('tests/e2e/e2e-fix-batch.test.ts')
   })
 
   it('checks market-safe seasonal offers, French fallback and CRM country permissions', () => {

@@ -229,6 +229,9 @@ jobs:
             tests/security/phase04-vancouver-company-onboarding.test.ts \
             tests/security/phase04-company-invitation-market.test.ts \
             tests/security/phase07-company-work-start-authorization.test.ts \
+            tests/security/phase11-inactive-company-owner-matching.test.ts \
+            tests/regions/phase11-provider-coverage-audit-contract.test.ts \
+            tests/e2e/e2e-fix-batch.test.ts \
             tests/security/crm-canonical-catalog.test.ts \
             tests/finance/phase05-price-input-isolation.test.ts \
             tests/pricing/phase05-market-price-estimate.test.ts \
