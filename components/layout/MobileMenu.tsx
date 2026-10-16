@@ -61,11 +61,11 @@ export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuPr
               Sign in
             </button>
             <Link
-              href="/booking"
+              href="/waitlist"
               onClick={() => setOpen(false)}
               className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-5 py-3 rounded-full text-sm transition-all mt-2"
             >
-              Book Now
+              Join Waitlist
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
