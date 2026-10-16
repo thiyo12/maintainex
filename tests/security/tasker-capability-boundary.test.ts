@@ -30,7 +30,8 @@ describe('tasker capability mutation boundary', () => {
 
   it('uses the tasker market currency for both new and existing skill rows', () => {
     const skills = read('app/api/mobile/taskers/skills/route.ts')
-    const matches = skills.match(/currency: getCurrencyForCountry\(user\.countryCode\)/g) || []
+    const matches = skills.match(/currency: getCurrencyForCountry\(market\)/g) || []
     expect(matches.length).toBeGreaterThanOrEqual(2)
+    expect((skills.match(/countryCode: market/g) || []).length).toBeGreaterThanOrEqual(2)
   })
 })

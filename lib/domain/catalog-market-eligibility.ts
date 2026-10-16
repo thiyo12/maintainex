@@ -16,3 +16,24 @@ export function isCatalogAvailableInMarket(storedCountries: string, market: 'LK'
     return false
   }
 }
+
+/**
+ * Phase 04: canonical V2 jobs available to an individual provider in their
+ * authenticated market. Reuse the marketplace catalogue boundary for both
+ * the onboarding list and its save endpoint, rather than trusting job IDs.
+ */
+export function isTaskerServiceAvailableInMarket(
+  job: { isActive: boolean; isCompanyOnly: boolean; countries: string; currency: string },
+  category: { isActive: boolean; countries: string },
+  market: 'LK' | 'CA',
+): boolean {
+  const expectedCurrency = market === 'CA' ? 'CAD' : 'LKR'
+  return (
+    job.isActive &&
+    !job.isCompanyOnly &&
+    category.isActive &&
+    job.currency === expectedCurrency &&
+    isCatalogAvailableInMarket(job.countries, market) &&
+    isCatalogAvailableInMarket(category.countries, market)
+  )
+}
