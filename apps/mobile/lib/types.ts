@@ -22,7 +22,7 @@ export interface User {
   activeCompany?: { companyId: string; role: string } | null
   birthday?: string
   gender?: 'MALE' | 'FEMALE' | 'OTHER'
-  language?: 'EN' | 'TA' | 'SI'
+  language?: 'EN' | 'TA' | 'SI' | 'FR'
   emergencyContact?: string
   province?: string
   region?: string
