@@ -6,8 +6,11 @@ import { createNotification } from '@/lib/notifications'
 import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 import { readStoredList } from '@/lib/db-utils'
 import { haversineKm } from '@/lib/distance'
+<<<<<<< HEAD
 import { isBookNowCatalogueAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 import { resolveMarketFromServiceAddress } from '@/lib/geography/market-engine'
+=======
+>>>>>>> 5e46ef06 (fix(crm): correct canonical catalogue authorization, scope and pricing)
 
 export interface BookNowInput {
   customerId: string

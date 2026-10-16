@@ -84,11 +84,15 @@ describe('canonical catalogue administration', () => {
   })
 
   afterAll(async () => {
+<<<<<<< HEAD
     // "created" contains JobCategory IDs, not TemplateJob IDs. Delete
     // jobs belonging to these test-created categories before removing
     // their parents. Otherwise incomplete drafts persist and pollute
     // later catalogue-integrity assertions in this isolated CI database.
     await prisma.templateJob.deleteMany({ where: { categoryId: { in: created } } })
+=======
+    await prisma.templateJob.deleteMany({ where: { id: { in: created } } })
+>>>>>>> 5e46ef06 (fix(crm): correct canonical catalogue authorization, scope and pricing)
     await prisma.jobCategory.deleteMany({ where: { slug: { startsWith: `crmtest-${ts}` } } })
   })
 
@@ -247,6 +251,7 @@ describe('canonical catalogue administration', () => {
     }
   })
 
+<<<<<<< HEAD
 
   it('does not reveal a shared LK+CA category to an LK-only CRM administrator', async () => {
     const shared = await makeCategory(['LK', 'CA'])
@@ -297,6 +302,8 @@ describe('canonical catalogue administration', () => {
     }
   })
 
+=======
+>>>>>>> 5e46ef06 (fix(crm): correct canonical catalogue authorization, scope and pricing)
   it('lists template jobs so the CRM can manage them', async () => {
     const category = await makeCategory(['LK'])
     await call('POST', {
