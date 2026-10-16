@@ -130,6 +130,89 @@ describe('Phase 10.3 — Quote Revision Lifecycle', () => {
       expect(createCall[0].data.revisionReason).toBe('Scope change')
     })
 
+
+    it('rejects a counteroffer whose currency differs from the original, without superseding it', async () => {
+      const prisma = mockPrisma({
+        originalQuote: {
+          id: 'orig-cad', jobId: 'job-ca', providerId: 'provider-1',
+          providerType: 'INDIVIDUAL', status: 'PENDING', price: 2500n,
+          currency: 'CAD', revisionNumber: 1, parentQuoteId: null,
+          estimatedCompletionTime: '2 hours', message: 'Original CAD', attachments: '[]',
+        },
+      })
+      const result = await createQuoteRevision(prisma, {
+        originalQuoteId: 'orig-cad', providerId: 'provider-1',
+        price: 2900n, currency: 'LKR',
+        estimatedCompletionTime: '2 hours', revisionReason: 'Counteroffer',
+      })
+      expect(result).toEqual({
+        success: false,
+        error: 'Quote revision currency must match the original quote',
+      })
+      expect(prisma.jobQuote.updateMany).not.toHaveBeenCalled()
+      expect(prisma.jobQuote.create).not.toHaveBeenCalled()
+    })
+
+    it('preserves CAD for legitimate Canadian counteroffers', async () => {
+      const prisma = mockPrisma({
+        originalQuote: {
+          id: 'orig-cad', jobId: 'job-ca', providerId: 'provider-1',
+          providerType: 'INDIVIDUAL', status: 'PENDING', price: 2500n,
+          currency: 'CAD', revisionNumber: 1, parentQuoteId: null,
+          estimatedCompletionTime: '2 hours', message: '', attachments: '[]',
+        },
+      })
+      const result = await createQuoteRevision(prisma, {
+        originalQuoteId: 'orig-cad', providerId: 'provider-1',
+        price: 2900n, currency: 'CAD',
+        estimatedCompletionTime: '2 hours', revisionReason: 'Counteroffer',
+      })
+      expect(result.success).toBe(true)
+      expect(prisma.jobQuote.create.mock.calls[0][0].data).toMatchObject({
+        price: 2900n, currency: 'CAD', parentQuoteId: 'orig-cad',
+        revisionNumber: 2,
+      })
+    })
+
+    it('preserves LKR for legitimate Sri Lankan counteroffers', async () => {
+      const prisma = mockPrisma({
+        originalQuote: {
+          id: 'orig-lkr', jobId: 'job-lk', providerId: 'provider-1',
+          providerType: 'INDIVIDUAL', status: 'PENDING', price: 10000n,
+          currency: 'LKR', revisionNumber: 1, parentQuoteId: null,
+          estimatedCompletionTime: '3 hours', message: '', attachments: '[]',
+        },
+      })
+      const result = await createQuoteRevision(prisma, {
+        originalQuoteId: 'orig-lkr', providerId: 'provider-1',
+        price: 9500n, estimatedCompletionTime: '3 hours', revisionReason: 'Negotiated price',
+      })
+      expect(result.success).toBe(true)
+      expect(prisma.jobQuote.create.mock.calls[0][0].data.currency).toBe('LKR')
+    })
+
+    it('refuses zero-price or negative-price revisions before mutating commercial records', async () => {
+      for (const price of [0n, -100n]) {
+        const prisma = mockPrisma({
+          originalQuote: {
+            id: 'orig-lkr', jobId: 'job-lk', providerId: 'provider-1',
+            providerType: 'INDIVIDUAL', status: 'PENDING', price: 10000n,
+            currency: 'LKR', revisionNumber: 1, parentQuoteId: null,
+            estimatedCompletionTime: '1 hour', message: '', attachments: '[]',
+          },
+        })
+        const result = await createQuoteRevision(prisma, {
+          originalQuoteId: 'orig-lkr', providerId: 'provider-1',
+          price, currency: 'LKR', estimatedCompletionTime: '1 hour',
+          revisionReason: 'Invalid revision',
+        })
+        expect(result.success).toBe(false)
+        expect(result.error).toBe('Quote revision amount must be positive')
+        expect(prisma.jobQuote.updateMany).not.toHaveBeenCalled()
+        expect(prisma.jobQuote.create).not.toHaveBeenCalled()
+      }
+    })
+
     it('original amount unchanged after revision', async () => {
       const prisma = mockPrisma({
         originalQuote: {

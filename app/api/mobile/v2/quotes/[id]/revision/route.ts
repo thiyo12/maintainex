@@ -194,6 +194,14 @@ export async function POST(
     }
 
     const canonicalCurrency = getCurrencyForCountry(jobMarket.countryCode)
+    if (originalQuote.currency !== canonicalCurrency) {
+      // Never reinterpret a historical quote's minor units as another
+      // currency. The original commercial record must be resolved first.
+      return NextResponse.json(
+        { error: 'Original quote currency does not match this job market' },
+        { status: 409 },
+      )
+    }
     if (currency && currency !== canonicalCurrency) {
       return NextResponse.json(
         { error: 'Quote currency does not match the job market' },
@@ -243,7 +251,7 @@ export async function POST(
     if (job.serviceTemplateId) {
       const benchmark = await resolveBenchmark(prisma, {
         serviceTemplateId: job.serviceTemplateId,
-        countryCode: job.countryCode,
+        countryCode: jobMarket.countryCode,
         currency: canonicalCurrency,
         pricingMode: 'SMART_QUOTE',
       })
