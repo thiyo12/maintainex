@@ -172,13 +172,10 @@ export async function PUT(request: NextRequest) {
             status: 'ACTIVE',
           },
         })
-      } else if (membership && user.role === 'COMPANY' &&
-        (membership.status !== 'ACTIVE' || membership.role !== 'COMPANY_OWNER')) {
-        await prisma.teamMember.update({
-          where: { id: membership.id },
-          data: { status: 'ACTIVE', role: 'COMPANY_OWNER', name: user.name },
-        })
       }
+      // Existing memberships are authoritative. Never restore SUSPENDED or
+      // REMOVED access (or promote a demoted member) through profile editing.
+      // Those changes must go through the authorized workforce flow.
     }
 
     const { context, error } = await resolveCompanyContext(user.id, companyId, 'company:update')
