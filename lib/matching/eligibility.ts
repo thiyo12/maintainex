@@ -108,9 +108,15 @@ export async function evaluateEligibility(
     // Check owner account
     const ownerUser = await client.user.findUnique({
       where: { id: company.userId },
-      select: { isSuspended: true, isBanned: true },
+      select: { isActive: true, isSuspended: true, isBanned: true },
     })
-    if (ownerUser?.isSuspended) {
+    // Matching must enforce the same owner-account boundary as provider
+    // onboarding. A deactivated/missing owner cannot receive new work.
+    if (!ownerUser || ownerUser.isActive === false) {
+      gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: false, reason: 'Company owner account is inactive or missing' })
+      return buildIneligibleResult(gates)
+    }
+    if (ownerUser.isSuspended) {
       gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: false, reason: 'Company owner suspended' })
       return buildIneligibleResult(gates)
     }
