@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
-import { calculatePrice } from '@/lib/pricing/engine'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 const fake = vi.hoisted(() => ({
   category: vi.fn(),
@@ -115,8 +116,6 @@ describe('Phase 05 — legacy estimate must obey independent local pricing', () 
 
 describe('Phase 05 — canonical category-level price selection', () => {
   it('does not use the old mixed-market template job lookup', () => {
-    const { readFileSync } = require('node:fs') as typeof import('node:fs')
-    const { resolve } = require('node:path') as typeof import('node:path')
     const code = readFileSync(resolve(process.cwd(), 'lib/pricing/engine.ts'), 'utf8')
     expect(code).toContain('countries: { contains: JSON.stringify(market) }')
     expect(code).toContain('currency: expectedCurrency')
