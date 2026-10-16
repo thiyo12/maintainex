@@ -67,6 +67,8 @@ jobs:
         run: npm ci
       - name: Generate Prisma client
         run: npx prisma generate
+      - name: Market-isolation smoke self-test
+        run: node scripts/international-catalogue-smoke.mjs --self-test
       - name: Fast authorization and launch-evidence regressions
         run: |
           npx vitest run \
