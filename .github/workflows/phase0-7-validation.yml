@@ -186,7 +186,16 @@ jobs:
       - name: Mobile TypeScript
         run: |
           cd apps/mobile
-          npx tsc --noEmit
+          npx tsc --noEmit 2>&1 | tee /tmp/mobile-tsc.txt
+
+      - name: Upload Mobile TypeScript diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mobile-typescript-diagnostics
+          path: /tmp/mobile-tsc.txt
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: International launch Phases 04-11 blocking acceptance gates
         if: always()
