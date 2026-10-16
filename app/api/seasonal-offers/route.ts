@@ -3,11 +3,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 import { requestCountry } from '@/lib/api/request-country'
+import { isSeasonalOfferJobAvailableInMarket } from '@/lib/domain/seasonal-offer-market'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const country = requestCountry(request)
+    if (country !== 'LK' && country !== 'CA') {
+      return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } })
+    }
     const runtime = await getPlatformRuntimeConfig(country)
 
     if (!runtime.offers.visible || !runtime.market.available) {
@@ -34,7 +38,14 @@ export async function GET(request: NextRequest) {
       orderBy: { displayOrder: 'asc' },
     })
 
-    return NextResponse.json(offers, {
+    const marketOffers = offers
+      .map(offer => ({
+        ...offer,
+        jobs: offer.jobs.filter(job => isSeasonalOfferJobAvailableInMarket(job, country)),
+      }))
+      .filter(offer => offer.jobs.length > 0)
+
+    return NextResponse.json(marketOffers, {
       headers: { 'Cache-Control': 'no-store' },
     })
   } catch (error) {
