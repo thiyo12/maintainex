@@ -64,4 +64,16 @@ describe('Phase 11 — aggregate-only provider coverage audit', () => {
     expect(source).toContain('NOT proof of geospatial matchability')
     expect(source).toContain('regexp_split_to_table')
   })
+  it('executes the aggregate SQL under a separate read-only user in isolated CI PostgreSQL', () => {
+    const workflow = readFileSync(
+      resolve(process.cwd(), '.github/workflows/phase0-7-validation.yml'), 'utf8',
+    )
+    expect(workflow).toContain('Phase 11 aggregate provider coverage query (isolated read-only CI DB)')
+    expect(workflow).toContain("'@localhost:5432/maintainex_test_phase07_ci'")
+    expect(workflow).toContain('CREATE ROLE phase11_coverage_auditor')
+    expect(workflow).toContain('GRANT SELECT ON ALL TABLES IN SCHEMA public')
+    expect(workflow).toContain('bash scripts/international-provider-coverage-audit.sh')
+    expect(workflow).toContain('28 rows')
+    expect(workflow).toContain('Upload Phase 11 coverage SQL diagnostics')
+  })
 })

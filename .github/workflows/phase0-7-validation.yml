@@ -171,6 +171,30 @@ jobs:
         run: |
           psql "$DATABASE_URL" -c "\di *countryCode*"
 
+      # Isolated CI PostgreSQL only: create a dedicated SELECT-only account
+      # and exercise the actual SQL of the launch provider-coverage audit.
+      # This proves query compatibility, never real-world provider supply.
+      - name: Phase 11 aggregate provider coverage query (isolated read-only CI DB)
+        run: |
+          set -euo pipefail
+          [[ "$DATABASE_URL" == *'@localhost:5432/maintainex_test_phase07_ci' ]] || { echo 'Refusing a non-CI database'; exit 1; }
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE phase11_coverage_auditor LOGIN PASSWORD 'phase11-ci-readonly-0123456789';
+          GRANT CONNECT ON DATABASE maintainex_test_phase07_ci TO phase11_coverage_auditor;
+          GRANT USAGE ON SCHEMA public TO phase11_coverage_auditor;
+          GRANT SELECT ON ALL TABLES IN SCHEMA public TO phase11_coverage_auditor;
+          SQL
+          export MAINTAINEX_READONLY_DATABASE_URL='postgresql://phase11_coverage_auditor:phase11-ci-readonly-0123456789@localhost:5432/maintainex_test_phase07_ci'
+          bash scripts/international-provider-coverage-audit.sh 2>&1 | tee /tmp/phase11-coverage-sql-test.txt
+          grep -Eq '\(28 rows\)' /tmp/phase11-coverage-sql-test.txt
+      - name: Upload Phase 11 coverage SQL diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase11-coverage-sql-diagnostics
+          path: /tmp/phase11-coverage-sql-test.txt
+          if-no-files-found: ignore
+          retention-days: 3
       - name: TypeScript
         run: npx tsc --noEmit 2>&1 | tee /tmp/tsc.txt
 
