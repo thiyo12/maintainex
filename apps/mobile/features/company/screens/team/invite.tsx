@@ -17,7 +17,7 @@ export default function InviteTeamMember() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [role, setRole] = useState('MEMBER')
+  const [role, setRole] = useState<'WORKER' | 'MANAGER'>('WORKER')
   const [sending, setSending] = useState(false)
 
   const handleSend = async () => {
@@ -91,16 +91,16 @@ export default function InviteTeamMember() {
       <Text style={styles.label}>{t('profile.role')}</Text>
       <View style={styles.roleRow}>
         <TouchableOpacity
-          style={[styles.rolePill, role === 'MEMBER' && styles.rolePillActive]}
-          onPress={() => setRole('MEMBER')}
+          style={[styles.rolePill, role === 'WORKER' && styles.rolePillActive]}
+          onPress={() => setRole('WORKER')}
         >
-            <Text style={[styles.roleText, role === 'MEMBER' && styles.roleTextActive]}>{t('team.memberRole')}</Text>
+            <Text style={[styles.roleText, role === 'WORKER' && styles.roleTextActive]}>Worker</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.rolePill, role === 'ADMIN' && styles.rolePillActive]}
-          onPress={() => setRole('ADMIN')}
+          style={[styles.rolePill, role === 'MANAGER' && styles.rolePillActive]}
+          onPress={() => setRole('MANAGER')}
         >
-          <Text style={[styles.roleText, role === 'ADMIN' && styles.roleTextActive]}>{t('team.adminRole')}</Text>
+          <Text style={[styles.roleText, role === 'MANAGER' && styles.roleTextActive]}>Manager</Text>
         </TouchableOpacity>
       </View>
 
