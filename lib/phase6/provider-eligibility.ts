@@ -19,12 +19,13 @@ export async function checkIndividualProviderEligibility(userId: string): Promis
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { identityStatus: true, isSuspended: true, isBanned: true, role: true },
+    select: { identityStatus: true, isActive: true, isSuspended: true, isBanned: true, role: true },
   })
   if (!user) {
     return { eligible: false, reasons: ['User not found'] }
   }
 
+  if (user.isActive === false) reasons.push('Account is inactive')
   if (user.isSuspended) reasons.push('Account is suspended')
   if (user.isBanned) reasons.push('Account is banned')
   if (user.identityStatus !== 'VERIFIED') reasons.push('Identity not verified')
@@ -82,8 +83,9 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
 
   const user = await prisma.user.findUnique({
     where: { id: company.userId },
-    select: { isSuspended: true, isBanned: true },
+    select: { isActive: true, isSuspended: true, isBanned: true },
   })
+  if (user?.isActive === false) reasons.push('Company owner account is inactive')
   if (user?.isSuspended) reasons.push('Company owner account is suspended')
   if (user?.isBanned) reasons.push('Company owner account is banned')
 
@@ -111,12 +113,13 @@ export async function checkWorkerEligibility(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { identityStatus: true, isSuspended: true, isBanned: true },
+    select: { identityStatus: true, isActive: true, isSuspended: true, isBanned: true },
   })
   if (!user) {
     return { eligible: false, reasons: ['User account not found'] }
   }
 
+  if (user.isActive === false) reasons.push('Worker account is inactive')
   if (user.isSuspended) reasons.push('Worker account is suspended')
   if (user.isBanned) reasons.push('Worker account is banned')
   if (user.identityStatus !== 'VERIFIED') reasons.push('Worker identity not verified')
