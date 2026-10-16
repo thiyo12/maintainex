@@ -139,7 +139,9 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
  *
  * This helper never throws and never blocks a legitimate historical release or
  * refund. Preference order:
- *   1. the authoritative validated service-address market, when resolvable;
+ *   1. the authoritative service-address market, but only when the job has a
+ *      complete coordinate pair, since the stored country is otherwise returned
+ *      unchallenged;
  *   2. the validated escrow currency mapped through the launch markets;
  *   3. the stored job country, as legacy metadata.
  */
@@ -147,11 +149,20 @@ export function resolveSettlementMarket(
   job: { countryCode: string | null; latitude: number | null; longitude: number | null },
   escrowCurrency: string,
 ): string {
-  try {
-    const resolved = resolvePaymentMarketForIntent(job)
-    if (resolved.ok) return resolved.countryCode
-  } catch {
-    /* fall through to the currency-derived market */
+  // Only a complete coordinate pair makes the market genuinely validated.
+  // Without one, the payment-intent resolver accepts the stored country through
+  // its own legacy fallback, which is exactly the untrusted value we must not
+  // let outrank a validated escrow currency.
+  const hasCoordinates =
+    typeof job.latitude === 'number' && Number.isFinite(job.latitude) &&
+    typeof job.longitude === 'number' && Number.isFinite(job.longitude)
+  if (hasCoordinates) {
+    try {
+      const resolved = resolvePaymentMarketForIntent(job)
+      if (resolved.ok) return resolved.countryCode
+    } catch {
+      /* fall through to the currency-derived market */
+    }
   }
   const currency = escrowCurrency.trim().toUpperCase()
   for (const market of Object.values(LAUNCH_MARKETS)) {

@@ -59,6 +59,8 @@ describe('settlement attribution uses a validated market', () => {
     // Preference: validated market, then validated currency, then stored metadata.
     expect(helper).toContain('resolvePaymentMarketForIntent(job)')
     expect(helper).toContain('LAUNCH_MARKETS')
+    // The stored-country fallback must never be treated as validated evidence.
+    expect(helper).toContain('if (hasCoordinates) {')
     expect(helper).toContain('return stored || \'LK\'')
   })
 })
@@ -133,5 +135,50 @@ describe('resolveSettlementMarket behaviour', () => {
         'CAD',
       ),
     ).toBe('CA') // currency-derived, still recorded rather than dropped
+  })
+})
+
+describe('stored country must not outrank a validated escrow currency', () => {
+  it('historical LK job with no coordinates but a CAD escrow is attributed to CA', async () => {
+    const { resolveSettlementMarket } = await import('@/lib/finance/escrow/escrow-service')
+    // The stored country is a supported value, so the payment-intent resolver
+    // accepts it via its own legacy fallback. Settlement must not treat that as
+    // coordinate-validated proof when the escrow currency disagrees.
+    expect(
+      resolveSettlementMarket({ countryCode: 'LK', latitude: null, longitude: null }, 'CAD'),
+    ).toBe('CA')
+  })
+
+  it('the inverse: stored CA with no coordinates and an LKR escrow is attributed to LK', async () => {
+    const { resolveSettlementMarket } = await import('@/lib/finance/escrow/escrow-service')
+    expect(
+      resolveSettlementMarket({ countryCode: 'CA', latitude: null, longitude: null }, 'LKR'),
+    ).toBe('LK')
+  })
+
+  it('an agreeing stored country and currency still resolve to that market', async () => {
+    const { resolveSettlementMarket } = await import('@/lib/finance/escrow/escrow-service')
+    expect(
+      resolveSettlementMarket({ countryCode: 'LK', latitude: null, longitude: null }, 'LKR'),
+    ).toBe('LK')
+    expect(
+      resolveSettlementMarket({ countryCode: 'CA', latitude: null, longitude: null }, 'CAD'),
+    ).toBe('CA')
+  })
+
+  it('genuinely validated coordinates still take precedence over the currency', async () => {
+    const { resolveSettlementMarket } = await import('@/lib/finance/escrow/escrow-service')
+    // Coordinates inside the City of Vancouver agree with a CAD escrow.
+    expect(
+      resolveSettlementMarket(
+        { countryCode: 'CA', latitude: 49.2606, longitude: -123.1156 },
+        'CAD',
+      ),
+    ).toBe('CA')
+    // Coordinates in Colombo agree with an LKR escrow, even when the stored
+    // country is absent.
+    expect(
+      resolveSettlementMarket({ countryCode: null, latitude: 6.9271, longitude: 79.8612 }, 'LKR'),
+    ).toBe('LK')
   })
 })
