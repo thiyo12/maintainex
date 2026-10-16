@@ -7,6 +7,7 @@ export interface User {
   phone?: string
   role: UserRole
   isActive: boolean
+  countryCode?: string
   createdAt: string
   identityStatus?: string
   nickname?: string

@@ -110,8 +110,16 @@ export async function PUT(request: NextRequest) {
         }
 
         const companyName = typeof data.companyName === 'string' ? data.companyName.trim() : ''
-        const services = Array.isArray(data.services) ? data.services.filter(Boolean) : []
-        const serviceAreas = Array.isArray(data.serviceAreas) ? data.serviceAreas.filter(Boolean) : []
+        const services = Array.isArray(data.services)
+          ? data.services.filter((value: unknown): value is string => typeof value === 'string' && value.trim().length > 0)
+          : []
+        const serviceAreas = Array.isArray(data.serviceAreas)
+          ? data.serviceAreas.filter((value: unknown): value is string => typeof value === 'string' && value.trim().length > 0).map((value: string) => value.trim())
+          : []
+        const market = (user.countryCode || 'LK').trim().toUpperCase()
+        if (market === 'CA' && !serviceAreas.some((area: string) => area.toLowerCase() === 'vancouver')) {
+          return NextResponse.json({ error: 'Declare City of Vancouver as your company service area' }, { status: 400 })
+        }
 
         if (!companyName) {
           return NextResponse.json({ error: 'Company name is required' }, { status: 400 })
@@ -129,7 +137,7 @@ export async function PUT(request: NextRequest) {
               description: data.description || null,
               services: JSON.stringify(services),
               serviceAreas: JSON.stringify(serviceAreas),
-              countryCode: user.countryCode || 'LK',
+              countryCode: market,
             },
           })
 
