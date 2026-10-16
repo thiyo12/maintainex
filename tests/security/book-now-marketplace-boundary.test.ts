@@ -20,8 +20,8 @@ describe('BOOK_NOW marketplace boundary', () => {
   it('fails closed when provider market or service area does not match', () => {
     expect(domain).toContain('Provider country does not match booking country')
     expect(domain).toContain('Provider does not serve the requested district')
-    expect(domain).toContain('serviceAreaAllows(company.serviceAreas, input.district)')
-    expect(domain).toContain('serviceAreaAllows(provider.serviceAreas, input.district)')
+    expect(domain).toContain('serviceAreaAllows(company.serviceAreas, input.district, companyCountry, hasValidatedServiceAddress(input))')
+    expect(domain).toContain('serviceAreaAllows(provider.serviceAreas, input.district, providerCountry, hasValidatedServiceAddress(input))')
   })
 
   it('honors declared provider availability and vacations', () => {

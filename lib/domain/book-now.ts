@@ -35,11 +35,25 @@ function normalizeToken(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
-function serviceAreaAllows(serviceAreas: string | null | undefined, district: string): boolean {
+/** Mirrors the matching rule so discovery and direct booking cannot disagree. */
+function serviceAreaAllows(
+  serviceAreas: string | null | undefined,
+  district: string,
+  providerCountry?: string | null,
+  hasValidatedAddress: boolean = false,
+): boolean {
+  const isCanada = (providerCountry || '').trim().toUpperCase() === 'CA'
   const configured = readStoredList(serviceAreas)
     .map(normalizeToken)
     .filter(Boolean)
-  if (configured.length === 0) return true
+  const hasDeclaredArea = configured.length > 0
+  if (!hasValidatedAddress) return true
+  if (!isCanada) {
+    if (!district || !hasDeclaredArea) return true
+  } else if (!hasDeclaredArea) {
+    return false
+  }
+  if (!district) return false
 
   const target = normalizeToken(district)
   return configured.some(area => area === target || target.includes(area) || area.includes(target))
@@ -72,6 +86,17 @@ function isDateInsideVacation(date: Date, start: Date | null, end: Date | null):
   return check >= from && check <= to
 }
 
+
+/** True when the caller supplied a complete coordinate pair to validate against. */
+function hasValidatedServiceAddress(input: {
+  latitude?: number
+  longitude?: number
+}): boolean {
+  return (
+    typeof input.latitude === 'number' && Number.isFinite(input.latitude) &&
+    typeof input.longitude === 'number' && Number.isFinite(input.longitude)
+  )
+}
 
 export async function createBookNowJob(input: BookNowInput) {
   const templateJob = await prisma.templateJob.findUnique({
@@ -149,7 +174,7 @@ export async function createBookNowJob(input: BookNowInput) {
       if (!catSpecialty) throw new Error('Company lacks required capability for this booking')
     }
 
-    if (!serviceAreaAllows(company.serviceAreas, input.district)) {
+    if (!serviceAreaAllows(company.serviceAreas, input.district, companyCountry, hasValidatedServiceAddress(input))) {
       throw new Error('Provider does not serve the requested district')
     }
 
@@ -201,7 +226,7 @@ export async function createBookNowJob(input: BookNowInput) {
       throw new Error('Provider lacks required capability for this booking')
     }
 
-    if (!serviceAreaAllows(provider.serviceAreas, input.district)) {
+    if (!serviceAreaAllows(provider.serviceAreas, input.district, providerCountry, hasValidatedServiceAddress(input))) {
       throw new Error('Provider does not serve the requested district')
     }
 

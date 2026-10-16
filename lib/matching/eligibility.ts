@@ -543,12 +543,42 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-function configuredAreaMatches(serviceAreas: string | null | undefined, areaId: string | null): boolean {
-  if (!serviceAreas || !areaId) return true
+/**
+ * Blank coverage is legacy fail-open in Sri Lanka and stays that way.
+ *
+ * In Canada it is not sufficient authority: the City of Vancouver is one
+ * municipality, so an undeclared area must not authorise work across the whole
+ * city. A Canadian provider needs a declared area, or a verified radius
+ * upstream. Historical records that cannot establish a service address at all
+ * (no job coordinates) keep their existing behaviour for both markets.
+ */
+function configuredAreaMatches(
+  serviceAreas: string | null | undefined,
+  areaId: string | null,
+  providerCountry?: string | null,
+  hasValidatedAddress: boolean = false,
+): boolean {
+  const isCanada = (providerCountry || '').trim().toUpperCase() === 'CA'
   const configured = readStoredList(serviceAreas)
     .map(value => value.trim().toLowerCase())
     .filter(Boolean)
-  if (configured.length === 0) return true
+  const hasDeclaredArea = configured.length > 0
+
+  // A historical record whose service address cannot be established keeps its
+  // existing behaviour in both markets.
+  if (!hasValidatedAddress) return true
+
+  if (!isCanada) {
+    // Sri Lanka keeps its legacy fail-open coverage.
+    if (!areaId || !hasDeclaredArea) return true
+  } else if (!hasDeclaredArea) {
+    // Blank coverage must not authorise work across the whole City of Vancouver.
+    return false
+  }
+  // With a validated address but no named area on the job, a declared area is
+  // the only authority available: the address has already been bounded to the
+  // supported market by the caller.
+  if (!areaId) return hasDeclaredArea
 
   const fullLocation = getLocationName(areaId).toLowerCase()
   const normalizedAreaId = areaId.toLowerCase()
@@ -606,7 +636,7 @@ async function evaluateServiceArea(
       return haversineKm(target.latitude, target.longitude, profile.latitude, profile.longitude) <= profile.serviceRadius
     }
 
-    return configuredAreaMatches(profile?.serviceAreas, target?.areaId ?? null)
+    return configuredAreaMatches(profile?.serviceAreas, target?.areaId ?? null, providerCountry, target?.latitude != null && target?.longitude != null)
   }
 
   const company = await client.companyProfile.findUnique({
@@ -633,7 +663,7 @@ async function evaluateServiceArea(
     return haversineKm(target.latitude, target.longitude, company.latitude, company.longitude) <= company.serviceRadius
   }
 
-  return configuredAreaMatches(company.serviceAreas, target?.areaId ?? null)
+  return configuredAreaMatches(company.serviceAreas, target?.areaId ?? null, providerCountry, target?.latitude != null && target?.longitude != null)
 }
 
 function timeToMinutes(value: string): number | null {

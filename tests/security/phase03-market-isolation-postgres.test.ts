@@ -108,6 +108,9 @@ describe('Phase 03 — LK/CA market isolation (PostgreSQL)', () => {
       data: {
         userId: caUser.id,
         countryCode: 'CA',
+        // A Vancouver provider must declare coverage: blank coverage is no
+        // longer authority to serve the whole municipality.
+        serviceAreas: '["Vancouver"]',
         isVerified: true,
         verificationStatus: 'VERIFIED',
         rating: 4.5,
@@ -283,6 +286,98 @@ describe('Phase 03 — LK/CA market isolation (PostgreSQL)', () => {
 
     const ids = result.candidates.map(c => c.userId || c.providerId)
     expect(ids).toContain(caProviderId)
+  })
+
+  it('a Vancouver provider with blank coverage does not match a Vancouver job', async () => {
+    const undeclared = await prisma.user.create({
+      data: {
+        email: `iso-blankca-${Date.now()}@test.local`,
+        passwordHash: 'x',
+        name: 'ISO blankca',
+        phone: `+9477000${String(Math.floor(Math.random() * 100000)).padStart(5, '0')}`,
+        countryCode: 'CA',
+        identityStatus: 'VERIFIED',
+        isActive: true,
+      },
+    })
+    const blankProfile = await prisma.taskerProfile.create({
+      data: {
+        userId: undeclared.id,
+        countryCode: 'CA',
+        isVerified: true,
+        verificationStatus: 'VERIFIED',
+        rating: 4.0,
+        completedJobs: 1,
+      },
+    })
+    await prisma.taskerSkill.create({
+      data: { taskerId: blankProfile.id, jobId: templateJobId, countryCode: 'CA', currency: 'CAD' },
+    })
+    try {
+      const job = await makeJob({ countryCode: 'CA', ...VANCOUVER })
+      const result = await findCandidates(prisma, {
+        jobId: job.id, categoryId, jobMode: 'QUOTE', urgency: 'NORMAL',
+      })
+      const ids = result.candidates.map(c => c.userId || c.providerId)
+      // Blank coverage must not authorise work across the whole municipality.
+      expect(ids).not.toContain(undeclared.id)
+      // The declared Vancouver provider still matches.
+      expect(ids).toContain(caProviderId)
+    } finally {
+      await prisma.taskerSkill.deleteMany({ where: { taskerId: blankProfile.id } })
+      await prisma.taskerProfile.deleteMany({ where: { id: blankProfile.id } })
+      await prisma.user.deleteMany({ where: { id: undeclared.id } })
+    }
+  })
+
+  it('a Vancouver provider inside a verified radius matches without a declared area', async () => {
+    const near = await prisma.user.create({
+      data: {
+        email: `iso-radiusca-${Date.now()}@test.local`,
+        passwordHash: 'x',
+        name: 'ISO radiusca',
+        phone: `+9477000${String(Math.floor(Math.random() * 100000)).padStart(5, '0')}`,
+        countryCode: 'CA',
+        identityStatus: 'VERIFIED',
+        isActive: true,
+      },
+    })
+    const radiusProfile = await prisma.taskerProfile.create({
+      data: {
+        userId: near.id,
+        countryCode: 'CA',
+        latitude: VANCOUVER.latitude,
+        longitude: VANCOUVER.longitude,
+        serviceRadius: 15,
+        isVerified: true,
+        verificationStatus: 'VERIFIED',
+        rating: 4.0,
+        completedJobs: 1,
+      },
+    })
+    await prisma.taskerSkill.create({
+      data: { taskerId: radiusProfile.id, jobId: templateJobId, countryCode: 'CA', currency: 'CAD' },
+    })
+    try {
+      const job = await makeJob({ countryCode: 'CA', ...VANCOUVER })
+      const result = await findCandidates(prisma, {
+        jobId: job.id, categoryId, jobMode: 'QUOTE', urgency: 'NORMAL',
+      })
+      expect(result.candidates.map(c => c.userId || c.providerId)).toContain(near.id)
+    } finally {
+      await prisma.taskerSkill.deleteMany({ where: { taskerId: radiusProfile.id } })
+      await prisma.taskerProfile.deleteMany({ where: { id: radiusProfile.id } })
+      await prisma.user.deleteMany({ where: { id: near.id } })
+    }
+  })
+
+  it('a Sri Lankan provider with blank coverage still matches, unchanged', async () => {
+    const job = await makeJob({ countryCode: 'LK', ...COLOMBO })
+    const result = await findCandidates(prisma, {
+      jobId: job.id, categoryId, jobMode: 'QUOTE', urgency: 'NORMAL',
+    })
+    // Historic Sri Lankan coverage semantics are preserved.
+    expect(result.candidates.map(c => c.userId || c.providerId)).toContain(lkProviderId)
   })
 
   it('a company worker is not offered a Canadian job', async () => {
