@@ -48,10 +48,15 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { role: 'COMPANY' },
-    })
+    // Team membership and company permissions are recorded on TeamMember.
+    // Joining as a worker must not overwrite an existing individual provider
+    // persona. Keep the historical company-role onboarding for new customers.
+    if (user.role !== 'TASKER' && user.role !== 'COMPANY') {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { role: 'COMPANY' },
+      })
+    }
 
     return NextResponse.json({
       success: true,
