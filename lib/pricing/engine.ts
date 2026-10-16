@@ -106,6 +106,7 @@ export async function calculatePrice(
     ...input,
     categoryId: identifiers.categoryId,
     serviceTemplateId: identifiers.serviceTemplateId,
+    countryCode: identifiers.countryCode || input.countryCode,
   })
   const urgency = computeUrgencyModifier(input.urgency, config)
   const urgencyAmount = capUrgencySurge(
@@ -160,8 +161,19 @@ async function resolveBaseAmount(
     }
   }
 
+  const market = input.countryCode?.trim().toUpperCase()
+  const expectedCurrency = market === 'CA' ? 'CAD' : market === 'LK' ? 'LKR' : null
   const templateJobs = await client.templateJob.findMany({
-    where: { categoryId: input.categoryId, isActive: true },
+    where: {
+      categoryId: input.categoryId,
+      isActive: true,
+      // Query only genuinely local prices — never average LKR and CAD
+      // templates from a multi-market parent category.
+      ...(expectedCurrency ? {
+        currency: expectedCurrency,
+        countries: { contains: JSON.stringify(market) },
+      } : {}),
+    },
     select: { priceMin: true, priceMax: true },
     take: 5,
   })
@@ -172,6 +184,13 @@ async function resolveBaseAmount(
     return BigInt(Math.max(avg, 100))
   }
 
+  // No currency exchange or fabricated Canadian default price.
+  if (market === 'CA') {
+    throw new PricingInputError('A locally priced service is required for a Canadian estimate')
+  }
+
+  // Preserve historic Sri Lankan category-level fallback; pricing can be
+  // configured independently per market without copying an LKR seed to CAD.
   return 5000n
 }
 
