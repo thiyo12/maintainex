@@ -46,4 +46,12 @@ describe('Phase 11 — international release gates are blocking and observable',
     expect(target).not.toContain('npm run deploy')
     expect(target).not.toContain('prisma migrate dev')
   })
+  it('keeps the French beta picker available without importing Node modules into mobile tests', () => {
+    const selector = readFileSync(
+      resolve(process.cwd(), 'apps/mobile/components/ui/LanguageSelector.tsx'),
+      'utf8',
+    )
+    expect(selector).toContain("code: 'fr', name: 'Français (bêta)'")
+    expect(selector).toContain("AsyncStorage.setItem('app-language', code)")
+  })
 })

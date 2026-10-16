@@ -2,8 +2,6 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import i18next, { initI18n } from '../index'
 import en from '../locales/en'
 import fr from '../locales/fr'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 
 describe('Phase 09 — French mobile language foundation with explicit English fallback', () => {
   beforeAll(async () => {
@@ -43,11 +41,6 @@ describe('Phase 09 — French mobile language foundation with explicit English f
     expect(i18next.hasResourceBundle('fr', 'translation')).toBe(true)
   })
 
-  it('offers the new language in the existing persisted user language picker', () => {
-    const selector = readFileSync(resolve(process.cwd(), 'apps/mobile/components/ui/LanguageSelector.tsx'), 'utf8')
-    expect(selector).toContain("code: 'fr', name: 'Français (bêta)'")
-    expect(selector).toContain("AsyncStorage.setItem('app-language', code)")
-  })
 
   it('does not publish or claim approval of French legal translations', () => {
     expect(fr).not.toHaveProperty('legal')
