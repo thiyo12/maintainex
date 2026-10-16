@@ -2,7 +2,7 @@ import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
-import { getCurrencyForCountry } from '@/lib/shared/money/money'
+import { getCurrencyForCountry, parseNonNegativeMajorUnitPrice } from '@/lib/shared/money/money'
 import { isCatalogAvailableInMarket, isTaskerServiceAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 
 const COMPANY_ONLY = ['landscaping', 'moving-truck', 'roofing-large']
@@ -132,7 +132,7 @@ export async function PUT(request: NextRequest) {
         ['hourlyRate', skill.hourlyRate],
         ['fixedRate', skill.fixedRate],
       ] as const) {
-        if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
+        if (value !== undefined && parseNonNegativeMajorUnitPrice(value, getCurrencyForCountry(market)) === null) {
           return NextResponse.json({ error: `${field} must be a non-negative number` }, { status: 400 })
         }
       }
@@ -224,8 +224,8 @@ export async function PUT(request: NextRequest) {
           taskerId_jobId: { taskerId: tasker.id, jobId: s.jobId.trim() },
         },
         update: {
-          hourlyRate: s.hourlyRate != null ? Number(s.hourlyRate) : undefined,
-          fixedRate: s.fixedRate != null ? Number(s.fixedRate) : undefined,
+          hourlyRate: s.hourlyRate != null ? parseNonNegativeMajorUnitPrice(s.hourlyRate, getCurrencyForCountry(market))! : undefined,
+          fixedRate: s.fixedRate != null ? parseNonNegativeMajorUnitPrice(s.fixedRate, getCurrencyForCountry(market))! : undefined,
           experienceYears: s.experienceYears != null ? Number(s.experienceYears) : undefined,
           experienceLevel: s.experienceLevel != null ? Number(s.experienceLevel) : undefined,
           currency: getCurrencyForCountry(market),
@@ -234,8 +234,8 @@ export async function PUT(request: NextRequest) {
         create: {
           taskerId: tasker.id,
           jobId: s.jobId.trim(),
-          hourlyRate: Number(s.hourlyRate ?? 0),
-          fixedRate: Number(s.fixedRate ?? 0),
+          hourlyRate: parseNonNegativeMajorUnitPrice(s.hourlyRate ?? 0, getCurrencyForCountry(market))!,
+          fixedRate: parseNonNegativeMajorUnitPrice(s.fixedRate ?? 0, getCurrencyForCountry(market))!,
           experienceYears: Number(s.experienceYears ?? 0),
           experienceLevel: Number(s.experienceLevel ?? 1),
           currency: getCurrencyForCountry(market),

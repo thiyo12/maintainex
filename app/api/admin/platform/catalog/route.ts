@@ -10,6 +10,7 @@ import {
   type CrmSecurityContext,
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
+import { parseNonNegativeMajorUnitPrice } from '@/lib/shared/money/money'
 import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 
 // 'jobCategory' and 'templateJob' are the canonical V2 entities that
@@ -188,7 +189,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'type must be category, service, jobCategory or templateJob' }, { status: 400 })
     }
 
-    const requestedActive = body?.isActive !== false
+    // Canonical V2 items are private drafts unless explicitly published.
+    // Legacy types retain their pre-existing activation behavior.
+    const requestedActive = (type === 'jobCategory' || type === 'templateJob')
+      ? body?.isActive === true
+      : body?.isActive !== false
     if (requestedActive && !canPublishCatalog(security)) {
       return NextResponse.json(
         { error: 'Publishing permission is required to create an active catalog item' },
@@ -203,6 +208,10 @@ export async function POST(request: NextRequest) {
       const countries = rawCountries.filter((c): c is string => typeof c === 'string')
       if (countries.length === 0) {
         return NextResponse.json({ error: 'countries is required' }, { status: 400 })
+      }
+      // No unsupported launch markets may be attached to canonical catalogue entries.
+      if (countries.some(country => !['LK', 'CA'].includes(country.trim().toUpperCase()))) {
+        return NextResponse.json({ error: 'countries must only contain LK or CA' }, { status: 400 })
       }
       if (!assertCrmCountriesAllowed(security, JSON.stringify(countries))) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -280,17 +289,19 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const priceMin = Number(body?.priceMin ?? 0)
-      const priceMax = Number(body?.priceMax ?? priceMin)
-      if (!Number.isFinite(priceMin) || !Number.isFinite(priceMax) || priceMin < 0 || priceMax < priceMin) {
-        return NextResponse.json({ error: 'Invalid price range' }, { status: 400 })
+      // Phase 05 — neither implied FX conversion nor sub-cent rounding.
+      // Validate currency BEFORE parsing independently entered local prices.
+      const currency = typeof body?.currency === 'string'
+        ? body.currency.trim().toUpperCase().slice(0, 8)
+        : ''
+      const priceMin = parseNonNegativeMajorUnitPrice(body?.priceMin ?? 0, currency as 'LKR' | 'CAD')
+      const priceMax = parseNonNegativeMajorUnitPrice(body?.priceMax ?? body?.priceMin ?? 0, currency as 'LKR' | 'CAD')
+      if (priceMin === null || priceMax === null || priceMax < priceMin) {
+        return NextResponse.json({ error: 'Invalid price range: use non-negative prices to 2 decimal places' }, { status: 400 })
       }
 
       // Price currency must match the market it is quoted in. Independent
       // Sri Lankan and Canadian pricing: never one derived from the other.
-      const currency = typeof body?.currency === 'string'
-        ? body.currency.trim().toUpperCase().slice(0, 8)
-        : ''
       const MARKET_CURRENCY: Record<string, string> = { LK: 'LKR', CA: 'CAD' }
       const declaredMarkets = countries.map(c => c.toUpperCase())
       if (currency !== 'LKR' && currency !== 'CAD') {

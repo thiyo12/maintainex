@@ -266,3 +266,33 @@ export function getCurrencyForCountry(countryCode: string): Currency {
     default: return 'LKR'
   }
 }
+
+/**
+ * Phase 05: provider-entered and draft-catalogue prices are MAJOR units.
+ * Store only amounts representable as whole minor units in LK/LKR or CA/CAD.
+ * Neither conversion nor a price estimate is inferred from the other market.
+ *
+ * Legacy Float columns still store a major-unit number; use the existing
+ * minor-unit money domain for any later booking, payment or settlement maths.
+ * Zero is allowed for unset provider rates / unpublished price drafts.
+ */
+export function parseNonNegativeMajorUnitPrice(
+  value: unknown,
+  currency: Currency,
+): number | null {
+  if (currency !== 'LKR' && currency !== 'CAD') return null
+  if (typeof value !== 'number' && typeof value !== 'string') return null
+  if (typeof value === 'number' && !Number.isFinite(value)) return null
+
+  const raw = String(value).trim()
+  // Refuse rounding, exponential notation, negative prices and sub-cent input.
+  // Allow integers and at most the currency's configured fractional digits.
+  const exponent = CURRENCY_EXPONENTS[currency]
+  const pattern = new RegExp('^\\d+(?:\\.\\d{1,' + exponent + '})?$')
+  if (!pattern.test(raw)) return null
+  const [whole, fraction = ''] = raw.split('.')
+  const scale = 10n ** BigInt(exponent)
+  const minor = BigInt(whole) * scale + BigInt(fraction.padEnd(exponent, '0') || '0')
+  if (minor > BigInt(Number.MAX_SAFE_INTEGER)) return null
+  return Number(minor) / Number(scale)
+}
