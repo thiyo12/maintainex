@@ -38,10 +38,10 @@ describe('Phase 11 — aggregate-only provider coverage audit', () => {
   })
 
   it('excludes restricted accounts and requires verified services and owners', () => {
-    expect((source.match(/u\."isActive" = TRUE/g) || []).toHaveLength(2)
-    expect((source.match(/u\."isSuspended" = FALSE/g) || []).toHaveLength(2)
-    expect((source.match(/u\."isBanned" = FALSE/g) || []).toHaveLength(2)
-    expect((source.match(/"verificationStatus" = 'VERIFIED'/g) || []).toHaveLength(2)
+    expect((source.match(/u\."isActive" = TRUE/g) || [])).toHaveLength(2)
+    expect((source.match(/u\."isSuspended" = FALSE/g) || [])).toHaveLength(2)
+    expect((source.match(/u\."isBanned" = FALSE/g) || [])).toHaveLength(2)
+    expect((source.match(/"verificationStatus" = 'VERIFIED'/g) || [])).toHaveLength(2)
     expect(source).toContain('u."identityStatus" =')
     expect(source).toContain("tm.role = 'COMPANY_OWNER' AND tm.status = 'ACTIVE'")
   })
