@@ -545,6 +545,29 @@ export function assertCrmCountryAllowed(
 }
 
 
+/**
+ * Country-scope check for entities that carry a JSON list of countries, such as
+ * the canonical JobCategory. The entity is in scope only when every listed
+ * country is within the administrator's scope, so a scoped admin cannot edit a
+ * category that also covers a market they do not own.
+ */
+export function assertCrmCountriesAllowed(
+  context: CrmSecurityContext,
+  countriesJson: string | null | undefined
+): boolean {
+  if (!countriesJson) return false
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(countriesJson)
+  } catch {
+    return false
+  }
+  const list = Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
+  if (list.length === 0) return false
+  return list.every(code => assertCrmCountryAllowed(context, code))
+}
+
+
 export interface CrmActionGuardOptions {
   level?: CrmSecurityLevel
 }

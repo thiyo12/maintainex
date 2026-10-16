@@ -2,6 +2,7 @@ import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
+  assertCrmCountriesAllowed,
   assertCrmCountryAllowed,
   getCrmCountryCodes,
   getCrmCountryFilter,
@@ -11,7 +12,16 @@ import {
 import { createAuditLog } from '@/lib/crm/audit'
 import { evaluateEffectivePermission, getPermissionCatalogEntry } from '@/lib/crm/governance'
 
-const ENTITY_TYPES = new Set(['category', 'service', 'template'])
+// 'jobCategory' and 'templateJob' are the canonical V2 entities that
+// /api/catalog, the website and the mobile apps actually read. The legacy
+// 'category' and 'service' records are retained for existing callers.
+const ENTITY_TYPES = new Set([
+  'category',
+  'service',
+  'template',
+  'jobCategory',
+  'templateJob',
+])
 
 function canPublishCatalog(security: CrmSecurityContext): boolean {
   const entry = getPermissionCatalogEntry('catalog:publish')
@@ -143,8 +153,119 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
     const type = typeof body?.type === 'string' ? body.type : ''
-    if (!['category', 'service'].includes(type)) {
-      return NextResponse.json({ error: 'type must be category or service' }, { status: 400 })
+    if (!['category', 'service', 'jobCategory', 'templateJob'].includes(type)) {
+      return NextResponse.json({ error: 'type must be category, service, jobCategory or templateJob' }, { status: 400 })
+    }
+
+    const requestedActive = body?.isActive !== false
+    if (requestedActive && !canPublishCatalog(security)) {
+      return NextResponse.json(
+        { error: 'Publishing permission is required to create an active catalog item' },
+        { status: 403 }
+      )
+    }
+
+    // Canonical V2 catalogue entities. These are what /api/catalog, the website
+    // and the mobile apps actually read, so CRM V2 must be able to create them.
+    if (type === 'jobCategory' || type === 'templateJob') {
+      const rawCountries: unknown[] = Array.isArray(body?.countries) ? body.countries : []
+      const countries = rawCountries.filter((c): c is string => typeof c === 'string')
+      if (countries.length === 0) {
+        return NextResponse.json({ error: 'countries is required' }, { status: 400 })
+      }
+      if (!assertCrmCountriesAllowed(security, JSON.stringify(countries))) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 200) : ''
+      if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
+      const slug = typeof body?.slug === 'string'
+        ? body.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 120)
+        : name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      const countriesJson = JSON.stringify(countries.map(c => c.toUpperCase()))
+      // Activation requires the publish permission; creation does not publish.
+      const publishAllowed = canPublishCatalog(security)
+      const isActive = publishAllowed && requestedActive === true
+
+      if (type === 'jobCategory') {
+        const created = await prisma.jobCategory.create({
+          data: {
+            name,
+            slug,
+            iconName: typeof body?.iconName === 'string' ? body.iconName.trim().slice(0, 60) : 'wrench',
+            colorHex: typeof body?.colorHex === 'string' ? body.colorHex.trim().slice(0, 20) : '#666666',
+            countries: countriesJson,
+            sortOrder: Number.isFinite(Number(body?.sortOrder)) ? Math.floor(Number(body.sortOrder)) : 0,
+            isActive,
+          },
+        })
+        await createAuditLog({
+          action: 'CREATE',
+          category: 'SYSTEM',
+          userId: security.adminId,
+          userEmail: security.email,
+          userRole: security.role,
+          entityType: 'JobCategory',
+          entityId: created.id,
+          entityName: created.name,
+          description: 'CRM canonical job category created',
+          newValue: created,
+          ipAddress: security.ipAddress,
+          userAgent: security.userAgent || undefined,
+          riskLevel: 'MEDIUM',
+        })
+        return NextResponse.json({ jobCategory: created }, { status: 201 })
+      }
+
+      const categoryId = typeof body?.categoryId === 'string' ? body.categoryId : ''
+      if (!categoryId) {
+        return NextResponse.json({ error: 'categoryId is required' }, { status: 400 })
+      }
+      const parent = await prisma.jobCategory.findUnique({ where: { id: categoryId } })
+      if (!parent) {
+        return NextResponse.json({ error: 'Job category not found' }, { status: 400 })
+      }
+      if (!assertCrmCountriesAllowed(security, parent.countries)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      const priceMin = Number(body?.priceMin ?? 0)
+      const priceMax = Number(body?.priceMax ?? priceMin)
+      if (!Number.isFinite(priceMin) || !Number.isFinite(priceMax) || priceMin < 0 || priceMax < priceMin) {
+        return NextResponse.json({ error: 'Invalid price range' }, { status: 400 })
+      }
+      const created = await prisma.templateJob.create({
+        data: {
+          categoryId,
+          name,
+          description: typeof body?.description === 'string' ? body.description.trim().slice(0, 5000) : '',
+          whatIsIncluded: typeof body?.whatIsIncluded === 'string' ? body.whatIsIncluded.trim().slice(0, 5000) : '',
+          typicalDurationMinutes: Number.isFinite(Number(body?.typicalDurationMinutes))
+            ? Math.floor(Number(body.typicalDurationMinutes))
+            : 0,
+          priceMin,
+          priceMax,
+          currency: typeof body?.currency === 'string' ? body.currency.trim().toUpperCase().slice(0, 8) : 'LKR',
+          isPopular: Boolean(body?.isPopular),
+          isCompanyOnly: Boolean(body?.isCompanyOnly),
+          countries: countriesJson,
+          isActive,
+        },
+      })
+      await createAuditLog({
+        action: 'CREATE',
+        category: 'SYSTEM',
+        userId: security.adminId,
+        userEmail: security.email,
+        userRole: security.role,
+        entityType: 'TemplateJob',
+        entityId: created.id,
+        entityName: created.name,
+        description: 'CRM canonical template job created',
+        newValue: created,
+        ipAddress: security.ipAddress,
+        userAgent: security.userAgent || undefined,
+        riskLevel: 'MEDIUM',
+      })
+      return NextResponse.json({ templateJob: created }, { status: 201 })
     }
 
     const countryCode = typeof body?.countryCode === 'string'
@@ -154,14 +275,6 @@ export async function POST(request: NextRequest) {
         : security.assignedCountries[0] || 'LK'
     if (!assertCrmCountryAllowed(security, countryCode)) {
       return NextResponse.json({ error: 'Forbidden country' }, { status: 403 })
-    }
-
-    const requestedActive = body?.isActive !== false
-    if (requestedActive && !canPublishCatalog(security)) {
-      return NextResponse.json(
-        { error: 'Publishing permission is required to create an active catalog item' },
-        { status: 403 }
-      )
     }
 
     if (type === 'category') {
@@ -297,11 +410,21 @@ export async function PATCH(request: NextRequest) {
       if (!oldValue) return NextResponse.json({ error: 'Service not found' }, { status: 404 })
       if (!assertCrmCountryAllowed(security, oldValue.countryCode)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       updated = await prisma.service.update({ where: { id }, data: { isActive } })
-    } else {
+    } else if (type === 'template') {
       oldValue = await prisma.serviceTemplate.findUnique({ where: { id } })
       if (!oldValue) return NextResponse.json({ error: 'Service template not found' }, { status: 404 })
       if (!assertCrmCountryAllowed(security, oldValue.countryCode)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       updated = await prisma.serviceTemplate.update({ where: { id }, data: { isActive } })
+    } else if (type === 'jobCategory') {
+      oldValue = await prisma.jobCategory.findUnique({ where: { id } })
+      if (!oldValue) return NextResponse.json({ error: 'Job category not found' }, { status: 404 })
+      if (!assertCrmCountriesAllowed(security, oldValue.countries)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      updated = await prisma.jobCategory.update({ where: { id }, data: { isActive } })
+    } else {
+      oldValue = await prisma.templateJob.findUnique({ where: { id } })
+      if (!oldValue) return NextResponse.json({ error: 'Template job not found' }, { status: 404 })
+      if (!assertCrmCountryAllowed(security, oldValue.countryCode)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      updated = await prisma.templateJob.update({ where: { id }, data: { isActive } })
     }
 
     await createAuditLog({
