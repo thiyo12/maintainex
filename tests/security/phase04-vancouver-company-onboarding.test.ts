@@ -52,6 +52,7 @@ describe('Phase 04 — new Vancouver company onboarding', () => {
     mock.profileFind.mockResolvedValue(null)
     mock.templateFind.mockImplementation(async () => [{
       id: 'service-1',
+      currency: mock.country === 'CA' ? 'CAD' : 'LKR',
       countries: JSON.stringify([mock.country]),
       category: { countries: JSON.stringify([mock.country]) },
     }])

@@ -17,8 +17,11 @@ import * as ImagePicker from 'expo-image-picker'
 import { auth } from '@/api/auth'
 import { company as companyApi } from '@/api/companies'
 import { upload } from '@/api/upload'
+import { getAuthToken } from '@/api/token'
 import { useAuth } from '@/features/auth/context/auth'
 import { v3 } from '@/theme/v3/tokens'
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
 export default function CompanyEditProfile() {
   const router = useRouter()
@@ -26,7 +29,15 @@ export default function CompanyEditProfile() {
   const [companyName, setCompanyName] = useState('')
   const [registrationNo, setRegistrationNo] = useState('')
   const [description, setDescription] = useState('')
-  const [services, setServices] = useState('')
+  // Canonical active template-job IDs, never free-form service names.
+  // Legacy profile labels are displayed but preserved on metadata-only edits.
+  const [existingServices, setExistingServices] = useState<string[]>([])
+  const [catalogue, setCatalogue] = useState<Array<{
+    id: string; name: string; jobs: Array<{ id: string; name: string }>
+  }>>([])
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
+  const [servicesEdited, setServicesEdited] = useState(false)
+  const [catalogueUnavailable, setCatalogueUnavailable] = useState(false)
   const [serviceAreas, setServiceAreas] = useState('')
   const [ownerName, setOwnerName] = useState('')
   const [phone, setPhone] = useState('')
@@ -44,9 +55,42 @@ export default function CompanyEditProfile() {
         setCompanyName(p?.companyName || '')
         setRegistrationNo(p?.registrationNo || '')
         setDescription(p?.description || '')
-        setServices(Array.isArray(p?.services) ? p.services.join(', ') : '')
+        const savedServices = Array.isArray(p?.services)
+          ? p.services.filter((id: unknown): id is string => typeof id === 'string')
+          : []
+        setExistingServices(savedServices)
         setServiceAreas(Array.isArray(p?.serviceAreas) ? p.serviceAreas.join(', ') : '')
         setLogo(p?.logo || (user as any)?.profileImage || '')
+
+        const market = p?.countryCode === 'CA' || user?.countryCode?.toUpperCase() === 'CA' ? 'CA' : 'LK'
+        try {
+          const token = await getAuthToken()
+          const response = await fetch(`${API_URL}/api/mobile/job-categories?country=${market}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          })
+          if (!response.ok) throw new Error('Service catalogue unavailable')
+          const data = await response.json()
+          if (!Array.isArray(data)) throw new Error('Invalid service catalogue')
+          const categories = data
+            .filter((c: any) => c && typeof c.id === 'string' && Array.isArray(c.jobs))
+            .map((c: any) => ({
+              id: c.id,
+              name: typeof c.name === 'string' ? c.name : 'Services',
+              jobs: c.jobs
+                .filter((job: any) => job && typeof job.id === 'string' && typeof job.name === 'string')
+                .map((job: any) => ({ id: job.id, name: job.name })),
+            }))
+            .filter((c: { jobs: unknown[] }) => c.jobs.length > 0)
+          setCatalogue(categories)
+          const allowedIds = new Set<string>(categories.flatMap((c: { jobs: Array<{ id: string }> }) =>
+            c.jobs.map((j: { id: string }) => j.id),
+          ))
+          setSelectedServiceIds(savedServices.filter((id: string) => allowedIds.has(id)))
+          setCatalogueUnavailable(categories.length === 0)
+        } catch {
+          // Leave legacy declarations untouched if the catalogue is unavailable.
+          setCatalogueUnavailable(true)
+        }
       } finally {
         setLoading(false)
       }
@@ -74,7 +118,18 @@ export default function CompanyEditProfile() {
 
   const toList = (value: string) => [...new Set(value.split(',').map((item) => item.trim()).filter(Boolean))]
 
+  const toggleServiceId = (id: string) => {
+    setServicesEdited(true)
+    setSelectedServiceIds(current =>
+      current.includes(id) ? current.filter(value => value !== id) : [...current, id],
+    )
+  }
+
   const save = async () => {
+    if (servicesEdited && selectedServiceIds.length === 0) {
+      Alert.alert('Select services', 'Choose at least one active service before saving.')
+      return
+    }
     if (companyName.trim().length < 2 || ownerName.trim().length < 2) {
       Alert.alert('Complete required fields', 'Add the company name and owner name.')
       return
@@ -87,8 +142,8 @@ export default function CompanyEditProfile() {
           companyName: companyName.trim(),
           registrationNo: registrationNo.trim() || null,
           description: description.trim() || null,
-          services: toList(services),
-          serviceAreas: toList(serviceAreas),
+          ...(servicesEdited ? { services: selectedServiceIds } : {}),
+          serviceAreas: user?.countryCode?.toUpperCase() === 'CA' ? ['Vancouver'] : toList(serviceAreas),
           logo: logo || null,
         }),
       ])
@@ -128,8 +183,36 @@ export default function CompanyEditProfile() {
         <Field label="About your company" value={description} onChangeText={setDescription} placeholder="What your team does and why customers should trust you" multiline />
 
         <Text style={styles.sectionTitle}>Marketplace setup</Text>
-        <Field label="Services" value={services} onChangeText={setServices} placeholder="AC repair, Plumbing, Electrical" helper="Separate services with commas. These help route relevant jobs." />
-        <Field label="Service areas" value={serviceAreas} onChangeText={setServiceAreas} placeholder="Colombo, Jaffna, Negombo" helper="Separate cities or regions with commas." />
+        <Text style={styles.helper}>Currently declared: {existingServices.join(', ') || 'None'}</Text>
+        <Text style={styles.helper}>Select exact services from your market catalogue. Changing the selection replaces old free-text labels; saving other details preserves them.</Text>
+        {catalogueUnavailable ? (
+          <Text style={styles.helper}>Catalogue unavailable. Existing services will be preserved.</Text>
+        ) : (
+          catalogue.map(category => (
+            <View key={category.id} style={styles.field}>
+              <Text style={styles.label}>{category.name}</Text>
+              {category.jobs.map(job => {
+                const checked = selectedServiceIds.includes(job.id)
+                return (
+                  <TouchableOpacity
+                    key={job.id}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked }}
+                    onPress={() => toggleServiceId(job.id)}
+                    style={[styles.serviceChoice, checked && styles.serviceChoiceSelected]}
+                  >
+                    <Text style={styles.serviceChoiceLabel}>{checked ? '✓  ' : '○  '}{job.name}</Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+          ))
+        )}
+        {user?.countryCode?.toUpperCase() === 'CA' ? (
+          <Text style={styles.helper}>Service territory: City of Vancouver only (municipal boundary). Other Canadian cities are not available.</Text>
+        ) : (
+          <Field label="Service areas" value={serviceAreas} onChangeText={setServiceAreas} placeholder="Colombo, Jaffna, Negombo" helper="Separate Sri Lankan cities or regions with commas." />
+        )}
 
         <Text style={styles.sectionTitle}>Owner contact</Text>
         <Field label="Owner full name *" value={ownerName} onChangeText={setOwnerName} placeholder="Full name" />
@@ -189,6 +272,9 @@ const styles = StyleSheet.create({
   input: { minHeight: 52, borderRadius: 15, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, paddingHorizontal: 14, color: v3.colors.ink, fontFamily: 'Outfit_500Medium', fontSize: 13 },
   textArea: { minHeight: 112, paddingTop: 14, paddingBottom: 14 },
   helper: { ...v3.typography.small, color: v3.colors.textMuted, marginTop: 5, lineHeight: 14 },
+  serviceChoice: { paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: v3.colors.line, marginBottom: 6 },
+  serviceChoiceSelected: { backgroundColor: v3.colors.paper, borderColor: v3.colors.ink },
+  serviceChoiceLabel: { ...v3.typography.body, color: v3.colors.ink },
   save: { height: 54, borderRadius: 16, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center', marginTop: 26 },
   saveText: { ...v3.typography.bodyLarge, color: v3.colors.paper },
 })

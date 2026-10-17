@@ -75,11 +75,13 @@ export async function validateCompanyCatalogueServices(
     select: {
       id: true,
       countries: true,
+      currency: true,
       category: { select: { countries: true } },
     },
   })
   const { storedListIncludes } = await import('@/lib/db-utils')
   const allowed = new Set(jobs.filter(job =>
+    job.currency === currency &&
     storedListIncludes(job.countries, market) &&
     storedListIncludes(job.category.countries, market)
   ).map(job => job.id))

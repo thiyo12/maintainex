@@ -54,6 +54,7 @@ describe('Phase 04 — company service-area mutation cannot expand Canada', () =
     mocks.profileFind.mockImplementation(async () => mocks.profile)
     mocks.templateFind.mockImplementation(async () => [{
       id: 'svc',
+      currency: 'CAD',
       countries: '["CA"]',
       category: { countries: '["CA"]' },
     }])

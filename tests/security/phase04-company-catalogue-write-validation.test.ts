@@ -83,7 +83,7 @@ describe('Phase 04 — company service claims are canonical and market-safe', ()
   it('rejects cross-currency and wrong-market categories independently', async () => {
     const client = { templateJob: { findMany: vi.fn()
       .mockResolvedValue([valid('a', 'CA', 'LKR')]) } } as any
-    expect(await validateCompanyCatalogueServices(client, 'CA', ['a'])).toBe(true)
+    expect(await validateCompanyCatalogueServices(client, 'CA', ['a'])).toBe(false)
     // The database query must select CAD, active jobs, active categories.
     expect(client.templateJob.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
@@ -91,6 +91,8 @@ describe('Phase 04 — company service claims are canonical and market-safe', ()
         category: { isActive: true },
       }),
     }))
+    client.templateJob.findMany.mockResolvedValue([valid('a', 'CA')])
+    expect(await validateCompanyCatalogueServices(client, 'CA', ['a'])).toBe(true)
     client.templateJob.findMany.mockResolvedValue([{ ...valid('a', 'CA'), category: { countries: '["LK"]' } }])
     expect(await validateCompanyCatalogueServices(client, 'CA', ['a'])).toBe(false)
   })
@@ -129,5 +131,16 @@ describe('Phase 04 — company service claims are canonical and market-safe', ()
       where: { id: 'company' },
       data: expect.objectContaining({ services: '["ca-service"]' }),
     })
+  })
+  it('uses the real mobile catalogue picker rather than accepting arbitrary service labels', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const ui = readFileSync(resolve(process.cwd(),
+      'apps/mobile/features/company/screens/settings/edit-profile.tsx'), 'utf8')
+    expect(ui).toContain('accessibilityRole="checkbox"')
+    expect(ui).toContain('/api/mobile/job-categories?country=')
+    expect(ui).toContain('toggleServiceId(job.id)')
+    expect(ui).toContain('...(servicesEdited ? { services: selectedServiceIds } : {})')
+    expect(ui).not.toContain('services: toList(services)')
   })
 })
