@@ -83,9 +83,12 @@ describe('Phase 07 — company order writes revoke with staff membership', () =>
   it('allows current authorized company creator to submit (domain still checks creator)', async () => {
     mocks.memberActive = true
     expect((await patch('submit')).status).toBe(200)
-    expect(mocks.submit).toHaveBeenCalledWith(expect.objectContaining({
-      changeOrderId: 'order', userId: 'worker', toStatus: 'SUBMITTED',
-    }))
+    expect(mocks.submit).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        changeOrderId: 'order', userId: 'worker', toStatus: 'SUBMITTED',
+      }),
+    )
   })
 
   it('allows current authorized company creator to cancel (domain checks creator)', async () => {
