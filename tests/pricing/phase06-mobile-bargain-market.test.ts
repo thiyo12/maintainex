@@ -41,7 +41,7 @@ describe('Phase 06 — mobile quote bargain currency and amount isolation', () =
   })
 
   it('blocks wrong-market quotes in UI as well as in action handlers', () => {
-    expect(source).toContain('quoteMatchesJobCurrency(job?.countryCode, quote.currency)')
+    expect(source).toContain('quoteMatchesJobCurrency(job.countryCode, quote.currency)')
     expect(source).toContain('quoteMatchesJobCurrency(job.countryCode, q.currency)')
     expect(source).toContain('parseCounterofferAmount(bargainPrice)')
     expect(source).not.toContain('parseInt(bargainPrice, 10)')
