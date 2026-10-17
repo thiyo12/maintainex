@@ -34,9 +34,12 @@ describe('launch location data', () => {
     }
   })
 
-  it('provides Vancouver for the Canadian launch market', () => {
+  it('provides Vancouver for the Canadian launch market in both web and mobile', () => {
     expect(canadaCityNames).toContain('Vancouver')
     expect(canadaCities.find(city => city.name === 'Vancouver')?.areas?.length).toBeGreaterThan(0)
+    const mobileCities = getMobileCountries().find(c => c.code === 'CA')?.states.flatMap(state => state.cities) ?? []
+    expect(mobileCities.map(city => city.name)).toContain('Vancouver')
+    expect(mobileCities.find(city => city.name === 'Vancouver')?.areas.length).toBeGreaterThan(0)
   })
 
   it('contains a city for every launch district so the picker is never empty', () => {
@@ -56,6 +59,8 @@ describe('launch location data', () => {
     // Historical bookings and legacy records may still reference them, so they
     // must not be deleted — every launch surface filters them out instead.
     expect(canadaCityNames).toContain('Toronto')
+    const mobileCities = getMobileCountries().find(c => c.code === 'CA')?.states.flatMap(state => state.cities.map(city => city.name)) ?? []
+    expect(mobileCities).toContain('Toronto')
   })
 
   it('exposes no unapproved market in the launch location data', () => {
