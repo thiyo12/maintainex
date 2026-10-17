@@ -14,6 +14,7 @@ import { V2Quote } from '@/api/v2-types'
 import JobLifecycleTracker from '@/components/ui/JobLifecycleTracker'
 import { emit, removedJobs } from '@/lib/events'
 import NewChatModal from '@/features/messaging/components/NewChatModal'
+import JobSafetyCentre from '@/features/safety/components/JobSafetyCentre'
 
 function usePulse() {
   const anim = useRef(new Animated.Value(0)).current
@@ -291,6 +292,10 @@ export default function V2JobDetailScreen() {
         <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
           <JobLifecycleTracker status={job.status} escrowStatus={escrow?.status} createdAt={job.createdAt} />
         </View>
+        {['QUOTE_ACCEPTED', 'ESCROW_DEPOSITED', 'IN_PROGRESS', 'COMPLETION_PENDING',
+          'COMPLETED', 'DISPUTED', 'CANCELLED'].includes(job.status) ? (
+          <JobSafetyCentre jobId={id} countryCode={job.countryCode} />
+        ) : null}
 
         {/* ─── Cancel Button ─── */}
         {canOtpCancel && (
