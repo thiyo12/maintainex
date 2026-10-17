@@ -48,6 +48,37 @@ describe('Phase 02 — launch locations stay scoped during normal and fallback r
     expect(cities(body.countries.find((c: { code: string }) => c.code === 'CA'))).toEqual(['Vancouver'])
   })
 
+  it('does not offer the UBC campus as a City of Vancouver launch neighbourhood', async () => {
+    const { body } = await locations()
+    const canada = body.countries.find((c: { code: string }) => c.code === 'CA')
+    const vancouver = canada.states.flatMap((s: { cities: Array<{ name: string; areas: Array<{ name: string }> }> }) => s.cities)
+      .find((c: { name: string }) => c.name === 'Vancouver')
+    expect(vancouver.areas.map((area: { name: string }) => area.name)).not.toContain('UBC')
+    expect(vancouver.areas.map((area: { name: string }) => area.name)).toContain('Downtown')
+  })
+
+  it('hides a historical UBC area from a database-backed Vancouver picker', async () => {
+    mock.findCountries.mockResolvedValue([
+      {
+        id: 'ca', name: 'Canada', code: 'CA',
+        states: [{
+          id: 'bc', name: 'British Columbia',
+          cities: [{
+            id: 'vancouver', name: 'Vancouver',
+            areas: [
+              { id: 'ubc', name: 'UBC' },
+              { id: 'downtown', name: 'Downtown' },
+            ],
+          }],
+        }],
+      },
+    ])
+    const { body } = await locations()
+    const canada = body.countries.find((c: { code: string }) => c.code === 'CA')
+    const vancouver = canada.states[0].cities[0]
+    expect(vancouver.areas.map((area: { name: string }) => area.name)).toEqual(['Downtown'])
+  })
+
   it('keeps all 25 Sri Lankan districts on fallback', async () => {
     mock.findCountries.mockRejectedValue(new Error('Database offline'))
     const { body } = await locations()

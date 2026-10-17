@@ -82,7 +82,7 @@ export async function GET() {
 
 type CountryWithRegions = {
   code: string
-  states?: Array<{ cities?: Array<{ name: string }> }>
+  states?: Array<{ cities?: Array<{ name: string; areas?: Array<{ name: string }> }> }>
 }
 
 /**
@@ -100,7 +100,19 @@ function restrictToLaunchMarket<T extends CountryWithRegions>(country: T): T {
     states: country.states
       .map(state => ({
         ...state,
-        cities: (state.cities || []).filter(city => allowed.has(city.name.toLowerCase())),
+        cities: (state.cities || [])
+          .filter(city => allowed.has(city.name.toLowerCase()))
+          .map(city => {
+            // The UBC main campus lies in Metro Vancouver Electoral Area A,
+            // outside the City of Vancouver municipal launch boundary.
+            // Preserve historical records but do not offer this area for a
+            // newly selected Vancouver service address.
+            if (country.code.toUpperCase() !== 'CA') return city
+            return {
+              ...city,
+              areas: city.areas?.filter(area => area.name.trim().toLowerCase() !== 'ubc'),
+            }
+          }),
       }))
       .filter(state => (state.cities || []).length > 0),
   } as T
