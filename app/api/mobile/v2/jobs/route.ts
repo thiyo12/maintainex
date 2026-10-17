@@ -151,6 +151,20 @@ export async function POST(request: NextRequest) {
     const finalPreferredTimeSlot = ['morning', 'afternoon', 'evening', 'anytime'].includes(preferredTimeSlot) ? preferredTimeSlot : null
     const claimedCountryCode = typeof countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(countryCode) ? countryCode.toUpperCase() : null
 
+    // Do not discard malformed or partial GPS input before calling the shared
+    // resolver. Turning invalid coordinates into null could silently downgrade
+    // a purported location to a postal-only LK booking authorization.
+    const coordinatesProvided = latitude != null || longitude != null
+    if (coordinatesProvided && (
+      typeof latitude !== 'number' || !Number.isFinite(latitude) ||
+      typeof longitude !== 'number' || !Number.isFinite(longitude)
+    )) {
+      return NextResponse.json({
+        error: 'Complete, valid service coordinates are required when location data is provided',
+        code: 'ADDRESS_REQUIRES_VERIFICATION',
+      }, { status: 400 })
+    }
+
     // Phase 02 authority rule: the validated service address decides the market.
     // A client-supplied country value is advisory only and can never authorize
     // a market on its own.

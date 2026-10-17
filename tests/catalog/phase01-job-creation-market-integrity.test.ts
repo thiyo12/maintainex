@@ -116,6 +116,43 @@ describe('Phase 01 — job creation validates canonical catalogue against addres
     expect((await create({ serviceTemplateId: 'service', templateJobId: 'service-job', postalCode: '00100' })).status).toBe(201)
     expect(mock.jobCreate).toHaveBeenCalledTimes(1)
   })
+
+  it('does not accept latitude-only coordinates with a Sri Lankan postal code', async () => {
+    mock.account = 'LK'; mock.market = 'LK'
+    const response = await create({ latitude: 49.2827, longitude: null, postalCode: '00100' })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'ADDRESS_REQUIRES_VERIFICATION' })
+    expect(mock.location).not.toHaveBeenCalled()
+    expect(mock.jobCreate).not.toHaveBeenCalled()
+  })
+
+  it('rejects longitude-only coordinates before the address market fallback', async () => {
+    mock.account = 'LK'; mock.market = 'LK'
+    const response = await create({ latitude: null, longitude: 79.8612, postalCode: '00100' })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'ADDRESS_REQUIRES_VERIFICATION' })
+    expect(mock.location).not.toHaveBeenCalled()
+    expect(mock.jobCreate).not.toHaveBeenCalled()
+  })
+
+  it('does not convert coordinate strings to missing coordinates', async () => {
+    mock.account = 'LK'; mock.market = 'LK'
+    const response = await create({ latitude: '6.9271', longitude: '79.8612', postalCode: '00100' })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'ADDRESS_REQUIRES_VERIFICATION' })
+    expect(mock.location).not.toHaveBeenCalled()
+    expect(mock.jobCreate).not.toHaveBeenCalled()
+  })
+
+  it('rejects a malformed coordinate while retaining a plausible postal code', async () => {
+    mock.account = 'LK'; mock.market = 'LK'
+    const response = await create({ latitude: 'bad', longitude: 79.8612, postalCode: '00100' })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'ADDRESS_REQUIRES_VERIFICATION' })
+    expect(mock.location).not.toHaveBeenCalled()
+    expect(mock.jobCreate).not.toHaveBeenCalled()
+  })
+
   it('rejects a forged client country when the address resolver says Vancouver', async () => {
     mock.category.countries = '["LK"]'
     await reject({ countryCode: 'LK' }, 'CATEGORY_MARKET_MISMATCH')
