@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { getCountries } from '@/lib/locations'
+import { getCountries as getMobileCountries } from '@/apps/mobile/lib/locations'
 import { getMarketConfig } from '@/lib/geography/market-engine'
 
 /**
@@ -19,9 +20,18 @@ describe('launch location data', () => {
   const canadaCityNames = canadaCities.map(city => city.name)
 
   it('provides Sri Lanka with all 25 districts', () => {
-    const sriLanka = countries.find(c => c.code === 'LK')
-    expect(sriLanka).toBeDefined()
-    expect(getMarketConfig('LK')?.districts).toHaveLength(25)
+    const expected = getMarketConfig('LK')!.districts
+    expect(expected).toHaveLength(25)
+    for (const source of [countries, getMobileCountries()]) {
+      const sriLanka = source.find(c => c.code === 'LK')
+      expect(sriLanka).toBeDefined()
+      const districtNames = sriLanka!.states.flatMap(state => state.cities.map(city => city.name))
+      expect(districtNames).toHaveLength(25)
+      expect(new Set(districtNames).size).toBe(25)
+      expect([...districtNames].sort()).toEqual([...expected].sort())
+      expect(districtNames).toContain('Mannar')
+      expect(districtNames).toContain('Mullaitivu')
+    }
   })
 
   it('provides Vancouver for the Canadian launch market', () => {

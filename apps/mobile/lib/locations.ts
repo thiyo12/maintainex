@@ -154,6 +154,20 @@ export const LOCATIONS: LocationCountry[] = [
               { id: 'lk-vavuniya-town', name: 'Vavuniya Town' },
             ],
           },
+          {
+            id: 'lk-mannar',
+            name: 'Mannar',
+            areas: [
+              { id: 'lk-mannar-town', name: 'Mannar Town' },
+            ],
+          },
+          {
+            id: 'lk-mullaitivu',
+            name: 'Mullaitivu',
+            areas: [
+              { id: 'lk-mullaitivu-town', name: 'Mullaitivu Town' },
+            ],
+          },
         ],
       },
       {
