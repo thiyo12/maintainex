@@ -72,7 +72,19 @@ export async function POST(
         },
         select: { id: true },
       })
-      authorizedProvider = Boolean(assignment)
+      // Historical assignments survive staff offboarding. A removed worker
+      // must not be able to upload photos or sensitive job evidence.
+      const activeMember = assignment
+        ? await prisma.teamMember.findFirst({
+            where: {
+              companyId: acceptedQuote.providerId,
+              userId: user.id,
+              status: 'ACTIVE',
+            },
+            select: { id: true },
+          })
+        : null
+      authorizedProvider = Boolean(assignment && activeMember)
     }
 
     if (!isCustomer && !authorizedProvider) {
