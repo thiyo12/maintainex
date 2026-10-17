@@ -86,6 +86,7 @@ jobs:
             tests/admin/pdf-generation.test.ts \
             tests/security/phase11-crm-catalogue-fixture-cleanup.test.ts \
             tests/pricing/phase06-mobile-bargain-market.test.ts \
+            tests/pricing/phase06-quote-review-payment-boundary.test.ts \
             tests/security/phase04-company-profile-owner-reactivation.test.ts \
             tests/security/phase11-inactive-company-owner-matching.test.ts \
             tests/regions/phase11-provider-coverage-audit-contract.test.ts \

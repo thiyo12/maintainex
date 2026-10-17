@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { CaretLeft, Lock, ShieldCheck } from 'phosphor-react-native'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2JobActions } from '@/api/v2-jobs'
+import { v2JobActions, v2Jobs } from '@/api/v2-jobs'
+import type { V2Quote } from '@/api/v2-types'
+import { currencyForJobCountry, quoteMatchesJobCurrency } from '@/lib/market-currency'
 
 export default function EscrowConfirmScreen() {
   const colors = useColors()
@@ -14,81 +16,141 @@ export default function EscrowConfirmScreen() {
     bookingId: string; jobTitle: string; taskerName: string;
     quotedAmount: string; currency?: string; quoteId?: string
   }>()
-  const { bookingId, jobTitle, taskerName, quotedAmount = '0', currency = 'LKR', quoteId } = params
+  const { bookingId, quoteId } = params
   const [loading, setLoading] = useState(false)
+  const [quote, setQuote] = useState<V2Quote | null>(null)
+  const [jobTitle, setJobTitle] = useState('')
+  const [currency, setCurrency] = useState<'LKR' | 'CAD' | null>(null)
+  const [readState, setReadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const styles = makeStyles(colors)
 
-  const amount = parseFloat(quotedAmount) || 0
-  const platformFee = Math.round(amount * 0.1 * 100) / 100
-  const totalAmount = amount + platformFee
+  // Navigation params are not financial evidence. Reload canonical job/quote.
+  useEffect(() => {
+    let alive = true
+    setReadState('loading')
+    setQuote(null)
+    setCurrency(null)
+    if (!bookingId || !quoteId) {
+      setReadState('error')
+      return
+    }
+    v2Jobs.get(bookingId)
+      .then(({ job }) => {
+        if (!alive) return
+        const selected = job.quotes?.find(item => item.id === quoteId && item.status === 'PENDING')
+        const marketCurrency = currencyForJobCountry(job.countryCode)
+        if (!selected || !marketCurrency ||
+            !quoteMatchesJobCurrency(job.countryCode, selected.currency)) {
+          setReadState('error')
+          return
+        }
+        setQuote(selected)
+        setCurrency(marketCurrency)
+        setJobTitle(job.title)
+        setReadState('ready')
+      })
+      .catch(() => { if (alive) setReadState('error') })
+    return () => { alive = false }
+  }, [bookingId, quoteId])
 
   const handleConfirm = async () => {
-    if (!quoteId) { Alert.alert('Error', 'Missing quote information'); return }
+    if (loading || readState !== 'ready' || !quote || !currency || !quoteId) return
     setLoading(true)
     try {
+      // Prevent stale navigation prices; server still owns final concurrency.
+      const latest = await v2Jobs.get(bookingId)
+      const stillPending = latest.job.quotes?.find(
+        item => item.id === quoteId && item.status === 'PENDING'
+      )
+      if (!stillPending || !quoteMatchesJobCurrency(latest.job.countryCode, stillPending.currency) ||
+          stillPending.currency !== currency || stillPending.price !== quote.price) {
+        throw new Error('Quote has changed. Return to the booking to review the latest quote.')
+      }
       await v2JobActions.selectQuote(bookingId, quoteId)
-      await v2JobActions.depositEscrow(bookingId, totalAmount)
-      router.replace(`/(customer)/jobs/v2/confirm/${bookingId}`)
+      // Canonical confirmation screen presents actual payment methods and fees.
+      // Quote acceptance itself never funds an escrow or charges the user.
+      router.replace('/(customer)/jobs/v2/confirm/' + bookingId)
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to accept quote.')
+      Alert.alert('Could not accept quote', e?.message || 'Review the current quote and retry.')
     } finally {
       setLoading(false)
     }
   }
 
+  const amount = quote?.price ?? 0
+  const ready = readState === 'ready' && !!quote && !!currency
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} style={styles.backBtn}>
           <CaretLeft size={22} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Secure Payment</Text>
+        <Text style={styles.headerTitle}>Review Quote</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <View style={styles.lockBox}>
         <Lock size={32} color={colors.amberDark} />
       </View>
-      <Text style={styles.htitle}>Secure Your Booking</Text>
+      <Text style={styles.htitle}>Confirm Your Provider Quote</Text>
       <Text style={styles.hsub}>
-        Your money is held safely until you confirm the job is done. {taskerName} cannot receive it until you approve.
+        Accept the provider's quote first. The next screen shows approved
+        payment methods and actual charges for this booking.
+        Cash is paid directly to the provider and is not held by MaintainEX.
       </Text>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Payment Breakdown</Text>
-        <View style={[styles.row, { borderTopWidth: 0 }]}>
-          <Text style={styles.rowL}>Job</Text>
-          <Text style={styles.rowV}>{jobTitle}</Text>
+      {ready ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Provider quote — before applicable charges</Text>
+          <View style={[styles.row, { borderTopWidth: 0 }]}>
+            <Text style={styles.rowL}>Job</Text>
+            <Text style={styles.rowV}>{jobTitle}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.rowL}>Provider</Text>
+            <Text style={styles.rowV}>{quote?.provider?.name || 'Selected provider'}</Text>
+          </View>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalL}>Provider quote</Text>
+            <Text style={styles.totalV}>{currency} {amount.toLocaleString()}</Text>
+          </View>
+          <Text style={[styles.rowL, { marginTop: 12 }]}>
+            Applicable fees and payment terms are shown on the next screen.
+            No funds are held at this stage.
+          </Text>
         </View>
-        <View style={styles.row}>
-          <Text style={styles.rowL}>Quote from {taskerName}</Text>
-          <Text style={styles.rowV}>{currency} {amount.toLocaleString()}</Text>
+      ) : (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>
+            {readState === 'loading' ? 'Loading current quote...' :
+              'Quote unavailable, changed or in a different currency'}
+          </Text>
+          <Text style={styles.rowL}>
+            Return to the booking to review the current verified quote.
+            No payment has been initiated.
+          </Text>
         </View>
-        <View style={styles.row}>
-          <Text style={styles.rowL}>Platform fee (10%)</Text>
-          <Text style={styles.rowV}>{currency} {platformFee.toLocaleString()}</Text>
-        </View>
-        <View style={styles.totalRow}>
-          <Text style={styles.totalL}>Total to secure</Text>
-          <Text style={styles.totalV}>{currency} {totalAmount.toLocaleString()}</Text>
-        </View>
-      </View>
+      )}
 
       <View style={styles.trustRow}>
         <ShieldCheck size={18} color="#06C167" />
         <Text style={styles.trustTxt}>
-          Money is held securely by MΛINTΛINEX. It is only released to {taskerName} after you confirm the work is done. You are protected.
+          Quote acceptance is separate from payment. MaintainEX shows available
+          payment methods before any funding action.
         </Text>
       </View>
 
-      <TouchableOpacity style={styles.btn} onPress={handleConfirm} disabled={loading} activeOpacity={0.8}>
-        <Lock size={18} color="#111827" />
-        <Text style={styles.btnTxt}>
-          {loading ? 'Securing...' : `Secure ${currency} ${totalAmount.toLocaleString()}`}
-        </Text>
-      </TouchableOpacity>
+      {ready ? (
+        <TouchableOpacity accessibilityRole="button"
+          style={styles.btn} onPress={handleConfirm} disabled={loading} activeOpacity={0.8}>
+          <Text style={styles.btnTxt}>
+            {loading ? 'Accepting quote...' : 'Accept Quote & Review Payment Options'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
-      <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
+      <TouchableOpacity accessibilityRole="button" style={styles.cancelBtn} onPress={() => router.back()}>
         <Text style={styles.cancelTxt}>Go back</Text>
       </TouchableOpacity>
     </SafeAreaView>

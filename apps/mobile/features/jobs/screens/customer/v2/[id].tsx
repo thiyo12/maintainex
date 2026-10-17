@@ -110,7 +110,7 @@ export default function V2JobDetailScreen() {
       Alert.alert('Quote currency mismatch', 'This quote cannot be accepted for the booking market.')
       return
     }
-    router.push({ pathname: '/(customer)/payment/escrow-confirm', params: { bookingId: id, jobTitle: job.title, taskerName: quote.provider?.name || '', quotedAmount: String(quote.price), quoteId } })
+    router.push({ pathname: '/(customer)/payment/escrow-confirm', params: { bookingId: id, quoteId } })
   }
 
   const handleBargain = async () => {
