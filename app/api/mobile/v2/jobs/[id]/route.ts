@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { getLocationName } from '@/lib/locations'
-import { hasCompanyPermission, type CompanyRole } from '@/lib/phase6/rbac'
+import { getReadableCompanyIds, getActiveAssignedCompanyId } from '@/lib/phase6/company-job-read-access'
 import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
 
 function redactSensitive(data: Record<string, any>, _isOwner: boolean): Record<string, any> {
@@ -52,23 +52,6 @@ async function getVerifiedTaskerPublicIdentity(userId: string) {
   }
 }
 
-async function getReadableCompanyIds(userId: string): Promise<string[]> {
-  const [ownedCompany, memberships] = await Promise.all([
-    prisma.companyProfile.findUnique({ where: { userId }, select: { id: true } }),
-    prisma.teamMember.findMany({
-      where: { userId, status: 'ACTIVE' },
-      select: { companyId: true, role: true },
-    }),
-  ])
-
-  const ids = memberships
-    .filter(member => hasCompanyPermission(member.role as CompanyRole, 'quotes:read'))
-    .map(member => member.companyId)
-
-  if (ownedCompany?.id) ids.push(ownedCompany.id)
-  return Array.from(new Set(ids))
-}
-
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -86,20 +69,13 @@ export async function GET(
     const requestedContext = new URL(_request.url).searchParams.get('context')
 
     if (!isOwner && job.targetTaskerId) {
-      const [targetTasker, targetCompanies, workerAssignment] = await Promise.all([
+      const [targetTasker, targetCompanies, workerCompanyId] = await Promise.all([
         prisma.taskerProfile.findUnique({
           where: { userId: user.id },
           select: { id: true },
         }),
         getReadableCompanyIds(user.id),
-        prisma.companyJobAssignment.findFirst({
-          where: {
-            jobId: job.id,
-            workerUserId: user.id,
-            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
-          },
-          select: { companyId: true },
-        }),
+        getActiveAssignedCompanyId(job.id, user.id),
       ])
 
       const readableTargetIds = new Set(
@@ -113,7 +89,7 @@ export async function GET(
       let hasAcceptedCompanyParticipation = false
       const participantCompanyIds = [...new Set([
         ...targetCompanies,
-        ...(workerAssignment?.companyId ? [workerAssignment.companyId] : []),
+        ...(workerCompanyId ? [workerCompanyId] : []),
       ])]
 
       if (participantCompanyIds.length > 0) {
@@ -157,21 +133,13 @@ export async function GET(
           : null
 
         if (!companyQuote) {
-          const workerAssignment = await prisma.companyJobAssignment.findFirst({
-            where: {
-              jobId: job.id,
-              workerUserId: user.id,
-              status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
-            },
-            orderBy: { assignedAt: 'desc' },
-            select: { companyId: true },
-          })
-          if (workerAssignment) {
+          const workerCompanyId = await getActiveAssignedCompanyId(job.id, user.id)
+          if (workerCompanyId) {
             companyQuote = await prisma.jobQuote.findFirst({
               where: {
                 jobId: job.id,
                 providerType: 'COMPANY',
-                providerId: workerAssignment.companyId,
+                providerId: workerCompanyId,
                 status: 'ACCEPTED',
               },
               orderBy: { createdAt: 'desc' },
@@ -192,28 +160,20 @@ export async function GET(
           providerContextId = user.id
           providerContextType = 'INDIVIDUAL'
         } else {
-          const workerAssignment = await prisma.companyJobAssignment.findFirst({
-            where: {
-              jobId: job.id,
-              workerUserId: user.id,
-              status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
-            },
-            orderBy: { assignedAt: 'desc' },
-            select: { companyId: true },
-          })
+          const workerCompanyId = await getActiveAssignedCompanyId(job.id, user.id)
 
-          if (workerAssignment) {
+          if (workerCompanyId) {
             const companyQuote = await prisma.jobQuote.findFirst({
               where: {
                 jobId: job.id,
-                providerId: workerAssignment.companyId,
+                providerId: workerCompanyId,
                 providerType: 'COMPANY',
                 status: 'ACCEPTED',
               },
               select: { providerId: true },
             })
             if (companyQuote) {
-              providerContextId = workerAssignment.companyId
+              providerContextId = workerCompanyId
               providerContextType = 'COMPANY'
             }
           }
