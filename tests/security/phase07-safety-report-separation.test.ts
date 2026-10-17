@@ -172,4 +172,16 @@ describe('Phase 07 safety intake never mutates financial disputes', () => {
     expect(client).toContain('/safety-report')
     expect(client).toContain('dispute: (jobId: string')
   })
+  it('separates safety reasons from the financial dispute in customer legacy wizard', () => {
+    const wizard = readFileSync(resolve(process.cwd(),
+      'apps/mobile/features/jobs/screens/customer/dispute/[id].tsx'), 'utf8')
+    expect(wizard).toContain("if (reason.startsWith('SAFETY_'))")
+    expect(wizard).toContain('await v2JobActions.reportSafety(id as string')
+    expect(wizard).toContain('await v2JobActions.dispute(id as string')
+    expect(wizard.indexOf('await v2JobActions.reportSafety(id as string'))
+      .toBeLessThan(wizard.indexOf('await v2JobActions.dispute(id as string'))
+    expect(wizard).toContain("submittedSafety ? 'Safety report recorded'")
+    expect(wizard).toContain('does not automatically put payment on hold')
+    expect(wizard).toContain('does not automatically hold escrow')
+  })
 })
