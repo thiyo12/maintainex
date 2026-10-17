@@ -53,15 +53,21 @@ export async function GET(request: NextRequest) {
       select: { id: true, slug: true, name: true, countries: true },
     })
     const eligibleCategories = dbCategories.filter(c => isCatalogAvailableInMarket(c.countries, market))
-    const bySlug = new Map(eligibleCategories.filter(c => c.slug).map(c => [c.slug!, c]))
     const eligibleJobs = await prisma.templateJob.findMany({
       where: { isActive: true, categoryId: { in: eligibleCategories.map(c => c.id) } },
       select: { id: true, name: true, categoryId: true, countries: true, currency: true },
     })
     const expectedCurrency = market === 'LK' ? 'LKR' : 'CAD'
+    const marketJobs = eligibleJobs.filter(j =>
+      j.currency === expectedCurrency && isCatalogAvailableInMarket(j.countries, market)
+    )
+    // A department with zero market-priced active services is not a bookable
+    // search result. Otherwise static category aliases create dead-end listings.
+    const categoryIdsWithServices = new Set(marketJobs.map(j => j.categoryId))
+    const availableCategories = eligibleCategories.filter(c => categoryIdsWithServices.has(c.id))
+    const bySlug = new Map(availableCategories.filter(c => c.slug).map(c => [c.slug!, c]))
     const byCategoryAndName = new Map(
-      eligibleJobs.filter(j => j.currency === expectedCurrency && isCatalogAvailableInMarket(j.countries, market))
-        .map(j => [j.categoryId + ':' + j.name.toLowerCase(), j]),
+      marketJobs.map(j => [j.categoryId + ':' + j.name.toLowerCase(), j]),
     )
 
     const results = q?.trim() ? aiSearch(q.trim()) : []
@@ -77,8 +83,8 @@ export async function GET(request: NextRequest) {
       // Keep its ranking, but only expose names belonging to eligible jobs
       // or categories; do not leak Canada-only suggestions to LK.
       const allowedNames = new Set([
-        ...eligibleCategories.map(c => c.name.toLowerCase()),
-        ...eligibleJobs.filter(j => j.currency === expectedCurrency && isCatalogAvailableInMarket(j.countries, market)).map(j => j.name.toLowerCase()),
+        ...availableCategories.map(c => c.name.toLowerCase()),
+        ...marketJobs.map(j => j.name.toLowerCase()),
       ])
       const suggestions = getAutocompleteSuggestions(q).filter(name => allowedNames.has(name.toLowerCase()))
       return NextResponse.json({ query: q, suggestions })

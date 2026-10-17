@@ -24,7 +24,9 @@ describe('V2 search market eligibility source invariants', () => {
   })
 
   it('restricts autocomplete suggestions to currency-safe market jobs', () => {
-    expect(route).toContain('...eligibleJobs.filter(j => j.currency === expectedCurrency && isCatalogAvailableInMarket(j.countries, market)).map(j => j.name.toLowerCase())')
+    expect(route).toContain('const marketJobs = eligibleJobs.filter(j =>')
+    expect(route).toContain('...marketJobs.map(j => j.name.toLowerCase())')
+    expect(route).toContain('...availableCategories.map(c => c.name.toLowerCase())')
   })
 
   it('does not use unscoped search results directly in response lists', () => {
