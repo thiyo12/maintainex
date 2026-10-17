@@ -84,7 +84,11 @@ describe('canonical catalogue administration', () => {
   })
 
   afterAll(async () => {
-    await prisma.templateJob.deleteMany({ where: { id: { in: created } } })
+    // "created" contains JobCategory IDs, not TemplateJob IDs. Delete
+    // jobs belonging to these test-created categories before removing
+    // their parents. Otherwise incomplete drafts persist and pollute
+    // later catalogue-integrity assertions in this isolated CI database.
+    await prisma.templateJob.deleteMany({ where: { categoryId: { in: created } } })
     await prisma.jobCategory.deleteMany({ where: { slug: { startsWith: `crmtest-${ts}` } } })
   })
 
