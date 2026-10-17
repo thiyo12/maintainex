@@ -203,8 +203,9 @@ describe.skipIf(!requiresPostgres())('Phase 6.5 — Quote Visibility Service (Ca
     const result = await resolveQuoteVisibility(prisma, { userId: multiCompanyUserId, jobId, companyId: companyBId })
     expect(result.allowedQuoteIds).toEqual([])
 
-    const quote = await prisma.jobQuote.findUnique({ where: { id: result.allowedQuoteIds[0] } })
-    expect(quote?.providerId).toBe(companyBId)
+    // A worker of company B without a job assignment must not receive a
+    // quote ID: avoid performing a lookup on the intentionally empty list.
+    expect(result.isCustomer).toBe(false)
   })
 
   it('multi-company user without companyId: sees nothing (no company context)', async () => {
