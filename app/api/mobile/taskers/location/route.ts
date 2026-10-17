@@ -24,7 +24,7 @@ export async function PUT(request: NextRequest) {
       if (typeof value === 'number') return Number.isFinite(value) ? value : null
       if (typeof value !== 'string') return null
       const decimal = value.trim()
-      if (!/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(decimal)) return null
+      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(decimal)) return null
       const parsed = Number(decimal)
       return Number.isFinite(parsed) ? parsed : null
     }
