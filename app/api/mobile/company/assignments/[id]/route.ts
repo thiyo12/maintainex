@@ -26,7 +26,7 @@ export async function GET(
     const assignment = await prisma.companyJobAssignment.findUnique({
       where: { id },
       include: {
-        job: { select: { id: true, title: true, status: true, createdAt: true } },
+        job: { select: { id: true, title: true, status: true, countryCode: true, createdAt: true } },
         worker: { select: { id: true, name: true, email: true } },
         company: { select: { id: true, companyName: true, userId: true } },
       },

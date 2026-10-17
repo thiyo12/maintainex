@@ -7,6 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { v2Request } from '@/api/v2-client'
+import JobSafetyCentre from '@/features/safety/components/JobSafetyCentre'
 
 interface AssignmentDetail {
   id: string
@@ -22,7 +23,8 @@ interface AssignmentDetail {
   revokedAt: string | null
   revokedReason: string | null
   rejectReason: string | null
-  job: { id: string; title: string; status: string }
+  job: { id: string; title: string; status: string; countryCode: string }
+  capabilities?: { isAssignedWorker: boolean }
   worker: { id: string; name: string; email: string }
   company: { id: string; companyName: string }
 }
@@ -212,6 +214,10 @@ export default function AssignmentDetailScreen() {
             </TouchableOpacity>
           )}
         </View>
+        {assignment.capabilities?.isAssignedWorker &&
+          ['ACCEPTED', 'IN_PROGRESS', 'COMPLETED'].includes(assignment.status) ? (
+          <JobSafetyCentre jobId={assignment.jobId} countryCode={assignment.job.countryCode} />
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   )
