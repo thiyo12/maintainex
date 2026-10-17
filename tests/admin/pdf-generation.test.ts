@@ -24,6 +24,10 @@ vi.mock('@/lib/crm/security', () => ({
   guardCrmRequest: vi.fn(),
 }))
 
+vi.mock('@/lib/reports/branch-scope', () => ({
+  resolveReportBranchScope: vi.fn(),
+}))
+
 vi.mock('@/lib/activity-log', () => ({
   getStatsForPeriod: vi.fn().mockResolvedValue({
     bookings: { total: 10, pending: 2, confirmed: 3, inProgress: 1, completed: 3, cancelled: 1 },
@@ -41,6 +45,7 @@ import { GET as reportGET } from '@/app/api/reports/export/route'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
 import { guardCrmRequest } from '@/lib/crm/security'
+import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
 import { NextRequest, NextResponse } from 'next/server'
 
 function makeRequest(url: string, headers?: Record<string, string>): NextRequest {
@@ -186,10 +191,12 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
 
     it('returns 403 for unauthorized branch access', async () => {
       // An authorized CRM session still cannot export another branch's invoice.
-      mockedGuard.mockResolvedValue(superGuard())
+      mockedGuard.mockResolvedValue({
+        ...superGuard(),
+        context: { ...superGuard().context, isSuperAdmin: false },
+      })
       vi.mocked(prisma.invoice.findUnique).mockResolvedValue(mockInvoice as any)
-      const resolveScope = await import('@/lib/reports/branch-scope')
-      vi.spyOn(resolveScope, 'resolveReportBranchScope').mockResolvedValueOnce({
+      vi.mocked(resolveReportBranchScope).mockResolvedValueOnce({
         ok: false, status: 403, error: 'Branch access denied',
       } as any)
       const req = makeRequest('http://localhost:3000/api/invoices/inv-1/pdf')
