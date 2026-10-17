@@ -119,6 +119,9 @@ describe.skipIf(!requiresPostgres())('Phase 5D — Opening Balance Cutover', () 
         CURRENT_TIMESTAMP
       FROM "WalletBalance" wb
       WHERE wb."balance" > 0
+        -- Isolate this integration fixture: never backfill wallets owned by
+        -- unrelated concurrent suites in the shared test database.
+        AND wb."walletId" IN ($1, $2, $3, $4)
         AND NOT EXISTS (
           SELECT 1 FROM "FinancialLedger" fl
           WHERE fl."referenceType" = 'OPENING_BALANCE'
@@ -126,7 +129,7 @@ describe.skipIf(!requiresPostgres())('Phase 5D — Opening Balance Cutover', () 
             AND fl."entryType" = 'CREDIT'
         )
       ON CONFLICT ("idempotencyKey") DO NOTHING
-    `);
+    `, customerWalletId, providerWalletId, zeroWalletId, preExistingWalletId);
 
     await prisma.$executeRawUnsafe(`
       INSERT INTO "FinancialLedger" (
@@ -150,6 +153,9 @@ describe.skipIf(!requiresPostgres())('Phase 5D — Opening Balance Cutover', () 
         CURRENT_TIMESTAMP
       FROM "WalletBalance" wb
       WHERE wb."balance" > 0
+        -- Isolate this integration fixture: never backfill wallets owned by
+        -- unrelated concurrent suites in the shared test database.
+        AND wb."walletId" IN ($1, $2, $3, $4)
         AND NOT EXISTS (
           SELECT 1 FROM "FinancialLedger" fl
           WHERE fl."referenceType" = 'OPENING_BALANCE'
@@ -157,7 +163,7 @@ describe.skipIf(!requiresPostgres())('Phase 5D — Opening Balance Cutover', () 
             AND fl."entryType" = 'DEBIT'
         )
       ON CONFLICT ("idempotencyKey") DO NOTHING
-    `);
+    `, customerWalletId, providerWalletId, zeroWalletId, preExistingWalletId);
   }
 
   it('customer wallet: positive balance gets opening CREDIT', async () => {
@@ -235,14 +241,26 @@ describe.skipIf(!requiresPostgres())('Phase 5D — Opening Balance Cutover', () 
 
   it('idempotency: rerun cutover produces no duplicate entries', async () => {
     const countBefore = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(
-      `SELECT COUNT(*) as count FROM "FinancialLedger" WHERE "referenceType" = 'OPENING_BALANCE'`
+      `SELECT COUNT(*) as count FROM "FinancialLedger"
+       WHERE "referenceType" = 'OPENING_BALANCE'
+         AND "referenceId" IN ($1, $2, $3, $4)`,
+      `opening-${customerWalletId}`,
+      `opening-${providerWalletId}`,
+      `opening-${zeroWalletId}`,
+      `opening-${preExistingWalletId}`,
     );
     const before = Number(countBefore[0].count);
 
     await executeCutover();
 
     const countAfter = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(
-      `SELECT COUNT(*) as count FROM "FinancialLedger" WHERE "referenceType" = 'OPENING_BALANCE'`
+      `SELECT COUNT(*) as count FROM "FinancialLedger"
+       WHERE "referenceType" = 'OPENING_BALANCE'
+         AND "referenceId" IN ($1, $2, $3, $4)`,
+      `opening-${customerWalletId}`,
+      `opening-${providerWalletId}`,
+      `opening-${zeroWalletId}`,
+      `opening-${preExistingWalletId}`,
     );
     const after = Number(countAfter[0].count);
     expect(after).toBe(before);
