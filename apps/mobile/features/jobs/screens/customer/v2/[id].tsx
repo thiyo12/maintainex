@@ -157,40 +157,11 @@ export default function V2JobDetailScreen() {
     } as any)
   }
 
-  const handleDepositEscrow = async () => {
+  const handleReviewPayment = () => {
     if (!job) return
-    setActionLoading('escrow')
-    try { await v2JobActions.depositEscrow(id, job.budgetAmount ?? 0); Alert.alert(t('jobDetail.escrowDeposited'), t('jobDetail.escrowDepositedDesc')); loadJob() }
-    catch (e: any) { Alert.alert(t('common.error'), e.message) }
-    finally { setActionLoading('') }
-  }
-
-  const handleCashPayment = () => {
-    Alert.alert(
-      'Use Cash Payment?',
-      'MaintainEX will not hold cash for this booking. Pay the provider directly as agreed after the work. The provider remains responsible for MaintainEX platform commission.',
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: 'Use Cash',
-          onPress: async () => {
-            setActionLoading('cash')
-            try {
-              const result = await v2JobActions.confirmCashPayment(id)
-              Alert.alert(
-                'Cash Selected',
-                `Cash amount due: ${result.currency} ${Number(result.amountDue || 0).toLocaleString()}. Use the verification PIN before work starts.`,
-              )
-              await loadJob()
-            } catch (e: any) {
-              Alert.alert(t('common.error'), e?.message || 'Could not select cash payment.')
-            } finally {
-              setActionLoading('')
-            }
-          },
-        },
-      ],
-    )
+    // The canonical payment screen queries server market eligibility, offers
+    // available methods, and never confuses selected cash with protected escrow.
+    router.push('/(customer)/jobs/v2/confirm/' + id)
   }
 
   const handleShareAddress = async () => {
@@ -204,13 +175,6 @@ export default function V2JobDetailScreen() {
     if (!job || !escrow || workspace?.progressStatus !== 'COMPLETION_REQUESTED') return
     const aq = quotes.find(q => q.status === 'ACCEPTED')
     router.push({ pathname: '/(customer)/payment/confirm-complete', params: { bookingId: id, jobTitle: job.title, taskerName: aq?.provider?.name || 'Provider' } })
-  }
-
-  const handleReleaseEscrow = async () => {
-    setActionLoading('release')
-    try { await v2JobActions.releaseEscrow(id); Alert.alert(t('jobDetail.escrowReleased'), ''); loadJob() }
-    catch (e: any) { Alert.alert(t('common.error'), e.message) }
-    finally { setActionLoading('') }
   }
 
   const handleRefundEscrow = async () => {
@@ -542,13 +506,12 @@ export default function V2JobDetailScreen() {
             <View style={styles.actionIconCircle}>
               <Lock size={28} color={colors.ink} weight="fill" />
             </View>
-            <Text style={styles.actionCardTitle}>Fund Escrow</Text>
+            <Text style={styles.actionCardTitle}>Choose a Payment Method</Text>
             <Text style={styles.actionCardDesc}>
-              Deposit {escrow?.currency || marketCurrency || 'Currency unavailable'} {escrow?.amount || job.budgetAmount} into escrow to start the work
-              {escrow?.createdAt ? ` — fund within 24 hours or the job will reopen` : ''}
+              Review server-approved payment methods and actual charges for {marketCurrency ?? 'this market'}.
+              Cash is paid directly to the provider and is not held as escrow.
             </Text>
-            <ActionBtn label="Deposit Now" loadingKey="escrow" onPress={handleDepositEscrow} />
-            <ActionBtn label="Use Cash" loadingKey="cash" onPress={handleCashPayment} outline />
+            <ActionBtn label="Review Payment Options" loadingKey="payment" onPress={handleReviewPayment} />
           </View>
         ) : null}
 
@@ -611,7 +574,6 @@ export default function V2JobDetailScreen() {
             </View>
             <Text style={styles.escrowAmount}>{escrow.currency || marketCurrency || 'Currency unavailable'} {escrow.amount}</Text>
             <View style={styles.escrowActions}>
-              <ActionBtn label="Release to Hero" loadingKey="release" onPress={handleReleaseEscrow} color={colors.amber} />
               <ActionBtn label="Refund & Cancel" loadingKey="refund" onPress={handleRefundEscrow} color={colors.error} />
             </View>
           </View>
