@@ -9,6 +9,7 @@ const mock = vi.hoisted(() => ({
   profileCreate: vi.fn(),
   memberCreate: vi.fn(),
   transaction: vi.fn(),
+  templateFind: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/marketplace-auth', () => ({
@@ -23,6 +24,7 @@ vi.mock('@/lib/auth/compatibility/mobile-auth', () => ({
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     companyProfile: { findUnique: mock.profileFind },
+    templateJob: { findMany: mock.templateFind },
     $transaction: mock.transaction,
   },
 }))
@@ -48,6 +50,11 @@ describe('Phase 04 — new Vancouver company onboarding', () => {
     vi.resetAllMocks()
     mock.country = 'CA'
     mock.profileFind.mockResolvedValue(null)
+    mock.templateFind.mockImplementation(async () => [{
+      id: 'service-1',
+      countries: JSON.stringify([mock.country]),
+      category: { countries: JSON.stringify([mock.country]) },
+    }])
     mock.profileCreate.mockResolvedValue({ id: 'company', companyName: 'Location company' })
     mock.memberCreate.mockResolvedValue({ id: 'owner-member' })
     mock.transaction.mockImplementation(async (callback: Function) => callback({

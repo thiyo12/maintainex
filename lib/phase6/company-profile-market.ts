@@ -49,3 +49,39 @@ export function normalizeCompanyServices(value: unknown): NormalizedCompanyServi
   const services = [...new Set(value.map((service: string) => service.trim()))]
   return { ok: true, services }
 }
+
+
+/**
+ * A company may declare only active canonical template jobs available in its
+ * persisted market. This rejects unapproved, inactive and cross-currency IDs.
+ *
+ * Historical free-text services already stored in existing profiles are
+ * preserved on metadata-only updates, but cannot be appended as new skills.
+ */
+export async function validateCompanyCatalogueServices(
+  db: Pick<import('@prisma/client').PrismaClient, 'templateJob'>,
+  market: string,
+  serviceIds: string[],
+): Promise<boolean> {
+  if (market !== 'LK' && market !== 'CA' || serviceIds.length === 0) return false
+  const currency = market === 'CA' ? 'CAD' : 'LKR'
+  const jobs = await db.templateJob.findMany({
+    where: {
+      id: { in: serviceIds },
+      isActive: true,
+      currency,
+      category: { isActive: true },
+    },
+    select: {
+      id: true,
+      countries: true,
+      category: { select: { countries: true } },
+    },
+  })
+  const { storedListIncludes } = await import('@/lib/db-utils')
+  const allowed = new Set(jobs.filter(job =>
+    storedListIncludes(job.countries, market) &&
+    storedListIncludes(job.category.countries, market)
+  ).map(job => job.id))
+  return serviceIds.every(id => allowed.has(id))
+}

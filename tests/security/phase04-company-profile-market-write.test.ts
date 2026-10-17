@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   profileCreate: vi.fn(),
   profileUpdate: vi.fn(),
   transaction: vi.fn(),
+  templateFind: vi.fn(),
   memberCreate: vi.fn(),
   resolveContext: vi.fn(),
 }))
@@ -28,6 +29,7 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: mocks.profileFind,
       update: mocks.profileUpdate,
     },
+    templateJob: { findMany: mocks.templateFind },
     $transaction: mocks.transaction,
   },
 }))
@@ -50,6 +52,11 @@ describe('Phase 04 — company service-area mutation cannot expand Canada', () =
     mocks.country = 'CA'
     mocks.profile = null
     mocks.profileFind.mockImplementation(async () => mocks.profile)
+    mocks.templateFind.mockImplementation(async () => [{
+      id: 'svc',
+      countries: '["CA"]',
+      category: { countries: '["CA"]' },
+    }])
     mocks.profileCreate.mockResolvedValue({ id: 'company', companyName: 'Company' })
     mocks.profileUpdate.mockResolvedValue({ id: 'company', companyName: 'Company' })
     mocks.transaction.mockImplementation(async (fn: Function) => fn({

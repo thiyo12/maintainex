@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
-import { normalizeCompanyServiceAreas, normalizeCompanyServices } from '@/lib/phase6/company-profile-market'
+import { normalizeCompanyServiceAreas, normalizeCompanyServices, validateCompanyCatalogueServices } from '@/lib/phase6/company-profile-market'
 
 function safeParseJson(val: string | null | undefined): string[] {
   if (!val) return []
@@ -129,6 +129,9 @@ export async function PUT(request: NextRequest) {
         if (services.length === 0) {
           return NextResponse.json({ error: 'Select at least one service' }, { status: 400 })
         }
+        if (!await validateCompanyCatalogueServices(prisma, market, services)) {
+          return NextResponse.json({ error: 'Select active service IDs from your market catalogue' }, { status: 400 })
+        }
 
         const created = await prisma.$transaction(async (tx) => {
           const profile = await tx.companyProfile.create({
@@ -196,14 +199,14 @@ export async function PUT(request: NextRequest) {
     // session, cannot change a company's service territory.
     const company = await prisma.companyProfile.findUnique({
       where: { id: context!.companyId },
-      select: { countryCode: true },
+      select: { countryCode: true, services: true },
     })
     if (!company) {
       return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
     }
     const accountMarket = (user.countryCode || 'LK').trim().toUpperCase()
     const market = (company.countryCode || '').trim().toUpperCase()
-    if (market !== accountMarket) {
+    if (market !== accountMarket || (market !== 'LK' && market !== 'CA')) {
       return NextResponse.json({ error: 'Company and account markets do not match' }, { status: 403 })
     }
     const checkedAreas = data.serviceAreas === undefined
@@ -215,6 +218,16 @@ export async function PUT(request: NextRequest) {
       ? null : normalizeCompanyServices(data.services)
     if (checkedServices && !checkedServices.ok) {
       return NextResponse.json({ error: checkedServices.error }, { status: 400 })
+    }
+    if (checkedServices?.ok) {
+      // Preserve pre-existing legacy labels ONLY if the submitted list is
+      // identical. Newly asserted services must be active canonical job IDs.
+      const existing = safeParseJson(company.services)
+      const unchanged = existing.length === checkedServices.services.length &&
+        existing.every((value, i) => value === checkedServices.services[i])
+      if (!unchanged && !await validateCompanyCatalogueServices(prisma, market, checkedServices.services)) {
+        return NextResponse.json({ error: 'Select active service IDs from your market catalogue' }, { status: 400 })
+      }
     }
 
     const profile = await prisma.companyProfile.update({
