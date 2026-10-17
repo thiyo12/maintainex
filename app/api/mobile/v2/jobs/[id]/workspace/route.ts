@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { transitionJobWorkspace, type ActorType, type WorkspaceStatus } from '@/lib/domain/job-lifecycle'
+import { getReadableCompanyIds, getActiveAssignedCompanyId } from '@/lib/phase6/company-job-read-access'
 
 async function resolveJobActor(
   jobId: string,
@@ -21,12 +22,21 @@ async function resolveJobActor(
   if (acceptedQuote.providerType === 'INDIVIDUAL' && acceptedQuote.providerId === userId) return 'PROVIDER'
 
   if (acceptedQuote.providerType === 'COMPANY') {
+    if (!requireAcceptedWorkerAssignment) {
+      // Company membership or the legacy WORKER jobs:read permission alone
+      // never authorizes reading every customer's private workspace.
+      const readableCompanyIds = await getReadableCompanyIds(userId)
+      if (readableCompanyIds.includes(acceptedQuote.providerId)) return 'COMPANY'
+      const assignedCompanyId = await getActiveAssignedCompanyId(jobId, userId)
+      return assignedCompanyId === acceptedQuote.providerId ? 'COMPANY' : null
+    }
+
+    // Write-side pause still requires a currently accepted/started worker.
     const membership = await prisma.teamMember.findFirst({
       where: { companyId: acceptedQuote.providerId, userId, status: 'ACTIVE' },
       select: { id: true },
     })
     if (!membership) return null
-    if (!requireAcceptedWorkerAssignment) return 'COMPANY'
 
     // Company membership alone cannot pause an active customer's booking.
     // Only the worker explicitly assigned to this job and actually accepted
@@ -54,6 +64,8 @@ export async function GET(
     const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })

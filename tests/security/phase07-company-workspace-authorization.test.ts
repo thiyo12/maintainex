@@ -3,6 +3,9 @@ import { NextRequest } from 'next/server'
 
 const mock = vi.hoisted(() => ({
   userId: 'worker',
+  suspended: false,
+  managedCompanies: [] as string[],
+  assignedCompany: null as string | null,
   job: { id: 'job', customerId: 'customer', status: 'IN_PROGRESS' },
   quote: { providerId: 'company', providerType: 'COMPANY' },
   membership: { id: 'member' } as null | { id: string },
@@ -13,11 +16,14 @@ const mock = vi.hoisted(() => ({
   assignmentFind: vi.fn(),
   findWorkspace: vi.fn(),
   transition: vi.fn(),
+  management: vi.fn(),
+  activeAssignment: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/compatibility/mobile-auth', () => ({
   authenticateRequest: async () => ({ id: mock.userId, role: 'TASKER', isActive: true }),
-  assertNotSuspended: () => null,
+  assertNotSuspended: () => mock.suspended
+    ? new Response(JSON.stringify({ error: 'Suspended' }), { status: 403 }) : null,
 }))
 vi.mock('@/lib/prisma', () => ({ prisma: {
   marketplaceJob: { findUnique: mock.findJob },
@@ -26,6 +32,10 @@ vi.mock('@/lib/prisma', () => ({ prisma: {
   companyJobAssignment: { findFirst: mock.assignmentFind },
   jobWorkspace: { findUnique: mock.findWorkspace },
 } }))
+vi.mock('@/lib/phase6/company-job-read-access', () => ({
+  getReadableCompanyIds: mock.management,
+  getActiveAssignedCompanyId: mock.activeAssignment,
+}))
 vi.mock('@/lib/domain/job-lifecycle', () => ({
   transitionJobWorkspace: mock.transition,
 }))
@@ -48,6 +58,11 @@ describe('Phase 07 — company job workspace writes require accepted worker assi
   beforeEach(() => {
     vi.clearAllMocks()
     mock.userId = 'worker'
+    mock.suspended = false
+    mock.managedCompanies = []
+    mock.assignedCompany = null
+    mock.management.mockImplementation(async () => mock.managedCompanies)
+    mock.activeAssignment.mockImplementation(async () => mock.assignedCompany)
     mock.job = { id: 'job', customerId: 'customer', status: 'IN_PROGRESS' }
     mock.quote = { providerId: 'company', providerType: 'COMPANY' }
     mock.membership = { id: 'member' }
@@ -101,6 +116,7 @@ describe('Phase 07 — company job workspace writes require accepted worker assi
   it('lets an existing team manager read the workspace without letting them write', async () => {
     mock.userId = 'manager'
     mock.assignment = null
+    mock.managedCompanies = ['company']
     const read = await get()
     expect(read.status).toBe(200)
     expect(mock.assignmentFind).not.toHaveBeenCalled()
@@ -141,4 +157,61 @@ describe('Phase 07 — company job workspace writes require accepted worker assi
     expect(response.status).toBe(409)
     expect(mock.assignmentFind).not.toHaveBeenCalled()
   })
+  it('blocks unassigned active company workers from reading a private workspace', async () => {
+    mock.userId = 'worker'
+    mock.assignedCompany = null
+    expect((await get()).status).toBe(403)
+    expect(mock.management).toHaveBeenCalledWith('worker')
+    expect(mock.activeAssignment).toHaveBeenCalledWith('job', 'worker')
+    expect(mock.findWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('permits a current job worker to read their assigned workspace', async () => {
+    mock.userId = 'worker'
+    mock.assignedCompany = 'company'
+    expect((await get()).status).toBe(200)
+    expect(mock.findWorkspace).toHaveBeenCalledTimes(1)
+  })
+
+  it('denies a revoked assignment or inactive company membership on workspace GET', async () => {
+    mock.userId = 'worker'
+    mock.assignedCompany = null
+    expect((await get()).status).toBe(403)
+    expect(mock.findWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('rejects company workers assigned to another company', async () => {
+    mock.userId = 'worker'
+    mock.assignedCompany = 'other-company'
+    expect((await get()).status).toBe(403)
+    expect(mock.findWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('rejects managers from another company', async () => {
+    mock.userId = 'manager'
+    mock.managedCompanies = ['other-company']
+    expect((await get()).status).toBe(403)
+    expect(mock.findWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('preserves direct customer access to their workspace', async () => {
+    mock.userId = 'customer'
+    expect((await get()).status).toBe(200)
+    expect(mock.management).not.toHaveBeenCalled()
+  })
+
+  it('preserves accepted individual provider workspace access', async () => {
+    mock.userId = 'individual'
+    mock.quote = { providerId: 'individual', providerType: 'INDIVIDUAL' }
+    expect((await get()).status).toBe(200)
+    expect(mock.management).not.toHaveBeenCalled()
+  })
+
+  it('blocks suspended users from reading any workspace data', async () => {
+    mock.suspended = true
+    expect((await get()).status).toBe(403)
+    expect(mock.findJob).not.toHaveBeenCalled()
+    expect(mock.findWorkspace).not.toHaveBeenCalled()
+  })
+
 })
