@@ -42,8 +42,14 @@ async function getVerifiedTaskerPublicIdentity(userId: string) {
     profile.verificationStatus === 'VERIFIED' &&
     identity?.kycStatus === 'VERIFIED'
 
+  // Never overwrite the provider User.id with TaskerProfile.id when this
+  // public identity is combined with the accepted quote's user summary.
+  // Raw verification state remains internal; only the approved booleans go out.
   return {
-    ...profile,
+    providerProfileId: profile.id,
+    rating: profile.rating,
+    completedJobs: profile.completedJobs,
+    isVerified: profile.isVerified,
     identityVerified,
     profileImage: identityVerified ? identity?.verifiedPhotoUrl || null : null,
     profilePhotoVerified: identityVerified && Boolean(identity?.verifiedPhotoUrl),
