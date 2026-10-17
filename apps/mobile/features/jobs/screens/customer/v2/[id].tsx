@@ -15,6 +15,7 @@ import JobLifecycleTracker from '@/components/ui/JobLifecycleTracker'
 import { emit, removedJobs } from '@/lib/events'
 import NewChatModal from '@/features/messaging/components/NewChatModal'
 import JobSafetyCentre from '@/features/safety/components/JobSafetyCentre'
+import { currencyForJobCountry, parseCounterofferAmount, quoteMatchesJobCurrency } from '@/lib/market-currency'
 
 function usePulse() {
   const anim = useRef(new Animated.Value(0)).current
@@ -80,6 +81,7 @@ export default function V2JobDetailScreen() {
   const [msgRecipient, setMsgRecipient] = useState<{ id: string; name: string } | null>(null)
   const [msgPrefill, setMsgPrefill] = useState('')
   const [bargainPrice, setBargainPrice] = useState('')
+  const marketCurrency = currencyForJobCountry(job?.countryCode)
   const [cancelReasonVisible, setCancelReasonVisible] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
@@ -104,13 +106,21 @@ export default function V2JobDetailScreen() {
   const handleSelectQuote = (quoteId: string) => {
     const quote = quotes.find(q => q.id === quoteId)
     if (!quote || !job) return
+    if (!quoteMatchesJobCurrency(job.countryCode, quote.currency)) {
+      Alert.alert('Quote currency mismatch', 'This quote cannot be accepted for the booking market.')
+      return
+    }
     router.push({ pathname: '/(customer)/payment/escrow-confirm', params: { bookingId: id, jobTitle: job.title, taskerName: quote.provider?.name || '', quotedAmount: String(quote.price), quoteId } })
   }
 
   const handleBargain = async () => {
-    if (!bargainModal || !bargainPrice) return
-    const price = parseInt(bargainPrice, 10)
-    if (!price || price < 100) {
+    if (!bargainModal || !job) return
+    if (!quoteMatchesJobCurrency(job.countryCode, bargainModal.currency)) {
+      Alert.alert('Quote currency mismatch', 'A counteroffer must use the booking currency.')
+      return
+    }
+    const price = parseCounterofferAmount(bargainPrice)
+    if (price === null) {
       Alert.alert(t('common.error'), t('errors.enterValidPrice'))
       return
     }
@@ -124,7 +134,7 @@ export default function V2JobDetailScreen() {
     }
 
     setMsgPrefill(
-      `Hi ${bargainModal.provider?.name || ''}, would you accept LKR ${price.toLocaleString()} for this job? If we agree, please update your official MaintainEX quote so I can accept the final price.`
+      `Hi ${bargainModal.provider?.name || ''}, would you accept ${marketCurrency} ${price.toLocaleString()} for this job? If we agree, please update your official MaintainEX quote so I can accept the final price.`
     )
     setMsgRecipient({ id: chatUserId, name: bargainModal.provider?.name || 'Provider' })
     setBargainModal(null)
@@ -348,7 +358,7 @@ export default function V2JobDetailScreen() {
               <Wallet size={14} color={colors.amber} weight="fill" />
               <Text style={styles.detailLabel}>Budget</Text>
             </View>
-            <Text style={styles.detailValue}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
+            <Text style={styles.detailValue}>{marketCurrency ?? 'Currency unavailable'} {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
           </View>
           <View style={styles.detailDivider} />
           {job.preferredDate && (
@@ -399,7 +409,7 @@ export default function V2JobDetailScreen() {
               <View style={styles.aiBanner}>
                 <WarningCircle size={16} color="#D48900" weight="fill" />
                 <Text style={styles.aiBannerText}>
-                  AI estimate was {((job as any).aiEstimate.symbol || 'LKR')} {((job as any).aiEstimate.priceRange?.min || 0).toLocaleString()}–{((job as any).aiEstimate.priceRange?.max || 0).toLocaleString()}
+                  AI estimate was {marketCurrency ?? 'Currency unavailable'} {((job as any).aiEstimate.priceRange?.min || 0).toLocaleString()}–{((job as any).aiEstimate.priceRange?.max || 0).toLocaleString()}
                   {((job as any).aiEstimate.materialHandling === 'tasker_brings') ? ' with materials' : ''}. Quotes below show how taskers compare.
                 </Text>
               </View>
@@ -411,7 +421,8 @@ export default function V2JobDetailScreen() {
             {quotes.map((q) => {
               const aiEst = (job as any).aiEstimate
               let quoteTag: { label: string; color: string; bg: string } | null = null
-              if (aiEst?.priceRange) {
+              const quoteCurrencyIsValid = quoteMatchesJobCurrency(job.countryCode, q.currency)
+              if (quoteCurrencyIsValid && aiEst?.currency === marketCurrency && aiEst?.priceRange) {
                 const price = Number(q.price)
                 if (price < aiEst.priceRange.min) {
                   quoteTag = { label: 'Below AI estimate', color: '#065F46', bg: '#DCFCE7' }
@@ -430,7 +441,7 @@ export default function V2JobDetailScreen() {
                     <Text style={styles.quoteProviderMeta}>{q.providerType} · {q.estimatedCompletionTime}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.quotePrice}>LKR {q.price}</Text>
+                    <Text style={styles.quotePrice}>{q.currency} {q.price}</Text>
                     {quoteTag && (
                       <View style={[styles.quoteTag, { backgroundColor: quoteTag.bg }]}>
                         <Text style={[styles.quoteTagText, { color: quoteTag.color }]}>{quoteTag.label}</Text>
@@ -439,7 +450,10 @@ export default function V2JobDetailScreen() {
                   </View>
                 </View>
                 {q.message ? <Text style={styles.quoteMessage}>{q.message}</Text> : null}
-                {q.status === 'PENDING' ? (
+                {!quoteCurrencyIsValid ? (
+                  <Text style={styles.quoteMessage}>Currency does not match this booking market. Acceptance and bargaining are unavailable.</Text>
+                ) : null}
+                {q.status === 'PENDING' && quoteCurrencyIsValid ? (
                   <View style={styles.quoteActions}>
                     <TouchableOpacity style={styles.quoteAcceptBtn} onPress={() => handleSelectQuote(q.id)} disabled={actionLoading !== ''}>
                       {actionLoading === q.id ? <ActivityIndicator color="#111827" size="small" /> : <Text style={styles.quoteAcceptText}>Accept</Text>}
@@ -504,7 +518,7 @@ export default function V2JobDetailScreen() {
                     {p.completedJobs > 0 && <Text style={styles.heroMetaText}>{p.completedJobs} jobs</Text>}
                     {p.distance && <Text style={styles.heroMetaText}>{p.distance}</Text>}
                   </View>
-                  {p.hourlyRate ? <Text style={styles.heroRate}>LKR {p.hourlyRate}/hr</Text> : p.fixedRate ? <Text style={styles.heroRate}>LKR {p.fixedRate}</Text> : null}
+                  {p.hourlyRate ? <Text style={styles.heroRate}>{marketCurrency ?? 'Currency unavailable'} {p.hourlyRate}/hr</Text> : p.fixedRate ? <Text style={styles.heroRate}>{marketCurrency ?? 'Currency unavailable'} {p.fixedRate}</Text> : null}
                 </View>
                 <TouchableOpacity
                   hitSlop={8}
@@ -530,7 +544,7 @@ export default function V2JobDetailScreen() {
             </View>
             <Text style={styles.actionCardTitle}>Fund Escrow</Text>
             <Text style={styles.actionCardDesc}>
-              Deposit LKR {escrow?.amount || job.budgetAmount} into escrow to start the work
+              Deposit {escrow?.currency || marketCurrency || 'Currency unavailable'} {escrow?.amount || job.budgetAmount} into escrow to start the work
               {escrow?.createdAt ? ` — fund within 24 hours or the job will reopen` : ''}
             </Text>
             <ActionBtn label="Deposit Now" loadingKey="escrow" onPress={handleDepositEscrow} />
@@ -595,7 +609,7 @@ export default function V2JobDetailScreen() {
               <Text style={styles.escrowTitle}>Escrow</Text>
               <View style={styles.escrowBadge}><Text style={styles.escrowBadgeText}>Protected</Text></View>
             </View>
-            <Text style={styles.escrowAmount}>LKR {escrow.amount}</Text>
+            <Text style={styles.escrowAmount}>{escrow.currency || marketCurrency || 'Currency unavailable'} {escrow.amount}</Text>
             <View style={styles.escrowActions}>
               <ActionBtn label="Release to Hero" loadingKey="release" onPress={handleReleaseEscrow} color={colors.amber} />
               <ActionBtn label="Refund & Cancel" loadingKey="refund" onPress={handleRefundEscrow} color={colors.error} />
@@ -655,7 +669,7 @@ export default function V2JobDetailScreen() {
             <Text style={styles.modalSub}>Propose your price to {bargainModal?.provider?.name || 'the hero'}</Text>
             <TextInput
               style={styles.modalInput}
-              value={bargainPrice} onChangeText={setBargainPrice} placeholder="LKR 0" placeholderTextColor="#6F6B6B" keyboardType="numeric" />
+              value={bargainPrice} onChangeText={setBargainPrice} placeholder={`${marketCurrency ?? 'Currency'} 0`} placeholderTextColor="#6F6B6B" keyboardType="numeric" />
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setBargainModal(null)}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
