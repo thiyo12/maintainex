@@ -166,13 +166,13 @@ describe.skipIf(!requiresPostgres())('Phase 6.5 — Quote Visibility Service (Ca
     expect(quote?.providerId).toBe(companyAId)
   })
 
-  it('company A WORKER with companyId=A has quotes:read', async () => {
+  it('company A worker without a job assignment cannot access company quote despite generic quotes:read', async () => {
     const { context } = await resolveCompanyContext(workerAId, companyAId, 'quotes:read')
     expect(context).toBeTruthy()
     expect(hasCompanyPermission(context!.role, 'quotes:read')).toBe(true)
 
     const result = await resolveQuoteVisibility(prisma, { userId: workerAId, jobId, companyId: companyAId })
-    expect(result.allowedQuoteIds.length).toBe(1)
+    expect(result.allowedQuoteIds).toEqual([])
   })
 
   it('company A CANNOT see company B quote', async () => {
@@ -199,9 +199,9 @@ describe.skipIf(!requiresPostgres())('Phase 6.5 — Quote Visibility Service (Ca
     expect(quote?.providerId).toBe(companyAId)
   })
 
-  it('multi-company user: companyId=B sees B only', async () => {
+  it('multi-company user: WORKER at B cannot read B quote without assignment', async () => {
     const result = await resolveQuoteVisibility(prisma, { userId: multiCompanyUserId, jobId, companyId: companyBId })
-    expect(result.allowedQuoteIds.length).toBe(1)
+    expect(result.allowedQuoteIds).toEqual([])
 
     const quote = await prisma.jobQuote.findUnique({ where: { id: result.allowedQuoteIds[0] } })
     expect(quote?.providerId).toBe(companyBId)
