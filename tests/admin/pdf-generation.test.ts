@@ -146,6 +146,13 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
   })
 
   describe('Invoice PDF route', () => {
+    // Invoice PDFs now use the canonical CRM guard, not getSession directly.
+    // Make authorization decisions explicit so denied scenarios remain covered
+    // and PDF formatting assertions run with a correctly authorized context.
+    beforeEach(() => {
+      mockedGuard.mockResolvedValue(superGuard())
+    })
+
     const mockInvoice = {
       id: 'inv-1',
       invoiceNumber: 'INV-001',
@@ -168,17 +175,23 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
     }
 
     it('returns 401 for unauthenticated request', async () => {
-      vi.mocked(getSession).mockResolvedValue(null)
+      mockedGuard.mockResolvedValue({
+        ok: false,
+        response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+      })
       const req = makeRequest('http://localhost:3000/api/invoices/inv-1/pdf')
       const res = await invoiceGET(req, { params: Promise.resolve({ id: 'inv-1' }) })
       expect(res.status).toBe(401)
     })
 
     it('returns 403 for unauthorized branch access', async () => {
-      vi.mocked(getSession).mockResolvedValue({
-        id: 'user-1', email: 'user@test.com', role: 'STAFF', branchId: 'other-branch',
-      } as any)
+      // An authorized CRM session still cannot export another branch's invoice.
+      mockedGuard.mockResolvedValue(superGuard())
       vi.mocked(prisma.invoice.findUnique).mockResolvedValue(mockInvoice as any)
+      const resolveScope = await import('@/lib/reports/branch-scope')
+      vi.spyOn(resolveScope, 'resolveReportBranchScope').mockResolvedValueOnce({
+        ok: false, status: 403, error: 'Branch access denied',
+      } as any)
       const req = makeRequest('http://localhost:3000/api/invoices/inv-1/pdf')
       const res = await invoiceGET(req, { params: Promise.resolve({ id: 'inv-1' }) })
       expect(res.status).toBe(403)
