@@ -24,8 +24,8 @@ function mobileCountrySection(code: 'LK' | 'CA') {
   const marker = `    code: '${code}',`
   const start = mobileLocationSource.indexOf(marker)
   if (start < 0) throw new Error(`Mobile locations missing market ${code}`)
-  const nextCountry = mobileLocationSource.indexOf("\\n  {\\n    id: 'ca',", start + marker.length)
-  const end = code === 'LK' ? nextCountry : mobileLocationSource.indexOf("\\n]\\n\\nexport function getCountries", start)
+  const nextCountry = mobileLocationSource.indexOf("\n  {\n    id: 'ca',", start + marker.length)
+  const end = code === 'LK' ? nextCountry : mobileLocationSource.indexOf("\n]\n\nexport function getCountries", start)
   if (end < 0) throw new Error(`Mobile locations missing market boundary for ${code}`)
   return mobileLocationSource.slice(start, end)
 }
