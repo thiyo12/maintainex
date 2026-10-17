@@ -570,9 +570,12 @@ function configuredAreaMatches(
     .filter(Boolean)
   const hasDeclaredArea = configured.length > 0
 
-  // A historical record whose service address cannot be established keeps its
-  // existing behaviour in both markets.
-  if (!hasValidatedAddress) return true
+  // Older jobs may lack GPS coordinates but still have a canonical areaId.
+  // A known district/area must NEVER be ignored solely because GPS is missing:
+  // that previously matched a Colombo-only provider to Jaffna jobs.
+  // Truly unlocated legacy records (no GPS AND no areaId) keep their
+  // compatibility behavior; financial booking still requires a market.
+  if (!hasValidatedAddress && !areaId) return true
 
   if (!isCanada) {
     // Sri Lanka keeps its legacy fail-open coverage.
