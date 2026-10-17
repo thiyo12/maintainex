@@ -81,6 +81,7 @@ jobs:
             tests/security/phase07-job-detail-company-membership.test.ts \
             tests/security/phase07-company-quote-assignment-visibility.test.ts \
             tests/security/phase07-accepted-provider-coordinate-privacy.test.ts \
+            tests/security/phase07-company-commercial-history-access.test.ts \
             tests/matching/phase03-known-area-failclosed-contract.test.ts \
             tests/structural/deployment-safety.test.ts \
             tests/admin/pdf-generation.test.ts \
