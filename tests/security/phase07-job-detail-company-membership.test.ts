@@ -46,8 +46,10 @@ describe('Phase 07 — private job detail requires actual active company members
       { companyId: 'c1', role: 'COMPANY_OWNER' },
       { companyId: 'c1', role: 'COMPANY_OWNER' },
       { companyId: 'c2', role: 'MANAGER' },
+      { companyId: 'c3', role: 'DISPATCHER' },
+      { companyId: 'c4', role: 'WORKER' },
     ])
-    expect(await getReadableCompanyIds('manager')).toEqual(['c1', 'c2'])
+    expect(await getReadableCompanyIds('manager')).toEqual(['c1', 'c2', 'c3'])
   })
 
   it('excludes active workers with no quotes:read permission', async () => {

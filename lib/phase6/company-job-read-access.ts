@@ -10,7 +10,12 @@ export async function getReadableCompanyIds(userId: string): Promise<string[]> {
     select: { companyId: true, role: true },
   })
   return [...new Set(memberships
-    .filter(member => hasCompanyPermission(member.role as CompanyRole, 'quotes:read'))
+    // The legacy WORKER role carries generic quotes:read, but booking detail
+    // contains private customer and competing quote data. Workers access an
+    // actual assigned job through getActiveAssignedCompanyId, never all
+    // company jobs through the broad quote permission.
+    .filter(member => member.role !== 'WORKER' &&
+      hasCompanyPermission(member.role as CompanyRole, 'quotes:read'))
     .map(member => member.companyId))]
 }
 
