@@ -407,6 +407,32 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+      # Full regression files share an isolated PostgreSQL service and run
+      # concurrently. A mid-suite FK audit can observe another file's fixture
+      # between cleanup statements. Run the exact orphan checks again after
+      # all test-file cleanup has completed; unlike the historical baseline,
+      # this final audit is a blocking launch invariant.
+      - name: Final PostgreSQL orphan audit after regression cleanup (blocking)
+        if: always()
+        run: |
+          set -euo pipefail
+          [[ "$DATABASE_URL" == *'@localhost:5432/maintainex_test_phase07_ci' ]] || {
+            echo 'Refusing to audit an unexpected database'
+            exit 1
+          }
+          npx vitest run tests/integration/real-postgresql-integration.test.ts \
+            -t '4D.7 — FK/Orphan Audit' --reporter=verbose \
+            2>&1 | tee /tmp/phase11-final-postgres-orphan-audit.txt
+
+      - name: Upload final PostgreSQL orphan audit diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase11-final-postgres-orphan-audit-diagnostics
+          path: /tmp/phase11-final-postgres-orphan-audit.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Immutable deploy script safety
         shell: bash
         run: |
