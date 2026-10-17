@@ -37,3 +37,22 @@ export function isTaskerServiceAvailableInMarket(
     isCatalogAvailableInMarket(category.countries, market)
   )
 }
+
+
+/**
+ * Phase 01: direct BOOK_NOW uses the same market grants as public discovery.
+ * A live service ID cannot be booked across borders, nor priced in a foreign
+ * currency. A single priced TemplateJob cannot represent both LKR and CAD.
+ */
+export function isBookNowCatalogueAvailableInMarket(
+  job: { isActive: boolean; countries: string; currency: string },
+  category: { isActive: boolean; countries: string },
+  market: 'LK' | 'CA',
+): boolean {
+  const currency = market === 'LK' ? 'LKR' : 'CAD'
+  const otherMarket = market === 'LK' ? 'CA' : 'LK'
+  return job.isActive && category.isActive && job.currency === currency &&
+    isCatalogAvailableInMarket(job.countries, market) &&
+    !isCatalogAvailableInMarket(job.countries, otherMarket) &&
+    isCatalogAvailableInMarket(category.countries, market)
+}

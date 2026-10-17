@@ -6,6 +6,7 @@ import { createNotification } from '@/lib/notifications'
 import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 import { readStoredList } from '@/lib/db-utils'
 import { haversineKm } from '@/lib/distance'
+import { isBookNowCatalogueAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 
 export interface BookNowInput {
   customerId: string
@@ -132,6 +133,8 @@ export async function createBookNowJob(input: BookNowInput) {
       description: true,
       categoryId: true,
       isActive: true,
+      countries: true,
+      currency: true,
     },
   })
   if (!templateJob?.isActive) throw new Error('Template job not found or inactive')
@@ -142,12 +145,25 @@ export async function createBookNowJob(input: BookNowInput) {
     ? input.countryCode.toUpperCase()
     : ''
   if (!finalCountryCode) throw new Error('Booking country is required')
+  if (finalCountryCode !== 'LK' && finalCountryCode !== 'CA') {
+    throw new Error('Unsupported booking country')
+  }
+
+  const category = await prisma.jobCategory.findUnique({
+    where: { id: templateJob.categoryId },
+    select: { isActive: true, countries: true },
+  })
+  if (!category || !isBookNowCatalogueAvailableInMarket(templateJob, category, finalCountryCode)) {
+    throw new Error('Template job is not available in booking country')
+  }
 
   const linkedServiceTemplate = await prisma.serviceTemplate.findFirst({
     where: {
       templateJobId: templateJob.id,
       jobCategoryId: templateJob.categoryId,
       isActive: true,
+      countryCode: finalCountryCode,
+      currency: finalCountryCode === 'LK' ? 'LKR' : 'CAD',
     },
     select: { id: true },
   })
