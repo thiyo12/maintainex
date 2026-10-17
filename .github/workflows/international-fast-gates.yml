@@ -87,6 +87,7 @@ jobs:
             tests/catalog/phase01-job-creation-market-integrity.test.ts \
             tests/catalog/catalog-integrity.test.ts \
             tests/catalog/proposed-expansion.test.ts \
+            tests/domain/catalog-provider-associations.test.ts \
             tests/quotes/inspection-company-membership.test.ts \
             tests/security/phase07-company-change-order-read-access.test.ts \
             tests/security/phase07-company-change-order-staff-revocation.test.ts \

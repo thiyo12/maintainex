@@ -72,11 +72,12 @@ export async function collectProviderAssociations(
         categoryId: true,
         isActive: true,
         countries: true,
+        currency: true,
         _count: { select: { taskerSkills: true } },
       },
     }),
-    db.jobCategory.findMany({ select: { id: true, isActive: true } }),
-    db.taskerSkill.findMany({ select: { id: true, jobId: true, taskerId: true, currency: true } }),
+    db.jobCategory.findMany({ select: { id: true, isActive: true, countries: true } }),
+    db.taskerSkill.findMany({ select: { id: true, jobId: true, taskerId: true, currency: true, countryCode: true } }),
     db.taskerProfile.count(),
   ])
 
@@ -91,11 +92,48 @@ export async function collectProviderAssociations(
 
   const jobsWithNoProviders = jobs.filter(j => (providerLinksPerJob.get(j.id) ?? 0) === 0)
 
+  // Audit market-aligned associations separately from historical links.
+  // A retained link on an inactive proposed service, wrong-currency record,
+  // or out-of-market department cannot demonstrate launch service coverage.
+  // These are catalogue/link checks, NOT verification of the provider's live
+  // identity, service radius, schedule or actual availability.
+  const expectedCurrency = { LK: 'LKR', CA: 'CAD' } as const
+  const marketForJob = new Map<string, 'LK' | 'CA'>()
+  for (const job of jobs) {
+    const category = categoryById.get(job.categoryId)
+    if (!job.isActive || !category?.isActive) continue
+    for (const market of ['LK', 'CA'] as const) {
+      if (job.currency !== expectedCurrency[market]) continue
+      if (!isCatalogAvailableInMarket(job.countries, market)) continue
+      if (!isCatalogAvailableInMarket(category.countries, market)) continue
+      // One TemplateJob carries one currency, so a dual-market grant cannot
+      // safely prove a bookable priced job in both markets.
+      if (isCatalogAvailableInMarket(job.countries, market === 'LK' ? 'CA' : 'LK')) continue
+      marketForJob.set(job.id, market)
+    }
+  }
+  const marketCompatibleLinks = new Set<string>()
+  const staffedBookableJobs = new Set<string>()
+  for (const skill of skills) {
+    const market = marketForJob.get(skill.jobId)
+    if (!market || skill.countryCode !== market || skill.currency !== expectedCurrency[market]) continue
+    marketCompatibleLinks.add(skill.id)
+    staffedBookableJobs.add(skill.jobId)
+  }
+  const bookableUnstaffedJobIds = [...marketForJob.keys()].filter(id => !staffedBookableJobs.has(id))
+
   return {
     taskers: taskerCount,
     taskersWithCatalogueSkills: linkedTaskers.size,
     taskersWithoutCatalogueSkills: Math.max(0, taskerCount - linkedTaskers.size),
     providerSkillLinks: skills.length,
+    // These counters are market-aligned service associations only. They
+    // must not be labelled verified/available providers in a launch report.
+    bookableJobs: marketForJob.size,
+    bookableJobsWithMarketCompatibleLinks: staffedBookableJobs.size,
+    bookableJobsWithoutMarketCompatibleLinks: bookableUnstaffedJobIds.length,
+    marketCompatibleProviderLinks: marketCompatibleLinks.size,
+    topBookableUnstaffedJobs: bookableUnstaffedJobIds.slice(0, 25).map(id => ({ id, providerLinks: 0 })),
     jobsWithProviders: jobs.length - jobsWithNoProviders.length,
     jobsWithNoProviders: jobsWithNoProviders.length,
     /** Provider links that point at a template job that no longer exists. */

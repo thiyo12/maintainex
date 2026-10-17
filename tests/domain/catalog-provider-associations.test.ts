@@ -22,19 +22,19 @@ function fakeDb(overrides: {
   } as any
 }
 
-const category = (id: string, isActive = true) => ({ id, isActive })
+const category = (id: string, isActive = true) => ({ id, isActive, countries: '["LK","CA"]' })
 
 describe('provider association inventory', () => {
   it('counts provider links per job without exposing personal data', async () => {
     const db = fakeDb({
       jobs: [
-        { id: 'j1', categoryId: 'c1', isActive: true, countries: '["LK"]', _count: { taskerSkills: 2 } },
-        { id: 'j2', categoryId: 'c1', isActive: true, countries: '["LK"]', _count: { taskerSkills: 0 } },
+        { id: 'j1', categoryId: 'c1', isActive: true, countries: '["LK"]', currency: 'LKR', _count: { taskerSkills: 2 } },
+        { id: 'j2', categoryId: 'c1', isActive: true, countries: '["LK"]', currency: 'LKR', _count: { taskerSkills: 0 } },
       ],
       categories: [category('c1')],
       skills: [
-        { id: 's1', jobId: 'j1', taskerId: 't1', currency: 'LKR' },
-        { id: 's2', jobId: 'j1', taskerId: 't2', currency: 'LKR' },
+        { id: 's1', jobId: 'j1', taskerId: 't1', currency: 'LKR', countryCode: 'LK' },
+        { id: 's2', jobId: 'j1', taskerId: 't2', currency: 'LKR', countryCode: 'LK' },
       ],
       taskerCount: 2,
     })
@@ -52,7 +52,7 @@ describe('provider association inventory', () => {
 
   it('flags provider links pointing at a job that no longer exists', async () => {
     const db = fakeDb({
-      jobs: [{ id: 'j1', categoryId: 'c1', isActive: true, countries: '["LK"]', _count: { taskerSkills: 0 } }],
+      jobs: [{ id: 'j1', categoryId: 'c1', isActive: true, countries: '["LK"]', currency: 'LKR', _count: { taskerSkills: 0 } }],
       categories: [category('c1')],
       skills: [{ id: 's1', jobId: 'deleted-job', taskerId: 't1', currency: 'LKR' }],
       taskerCount: 1,
@@ -65,13 +65,13 @@ describe('provider association inventory', () => {
   it('flags links stranded by an inactive department or inactive job', async () => {
     const db = fakeDb({
       jobs: [
-        { id: 'j1', categoryId: 'c1', isActive: true, countries: '["LK"]', _count: { taskerSkills: 0 } },
-        { id: 'j2', categoryId: 'c2', isActive: false, countries: '["LK"]', _count: { taskerSkills: 0 } },
+        { id: 'j1', categoryId: 'c1', isActive: true, countries: '["LK"]', currency: 'LKR', _count: { taskerSkills: 0 } },
+        { id: 'j2', categoryId: 'c2', isActive: false, countries: '["LK"]', currency: 'LKR', _count: { taskerSkills: 0 } },
       ],
       categories: [category('c1'), category('c2', false)],
       skills: [
-        { id: 's1', jobId: 'j1', taskerId: 't1', currency: 'LKR' },
-        { id: 's2', jobId: 'j2', taskerId: 't2', currency: 'LKR' },
+        { id: 's1', jobId: 'j1', taskerId: 't1', currency: 'LKR', countryCode: 'LK' },
+        { id: 's2', jobId: 'j2', taskerId: 't2', currency: 'LKR', countryCode: 'LK' },
       ],
       taskerCount: 2,
     })
@@ -84,13 +84,13 @@ describe('provider association inventory', () => {
   it('flags provider rates priced in the wrong currency for the market', async () => {
     const db = fakeDb({
       jobs: [
-        { id: 'lk', categoryId: 'c1', isActive: true, countries: '["LK"]', _count: { taskerSkills: 0 } },
-        { id: 'ca', categoryId: 'c1', isActive: true, countries: '["CA"]', _count: { taskerSkills: 0 } },
+        { id: 'lk', categoryId: 'c1', isActive: true, countries: '["LK"]', currency: 'LKR', _count: { taskerSkills: 0 } },
+        { id: 'ca', categoryId: 'c1', isActive: true, countries: '["CA"]', currency: 'LKR', _count: { taskerSkills: 0 } },
       ],
       categories: [category('c1')],
       skills: [
-        { id: 's1', jobId: 'lk', taskerId: 't1', currency: 'CAD' },
-        { id: 's2', jobId: 'ca', taskerId: 't2', currency: 'CAD' },
+        { id: 's1', jobId: 'lk', taskerId: 't1', currency: 'CAD', countryCode: 'CA' },
+        { id: 's2', jobId: 'ca', taskerId: 't2', currency: 'CAD', countryCode: 'CA' },
       ],
       taskerCount: 2,
     })
@@ -113,9 +113,82 @@ describe('provider association inventory', () => {
     expect(Object.keys(result)).not.toContain('taskerIds')
   })
 
+
+  it('does not treat wrong-currency links as market-ready staff', async () => {
+    const db = fakeDb({
+      jobs: [
+        { id: 'lk', categoryId: 'c1', isActive: true, countries: '["LK"]', currency: 'LKR' },
+        { id: 'ca', categoryId: 'c1', isActive: true, countries: '["CA"]', currency: 'CAD' },
+      ],
+      categories: [category('c1')],
+      skills: [
+        { id: 'wrong', jobId: 'lk', taskerId: 't1', currency: 'CAD', countryCode: 'LK' },
+        { id: 'wrong-country', jobId: 'ca', taskerId: 't2', currency: 'CAD', countryCode: 'LK' },
+      ],
+      taskerCount: 2,
+    })
+    const result = await collectProviderAssociations(db)
+    expect(result.jobsWithProviders).toBe(2) // historical links remain counted
+    expect(result.bookableJobs).toBe(2)
+    expect(result.bookableJobsWithMarketCompatibleLinks).toBe(0)
+    expect(result.bookableJobsWithoutMarketCompatibleLinks).toBe(2)
+    expect(result.marketCompatibleProviderLinks).toBe(0)
+  })
+
+  it('excludes inactive proposed services and inactive departments from launch staffing claims', async () => {
+    const db = fakeDb({
+      jobs: [
+        { id: 'draft', categoryId: 'c1', isActive: false, countries: '["LK"]', currency: 'LKR' },
+        { id: 'retired', categoryId: 'c2', isActive: true, countries: '["LK"]', currency: 'LKR' },
+        { id: 'live', categoryId: 'c1', isActive: true, countries: '["LK"]', currency: 'LKR' },
+      ],
+      categories: [category('c1'), category('c2', false)],
+      skills: [
+        { id: 'one', jobId: 'draft', taskerId: 't1', currency: 'LKR', countryCode: 'LK' },
+        { id: 'two', jobId: 'retired', taskerId: 't1', currency: 'LKR', countryCode: 'LK' },
+      ],
+      taskerCount: 1,
+    })
+    const r = await collectProviderAssociations(db)
+    expect(r.jobsWithProviders).toBe(2) // historical relationship preserved
+    expect(r.bookableJobs).toBe(1)
+    expect(r.bookableJobsWithMarketCompatibleLinks).toBe(0)
+    expect(r.topBookableUnstaffedJobs).toEqual([{ id: 'live', providerLinks: 0 }])
+  })
+
+  it('counts only exact market and currency matched links for a bookable service', async () => {
+    const db = fakeDb({
+      jobs: [{ id: 'ca', categoryId: 'c', isActive: true, countries: '["CA"]', currency: 'CAD' }],
+      categories: [category('c')],
+      skills: [
+        { id: 'ok', jobId: 'ca', taskerId: 't1', currency: 'CAD', countryCode: 'CA' },
+        { id: 'incorrect', jobId: 'ca', taskerId: 't2', currency: 'LKR', countryCode: 'CA' },
+      ],
+      taskerCount: 2,
+    })
+    const r = await collectProviderAssociations(db)
+    expect(r.bookableJobsWithMarketCompatibleLinks).toBe(1)
+    expect(r.marketCompatibleProviderLinks).toBe(1)
+    expect(r.bookableJobsWithoutMarketCompatibleLinks).toBe(0)
+  })
+
+  it('does not mistake invalid or dual-market catalogue grants for independently priced coverage', async () => {
+    const db = fakeDb({
+      jobs: [
+        { id: 'invalid', categoryId: 'c', isActive: true, countries: 'not-json', currency: 'LKR' },
+        { id: 'cross-market', categoryId: 'c', isActive: true, countries: '["LK","CA"]', currency: 'LKR' },
+      ],
+      categories: [category('c')],
+      skills: [],
+    })
+    const r = await collectProviderAssociations(db)
+    expect(r.bookableJobs).toBe(0)
+    expect(r.marketCompatibleProviderLinks).toBe(0)
+  })
+
   it('performs no database mutation', async () => {
     const db = fakeDb({
-      jobs: [{ id: 'j1', categoryId: 'c1', isActive: true, countries: '["LK"]', _count: { taskerSkills: 1 } }],
+      jobs: [{ id: 'j1', categoryId: 'c1', isActive: true, countries: '["LK"]', currency: 'LKR', _count: { taskerSkills: 1 } }],
       categories: [category('c1')],
       skills: [{ id: 's1', jobId: 'j1', taskerId: 't1', currency: 'LKR' }],
       taskerCount: 1,
