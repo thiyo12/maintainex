@@ -16,8 +16,6 @@ async function getVerifiedTaskerPublicIdentity(userId: string) {
     where: { userId },
     select: {
       id: true,
-      latitude: true,
-      longitude: true,
       rating: true,
       completedJobs: true,
       isVerified: true,
@@ -220,7 +218,7 @@ export async function GET(
       } else {
         const company = await prisma.companyProfile.findUnique({
           where: { id: acceptedQuote.providerId },
-          select: { id: true, userId: true, companyName: true, logo: true, rating: true, latitude: true, longitude: true },
+          select: { id: true, userId: true, companyName: true, logo: true, rating: true },
         })
         if (company) {
           acceptedProvider = {
@@ -229,8 +227,6 @@ export async function GET(
             name: company.companyName,
             profileImage: company.logo,
             rating: company.rating,
-            latitude: company.latitude,
-            longitude: company.longitude,
           }
         }
       }
