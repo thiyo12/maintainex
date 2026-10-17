@@ -86,6 +86,7 @@ jobs:
             tests/security/phase07-company-inspection-read-access.test.ts \
             tests/catalog/phase01-job-creation-market-integrity.test.ts \
             tests/catalog/catalog-integrity.test.ts \
+            tests/domain/catalog-inventory.test.ts \
             tests/catalog/proposed-expansion.test.ts \
             tests/domain/catalog-provider-associations.test.ts \
             tests/geography/phase02-incomplete-coordinate-market.test.ts \

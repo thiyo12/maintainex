@@ -15,19 +15,32 @@ export async function collectCatalogInventory(db: Pick<PrismaClient, 'jobCategor
   const categoryIds = new Set(categories.map(c => c.id))
   const jobIds = new Set(jobs.map(j => j.id))
   const categoryById = new Map(categories.map(c => [c.id, c]))
-  const markets = (['LK', 'CA'] as const).map(countryCode => ({
-    countryCode,
-    activeCategories: categories.filter(c => c.isActive && isCatalogAvailableInMarket(c.countries, countryCode)).length,
-    activeJobs: jobs.filter(j => j.isActive && isCatalogAvailableInMarket(j.countries, countryCode) &&
+  const markets = (['LK', 'CA'] as const).map(countryCode => {
+    const expectedCurrency = countryCode === 'LK' ? 'LKR' : 'CAD'
+    const otherMarket = countryCode === 'LK' ? 'CA' : 'LK'
+    // A TemplateJob has only one price/currency. A dual-market grant is NOT
+    // usable in either market until independently priced variants exist.
+    const bookableJobs = jobs.filter(j =>
+      j.isActive && j.currency === expectedCurrency &&
+      isCatalogAvailableInMarket(j.countries, countryCode) &&
+      !isCatalogAvailableInMarket(j.countries, otherMarket) &&
       !!categoryById.get(j.categoryId)?.isActive &&
-      isCatalogAvailableInMarket(categoryById.get(j.categoryId)!.countries, countryCode)).length,
-    activeServiceTemplates: templates.filter(t => t.isActive && t.countryCode === countryCode &&
-      t.currency === (countryCode === 'LK' ? 'LKR' : 'CAD') &&
-      !!categoryById.get(t.jobCategoryId)?.isActive &&
-      isCatalogAvailableInMarket(categoryById.get(t.jobCategoryId)!.countries, countryCode) &&
-      (!t.templateJobId || jobs.some(j => j.id === t.templateJobId && j.categoryId === t.jobCategoryId &&
-        j.isActive && isCatalogAvailableInMarket(j.countries, countryCode)))).length,
-  }))
+      isCatalogAvailableInMarket(categoryById.get(j.categoryId)!.countries, countryCode)
+    )
+    return {
+      countryCode,
+      activeCategories: categories.filter(c => c.isActive && isCatalogAvailableInMarket(c.countries, countryCode)).length,
+      // Only count the jobs a customer may actually book at this market's
+      // native price; invalid grants and stale cross-market rows are excluded.
+      activeJobs: bookableJobs.length,
+      activeServiceTemplates: templates.filter(t => t.isActive && t.countryCode === countryCode &&
+        t.currency === expectedCurrency &&
+        !!categoryById.get(t.jobCategoryId)?.isActive &&
+        isCatalogAvailableInMarket(categoryById.get(t.jobCategoryId)!.countries, countryCode) &&
+        (!t.templateJobId || bookableJobs.some(j =>
+          j.id === t.templateJobId && j.categoryId === t.jobCategoryId))).length,
+    }
+  })
   return {
     categories: categories.length,
     jobs: jobs.length,
