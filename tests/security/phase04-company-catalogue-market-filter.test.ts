@@ -85,6 +85,35 @@ describe('Phase 04 — onboarding catalogue filters each canonical service by ma
     expect(mock.findMany).not.toHaveBeenCalled()
   })
 
+  it('omits departments with no active CA/CAD services', async () => {
+    mock.findMany.mockResolvedValue([{
+      ...category, jobs: [{ ...job, countries: '["LK"]', currency: 'LKR' }],
+    }])
+    const response = await catalogue('CA')
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual([])
+  })
+
+  it('omits departments with no active LK/LKR services', async () => {
+    mock.findMany.mockResolvedValue([{
+      ...category, jobs: [{ ...job, countries: '["CA"]', currency: 'CAD' }],
+    }])
+    const response = await catalogue('LK')
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual([])
+  })
+
+  it('preserves departments that retain any eligible service in the market', async () => {
+    mock.findMany.mockResolvedValue([{
+      ...category, jobs: [
+        { ...job, id: 'lk', countries: '["LK"]', currency: 'LKR' },
+        { ...job, id: 'ca', countries: '["CA"]', currency: 'CAD' },
+      ],
+    }])
+    const response = await catalogue('CA')
+    expect((await response.json())[0].jobs.map((j: { id: string }) => j.id)).toEqual(['ca'])
+  })
+
   it('keeps market-scoped parent categories unchanged', async () => {
     mock.findMany.mockResolvedValue([{
       ...category,

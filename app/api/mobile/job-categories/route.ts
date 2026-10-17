@@ -32,7 +32,18 @@ export async function GET(request: NextRequest) {
       orderBy: { sortOrder: 'asc' },
     })
 
-    const categories = allCategories.filter(c => storedListIncludes(c.countries, country))
+    // A country grant on a department does not prove any service is bookable
+    // there. Keep mobile discovery aligned with the canonical public catalogue:
+    // hide departments whose active jobs have no matching market/currency.
+    const categories = allCategories
+      .filter(c => storedListIncludes(c.countries, country))
+      .map(c => ({
+        ...c,
+        jobs: c.jobs.filter(j =>
+          storedListIncludes(j.countries, country) && j.currency === expectedCurrency
+        ),
+      }))
+      .filter(c => c.jobs.length > 0)
 
     return NextResponse.json(categories.map(c => ({
       id: c.id,
@@ -43,11 +54,7 @@ export async function GET(request: NextRequest) {
       sortOrder: c.sortOrder,
       countries: safeParseJsonArr(c.countries),
       isActive: c.isActive,
-      jobs: c.jobs
-        .filter(j =>
-          storedListIncludes(j.countries, country) && j.currency === expectedCurrency
-        )
-        .map(j => ({
+      jobs: c.jobs.map(j => ({
         id: j.id,
         categoryId: j.categoryId,
         name: j.name,
