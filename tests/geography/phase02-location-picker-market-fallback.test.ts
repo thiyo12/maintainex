@@ -106,6 +106,31 @@ describe('Phase 02 — launch locations stay scoped during normal and fallback r
     expect(body.countries.map((c: { code: string }) => c.code)).toEqual(['CA'])
   })
 
+  it('normalizes lowercase database market codes without duplicating fallback countries', async () => {
+    mock.findCountries.mockResolvedValue([
+      { id: 'ca-db', code: 'ca', name: 'Canada', states: [
+        { name: 'British Columbia', cities: [{ name: 'Vancouver', areas: [] }] },
+      ] },
+    ])
+    const { body } = await locations()
+    expect(body.countries.map((c: { code: string }) => c.code).sort()).toEqual(['CA', 'LK'])
+    expect(body.countries.filter((c: { code: string }) => c.code === 'CA')).toHaveLength(1)
+    expect(body.countries.find((c: { code: string }) => c.code === 'CA')).toMatchObject({
+      id: 'ca-db', _source: 'database',
+    })
+  })
+
+  it('normalizes padded database market codes in the launch address response', async () => {
+    mock.findCountries.mockResolvedValue([
+      { id: 'lk-db', code: ' lk ', name: 'Sri Lanka', states: [] },
+    ])
+    const { body } = await locations()
+    expect(body.countries.map((c: { code: string }) => c.code).sort()).toEqual(['CA', 'LK'])
+    expect(body.countries.find((c: { code: string }) => c.code === 'LK')).toMatchObject({
+      id: 'lk-db', _source: 'database',
+    })
+  })
+
   it('never exposes countries outside the two launch markets from the DB', async () => {
     mock.findCountries.mockResolvedValue([
       { id: 'us', name: 'United States', code: 'US', states: [{ name: 'New York', cities: [{ name: 'New York', areas: [] }] }] },

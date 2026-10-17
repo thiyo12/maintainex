@@ -30,13 +30,19 @@ export async function GET() {
       },
     })
 
-    const databaseCodes = new Set(databaseCountries.map(country => country.code))
+    // Historical country rows sometimes contain lowercase codes. Treat those
+    // as the same market for fallback deduplication and output canonical IDs.
+    const databaseCodes = new Set(databaseCountries.map(country => country.code.trim().toUpperCase()))
     const fallbackCountries = getCountries()
-      .filter(country => !databaseCodes.has(country.code))
+      .filter(country => !databaseCodes.has(country.code.trim().toUpperCase()))
       .map(country => ({ ...country, _source: 'static-fallback' as const }))
 
     const countries = [
-      ...databaseCountries.map(country => ({ ...country, _source: 'database' as const })),
+      ...databaseCountries.map(country => ({
+        ...country,
+        code: country.code.trim().toUpperCase(),
+        _source: 'database' as const,
+      })),
       ...fallbackCountries,
     ]
       // Historical database/fallback rows may still contain Toronto and other
