@@ -1,9 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import {
-  currencyForJobCountry, parseCounterofferAmount, quoteMatchesJobCurrency,
-} from '../../apps/mobile/lib/market-currency'
+import { transpileModule, ScriptTarget, ModuleKind } from 'typescript'
+import { runInNewContext } from 'node:vm'
+
+// This web-root Vitest runner intentionally does not install Expo dependencies.
+// Compile this pure mobile TS helper directly instead of making Vite parse
+// apps/mobile/tsconfig.json (which extends expo/tsconfig.base).
+const moneySource = readFileSync(resolve(process.cwd(),
+  'apps/mobile/lib/market-currency.ts'), 'utf8')
+const moduleExports: Record<string, any> = {}
+const compiled = transpileModule(moneySource, {
+  compilerOptions: { target: ScriptTarget.ES2020, module: ModuleKind.CommonJS },
+}).outputText
+runInNewContext(compiled, { exports: moduleExports })
+const { currencyForJobCountry, parseCounterofferAmount, quoteMatchesJobCurrency } =
+  moduleExports as {
+    currencyForJobCountry: (country: string | undefined) => 'LKR' | 'CAD' | null
+    parseCounterofferAmount: (price: string) => number | null
+    quoteMatchesJobCurrency: (country: string, currency: string | undefined) => boolean
+  }
 
 const source = readFileSync(resolve(process.cwd(),
   'apps/mobile/features/jobs/screens/customer/v2/[id].tsx'), 'utf8')
