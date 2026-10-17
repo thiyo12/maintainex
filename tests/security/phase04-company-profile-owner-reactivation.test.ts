@@ -49,7 +49,7 @@ describe('Phase 04 — company profile edits cannot reactivate or promote owner 
   beforeEach(() => {
     vi.resetAllMocks()
     mocks.existingMembership = null
-    mocks.profileFindUnique.mockResolvedValue({ id: 'company' })
+    mocks.profileFindUnique.mockResolvedValue({ id: 'company', countryCode: 'LK' })
     mocks.memberFindFirst.mockImplementation(async () => mocks.existingMembership)
     mocks.profileUpdate.mockResolvedValue({ id: 'company', companyName: 'Updated' })
     mocks.resolveContext.mockResolvedValue({

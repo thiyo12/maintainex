@@ -74,6 +74,8 @@ jobs:
           npx vitest run \
             tests/auth/work-start-auth.test.ts \
             tests/security/phase07-company-work-start-authorization.test.ts \
+            tests/security/phase04-company-profile-market-write.test.ts \
+            tests/security/phase04-company-profile-owner-reactivation.test.ts \
             tests/security/phase11-inactive-company-owner-matching.test.ts \
             tests/regions/phase11-provider-coverage-audit-contract.test.ts \
             --reporter=verbose
