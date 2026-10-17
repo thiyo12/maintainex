@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { useRouter } from 'expo-router'
 import {
   ActivityIndicator, Alert, Linking, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
@@ -27,6 +28,8 @@ export default function JobSafetyCentre({
   jobId: string
   countryCode?: string
 }) {
+  const router = useRouter()
+  const exited = useRef(false)
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState<Reason>('SAFETY_UNSAFE_WORK')
   const [description, setDescription] = useState('')
@@ -51,7 +54,19 @@ export default function JobSafetyCentre({
     }
   }
 
+  const quickExit = () => {
+    // Leave the job screen immediately without an Alert or confirmation.
+    // Clear local sensitive content, never remove an already-sent staff report.
+    exited.current = true
+    setOpen(false)
+    setDescription('')
+    setReference(null)
+    setReason('SAFETY_UNSAFE_WORK')
+    router.replace('/')
+  }
+
   const report = async () => {
+    exited.current = false
     const detail = description.trim()
     if (detail.length < 10 || detail.length > 2000) {
       Alert.alert('Details needed', 'Describe the safety issue in 10–2000 characters.')
@@ -62,16 +77,20 @@ export default function JobSafetyCentre({
       const response = await v2JobActions.reportSafety(jobId, {
         reason, description: detail,
       })
-      setReference(response.reportId)
-      setDescription('')
-      setOpen(false)
-      Alert.alert(
-        'Report recorded',
-        'Staff can review your report. This is not emergency dispatch and does not automatically change a payment.',
-      )
+      if (!exited.current) {
+        setReference(response.reportId)
+        setDescription('')
+        setOpen(false)
+        Alert.alert(
+          'Report recorded',
+          'Staff can review your report. This is not emergency dispatch and does not automatically change a payment.',
+        )
+      }
     } catch (error: any) {
-      Alert.alert('Could not record report', error?.message ||
-        'Check your connection. In immediate danger, call emergency services.')
+      if (!exited.current) {
+        Alert.alert('Could not record report', error?.message ||
+          'Check your connection. In immediate danger, call emergency services.')
+      }
     } finally {
       setSending(false)
     }
@@ -87,6 +106,17 @@ export default function JobSafetyCentre({
         <Text style={styles.headline}>{open ? 'Close Safety Centre' : 'Safety Centre — report danger or get help'}</Text>
       </TouchableOpacity>
       {reference ? <Text style={styles.note}>Recorded reference: {reference}</Text> : null}
+      {open ? (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Quick exit Safety Centre"
+          accessibilityHint="Clears unsent details and leaves this screen without a confirmation"
+          onPress={quickExit}
+          style={styles.quickExit}
+        >
+          <Text style={styles.quickExitLabel}>Quick exit — return to home</Text>
+        </TouchableOpacity>
+      ) : null}
       {open ? (
         <View style={styles.content}>
           <Text style={styles.important}>If you are in immediate danger, leave if safe and call emergency services.</Text>
@@ -162,4 +192,6 @@ const styles = StyleSheet.create({
   send: { backgroundColor: v3.colors.ink, borderRadius: 8, alignItems: 'center', justifyContent: 'center', minHeight: 48 },
   sendLabel: { color: v3.colors.paper, fontSize: 14, fontWeight: '700' },
   dismiss: { paddingVertical: 8, alignItems: 'center' },
+  quickExit: { backgroundColor: v3.colors.line, paddingVertical: 12, paddingHorizontal: 10, borderRadius: 8, marginTop: 4 },
+  quickExitLabel: { color: v3.colors.ink, fontWeight: '700', textAlign: 'center' },
 })
