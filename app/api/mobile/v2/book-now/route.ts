@@ -60,6 +60,16 @@ export async function POST(request: NextRequest) {
 
     const requestedCountryCode = market.countryCode
 
+    // A valid coordinate market must not be combined with an arbitrary district
+    // supplied by the client. All 25 named LK districts are supported; CA is
+    // the Vancouver municipality only. Persist the canonical district label.
+    if (!market.district) {
+      return NextResponse.json({
+        error: 'District does not match the verified service address market',
+        code: 'SERVICE_DISTRICT_MISMATCH',
+      }, { status: 400 })
+    }
+
     if (user.countryCode && requestedCountryCode !== user.countryCode.toUpperCase()) {
       return NextResponse.json({
         error: 'Country mismatch: you cannot create jobs in a different country',
@@ -75,7 +85,7 @@ export async function POST(request: NextRequest) {
       scheduledDate,
       timeSlot: normalizedTimeSlot,
       address: String(address).trim(),
-      district: String(district).trim(),
+      district: market.district,
       notes: typeof notes === 'string' ? notes.slice(0, 5000) : undefined,
       latitude: typeof latitude === 'number' ? latitude : undefined,
       longitude: typeof longitude === 'number' ? longitude : undefined,
