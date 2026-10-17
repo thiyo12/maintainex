@@ -138,4 +138,38 @@ describe('Phase 07 safety intake never mutates financial disputes', () => {
     expect(source).not.toContain('releaseEscrow(')
     expect(source).toContain("targetTable: 'MarketplaceJob'")
   })
+  it('wires customer, individual-provider and assigned-worker safety entry points', () => {
+    const files = [
+      'apps/mobile/features/jobs/screens/customer/v2/[id].tsx',
+      'apps/mobile/features/jobs/screens/tasker/v2/manage/[id].tsx',
+      'apps/mobile/features/company/screens/workforce/assignment/[id].tsx',
+    ]
+    for (const path of files) {
+      const src = readFileSync(resolve(process.cwd(), path), 'utf8')
+      expect(src).toContain('JobSafetyCentre')
+    }
+    const worker = readFileSync(resolve(process.cwd(),
+      'apps/mobile/features/company/screens/workforce/assignment/[id].tsx'), 'utf8')
+    expect(worker).toContain('assignment.capabilities?.isAssignedWorker')
+  })
+
+  it('makes emergency dialling optional and does not promise automatic response', () => {
+    const src = readFileSync(resolve(process.cwd(),
+      'apps/mobile/features/safety/components/JobSafetyCentre.tsx'), 'utf8')
+    expect(src).toContain("Linking.openURL('tel:' + number)")
+    expect(src).toContain("number: '911'")
+    expect(src).toContain("number: '119'")
+    expect(src).toContain("number: '1990'")
+    expect(src).toContain('cannot dispatch responders')
+    expect(src).toContain('Close without reporting')
+    expect(src).toContain('does not automatically change a payment.')
+  })
+
+  it('uses the new safety route, not the escrow dispute operation', () => {
+    const client = readFileSync(resolve(process.cwd(),
+      'apps/mobile/api/v2-jobs.ts'), 'utf8')
+    expect(client).toContain('reportSafety: (jobId: string')
+    expect(client).toContain('/safety-report')
+    expect(client).toContain('dispute: (jobId: string')
+  })
 })
