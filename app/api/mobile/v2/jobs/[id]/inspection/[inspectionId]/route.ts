@@ -5,6 +5,7 @@ import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/mark
 import { transitionInspection, completeInspection, scheduleInspection, verifyInspectionArrival } from '@/lib/domain/inspection'
 import { notifyInspectionArrived, notifyInspectionCompleted } from '@/lib/notifications'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { getReadableCompanyIds, getActiveAssignedCompanyId } from '@/lib/phase6/company-job-read-access'
 
 export async function PATCH(
   request: NextRequest,
@@ -185,8 +186,40 @@ export async function GET(
   try {
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { id: jobId, inspectionId } = await params
+
+    // Read ownership metadata first. Do not load notes or evidence until
+    // this exact job's user/assignment permissions have been verified.
+    const inspectionAccess = await prisma.jobInspection.findUnique({
+      where: { id: inspectionId },
+      select: {
+        jobId: true,
+        taskerId: true,
+        companyId: true,
+        job: { select: { customerId: true } },
+      },
+    })
+    if (!inspectionAccess || inspectionAccess.jobId !== jobId) {
+      return NextResponse.json({ error: 'Inspection not found for this job' }, { status: 404 })
+    }
+
+    let authorized =
+      inspectionAccess.job.customerId === user.id ||
+      inspectionAccess.taskerId === user.id
+    if (!authorized && inspectionAccess.companyId) {
+      // Legacy jobs:read includes WORKER. Only current company managers
+      // and active workers assigned to this job may read inspection evidence.
+      const managedCompanyIds = await getReadableCompanyIds(user.id)
+      authorized = managedCompanyIds.includes(inspectionAccess.companyId)
+      if (!authorized) {
+        const assignedCompanyId = await getActiveAssignedCompanyId(jobId, user.id)
+        authorized = assignedCompanyId === inspectionAccess.companyId
+      }
+    }
+    if (!authorized) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const inspection = await prisma.jobInspection.findUnique({
       where: { id: inspectionId },
@@ -195,20 +228,9 @@ export async function GET(
         job: { select: { customerId: true } },
       },
     })
-
     if (!inspection || inspection.jobId !== jobId) {
       return NextResponse.json({ error: 'Inspection not found for this job' }, { status: 404 })
     }
-
-    let authorized = inspection.job.customerId === user.id || inspection.taskerId === user.id
-    if (!authorized && inspection.companyId) {
-      const { context } = await resolveCompanyContext(user.id, inspection.companyId, 'jobs:read')
-      authorized = Boolean(context)
-    }
-    if (!authorized) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
     return NextResponse.json({ inspection })
   } catch (error) {
     secureConsole.error('Get inspection error:', error)
