@@ -280,6 +280,16 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
   })
 
   describe('Reports PDF route', () => {
+    // The report endpoint requires a country-scoped branch decision before
+    // stats queries. Always give authorized tests the same explicit scoped
+    // result that resolveReportBranchScope returns in production.
+    beforeEach(() => {
+      vi.mocked(resolveReportBranchScope).mockResolvedValue({
+        ok: true,
+        scope: { branchIds: null, branchId: null, branchCountryFilter: {} },
+      })
+    })
+
     it('returns 401 for unauthenticated request', async () => {
       mockedGuard.mockResolvedValue({
         ok: false,
