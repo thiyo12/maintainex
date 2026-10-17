@@ -14,6 +14,7 @@ import {
   notifyChangeOrderSubmitted,
 } from '@/lib/notifications'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { getReadableCompanyIds, getActiveAssignedCompanyId } from '@/lib/phase6/company-job-read-access'
 
 export async function PATCH(
   request: NextRequest,
@@ -146,6 +147,8 @@ export async function GET(
   try {
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { id: jobId, changeOrderId } = await params
 
@@ -168,8 +171,16 @@ export async function GET(
     })
     let isProvider = acceptedQuote?.providerType === 'INDIVIDUAL' && acceptedQuote.providerId === user.id
     if (!isProvider && acceptedQuote?.providerType === 'COMPANY') {
-      const { context } = await resolveCompanyContext(user.id, acceptedQuote.providerId, 'quotes:read')
-      isProvider = Boolean(context)
+      // The generic legacy quotes:read capability includes WORKER. Keep
+      // financial change-order detail private unless this staff member is
+      // authorized management or a currently assigned worker on this job.
+      const companyIds = await getReadableCompanyIds(user.id)
+      if (companyIds.includes(acceptedQuote.providerId)) {
+        isProvider = true
+      } else {
+        const assignedCompanyId = await getActiveAssignedCompanyId(jobId, user.id)
+        isProvider = assignedCompanyId === acceptedQuote.providerId
+      }
     }
     if (job.customerId !== user.id && !isProvider) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
