@@ -84,7 +84,7 @@ export type IntegrityViolation = {
     | 'JOB_UNSUPPORTED_CURRENCY'
     | 'JOB_CURRENCY_MARKET_MISMATCH'
     | 'JOB_UNSUPPORTED_COUNTRY'
-    | 'INACTIVE_JOB_IN_ACTIVE_CATEGORY'
+    | 'JOB_COUNTRY_OUTSIDE_CATEGORY'
   entity: string
   detail: string
 }
@@ -228,6 +228,16 @@ export function validateCatalogueIntegrity(
           })
         }
       }
+      const parentCountries = parseCountryList(category.countries)
+      for (const country of jobCountries) {
+        if (!parentCountries.includes(country)) {
+          violations.push({
+            code: 'JOB_COUNTRY_OUTSIDE_CATEGORY',
+            entity: job.id,
+            detail: `Service "${job.name}" claims ${country} outside department "${category.name}" market scope`,
+          })
+        }
+      }
       // A service must not advertise a market whose currency it does not price in.
       if (
         (jobCountries.includes('LK') && currency !== 'LKR') ||
@@ -241,17 +251,9 @@ export function validateCatalogueIntegrity(
       }
     }
 
-    if (
-      job.isActive === false &&
-      category.isActive !== false &&
-      jobCountries.length > 0
-    ) {
-      violations.push({
-        code: 'INACTIVE_JOB_IN_ACTIVE_CATEGORY',
-        entity: job.id,
-        detail: `Service "${job.name}" is inactive inside an active department`,
-      })
-    }
+    // Inactive proposed services intentionally coexist with existing active
+    // departments. They are hidden from discovery until explicitly approved.
+    // This is a safe staging state, not a catalogue integrity violation.
   }
 
   return violations
@@ -277,6 +279,7 @@ export function summariseCatalogueCoverage(
   jobs: CatalogueJob[],
 ): CatalogueCoverage {
   const activeCategories = categories.filter(category => category.isActive !== false)
+  const categoryById = new Map(categories.map(category => [category.id, category]))
   const byMarket: CatalogueCoverage['byMarket'] = {}
 
   for (const category of categories) {
@@ -286,14 +289,23 @@ export function summariseCatalogueCoverage(
     }
   }
   for (const job of jobs) {
-    if (job.isActive === false) continue
+    const parent = categoryById.get(job.categoryId)
+    if (job.isActive === false || !parent || parent.isActive === false) continue
     for (const country of parseCountryList(job.countries)) {
+      if (!parseCountryList(parent.countries).includes(country)) continue
+      if (country === 'LK' && job.currency !== 'LKR') continue
+      if (country === 'CA' && job.currency !== 'CAD') continue
       byMarket[country] = byMarket[country] || { departments: 0, serviceJobs: 0 }
       byMarket[country].serviceJobs += 1
     }
   }
 
-  const serviceJobs = jobs.filter(job => job.isActive !== false).length
+  // An active orphan or a service under an inactive department is not live
+  // marketplace coverage, even when it is still retained for history.
+  const serviceJobs = jobs.filter(job =>
+    job.isActive !== false && categoryById.get(job.categoryId)?.isActive !== false &&
+    categoryById.has(job.categoryId)
+  ).length
   const departments = activeCategories.length
 
   return {

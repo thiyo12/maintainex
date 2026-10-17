@@ -19,6 +19,7 @@ import {
   PROPOSED_DEPARTMENTS,
   PROPOSED_SERVICES,
   buildProposedImportRows,
+  getSafeProposedImportPricing,
 } from '../lib/catalog/proposed-expansion'
 
 const prisma = new PrismaClient()
@@ -73,6 +74,14 @@ async function main() {
   const rows = buildProposedImportRows(PROPOSED_SERVICES)
 
   for (const row of rows) {
+    const importPricing = getSafeProposedImportPricing(row)
+    if (!importPricing) {
+      // Keep this service in the 309-item review dataset. Do not invent CAD
+      // prices or create CA/LKR rows that could later be activated by mistake.
+      servicesSkipped += 1
+      console.log(`[proposed-catalogue] awaiting independently approved market price: ${row.name}`)
+      continue
+    }
     const category = await resolveCategory(row.department)
     if (!category) {
       servicesSkipped += 1
@@ -95,12 +104,12 @@ async function main() {
         description: row.description,
         whatIsIncluded: row.whatIsIncluded.join('\n'),
         typicalDurationMinutes: row.typicalDurationMinutes,
-        // Canadian pricing is never fabricated: CA entries are stored without a
-        // price band so no unverified benchmark reaches the catalogue.
-        priceMin: row.priceLKR?.min ?? 0,
-        priceMax: row.priceLKR?.max ?? 0,
-        currency: 'LKR',
-        countries: JSON.stringify(row.markets),
+        // Persist only the LKR/LK staging grant. Vancouver needs separate
+        // independently priced CAD records after explicit approval.
+        priceMin: importPricing.priceMin,
+        priceMax: importPricing.priceMax,
+        currency: importPricing.currency,
+        countries: importPricing.countries,
         isCompanyOnly: row.isCompanyOnly,
         // Always inactive until the catalogue is approved.
         isActive: false,

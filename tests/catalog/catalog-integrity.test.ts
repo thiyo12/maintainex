@@ -132,18 +132,46 @@ describe('catalogue integrity validators', () => {
     expect(violations.map(v => v.code)).toContain('JOB_CURRENCY_MARKET_MISMATCH')
   })
 
-  it('flags inactive services left inside an active department', () => {
-    const violations = validateCatalogueIntegrity([category()], [job({ isActive: false })])
-    expect(violations.map(v => v.code)).toContain('INACTIVE_JOB_IN_ACTIVE_CATEGORY')
+  it('allows pending inactive proposed services in a live department without activating them', () => {
+    expect(validateCatalogueIntegrity([category()], [job({ isActive: false })])).toEqual([])
+    expect(summariseCatalogueCoverage([category()], [job({ isActive: false })]).serviceJobs).toBe(0)
   })
 
   it('accepts JSON-encoded market assignments as seeded', () => {
     expect(
       validateCatalogueIntegrity(
-        [category({ countries: '["LK"]' })],
+        [category({ countries: '["LK","CA"]' })],
         [job({ countries: '["LK"]' }), job({ id: 'job-ca', name: 'Vancouver Clean', categoryId: 'cat-1', countries: '["CA"]', currency: 'CAD' })],
       ),
     ).toEqual([])
+  })
+
+  it('rejects a service offered in a market missing from its parent category', () => {
+    const issues = validateCatalogueIntegrity([category({ countries: '["LK"]' })], [
+      job({ countries: '["CA"]', currency: 'CAD' }),
+    ])
+    expect(issues.map(issue => issue.code)).toContain('JOB_COUNTRY_OUTSIDE_CATEGORY')
+  })
+
+  it('does not count orphan jobs or services in inactive departments as active coverage', () => {
+    const coverage = summariseCatalogueCoverage([
+      category(), category({ id: 'inactive', name: 'Draft', slug: 'draft', isActive: false }),
+    ], [
+      job(), job({ id: 'orphan', categoryId: 'missing' }),
+      job({ id: 'draft', categoryId: 'inactive' }),
+    ])
+    expect(coverage.serviceJobs).toBe(1)
+    expect(coverage.byMarket.LK.serviceJobs).toBe(1)
+  })
+
+  it('does not count cross-market or wrong-currency services in per-market coverage', () => {
+    const coverage = summariseCatalogueCoverage([category()], [
+      job(),
+      job({ id: 'wrong-market', countries: 'CA', currency: 'CAD' }),
+      job({ id: 'wrong-currency', countries: 'LK', currency: 'CAD' }),
+    ])
+    expect(coverage.byMarket.LK.serviceJobs).toBe(1)
+    expect(coverage.byMarket.CA?.serviceJobs ?? 0).toBe(0)
   })
 
   it('rejects a service with no market assignment', () => {

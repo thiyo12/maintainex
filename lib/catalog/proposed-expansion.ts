@@ -97,6 +97,28 @@ export function proposedService(
 }
 
 /**
+ * Project proposed market eligibility into a *single priced market* before any
+ * optional database staging. TemplateJob has one currency and one price band.
+ * CA-only items have no verified CAD prices; a dual-market LKR row must never
+ * be labelled CA, even while inactive. All 309 proposed source records stay
+ * intact pending explicit catalogue/price approval.
+ */
+export function getSafeProposedImportPricing(service: ProposedService):
+  | { countries: string; currency: 'LKR'; priceMin: number; priceMax: number }
+  | null {
+  const price = service.priceLKR
+  if (!service.markets.includes('LK') || !price ||
+      !Number.isFinite(price.min) || !Number.isFinite(price.max) ||
+      price.min < 0 || price.max < price.min) return null
+  return {
+    countries: JSON.stringify(['LK']),
+    currency: 'LKR',
+    priceMin: price.min,
+    priceMax: price.max,
+  }
+}
+
+/**
  * Every proposed service is explicitly marked PROPOSED and is imported inactive.
  * This helper exists so no call site can accidentally omit that guarantee.
  */

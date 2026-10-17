@@ -6,6 +6,7 @@ import {
   PROPOSED_SKILLS,
   PROPOSED_CATALOGUE_STATUS,
   buildProposedImportRows,
+  getSafeProposedImportPricing,
 } from '@/lib/catalog/proposed-expansion'
 import {
   summariseProposedCoverage,
@@ -102,6 +103,41 @@ describe('proposed catalogue expansion integrity', () => {
     }
   })
 
+
+  it('stages LKR proposals only for Sri Lanka, never the CA market without CAD evidence', () => {
+    const sample = PROPOSED_SERVICES.find(service => service.markets.includes('LK') && service.priceLKR)
+    expect(sample).toBeDefined()
+    expect(getSafeProposedImportPricing(sample!)).toMatchObject({
+      countries: '["LK"]', currency: 'LKR', priceMin: sample!.priceLKR!.min,
+      priceMax: sample!.priceLKR!.max,
+    })
+  })
+
+  it('never creates a CA/LKR catalogue record for dual-market proposed services', () => {
+    const sample = PROPOSED_SERVICES.find(service => service.markets.includes('CA') && service.markets.includes('LK') && service.priceLKR)
+    expect(sample).toBeDefined()
+    expect(getSafeProposedImportPricing(sample!)?.countries).toBe('["LK"]')
+    expect(sample?.markets).toContain('CA')
+  })
+
+  it('keeps Canada-only proposals in source but excludes them from unpriced database staging', () => {
+    const sample = { ...PROPOSED_SERVICES[0], markets: ['CA'] as Array<'CA' | 'LK'>, priceLKR: undefined }
+    expect(getSafeProposedImportPricing(sample)).toBeNull()
+  })
+
+  it('refuses invalid or missing Sri Lankan pricing instead of persisting fake zeros', () => {
+    const sample = { ...PROPOSED_SERVICES[0], markets: ['LK'] as Array<'CA' | 'LK'>, priceLKR: undefined }
+    expect(getSafeProposedImportPricing(sample)).toBeNull()
+    expect(getSafeProposedImportPricing({
+      ...sample, priceLKR: { min: 9000, max: 1000 },
+    })).toBeNull()
+  })
+
+  it('preserves every unapproved proposed source record as inactive', () => {
+    const rows = buildProposedImportRows(PROPOSED_SERVICES)
+    expect(rows).toHaveLength(309)
+    expect(rows.every(r => !r.isActive && r.status === 'PROPOSED')).toBe(true)
+  })
   it('marks company-only services correctly', () => {
     const rows = buildProposedImportRows(PROPOSED_SERVICES)
     const index = new Map(PROPOSED_SERVICES.map((s, i) => [i, s]))
