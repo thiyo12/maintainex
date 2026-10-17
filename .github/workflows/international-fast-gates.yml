@@ -89,6 +89,7 @@ jobs:
             tests/domain/catalog-inventory.test.ts \
             tests/domain/phase01-book-now-catalogue-market.test.ts \
             tests/geography/phase02-book-now-district-authority.test.ts \
+            tests/geography/phase02-location-picker-market-fallback.test.ts \
             tests/catalog/proposed-expansion.test.ts \
             tests/domain/catalog-provider-associations.test.ts \
             tests/geography/phase02-incomplete-coordinate-market.test.ts \

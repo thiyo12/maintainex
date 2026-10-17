@@ -6,9 +6,13 @@ import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 import { getCountries } from '@/lib/locations'
 
 export async function GET() {
+  // Preserve runtime market restrictions if the country-table query fails.
+  // If runtime permissions themselves cannot be read, fail closed instead of
+  // revealing stale or disabled locations from the historical static dataset.
+  let availableMarkets: Set<string> | null = null
   try {
     const runtime = await getPlatformRuntimeConfig()
-    const availableMarkets = new Set(runtime.market.availableMarkets)
+    availableMarkets = new Set(runtime.market.availableMarkets)
     const databaseCountries = await prisma.country.findMany({
       orderBy: { name: 'asc' },
       include: {
@@ -35,7 +39,11 @@ export async function GET() {
       ...databaseCountries.map(country => ({ ...country, _source: 'database' as const })),
       ...fallbackCountries,
     ]
-      .filter(country => availableMarkets.size === 0 || availableMarkets.has(country.code.toUpperCase()))
+      // Historical database/fallback rows may still contain Toronto and other
+      // markets. Only configured LK and City of Vancouver launch markets may
+      // appear in the address picker, even with an empty runtime allowlist.
+      .filter(country => getMarketConfig(country.code) !== null)
+      .filter(country => availableMarkets!.size === 0 || availableMarkets!.has(country.code.toUpperCase()))
       .map(country => restrictToLaunchMarket(country))
       .sort((a, b) => a.name.localeCompare(b.name))
 
@@ -51,14 +59,19 @@ export async function GET() {
     secureConsole.error('Mobile locations GET error:', error)
     return NextResponse.json(
       {
-        source: 'static-fallback',
-        countries: getCountries().map(country => ({
-          ...country,
-          _source: 'static-fallback',
-        })),
+        source: availableMarkets ? 'static-fallback' : 'unavailable',
+        countries: availableMarkets
+          ? getCountries()
+              .filter(country => getMarketConfig(country.code) !== null)
+              .filter(country => availableMarkets!.size === 0 || availableMarkets!.has(country.code.toUpperCase()))
+              .map(country => restrictToLaunchMarket({
+                ...country,
+                _source: 'static-fallback' as const,
+              }))
+          : [],
       },
       {
-        status: 200,
+        status: availableMarkets ? 200 : 503,
         headers: {
           'X-MaintainEX-Location-Fallback': '1',
         },
