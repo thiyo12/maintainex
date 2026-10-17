@@ -78,6 +78,7 @@ jobs:
             tests/security/phase04-company-catalogue-write-validation.test.ts \
             tests/security/phase07-company-workspace-authorization.test.ts \
             tests/security/phase07-safety-report-separation.test.ts \
+            tests/security/phase07-job-detail-company-membership.test.ts \
             tests/security/phase04-company-profile-owner-reactivation.test.ts \
             tests/security/phase11-inactive-company-owner-matching.test.ts \
             tests/regions/phase11-provider-coverage-audit-contract.test.ts \
