@@ -108,9 +108,15 @@ export async function evaluateEligibility(
     // Check owner account
     const ownerUser = await client.user.findUnique({
       where: { id: company.userId },
-      select: { isSuspended: true, isBanned: true },
+      select: { isActive: true, isSuspended: true, isBanned: true },
     })
-    if (ownerUser?.isSuspended) {
+    // Matching must enforce the same owner-account boundary as provider
+    // onboarding. A deactivated/missing owner cannot receive new work.
+    if (!ownerUser || ownerUser.isActive === false) {
+      gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: false, reason: 'Company owner account is inactive or missing' })
+      return buildIneligibleResult(gates)
+    }
+    if (ownerUser.isSuspended) {
       gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: false, reason: 'Company owner suspended' })
       return buildIneligibleResult(gates)
     }
@@ -543,12 +549,45 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-function configuredAreaMatches(serviceAreas: string | null | undefined, areaId: string | null): boolean {
-  if (!serviceAreas || !areaId) return true
+/**
+ * Blank coverage is legacy fail-open in Sri Lanka and stays that way.
+ *
+ * In Canada it is not sufficient authority: the City of Vancouver is one
+ * municipality, so an undeclared area must not authorise work across the whole
+ * city. A Canadian provider needs a declared area, or a verified radius
+ * upstream. Historical records that cannot establish a service address at all
+ * (no job coordinates) keep their existing behaviour for both markets.
+ */
+function configuredAreaMatches(
+  serviceAreas: string | null | undefined,
+  areaId: string | null,
+  providerCountry?: string | null,
+  hasValidatedAddress: boolean = false,
+): boolean {
+  const isCanada = (providerCountry || '').trim().toUpperCase() === 'CA'
   const configured = readStoredList(serviceAreas)
     .map(value => value.trim().toLowerCase())
     .filter(Boolean)
-  if (configured.length === 0) return true
+  const hasDeclaredArea = configured.length > 0
+
+  // Older jobs may lack GPS coordinates but still have a canonical areaId.
+  // A known district/area must NEVER be ignored solely because GPS is missing:
+  // that previously matched a Colombo-only provider to Jaffna jobs.
+  // Truly unlocated legacy records (no GPS AND no areaId) keep their
+  // compatibility behavior; financial booking still requires a market.
+  if (!hasValidatedAddress && !areaId) return true
+
+  if (!isCanada) {
+    // Sri Lanka keeps its legacy fail-open coverage.
+    if (!areaId || !hasDeclaredArea) return true
+  } else if (!hasDeclaredArea) {
+    // Blank coverage must not authorise work across the whole City of Vancouver.
+    return false
+  }
+  // With a validated address but no named area on the job, a declared area is
+  // the only authority available: the address has already been bounded to the
+  // supported market by the caller.
+  if (!areaId) return hasDeclaredArea
 
   const fullLocation = getLocationName(areaId).toLowerCase()
   const normalizedAreaId = areaId.toLowerCase()
@@ -565,7 +604,12 @@ async function evaluateServiceArea(
   providerId: string,
   job: MatchingInput,
 ): Promise<boolean> {
-  if (!job.countryCode) return true
+  // A job whose market cannot be established must match nobody. Returning true
+  // here would surface providers from any country, including providers who cannot
+  // legally or practically serve the address.
+  if (!job.countryCode) return false
+
+  const jobCountry = job.countryCode.toUpperCase()
 
   const target = await client.marketplaceJob.findUnique({
     where: { id: job.jobId },
@@ -590,8 +634,8 @@ async function evaluateServiceArea(
       }),
     ])
 
-    const providerCountry = profile?.countryCode || user?.countryCode
-    if (providerCountry !== job.countryCode) return false
+    const providerCountry = (profile?.countryCode || user?.countryCode || '').toUpperCase()
+    if (providerCountry !== jobCountry) return false
 
     if (
       target?.latitude != null && target.longitude != null &&
@@ -601,7 +645,7 @@ async function evaluateServiceArea(
       return haversineKm(target.latitude, target.longitude, profile.latitude, profile.longitude) <= profile.serviceRadius
     }
 
-    return configuredAreaMatches(profile?.serviceAreas, target?.areaId ?? null)
+    return configuredAreaMatches(profile?.serviceAreas, target?.areaId ?? null, providerCountry, target?.latitude != null && target?.longitude != null)
   }
 
   const company = await client.companyProfile.findUnique({
@@ -617,8 +661,8 @@ async function evaluateServiceArea(
   })
   if (!company) return false
 
-  const providerCountry = company.countryCode || company.user?.countryCode
-  if (providerCountry !== job.countryCode) return false
+  const providerCountry = (company.countryCode || company.user?.countryCode || '').toUpperCase()
+  if (providerCountry !== jobCountry) return false
 
   if (
     target?.latitude != null && target.longitude != null &&
@@ -628,7 +672,7 @@ async function evaluateServiceArea(
     return haversineKm(target.latitude, target.longitude, company.latitude, company.longitude) <= company.serviceRadius
   }
 
-  return configuredAreaMatches(company.serviceAreas, target?.areaId ?? null)
+  return configuredAreaMatches(company.serviceAreas, target?.areaId ?? null, providerCountry, target?.latitude != null && target?.longitude != null)
 }
 
 function timeToMinutes(value: string): number | null {

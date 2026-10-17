@@ -1,4 +1,5 @@
 import { logger } from '@/lib/shared/observability/logger'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -116,7 +117,13 @@ export async function GET(
     if (!isParticipant) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: id } })
-    const currency = getCurrencyForCountry(job.countryCode)
+    // Phase 02: display currency follows the authoritative service-address
+    // market. Stored escrow amounts are never recalculated, and a job whose
+    // address can no longer be resolved still returns its existing amounts.
+    const refundMarket = requireJobMarket(job)
+    const currency = getCurrencyForCountry(
+      refundMarket.ok ? refundMarket.countryCode : job.countryCode,
+    )
     return NextResponse.json({
       escrow: escrow ? {
         ...escrow,

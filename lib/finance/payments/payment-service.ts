@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { notifyEscrowDeposited } from '@/lib/notifications'
@@ -57,6 +58,53 @@ export interface PaymentResult {
   code?: string
 }
 
+/**
+ * Phase 02/03 — authoritative market for a NEW payment intent.
+ *
+ * Delegates to the shared geography engine; it does not reimplement market
+ * validation. Two rules:
+ *
+ *  1. A complete coordinate pair is the authority. It must resolve inside a
+ *     launch market, and it must not contradict the stored job country.
+ *  2. Legacy jobs with no complete coordinate pair keep today's behaviour: the
+ *     stored country decides. This is deliberate compatibility, not a weakness —
+ *     it is covered by the geography engine's existing tests.
+ *
+ * Refunds, capture and reconciliation deliberately do NOT use this, because they
+ * act on already-committed transactions and must never be blocked by stale or
+ * missing location data.
+ */
+export function resolvePaymentMarketForIntent(job: {
+  countryCode?: string | null
+  latitude?: number | null
+  longitude?: number | null
+}): { ok: true; countryCode: string } | { ok: false; code: string; error: string } {
+  const stored = (job.countryCode || '').trim().toUpperCase()
+  const hasCompleteCoordinates =
+    typeof job.latitude === 'number' && Number.isFinite(job.latitude) &&
+    typeof job.longitude === 'number' && Number.isFinite(job.longitude)
+
+  const resolved = requireJobMarket(job)
+
+  if (hasCompleteCoordinates) {
+    if (!resolved.ok) {
+      return { ok: false, code: 'JOB_MARKET_UNRESOLVED', error: resolved.error }
+    }
+    if (stored && stored !== resolved.countryCode) {
+      return {
+        ok: false,
+        code: 'PAYMENT_MARKET_MISMATCH',
+        error: `Job market could not be confirmed: stored country ${stored} does not match the validated service address (${resolved.countryCode}). Refusing to start payment.`,
+      }
+    }
+    return { ok: true, countryCode: resolved.countryCode }
+  }
+
+  // No complete coordinate pair — preserve legacy stored-country behaviour.
+  if (resolved.ok) return { ok: true, countryCode: resolved.countryCode }
+  return { ok: false, code: 'JOB_MARKET_UNRESOLVED', error: resolved.error }
+}
+
 export async function createPaymentIntent(params: CreatePaymentParams): Promise<PaymentResult> {
   const { jobId, customerId, baseUrl } = params
 
@@ -66,6 +114,8 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       id: true,
       customerId: true,
       countryCode: true,
+      latitude: true,
+      longitude: true,
       status: true,
       title: true,
     },
@@ -75,6 +125,13 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
   }
   if (previewJob.customerId !== customerId) {
     return { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }
+  }
+
+  // Phase 02/03: a new payment intent must be authorised by the authoritative
+  // service-address market, not by the stored country alone.
+  const previewMarket = resolvePaymentMarketForIntent(previewJob)
+  if (!previewMarket.ok) {
+    return { success: false, error: previewMarket.error, code: previewMarket.code }
   }
 
   const previewEscrow = await prisma.jobEscrow.findFirst({
@@ -90,7 +147,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
   }
 
   const provider = await resolvePaymentProviderForMarket({
-    countryCode: previewJob.countryCode,
+    countryCode: previewMarket.countryCode,
     currency: previewEscrow.currency,
   })
   if (!provider) {
@@ -134,9 +191,11 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         status: string
         title: string
         countryCode: string
+        latitude: number | null
+        longitude: number | null
       }[]
     >`
-      SELECT id, "customerId", status, title, "countryCode"
+      SELECT id, "customerId", status, title, "countryCode", "latitude", "longitude"
       FROM "MarketplaceJob"
       WHERE id = ${jobId}
       FOR UPDATE
@@ -163,7 +222,25 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         failure: { success: false, error: 'Job is not payable', code: 'JOB_NOT_PAYABLE' },
       }
     }
-    if (job.countryCode !== provider.countryCode) {
+    // Revalidate the authoritative market on the locked row: the job may have
+    // changed between the preview read and the start of checkout.
+    const lockedMarket = resolvePaymentMarketForIntent({
+      countryCode: job.countryCode,
+      latitude: job.latitude,
+      longitude: job.longitude,
+    })
+    if (!lockedMarket.ok) {
+      return {
+        intent: null,
+        jobTitle: job.title,
+        failure: {
+          success: false,
+          error: lockedMarket.error,
+          code: lockedMarket.code,
+        },
+      }
+    }
+    if (lockedMarket.countryCode !== provider.countryCode) {
       return {
         intent: null,
         jobTitle: job.title,

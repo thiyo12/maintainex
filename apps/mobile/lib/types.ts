@@ -7,6 +7,7 @@ export interface User {
   phone?: string
   role: UserRole
   isActive: boolean
+  countryCode?: string
   createdAt: string
   identityStatus?: string
   nickname?: string
@@ -21,7 +22,7 @@ export interface User {
   activeCompany?: { companyId: string; role: string } | null
   birthday?: string
   gender?: 'MALE' | 'FEMALE' | 'OTHER'
-  language?: 'EN' | 'TA' | 'SI'
+  language?: 'EN' | 'TA' | 'SI' | 'FR'
   emergencyContact?: string
   province?: string
   region?: string
@@ -70,20 +71,45 @@ export interface Booking {
   userId?: string
 }
 
+/**
+ * Phase 03: the server may return a reduced public profile when the viewer has
+ * no same-market active transaction. Private fields are ABSENT (not null), so
+ * every field below except the public ones is optional and must be guarded.
+ */
 export interface TaskerProfile {
+  /** Public provider profile id. Not the private account user id. */
   id: string
-  userId: string
-  user: User
+  name?: string
+  marketLabel?: string | null
+  /**
+   * Phase 03 tiers:
+   *  PUBLIC      — same-market eligible viewer, normal commercial information
+   *  TRANSACTION — same-market viewer with an active job
+   *  REDUCED     — out-of-market/unverifiable viewer; private fields omitted
+   */
+  visibility?: 'PUBLIC' | 'TRANSACTION' | 'REDUCED'
+  userId?: string
+  user?: User
   bio: string
-  hourlyRate: number
+  hourlyRate?: number
   skills: string[]
-  serviceAreas: string[]
+  serviceAreas?: string[]
   rating: number
   completedJobs: number
-  isVerified: boolean
-  isOnline: boolean
+  isVerified?: boolean
+  isOnline?: boolean
   profileImage?: string
-  createdAt: string
+  /** Broad approved coverage areas for eligible same-market viewers. */
+  coverageAreas?: string[]
+  reviews?: Array<{
+    id: string
+    rating: number
+    comment: string
+    createdAt: string
+  }>
+  /** Only present on an authorised transaction tier. */
+  activeJobId?: string
+  createdAt?: string
 }
 
 export interface TaskerLocation {
@@ -194,23 +220,37 @@ export interface TemplateJob {
   countries: string[]
 }
 
+/**
+ * Phase 03: 'REDUCED' responses carry public identity only — private fields are
+ * absent, so they are optional and screens must guard before rendering.
+ */
 export interface FindTaskerResult {
   id: string
-  userId: string
+  userId?: string
   name: string
   bio: string
   rating: number
   completedJobs: number
-  isVerified: boolean
-  isOnline: boolean
+  marketLabel?: string | null
+  visibility?: 'PUBLIC' | 'TRANSACTION' | 'REDUCED'
+  isVerified?: boolean
+  isOnline?: boolean
   profileImage?: string
   latitude?: number
   longitude?: number
   distance?: number
   skills: string[]
-  hourlyRate: number
-  fixedRate: number
-  experienceYears: number
+  hourlyRate?: number
+  fixedRate?: number
+  experienceYears?: number
+  serviceAreas?: string[]
+  reviews?: Array<{
+    id: string
+    rating: number
+    comment: string
+    createdAt: string
+  }>
+  activeJobId?: string
 }
 
 export interface TaskerSkill {

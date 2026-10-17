@@ -26,11 +26,20 @@ describe('Deployment Safety — No prisma db push in production paths', () => {
     expect(content).not.toContain('db push')
   })
 
-  it('Dockerfile uses prisma migrate deploy', () => {
-    const dockerfile = join(ROOT, 'Dockerfile')
-    if (!fileExists(dockerfile)) return
-    const content = readFile(dockerfile)
-    expect(content).toContain('prisma migrate deploy')
+  it('container startup runs migrate deploy with the dedicated migration role before app launch', () => {
+    const dockerfile = readFile(join(ROOT, 'Dockerfile'))
+    const startup = readFile(join(ROOT, 'scripts/start-production.sh'))
+    expect(dockerfile).toContain('CMD ["sh", "/app/scripts/start-production.sh"]')
+    expect(startup).toContain('DATABASE_URL="$DIRECT_URL" npx prisma migrate deploy')
+    expect(startup).toContain('unset DIRECT_URL')
+    expect(startup).toContain('&& exec npm start')
+    const migrationIndex = startup.indexOf('DATABASE_URL="$DIRECT_URL" npx prisma migrate deploy')
+    const unsetIndex = startup.indexOf('unset DIRECT_URL')
+    const serverIndex = startup.indexOf('&& exec npm start')
+    expect(migrationIndex).toBeGreaterThanOrEqual(0)
+    expect(unsetIndex).toBeGreaterThan(migrationIndex)
+    expect(serverIndex).toBeGreaterThan(unsetIndex)
+    expect(startup).not.toContain('prisma db push')
   })
 
   it('Dockerfile does not contain --accept-data-loss', () => {

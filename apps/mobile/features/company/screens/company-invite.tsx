@@ -16,7 +16,7 @@ export default function CompanyInviteScreen() {
   const colors = useColors()
   const styles = makeStyles(colors)
   const params = useLocalSearchParams<{ token?: string }>()
-  const { isAuthenticated, isLoading, refreshUser } = useAuth()
+  const { isAuthenticated, isLoading, user, refreshUser } = useAuth()
   const [token, setToken] = useState('')
   const [accepting, setAccepting] = useState(false)
 
@@ -52,7 +52,14 @@ export default function CompanyInviteScreen() {
       Alert.alert(
         'Invitation accepted',
         `You joined ${result.teamMember?.companyName || 'the company'} in MaintainEX.`,
-        [{ text: 'Open Assignments', onPress: () => router.replace('/(company)/(tabs)/dispatch') }]
+        [{
+          text: 'Open Assignments',
+          // Existing taskers retain their individual-provider persona and
+          // access their team work through the tasker company-assignments screen.
+          onPress: () => router.replace(
+            user?.role === 'TASKER' ? '/(tasker)/company-assignments' : '/(company)/(tabs)/dispatch'
+          ),
+        }]
       )
     } catch (error: any) {
       Alert.alert('Could not accept invitation', error?.message || 'Please ask the company to send a new invitation.')

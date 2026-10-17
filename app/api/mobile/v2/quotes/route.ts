@@ -1,4 +1,5 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -65,7 +66,14 @@ export async function POST(request: NextRequest) {
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-    const currency = getCurrencyForCountry(job.countryCode)
+    // Phase 02: commercial operations follow the authoritative service-address
+    // market, never a caller-supplied or stale stored country value.
+    const jobMarket = requireJobMarket(job)
+    if (!jobMarket.ok) {
+      return NextResponse.json({ error: jobMarket.error, code: jobMarket.code }, { status: 409 })
+    }
+
+    const currency = getCurrencyForCountry(jobMarket.countryCode)
     const priceMinor = parseMajorUnitsInput(body.price, currency)
     if (priceMinor === null) {
       return NextResponse.json({ error: 'Quote price must be a positive amount with at most 2 decimal places' }, { status: 400 })
@@ -73,7 +81,7 @@ export async function POST(request: NextRequest) {
     if (job.status !== 'OPEN') return NextResponse.json({ error: 'Job is not accepting quotes' }, { status: 400 })
     if (job.customerId === user.id) return NextResponse.json({ error: 'Cannot quote on your own job' }, { status: 400 })
 
-    const jobCountry = job.countryCode || 'LK'
+    const jobCountry = jobMarket.countryCode
 
     let providerCountry: string
     if (resolvedProviderType === 'COMPANY') {
@@ -120,7 +128,7 @@ export async function POST(request: NextRequest) {
       serviceTemplateId: job.serviceTemplateId || undefined,
       latitude: job.latitude,
       longitude: job.longitude,
-      countryCode: job.countryCode || 'GLOBAL',
+      countryCode: jobMarket.countryCode,
       preferredDate: job.preferredDate,
     })
     const eligible = matching.candidates.some(candidate =>
@@ -258,6 +266,13 @@ export async function GET(request: NextRequest) {
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
+    // Phase 02: quote display currency follows the authoritative service-address
+    // market, never a raw stored country value.
+    const jobMarket = requireJobMarket(job)
+    if (!jobMarket.ok) {
+      return NextResponse.json({ error: jobMarket.error, code: jobMarket.code }, { status: 409 })
+    }
+
     const { allowedQuoteIds, isCustomer } = await resolveQuoteVisibility(prisma, {
       userId: user.id,
       jobId,
@@ -297,7 +312,7 @@ export async function GET(request: NextRequest) {
           if (companyProfile) { rating = companyProfile.rating; completedJobs = companyProfile.completedProjects }
         }
 
-        return { ...q, price: minorUnitsToMajorUnits(q.price, getCurrencyForCountry(job.countryCode)), provider: provider || { id: q.providerId }, providerRating: rating, completedJobs }
+        return { ...q, price: minorUnitsToMajorUnits(q.price, getCurrencyForCountry(jobMarket.countryCode)), provider: provider || { id: q.providerId }, providerRating: rating, completedJobs }
       })
     )
 

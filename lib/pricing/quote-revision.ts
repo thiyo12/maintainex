@@ -34,6 +34,14 @@ export async function createQuoteRevision(
 
       if (!original) return { success: false, error: 'Original quote not found' }
       if (original.providerId !== params.providerId) return { success: false, error: 'Not your quote' }
+      // A bargaining revision cannot reinterpret the original quote's money
+      // or mix currencies within an immutable commercial revision chain.
+      if (params.currency != null && params.currency !== original.currency) {
+        return { success: false, error: 'Quote revision currency must match the original quote' }
+      }
+      if (params.price <= 0n) {
+        return { success: false, error: 'Quote revision amount must be positive' }
+      }
       if (original.status === 'ACCEPTED') return { success: false, error: 'Cannot revise an accepted quote' }
       if (original.status === 'REJECTED') return { success: false, error: 'Cannot revise a rejected quote' }
       if (original.status === 'WITHDRAWN') return { success: false, error: 'Cannot revise a withdrawn quote' }
@@ -86,7 +94,7 @@ export async function createQuoteRevision(
           message: params.message ?? original.message,
           attachments: params.attachments ?? original.attachments,
           status: 'PENDING',
-          currency: params.currency ?? original.currency,
+          currency: original.currency,
           subtotalCents: params.subtotalCents ?? null,
           taxCents: params.taxCents ?? null,
           totalCents: params.totalCents ?? null,

@@ -5,6 +5,7 @@
  * @deprecated since Phase 10.2
  */
 import { prisma } from './prisma'
+import { isSupportedMarket } from './geography/market-engine'
 import { getSetting } from './settings'
 import { haversineKm } from './distance'
 
@@ -94,17 +95,23 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
   const radiusKm = input.radiusKm ?? (await getSetting('matching.radius_km', 50))
   const targeted = !!input.targetTaskerId
 
+  // Phase 03: a browse request with no established market must return nobody.
+  // Previously the country filter was dropped entirely when countryCode was
+  // falsy, listing online providers from every launch market.
+  const market = (input.countryCode || '').trim().toUpperCase()
+  const marketFilter = isSupportedMarket(market) ? { countryCode: market } : { countryCode: '__none__' }
+
   const allProfiles = await prisma.taskerProfile.findMany({
     where: targeted
       ? {
           userId: input.targetTaskerId!,
           isVerified: true,
-          ...(input.countryCode ? { countryCode: input.countryCode } : {}),
+          ...marketFilter,
         }
       : {
           isOnline: true,
           isVerified: true,
-          ...(input.countryCode ? { countryCode: input.countryCode } : {}),
+          ...marketFilter,
         },
     include: {
       user: {

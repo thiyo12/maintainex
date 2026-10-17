@@ -46,18 +46,30 @@ export async function checkWorkStartAuthorization(
     acceptedQuote.providerType === 'INDIVIDUAL' &&
     acceptedQuote.providerId === providerId
 
-  const isCompanyMember =
-    acceptedQuote.providerType === 'COMPANY' &&
-    (await client.teamMember.findFirst({
-      where: {
-        companyId: acceptedQuote.providerId,
-        userId: providerId,
-        status: 'ACTIVE',
-      },
-      select: { id: true },
-    }))
+  // Company membership alone is insufficient: an unrelated manager,
+  // dispatcher or finance employee cannot start an assigned worker's job.
+  // The work-start PIN checks the same accepted-assignment boundary.
+  let isAssignedCompanyWorker = false
+  if (acceptedQuote.providerType === 'COMPANY') {
+    const [membership, assignment] = await Promise.all([
+      client.teamMember.findFirst({
+        where: { companyId: acceptedQuote.providerId, userId: providerId, status: 'ACTIVE' },
+        select: { id: true },
+      }),
+      client.companyJobAssignment.findFirst({
+        where: {
+          companyId: acceptedQuote.providerId,
+          jobId,
+          workerUserId: providerId,
+          status: 'ACCEPTED',
+        },
+        select: { id: true },
+      }),
+    ])
+    isAssignedCompanyWorker = Boolean(membership && assignment)
+  }
 
-  if (!isProvider && !isCompanyMember) {
+  if (!isProvider && !isAssignedCompanyWorker) {
     return { authorized: false, reason: 'NOT_PROVIDER' }
   }
 

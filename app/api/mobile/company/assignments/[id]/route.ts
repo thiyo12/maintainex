@@ -26,7 +26,7 @@ export async function GET(
     const assignment = await prisma.companyJobAssignment.findUnique({
       where: { id },
       include: {
-        job: { select: { id: true, title: true, status: true, createdAt: true } },
+        job: { select: { id: true, title: true, status: true, countryCode: true, createdAt: true } },
         worker: { select: { id: true, name: true, email: true } },
         company: { select: { id: true, companyName: true, userId: true } },
       },
@@ -36,18 +36,18 @@ export async function GET(
       return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
     }
 
-    const isWorker = assignment.workerUserId === user.id
-    const isOwner = assignment.company.userId === user.id
-    const membership = isOwner
-      ? null
-      : await prisma.teamMember.findFirst({
-          where: { companyId: assignment.companyId, userId: user.id, status: 'ACTIVE' },
-          select: { role: true },
-        })
+    // A known assignment ID must never bypass active company membership.
+    // This also protects worker and owner records after deactivation/removal.
+    const membership = await prisma.teamMember.findFirst({
+      where: { companyId: assignment.companyId, userId: user.id, status: 'ACTIVE' },
+      select: { role: true },
+    })
+    const isWorker = !!membership && assignment.workerUserId === user.id
+    const isOwner = !!membership &&
+      assignment.company.userId === user.id && membership.role === 'COMPANY_OWNER'
 
     const canReadAssignment =
       isWorker ||
-      isOwner ||
       (!!membership && hasCompanyPermission(membership.role as CompanyRole, 'workers:read'))
 
     if (!canReadAssignment) {
@@ -55,8 +55,7 @@ export async function GET(
     }
 
     const canManageAssignment =
-      isOwner ||
-      (!!membership && hasCompanyPermission(membership.role as CompanyRole, 'workers:assign'))
+      !!membership && hasCompanyPermission(membership.role as CompanyRole, 'workers:assign')
 
     return NextResponse.json({
       id: assignment.id,

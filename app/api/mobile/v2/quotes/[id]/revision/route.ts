@@ -1,6 +1,7 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { createQuoteRevision } from '@/lib/pricing/quote-revision'
 import { validateLineItems, calculateQuoteTotal } from '@/lib/pricing/line-items'
@@ -153,6 +154,12 @@ export async function POST(
       )
     }
 
+    // Phase 03: fail closed when the job market cannot be established.
+    const jobMarket = requireJobMarket(job)
+    if (!jobMarket.ok) {
+      return NextResponse.json({ error: jobMarket.error, code: jobMarket.code }, { status: 409 })
+    }
+
     const matching = await findCandidates(prisma, {
       jobId: job.id,
       userId: job.customerId,
@@ -162,7 +169,9 @@ export async function POST(
       serviceTemplateId: job.serviceTemplateId || undefined,
       latitude: job.latitude,
       longitude: job.longitude,
-      countryCode: job.countryCode || 'GLOBAL',
+      // Phase 03: eligibility for a revision is resolved from the validated
+      // service address, never from the raw stored country.
+      countryCode: jobMarket.countryCode,
       preferredDate: job.preferredDate,
     })
 
@@ -184,7 +193,15 @@ export async function POST(
       )
     }
 
-    const canonicalCurrency = getCurrencyForCountry(job.countryCode)
+    const canonicalCurrency = getCurrencyForCountry(jobMarket.countryCode)
+    if (originalQuote.currency !== canonicalCurrency) {
+      // Never reinterpret a historical quote's minor units as another
+      // currency. The original commercial record must be resolved first.
+      return NextResponse.json(
+        { error: 'Original quote currency does not match this job market' },
+        { status: 409 },
+      )
+    }
     if (currency && currency !== canonicalCurrency) {
       return NextResponse.json(
         { error: 'Quote currency does not match the job market' },
@@ -234,7 +251,7 @@ export async function POST(
     if (job.serviceTemplateId) {
       const benchmark = await resolveBenchmark(prisma, {
         serviceTemplateId: job.serviceTemplateId,
-        countryCode: job.countryCode,
+        countryCode: jobMarket.countryCode,
         currency: canonicalCurrency,
         pricingMode: 'SMART_QUOTE',
       })

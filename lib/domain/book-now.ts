@@ -5,6 +5,8 @@ import { calculatePrice } from '@/lib/pricing/engine'
 import { createNotification } from '@/lib/notifications'
 import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 import { readStoredList } from '@/lib/db-utils'
+import { haversineKm } from '@/lib/distance'
+import { isBookNowCatalogueAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 
 export interface BookNowInput {
   customerId: string
@@ -35,11 +37,25 @@ function normalizeToken(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
-function serviceAreaAllows(serviceAreas: string | null | undefined, district: string): boolean {
+/** Mirrors the matching rule so discovery and direct booking cannot disagree. */
+function serviceAreaAllows(
+  serviceAreas: string | null | undefined,
+  district: string,
+  providerCountry?: string | null,
+  hasValidatedAddress: boolean = false,
+): boolean {
+  const isCanada = (providerCountry || '').trim().toUpperCase() === 'CA'
   const configured = readStoredList(serviceAreas)
     .map(normalizeToken)
     .filter(Boolean)
-  if (configured.length === 0) return true
+  const hasDeclaredArea = configured.length > 0
+  if (!hasValidatedAddress) return true
+  if (!isCanada) {
+    if (!district || !hasDeclaredArea) return true
+  } else if (!hasDeclaredArea) {
+    return false
+  }
+  if (!district) return false
 
   const target = normalizeToken(district)
   return configured.some(area => area === target || target.includes(area) || area.includes(target))
@@ -73,6 +89,41 @@ function isDateInsideVacation(date: Date, start: Date | null, end: Date | null):
 }
 
 
+/**
+ * Mirrors the matching radius rule so a provider who is a candidate for a job
+ * is not refused at booking purely because they express coverage as a radius
+ * rather than a named area. Matching already prefers a verified radius; direct
+ * booking previously ignored it entirely, which made a radius-only Vancouver
+ * provider discoverable but unbookable.
+ */
+function serviceRadiusAllows(
+  providerLat: number | null | undefined,
+  providerLon: number | null | undefined,
+  serviceRadius: number | null | undefined,
+  targetLat: number | null | undefined,
+  targetLon: number | null | undefined,
+): boolean | null {
+  if (
+    providerLat == null || providerLon == null ||
+    serviceRadius == null || serviceRadius <= 0 ||
+    targetLat == null || targetLon == null
+  ) {
+    return null
+  }
+  return haversineKm(targetLat, targetLon, providerLat, providerLon) <= serviceRadius
+}
+
+/** True when the caller supplied a complete coordinate pair to validate against. */
+function hasValidatedServiceAddress(input: {
+  latitude?: number
+  longitude?: number
+}): boolean {
+  return (
+    typeof input.latitude === 'number' && Number.isFinite(input.latitude) &&
+    typeof input.longitude === 'number' && Number.isFinite(input.longitude)
+  )
+}
+
 export async function createBookNowJob(input: BookNowInput) {
   const templateJob = await prisma.templateJob.findUnique({
     where: { id: input.templateJobId },
@@ -82,6 +133,8 @@ export async function createBookNowJob(input: BookNowInput) {
       description: true,
       categoryId: true,
       isActive: true,
+      countries: true,
+      currency: true,
     },
   })
   if (!templateJob?.isActive) throw new Error('Template job not found or inactive')
@@ -92,12 +145,25 @@ export async function createBookNowJob(input: BookNowInput) {
     ? input.countryCode.toUpperCase()
     : ''
   if (!finalCountryCode) throw new Error('Booking country is required')
+  if (finalCountryCode !== 'LK' && finalCountryCode !== 'CA') {
+    throw new Error('Unsupported booking country')
+  }
+
+  const category = await prisma.jobCategory.findUnique({
+    where: { id: templateJob.categoryId },
+    select: { isActive: true, countries: true },
+  })
+  if (!category || !isBookNowCatalogueAvailableInMarket(templateJob, category, finalCountryCode)) {
+    throw new Error('Template job is not available in booking country')
+  }
 
   const linkedServiceTemplate = await prisma.serviceTemplate.findFirst({
     where: {
       templateJobId: templateJob.id,
       jobCategoryId: templateJob.categoryId,
       isActive: true,
+      countryCode: finalCountryCode,
+      currency: finalCountryCode === 'LK' ? 'LKR' : 'CAD',
     },
     select: { id: true },
   })
@@ -124,6 +190,9 @@ export async function createBookNowJob(input: BookNowInput) {
         companyName: true,
         countryCode: true,
         serviceAreas: true,
+        latitude: true,
+        longitude: true,
+        serviceRadius: true,
         user: { select: { countryCode: true } },
       },
     })
@@ -149,7 +218,10 @@ export async function createBookNowJob(input: BookNowInput) {
       if (!catSpecialty) throw new Error('Company lacks required capability for this booking')
     }
 
-    if (!serviceAreaAllows(company.serviceAreas, input.district)) {
+    const companyRadius = serviceRadiusAllows(
+      company.latitude, company.longitude, company.serviceRadius, input.latitude, input.longitude,
+    )
+    if (companyRadius === false || (companyRadius === null && !serviceAreaAllows(company.serviceAreas, input.district, companyCountry, hasValidatedServiceAddress(input)))) {
       throw new Error('Provider does not serve the requested district')
     }
 
@@ -174,6 +246,9 @@ export async function createBookNowJob(input: BookNowInput) {
         id: true,
         userId: true,
         skills: true,
+        latitude: true,
+        longitude: true,
+        serviceRadius: true,
         serviceAreas: true,
         taskerSkills: { select: { jobId: true } },
         countryCode: true,
@@ -201,7 +276,10 @@ export async function createBookNowJob(input: BookNowInput) {
       throw new Error('Provider lacks required capability for this booking')
     }
 
-    if (!serviceAreaAllows(provider.serviceAreas, input.district)) {
+    const providerRadius = serviceRadiusAllows(
+      provider.latitude, provider.longitude, provider.serviceRadius, input.latitude, input.longitude,
+    )
+    if (providerRadius === false || (providerRadius === null && !serviceAreaAllows(provider.serviceAreas, input.district, providerCountry, hasValidatedServiceAddress(input)))) {
       throw new Error('Provider does not serve the requested district')
     }
 

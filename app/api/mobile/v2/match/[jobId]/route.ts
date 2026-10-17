@@ -1,4 +1,5 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
@@ -17,6 +18,13 @@ export async function GET(
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (job.customerId !== user.id) return NextResponse.json({ error: 'Only the job owner can view matches' }, { status: 403 })
 
+    // Phase 02/03: discovery follows the authoritative service-address market.
+    // A stored country alone must never decide which providers a customer sees.
+    const jobMarket = requireJobMarket(job)
+    if (!jobMarket.ok) {
+      return NextResponse.json({ error: jobMarket.error, code: jobMarket.code }, { status: 409 })
+    }
+
     const result = await findCandidates(prisma, {
       jobId: job.id,
       userId: user.id,
@@ -26,7 +34,7 @@ export async function GET(
       serviceTemplateId: job.serviceTemplateId || undefined,
       latitude: job.latitude,
       longitude: job.longitude,
-      countryCode: job.countryCode || 'GLOBAL',
+      countryCode: jobMarket.countryCode,
       preferredDate: job.preferredDate,
     })
 

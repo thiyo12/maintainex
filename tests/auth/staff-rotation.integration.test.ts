@@ -141,7 +141,9 @@ describe.skipIf(!isVPS)('DATABASE INTEGRATION: Staff Refresh Rotation', () => {
     const session = await createStaffSession({ adminUserId: testAdminId })
     const parsed = parseStaffRefreshToken(session.refreshTokenRaw)
 
-    const fakeToken = `${parsed!.sessionId}.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`
+    // A malformed-length token is rejected during parsing, before replay
+    // detection. Supply a syntactically valid but wrong 128-hex secret.
+    const fakeToken = `${parsed!.sessionId}.${'a'.repeat(128)}`
 
     const result = await rotateStaffRefreshToken(fakeToken)
     expect(result).toBeNull()

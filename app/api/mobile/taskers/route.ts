@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { jsonArrayContains, safeParseJsonArr } from '@/lib/db-utils'
+import { isSupportedMarket } from '@/lib/geography/market-engine'
 
 // List taskers (public-ish, requires auth)
 export async function GET(request: NextRequest) {
@@ -16,8 +17,30 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category')
     const area = searchParams.get('area')
     const isOnline = searchParams.get('isOnline')
+    const requestedCountry = searchParams.get('country')
 
-    const where: any = { isVerified: true }
+    // Phase 03: a customer must only ever see providers in the market they are
+    // actually shopping in. Previously this directory applied no market filter at
+    // all, so providers from every market — with coordinates, rates and contact
+    // details — were listed to any authenticated caller.
+    const market = resolveDirectoryMarket(requestedCountry, user.countryCode)
+    if (!market) {
+      return NextResponse.json(
+        {
+          error: 'Provider directory is unavailable for this market',
+          code: 'MARKET_NOT_SUPPORTED',
+          taskers: [],
+        },
+        { status: 200 },
+      )
+    }
+
+    const where: any = {
+      isVerified: true,
+      // TaskerProfile carries the provider market; fall back to the owning
+      // account's market for legacy profiles that predate the field.
+      OR: [{ countryCode: market }, { countryCode: null, user: { countryCode: market } }],
+    }
     if (isOnline === 'true') where.isOnline = true
 
     let taskers = await prisma.taskerProfile.findMany({
@@ -110,4 +133,20 @@ async function resolveCategoryMatchKeys(category: string): Promise<string[]> {
   }
 
   return [...keys]
+}
+
+/**
+ * Resolves which market's providers a directory listing may expose.
+ * An explicitly requested market must be a supported launch market; otherwise
+ * the caller's account market is used. Anything unsupported fails closed so the
+ * directory can never fall back to listing every market.
+ */
+function resolveDirectoryMarket(
+  requestedCountry: string | null,
+  accountCountry: string | null | undefined,
+): string | null {
+  const requested = (requestedCountry || '').trim().toUpperCase()
+  if (requested) return isSupportedMarket(requested) ? requested : null
+  const account = (accountCountry || '').trim().toUpperCase()
+  return isSupportedMarket(account) ? account : null
 }

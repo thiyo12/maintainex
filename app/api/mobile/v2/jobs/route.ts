@@ -4,6 +4,7 @@ import { createHash } from 'crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
+import { resolveMarketFromServiceAddress } from '@/lib/geography/market-engine'
 import { blastJobToTaskers } from '@/lib/job-blast'
 import { calculatePrice } from '@/lib/pricing/engine'
 import { getSetting } from '@/lib/settings'
@@ -14,6 +15,7 @@ import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } f
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { checkCompanyEligibility, checkIndividualProviderEligibility } from '@/lib/phase6/provider-eligibility'
 import { readStoredList } from '@/lib/db-utils'
+import { isCatalogAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
 
@@ -86,6 +88,9 @@ export async function POST(request: NextRequest) {
     title = typeof title === 'string' ? sanitize(title, 200) : ''
     description = typeof description === 'string' ? sanitize(description, 5000) : ''
     categoryId = typeof categoryId === 'string' ? sanitize(categoryId, 80) : ''
+    if (areaId != null && areaId !== '' && typeof areaId !== 'string') {
+      return NextResponse.json({ error: 'areaId must be a valid area identifier', code: 'INVALID_AREA_ID' }, { status: 400 })
+    }
     if (typeof areaId === 'string') areaId = sanitize(areaId, 80)
     if (typeof postalCode === 'string') postalCode = sanitize(postalCode, 20)
     if (typeof serviceTemplateId === 'string') serviceTemplateId = sanitize(serviceTemplateId, 80)
@@ -103,15 +108,16 @@ export async function POST(request: NextRequest) {
 
     const category = await prisma.jobCategory.findUnique({
       where: { id: categoryId },
-      select: { id: true, name: true, slug: true, isActive: true },
+      select: { id: true, name: true, slug: true, isActive: true, countries: true },
     })
     if (!category?.isActive) return NextResponse.json({ error: 'Invalid or inactive categoryId' }, { status: 400 })
 
-    let serviceTemplate: { id: string; jobCategoryId: string; templateJobId: string | null; isActive: boolean } | null = null
+    let serviceTemplate: { id: string; jobCategoryId: string; templateJobId: string | null; isActive: boolean; countryCode: string; currency: string } | null = null
+    let selectedTemplateJob: { id: string; categoryId: string; isActive: boolean; countries: string; currency: string } | null = null
     if (serviceTemplateId) {
       serviceTemplate = await prisma.serviceTemplate.findUnique({
         where: { id: serviceTemplateId },
-        select: { id: true, jobCategoryId: true, templateJobId: true, isActive: true },
+        select: { id: true, jobCategoryId: true, templateJobId: true, isActive: true, countryCode: true, currency: true },
       })
       if (!serviceTemplate?.isActive || serviceTemplate.jobCategoryId !== categoryId) {
         return NextResponse.json({ error: 'serviceTemplateId does not belong to categoryId' }, { status: 400 })
@@ -121,8 +127,9 @@ export async function POST(request: NextRequest) {
     if (templateJobId) {
       const templateJob = await prisma.templateJob.findUnique({
         where: { id: templateJobId },
-        select: { id: true, categoryId: true, isActive: true },
+        select: { id: true, categoryId: true, isActive: true, countries: true, currency: true },
       })
+      selectedTemplateJob = templateJob
       if (!templateJob?.isActive || templateJob.categoryId !== categoryId) {
         return NextResponse.json({ error: 'templateJobId does not belong to categoryId' }, { status: 400 })
       }
@@ -136,15 +143,52 @@ export async function POST(request: NextRequest) {
     if (serviceTemplate?.templateJobId) {
       const linked = await prisma.templateJob.findUnique({
         where: { id: serviceTemplate.templateJobId },
-        select: { categoryId: true, isActive: true },
+        select: { id: true, categoryId: true, isActive: true, countries: true, currency: true },
       })
+      selectedTemplateJob = linked
       if (!linked?.isActive || linked.categoryId !== categoryId) {
         return NextResponse.json({ error: 'Service template has invalid TemplateJob relationship' }, { status: 400 })
       }
     }
 
     const finalPreferredTimeSlot = ['morning', 'afternoon', 'evening', 'anytime'].includes(preferredTimeSlot) ? preferredTimeSlot : null
-    const finalCountryCode = typeof countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(countryCode) ? countryCode.toUpperCase() : 'LK'
+    const claimedCountryCode = typeof countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(countryCode) ? countryCode.toUpperCase() : null
+
+    // Do not discard malformed or partial GPS input before calling the shared
+    // resolver. Turning invalid coordinates into null could silently downgrade
+    // a purported location to a postal-only LK booking authorization.
+    const coordinatesProvided = latitude != null || longitude != null
+    if (coordinatesProvided && (
+      typeof latitude !== 'number' || !Number.isFinite(latitude) ||
+      typeof longitude !== 'number' || !Number.isFinite(longitude)
+    )) {
+      return NextResponse.json({
+        error: 'Complete, valid service coordinates are required when location data is provided',
+        code: 'ADDRESS_REQUIRES_VERIFICATION',
+      }, { status: 400 })
+    }
+
+    // Phase 02 authority rule: the validated service address decides the market.
+    // A client-supplied country value is advisory only and can never authorize
+    // a market on its own.
+    const addressResolution = resolveMarketFromServiceAddress({
+      latitude: typeof latitude === 'number' && Number.isFinite(latitude) ? latitude : null,
+      longitude: typeof longitude === 'number' && Number.isFinite(longitude) ? longitude : null,
+      postalCode: typeof postalCode === 'string' ? postalCode : null,
+      claimedCountryCode,
+    })
+
+    if (!addressResolution.ok) {
+      return NextResponse.json(
+        {
+          error: addressResolution.error,
+          code: addressResolution.code,
+        },
+        { status: 400 }
+      )
+    }
+
+    const finalCountryCode = addressResolution.countryCode
     const currency = getCurrencyForCountry(finalCountryCode)
     const budgetProvided = budgetAmount !== undefined && budgetAmount !== null && budgetAmount !== ''
     const budgetMinor = budgetProvided ? parseMajorUnitsInput(budgetAmount, currency) : null
@@ -157,6 +201,50 @@ export async function POST(request: NextRequest) {
         error: 'Country mismatch: you cannot create jobs in a different country',
         code: 'COUNTRY_MISMATCH',
       }, { status: 403 })
+    }
+
+    // Phase 02: areaId is a database ID, not proof of location. Verify its
+    // country and, for Canada, its exact municipality before any pricing,
+    // provider matching, or job creation. Coordinates remain authoritative
+    // for the precise Vancouver municipal boundary.
+    if (areaId) {
+      const requestedArea = await prisma.area.findUnique({
+        where: { id: areaId },
+        select: {
+          city: {
+            select: {
+              name: true,
+              state: { select: { name: true, country: { select: { code: true } } } },
+            },
+          },
+        },
+      })
+      const areaCountry = requestedArea?.city?.state?.country?.code?.trim().toUpperCase()
+      const areaCity = requestedArea?.city?.name?.trim().toLowerCase()
+      const areaProvince = requestedArea?.city?.state?.name?.trim().toLowerCase()
+      // A city name alone is not sufficient: Vancouver must be in BC,
+      // not a similarly named or misfiled city in another Canadian province.
+      const validVancouverArea = areaCity === 'vancouver' &&
+        (areaProvince === 'british columbia' || areaProvince === 'bc')
+      if (areaCountry !== finalCountryCode || (finalCountryCode === 'CA' && !validVancouverArea)) {
+        return NextResponse.json({
+          error: 'Selected area does not belong to the verified service location',
+          code: 'AREA_MARKET_MISMATCH',
+        }, { status: 400 })
+      }
+    }
+
+    // An active catalogue ID is not an authorization to book it in every market.
+    // Validate the selected category and each optional service against the
+    // authoritative address market BEFORE pricing, matching or job creation.
+    if (!isCatalogAvailableInMarket(category.countries, finalCountryCode)) {
+      return NextResponse.json({ error: 'Category is not available at this service address', code: 'CATEGORY_MARKET_MISMATCH' }, { status: 400 })
+    }
+    if (serviceTemplate && (serviceTemplate.countryCode !== finalCountryCode || serviceTemplate.currency !== currency)) {
+      return NextResponse.json({ error: 'Service template is not available in this market', code: 'SERVICE_TEMPLATE_MARKET_MISMATCH' }, { status: 400 })
+    }
+    if (selectedTemplateJob && (!isCatalogAvailableInMarket(selectedTemplateJob.countries, finalCountryCode) || selectedTemplateJob.currency !== currency)) {
+      return NextResponse.json({ error: 'Selected job service is not available in this market', code: 'TEMPLATE_JOB_MARKET_MISMATCH' }, { status: 400 })
     }
 
     if (targetTaskerId) {

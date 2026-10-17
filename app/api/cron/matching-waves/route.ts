@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { logger } from '@/lib/shared/observability/logger'
 import { prisma } from '@/lib/prisma'
+import { requireJobMarket } from '@/lib/geography/market-engine'
+import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { resolveMatchingConfig } from '@/lib/matching'
 import { expireOpportunities, advanceMatchingWave, shouldStopWaves } from '@/lib/matching/waves'
 import { findCandidates } from '@/lib/matching'
@@ -46,23 +48,38 @@ export async function GET(request: NextRequest) {
         continue
       }
 
+      // Find candidates for next wave and create opportunities.
+      // Phase 03: coordinates must be selected here. The previous query omitted
+      // them, so requireJobMarket silently fell back to the stored country and
+      // the guard never actually evaluated the validated address.
+      const job = await prisma.marketplaceJob.findUnique({
+        where: { id: jobId },
+        select: {
+          categoryId: true, serviceTemplateId: true, countryCode: true,
+          latitude: true, longitude: true, preferredDate: true,
+        },
+      })
+      if (!job) continue
+
+      // Validate the authoritative market BEFORE any market-dependent wave
+      // mutation or provider dispatch. Advancing first would have created and
+      // expired wave state for a job we then refuse to dispatch.
+      const jobMarket = requireJobMarket(job)
+      if (!jobMarket.ok) {
+        secureConsole.warn('Matching wave skipped: unresolved job market', { jobId })
+        continue
+      }
+
       const result = await advanceMatchingWave(prisma, jobId, config)
       if (!result.advanced) continue
 
       advanced++
 
-      // Find candidates for next wave and create opportunities
-      const job = await prisma.marketplaceJob.findUnique({
-        where: { id: jobId },
-        select: { categoryId: true, serviceTemplateId: true, countryCode: true, preferredDate: true },
-      })
-      if (!job) continue
-
       const matchResult = await findCandidates(prisma, {
         jobId,
         categoryId: job.categoryId,
         serviceTemplateId: job.serviceTemplateId || undefined,
-        countryCode: job.countryCode || 'GLOBAL',
+        countryCode: jobMarket.countryCode,
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
         preferredDate: job.preferredDate,

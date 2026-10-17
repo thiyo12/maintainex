@@ -31,6 +31,12 @@ describe('quote revision route security invariants', () => {
     expect(revisionIndex).toBeGreaterThan(matchIndex)
   })
 
+  it('classifies counteroffers using the validated job market rather than stale stored country', () => {
+    expect(source).toContain('countryCode: jobMarket.countryCode,')
+    expect(source).not.toContain('countryCode: job.countryCode,')
+    expect(source).toContain('originalQuote.currency !== canonicalCurrency')
+  })
+
   it('uses the job service template for benchmark classification', () => {
     expect(source).toContain('if (job.serviceTemplateId)')
     expect(source).toContain('serviceTemplateId: job.serviceTemplateId')

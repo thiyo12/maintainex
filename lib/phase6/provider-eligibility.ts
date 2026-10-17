@@ -1,5 +1,13 @@
 import { prisma } from '@/lib/prisma'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { readStoredList } from '@/lib/db-utils'
+
+/** Legacy capabilities can be JSON lists or old comma-separated labels.
+ * An empty JSON array is NOT a declared capability, even if the string is truthy.
+ */
+export function hasDeclaredProviderCapabilities(stored: string | null | undefined): boolean {
+  return readStoredList(stored).some(value => value.trim().length > 0)
+}
 
 export interface ProviderEligibility {
   eligible: boolean
@@ -11,12 +19,13 @@ export async function checkIndividualProviderEligibility(userId: string): Promis
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { identityStatus: true, isSuspended: true, isBanned: true, role: true },
+    select: { identityStatus: true, isActive: true, isSuspended: true, isBanned: true, role: true },
   })
   if (!user) {
     return { eligible: false, reasons: ['User not found'] }
   }
 
+  if (user.isActive === false) reasons.push('Account is inactive')
   if (user.isSuspended) reasons.push('Account is suspended')
   if (user.isBanned) reasons.push('Account is banned')
   if (user.identityStatus !== 'VERIFIED') reasons.push('Identity not verified')
@@ -32,7 +41,7 @@ export async function checkIndividualProviderEligibility(userId: string): Promis
   if (profile.verificationStatus !== 'VERIFIED') reasons.push('Provider verification not approved')
   if (!profile.isVerified) reasons.push('Provider not marked as verified')
 
-  const hasLegacySkills = profile.skills && profile.skills !== '[]' && profile.skills !== ''
+  const hasLegacySkills = hasDeclaredProviderCapabilities(profile.skills)
   if (!hasLegacySkills) {
     const relationalSkillCount = await prisma.taskerSkill.count({ where: { taskerId: profile.id } })
     if (relationalSkillCount === 0) {
@@ -63,7 +72,7 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
   if (company.verificationStatus !== 'VERIFIED') reasons.push('Company verification not approved')
   if (!company.isVerified) reasons.push('Company not marked as verified')
 
-  const hasLegacyServices = company.services && company.services !== ''
+  const hasLegacyServices = hasDeclaredProviderCapabilities(company.services)
   if (!hasLegacyServices) {
     const relationalSpecialtyCount = await prisma.companySpecialty.count({ where: { companyId } })
     if (relationalSpecialtyCount === 0) {
@@ -74,8 +83,9 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
 
   const user = await prisma.user.findUnique({
     where: { id: company.userId },
-    select: { isSuspended: true, isBanned: true },
+    select: { isActive: true, isSuspended: true, isBanned: true },
   })
+  if (user?.isActive === false) reasons.push('Company owner account is inactive')
   if (user?.isSuspended) reasons.push('Company owner account is suspended')
   if (user?.isBanned) reasons.push('Company owner account is banned')
 
@@ -103,12 +113,13 @@ export async function checkWorkerEligibility(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { identityStatus: true, isSuspended: true, isBanned: true },
+    select: { identityStatus: true, isActive: true, isSuspended: true, isBanned: true },
   })
   if (!user) {
     return { eligible: false, reasons: ['User account not found'] }
   }
 
+  if (user.isActive === false) reasons.push('Worker account is inactive')
   if (user.isSuspended) reasons.push('Worker account is suspended')
   if (user.isBanned) reasons.push('Worker account is banned')
   if (user.identityStatus !== 'VERIFIED') reasons.push('Worker identity not verified')
@@ -122,11 +133,41 @@ export async function checkWorkerEligibility(
         preferredDate: true,
         preferredTimeSlot: true,
         workerIdentityCheckRequired: true,
+        countryCode: true,
+        latitude: true,
+        longitude: true,
       },
     })
     if (!job) {
       reasons.push('Job not found')
     } else {
+      // Phase 03: a company worker may only be assigned to a job in their own
+      // market. Assignment overwrites the job's target provider, so this must be
+      // decided from the validated service address, not from stored metadata.
+      const jobMarket = requireJobMarket(job)
+      if (!jobMarket.ok) {
+        reasons.push('Job service address is not in a supported market')
+      } else {
+        const workerProfile = await prisma.taskerProfile.findUnique({
+          where: { userId },
+          select: { countryCode: true },
+        })
+        const workerUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { countryCode: true },
+        })
+        const workerCountry = (workerProfile?.countryCode || workerUser?.countryCode || '')
+          .trim()
+          .toUpperCase()
+        if (!workerCountry) {
+          reasons.push('Worker market is unknown')
+        } else if (workerCountry !== jobMarket.countryCode) {
+          reasons.push('Worker market does not match the job market')
+        }
+      }
+    }
+
+    if (job) {
       const [profile, category, template] = await Promise.all([
         prisma.taskerProfile.findUnique({
           where: { userId },

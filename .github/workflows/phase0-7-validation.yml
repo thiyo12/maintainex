@@ -171,6 +171,30 @@ jobs:
         run: |
           psql "$DATABASE_URL" -c "\di *countryCode*"
 
+      # Isolated CI PostgreSQL only: create a dedicated SELECT-only account
+      # and exercise the actual SQL of the launch provider-coverage audit.
+      # This proves query compatibility, never real-world provider supply.
+      - name: Phase 11 aggregate provider coverage query (isolated read-only CI DB)
+        run: |
+          set -euo pipefail
+          [[ "$DATABASE_URL" == *'@localhost:5432/maintainex_test_phase07_ci' ]] || { echo 'Refusing a non-CI database'; exit 1; }
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE phase11_coverage_auditor LOGIN PASSWORD 'phase11-ci-readonly-0123456789';
+          GRANT CONNECT ON DATABASE maintainex_test_phase07_ci TO phase11_coverage_auditor;
+          GRANT USAGE ON SCHEMA public TO phase11_coverage_auditor;
+          GRANT SELECT ON ALL TABLES IN SCHEMA public TO phase11_coverage_auditor;
+          SQL
+          export MAINTAINEX_READONLY_DATABASE_URL='postgresql://phase11_coverage_auditor:phase11-ci-readonly-0123456789@localhost:5432/maintainex_test_phase07_ci'
+          bash scripts/international-provider-coverage-audit.sh 2>&1 | tee /tmp/phase11-coverage-sql-test.txt
+          grep -Eq '\(28 rows\)' /tmp/phase11-coverage-sql-test.txt
+      - name: Upload Phase 11 coverage SQL diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase11-coverage-sql-diagnostics
+          path: /tmp/phase11-coverage-sql-test.txt
+          if-no-files-found: ignore
+          retention-days: 3
       - name: TypeScript
         run: npx tsc --noEmit 2>&1 | tee /tmp/tsc.txt
 
@@ -186,7 +210,48 @@ jobs:
       - name: Mobile TypeScript
         run: |
           cd apps/mobile
-          npx tsc --noEmit
+          npx tsc --noEmit 2>&1 | tee /tmp/mobile-tsc.txt
+
+      - name: Upload Mobile TypeScript diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mobile-typescript-diagnostics
+          path: /tmp/mobile-tsc.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: International launch Phases 04-11 blocking acceptance gates
+        if: always()
+        run: |
+          set -euo pipefail
+          npx vitest run \
+            tests/security/phase04-vancouver-company-onboarding.test.ts \
+            tests/security/phase04-company-invitation-market.test.ts \
+            tests/security/phase07-company-work-start-authorization.test.ts \
+            tests/security/phase11-inactive-company-owner-matching.test.ts \
+            tests/regions/phase11-provider-coverage-audit-contract.test.ts \
+            tests/e2e/e2e-fix-batch.test.ts \
+            tests/security/crm-canonical-catalog.test.ts \
+            tests/finance/phase05-price-input-isolation.test.ts \
+            tests/pricing/phase05-market-price-estimate.test.ts \
+            tests/quotes/quote-revision.test.ts \
+            tests/security/quote-revision-route-security.test.ts \
+            tests/domain/phase08-seasonal-offer-market.test.ts \
+            apps/mobile/lib/i18n/__tests__/french-locale.test.ts \
+            tests/structural/phase11-launch-gate-contract.test.ts \
+            --reporter=verbose 2>&1 | tee /tmp/international-launch-phase-gates.txt
+
+      - name: Upload international launch acceptance diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: international-launch-acceptance-diagnostics
+          path: /tmp/international-launch-phase-gates.txt
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: International launch market regression checks
+        run: npx vitest run tests/regions/international-launch-regions.test.ts tests/security/international-v2-search-market-contract.test.ts tests/domain/catalog-market-eligibility.test.ts tests/domain/catalog-inventory.test.ts tests/domain/international-template-job-route-market.test.ts tests/pricing/international-estimate-market-contract.test.ts tests/pricing/international-authoritative-job-country.test.ts tests/security/international-tracking-issue-report-contract.test.ts tests/security/international-safety-escalation-contract.test.ts tests/security/international-active-v2-safety-report-contract.test.ts
 
       - name: Schema integrity tests
         run: npx vitest run tests/structural/schema-integrity.test.ts tests/structural/migration-validation.test.ts tests/structural/crm-legacy-role-retirement.test.ts tests/structural/crm-app-web-v2.test.ts tests/structural/crm-legacy-customer-api-retirement.test.ts tests/structural/crm-v2-shell-permissions.test.ts tests/structural/crm-v2-visual-contract.test.ts tests/structural/crm-reference-parity-all-pages.test.ts tests/structural/crm-global-readability.test.ts tests/structural/crm-v2-migrated-page-contract.test.ts tests/structural/crm-v2-shell.test.ts tests/structural/crm-phase14-v2.test.ts tests/structural/crm-phase15-legacy-demolition.test.ts --reporter=verbose 2>&1 | tee /tmp/schema-tests.txt
@@ -342,6 +407,32 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+      # Full regression files share an isolated PostgreSQL service and run
+      # concurrently. A mid-suite FK audit can observe another file's fixture
+      # between cleanup statements. Run the exact orphan checks again after
+      # all test-file cleanup has completed; unlike the historical baseline,
+      # this final audit is a blocking launch invariant.
+      - name: Final PostgreSQL orphan audit after regression cleanup (blocking)
+        if: always()
+        run: |
+          set -euo pipefail
+          [[ "$DATABASE_URL" == *'@localhost:5432/maintainex_test_phase07_ci' ]] || {
+            echo 'Refusing to audit an unexpected database'
+            exit 1
+          }
+          npx vitest run tests/integration/real-postgresql-integration.test.ts \
+            -t '4D.7 — FK/Orphan Audit' --reporter=verbose \
+            2>&1 | tee /tmp/phase11-final-postgres-orphan-audit.txt
+
+      - name: Upload final PostgreSQL orphan audit diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase11-final-postgres-orphan-audit-diagnostics
+          path: /tmp/phase11-final-postgres-orphan-audit.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Immutable deploy script safety
         shell: bash
         run: |
@@ -459,6 +550,12 @@ jobs:
           exit 1
         if: always()
 
+      - name: International launch running-container market-isolation smoke
+        run: |
+          set -euo pipefail
+          node scripts/international-catalogue-smoke.mjs --self-test
+          node scripts/international-catalogue-smoke.mjs http://127.0.0.1:3199
+        if: always()
       - name: Verify non-root user
         run: |
           RUNNING=$(docker inspect -f '{{.State.Running}}' phase9-ci-test 2>/dev/null || echo "false")

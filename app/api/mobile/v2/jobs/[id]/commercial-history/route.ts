@@ -1,10 +1,10 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { getCommercialHistory, calculatePriceEscalationSignals } from '@/lib/domain/risk-events'
 import { calculateFinalAuthorizedAmount } from '@/lib/domain/change-order'
-import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { getReadableCompanyIds, getActiveAssignedCompanyId } from '@/lib/phase6/company-job-read-access'
 
 function toJsonSafe<T>(value: T): any {
   return JSON.parse(JSON.stringify(value, (_key, item) =>
@@ -28,6 +28,8 @@ export async function GET(
   try {
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { id: jobId } = await params
 
@@ -47,9 +49,19 @@ export async function GET(
         if (acceptedQuote.providerId !== user.id) {
           return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
+      } else if (acceptedQuote.providerType === 'COMPANY') {
+        // Generic quotes:read grants WORKER broad company access in older RBAC.
+        // This financial history is private to actual company management and
+        // workers with an active assignment for this precise job.
+        const managerialCompanyIds = await getReadableCompanyIds(user.id)
+        if (!managerialCompanyIds.includes(acceptedQuote.providerId)) {
+          const assignedCompanyId = await getActiveAssignedCompanyId(jobId, user.id)
+          if (assignedCompanyId !== acceptedQuote.providerId) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+          }
+        }
       } else {
-        const { error } = await resolveCompanyContext(user.id, acceptedQuote.providerId, 'quotes:read')
-        if (error) return error
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
     }
 

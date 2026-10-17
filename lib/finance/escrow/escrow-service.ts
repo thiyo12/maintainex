@@ -14,6 +14,8 @@ import {
 import type { TransitionContext } from '@/lib/domain/job-lifecycle'
 import { resolveEscrowFundingSource } from '@/lib/finance/payments/funding-source'
 import { isCashPaymentAvailableForMarket } from '@/lib/finance/payments/provider-registry'
+import { resolvePaymentMarketForIntent } from '@/lib/finance/payments/payment-service'
+import { LAUNCH_MARKETS } from '@/lib/geography/market-engine'
 
 export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
@@ -126,6 +128,50 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   return { success: true, totalAmount, escrowId: escrow.id }
 }
 
+/**
+ * Settlement attribution market.
+ *
+ * Release and completion resolve the provider financial policy by
+ * (countryCode, providerType, currency), so the recorded country is not a mere
+ * label: it selects which policy applies and whether online-earnings offsets are
+ * enabled. Deriving it from the job's STORED country with an implicit Sri Lanka
+ * default mis-attributes a Canadian transaction to the Sri Lankan policy.
+ *
+ * This helper never throws and never blocks a legitimate historical release or
+ * refund. Preference order:
+ *   1. the authoritative service-address market, but only when the job has a
+ *      complete coordinate pair, since the stored country is otherwise returned
+ *      unchallenged;
+ *   2. the validated escrow currency mapped through the launch markets;
+ *   3. the stored job country, as legacy metadata.
+ */
+export function resolveSettlementMarket(
+  job: { countryCode: string | null; latitude: number | null; longitude: number | null },
+  escrowCurrency: string,
+): string {
+  // Only a complete coordinate pair makes the market genuinely validated.
+  // Without one, the payment-intent resolver accepts the stored country through
+  // its own legacy fallback, which is exactly the untrusted value we must not
+  // let outrank a validated escrow currency.
+  const hasCoordinates =
+    typeof job.latitude === 'number' && Number.isFinite(job.latitude) &&
+    typeof job.longitude === 'number' && Number.isFinite(job.longitude)
+  if (hasCoordinates) {
+    try {
+      const resolved = resolvePaymentMarketForIntent(job)
+      if (resolved.ok) return resolved.countryCode
+    } catch {
+      /* fall through to the currency-derived market */
+    }
+  }
+  const currency = escrowCurrency.trim().toUpperCase()
+  for (const market of Object.values(LAUNCH_MARKETS)) {
+    if (market.currency.trim().toUpperCase() === currency) return market.countryCode
+  }
+  const stored = job.countryCode?.trim().toUpperCase()
+  return stored || 'LK'
+}
+
 export async function confirmCashPayment(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
@@ -154,10 +200,10 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
     throw new Error('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
   }
 
-  if (!isCashPaymentAvailableForMarket(job.countryCode || 'LK', escrow.currency)) {
-    throw new Error('CASH_PAYMENT_NOT_AVAILABLE_FOR_MARKET')
-  }
-
+  // Historical cash selections stay readable and idempotent even if the job's
+  // location metadata has since become inconsistent. This runs BEFORE any market
+  // gate so an already-settled cash payment never becomes inaccessible, and it
+  // never relaxes the restriction on a NEW selection below.
   if (escrow.paymentMethod === 'CASH' && escrow.status === 'CASH_CONFIRMED') {
     return {
       success: true,
@@ -173,8 +219,17 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
 
   const confirmedAt = new Date()
   await prisma.$transaction(async tx => {
-    const lockedJobs = await tx.$queryRaw<Array<{ id: string; customerId: string; status: string }>>`
-      SELECT id, "customerId", status
+    const lockedJobs = await tx.$queryRaw<
+      Array<{
+        id: string
+        customerId: string
+        status: string
+        countryCode: string | null
+        latitude: number | null
+        longitude: number | null
+      }>
+    >`
+      SELECT id, "customerId", status, "countryCode", latitude, longitude
       FROM "MarketplaceJob"
       WHERE id = ${jobId}
       FOR UPDATE
@@ -184,10 +239,27 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
     if (lockedJob.customerId !== ctx.actorId) throw new Error('Only the customer can select cash payment')
     if (lockedJob.status !== 'QUOTE_ACCEPTED') throw new Error('Job is not ready for cash payment')
 
+    // Phase 03: the cash market is revalidated from the LOCKED job row. The
+    // pre-lock preview is not trusted, stored country alone does not prove
+    // geographic eligibility, and there is no implicit Sri Lanka fallback.
+    const lockedJobMarket = resolvePaymentMarketForIntent({
+      countryCode: lockedJob.countryCode,
+      latitude: lockedJob.latitude,
+      longitude: lockedJob.longitude,
+    })
+    if (!lockedJobMarket.ok) {
+      throw new Error('CASH_PAYMENT_NOT_AVAILABLE_FOR_MARKET')
+    }
+    const authoritativeCountryCode = lockedJobMarket.countryCode
+
+    if (!isCashPaymentAvailableForMarket(authoritativeCountryCode, escrow.currency)) {
+      throw new Error('CASH_PAYMENT_NOT_AVAILABLE_FOR_MARKET')
+    }
+
     await assertProviderCashEligible(tx, {
       providerId: quote.providerId,
       providerType: quote.providerType as 'INDIVIDUAL' | 'COMPANY',
-      countryCode: job.countryCode || 'LK',
+      countryCode: authoritativeCountryCode,
       currency: escrow.currency,
     })
 
@@ -275,6 +347,9 @@ export async function releaseEscrow(
   }
   const providerType = quote.providerType
   const escrowCurrency = escrow.currency as Currency
+  // Attribution market for provider financial policy and commission records.
+  const settlementMarket = resolveSettlementMarket(job, escrowCurrency)
+
 
   const identity = await resolvePayoutIdentity(quote.providerId, providerType)
   const defaultRate = await getCommissionRate()
@@ -299,7 +374,7 @@ export async function releaseEscrow(
     const commissionRecovery = await recoverProviderCommissionFromOnlineEarnings(tx, {
       providerId: quote.providerId,
       providerType,
-      countryCode: job.countryCode || 'LK',
+      countryCode: settlementMarket,
       currency: escrowCurrency,
       availableOnlineEarningsMinor: netCents,
       sourceJobId: jobId,
@@ -432,7 +507,7 @@ export async function releaseEscrow(
           commissionRate: rate,
           commissionAmount: commissionCents,
           currency: escrowCurrency,
-          countryCode: job.countryCode || 'LK',
+          countryCode: settlementMarket,
           status: 'PENDING',
         },
       })
@@ -939,6 +1014,9 @@ export async function completeAndReleaseEscrow(
     const netMajor = bigIntToSafeNumber(netCents) / 100
     const platformDueMajor = bigIntToSafeNumber(platformDueCents) / 100
     const escrowCurrency = escrow.currency as Currency
+    // Attribution market for provider financial policy and commission records.
+    const settlementMarket = resolveSettlementMarket(job, escrowCurrency)
+
 
     if (escrow.paymentMethod === 'CASH') {
       const cashAllowedStatuses =
@@ -983,7 +1061,7 @@ export async function completeAndReleaseEscrow(
           commissionRate: effectivePlatformRate,
           commissionCents: platformDueCents,
           currency: escrowCurrency,
-          countryCode: job.countryCode || 'LK',
+          countryCode: settlementMarket,
         })
 
         await recordCashPlatformReceivable(tx, {
@@ -991,7 +1069,7 @@ export async function completeAndReleaseEscrow(
           escrowId: escrow.id,
           providerId: quote.providerId,
           providerType,
-          countryCode: job.countryCode || 'LK',
+          countryCode: settlementMarket,
           currency: escrowCurrency,
           platformDueMinor: platformDueCents,
           weeklySettlementId: weeklySettlement.id,
@@ -1048,7 +1126,7 @@ export async function completeAndReleaseEscrow(
     const commissionRecovery = await recoverProviderCommissionFromOnlineEarnings(tx, {
       providerId: quote.providerId,
       providerType,
-      countryCode: job.countryCode || 'LK',
+      countryCode: settlementMarket,
       currency: escrowCurrency,
       availableOnlineEarningsMinor: netCents,
       sourceJobId: jobId,
@@ -1192,7 +1270,7 @@ export async function completeAndReleaseEscrow(
           commissionRate: rate,
           commissionAmount: commissionCents,
           currency: escrowCurrency,
-          countryCode: job.countryCode || 'LK',
+          countryCode: settlementMarket,
           status: 'PENDING',
         },
       })
