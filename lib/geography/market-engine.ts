@@ -164,6 +164,19 @@ export function resolveMarketFromServiceAddress(input: ServiceAddressInput): Mar
     typeof input.longitude === 'number' &&
     Number.isFinite(input.longitude)
 
+  // An incomplete or invalid coordinate pair is not "no coordinates".
+  // Otherwise an attacker can omit just the longitude (or supply NaN) and
+  // downgrade a location assertion into postal-only Sri Lanka eligibility.
+  const latitudeProvided = input.latitude !== null && input.latitude !== undefined
+  const longitudeProvided = input.longitude !== null && input.longitude !== undefined
+  if ((latitudeProvided || longitudeProvided) && !hasCoordinates) {
+    return {
+      ok: false,
+      code: 'ADDRESS_REQUIRES_VERIFICATION',
+      error: 'The service address has incomplete or invalid coordinates and requires verification.',
+    }
+  }
+
   if (hasCoordinates) {
     const latitude = input.latitude as number
     const longitude = input.longitude as number
@@ -316,6 +329,14 @@ export function resolveJobMarket(job: {
     Number.isFinite(job.latitude) &&
     typeof job.longitude === 'number' &&
     Number.isFinite(job.longitude)
+
+  // Legacy rows with NO coordinates can retain their historical country.
+  // A partial/corrupt coordinate pair is NOT legacy addressless data and
+  // cannot be silently downgraded to a stored-country authorization.
+  const hasAnyCoordinate =
+    (job.latitude !== null && job.latitude !== undefined) ||
+    (job.longitude !== null && job.longitude !== undefined)
+  if (hasAnyCoordinate && !hasCoordinates) return null
 
   if (hasCoordinates) {
     const resolved = resolveMarketFromServiceAddress({
