@@ -184,4 +184,15 @@ describe('Phase 07 safety intake never mutates financial disputes', () => {
     expect(wizard).toContain('does not automatically put payment on hold')
     expect(wizard).toContain('does not automatically hold escrow')
   })
+  it('shows only permitted assignment actions and never offers unsupported completion', () => {
+    const component = readFileSync(resolve(process.cwd(),
+      'apps/mobile/features/company/screens/workforce/assignment/[id].tsx'), 'utf8')
+    const route = readFileSync(resolve(process.cwd(),
+      'app/api/mobile/company/assignments/[id]/route.ts'), 'utf8')
+    expect(component).toContain("assignment.capabilities?.isAssignedWorker && assignment.status === 'ASSIGNED'")
+    expect(component).toContain("assignment.capabilities?.canManageAssignment && ['ASSIGNED', 'ACCEPTED'].includes(assignment.status)")
+    expect(component).not.toContain("handleAction('complete')")
+    expect(component).toContain('customer approval flow')
+    expect(route).toContain("['accept', 'reject', 'revoke']")
+  })
 })
