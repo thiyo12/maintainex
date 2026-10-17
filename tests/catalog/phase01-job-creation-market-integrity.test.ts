@@ -6,7 +6,7 @@ const mock = vi.hoisted(() => ({
   category: { id: 'cat', name: 'Plumbing', slug: 'plumbing', isActive: true, countries: '["CA"]' },
   service: { id: 'service', jobCategoryId: 'cat', templateJobId: null as string | null, isActive: true, countryCode: 'CA', currency: 'CAD' },
   job: { id: 'service-job', categoryId: 'cat', isActive: true, countries: '["CA"]', currency: 'CAD' },
-  area: { city: { name: 'Vancouver', state: { country: { code: 'CA' } } } } as null | { city: { name: string; state: { country: { code: string } } } },
+  area: { city: { name: 'Vancouver', state: { name: 'British Columbia', country: { code: 'CA' } } } } as null | { city: { name: string; state: { name: string; country: { code: string } } } },
   areaFind: vi.fn(),
   categoryFind: vi.fn(), serviceFind: vi.fn(), templateFind: vi.fn(),
   jobCreate: vi.fn(), price: vi.fn(), blast: vi.fn(), location: vi.fn(),
@@ -49,7 +49,7 @@ describe('Phase 01 — job creation validates canonical catalogue against addres
     vi.clearAllMocks()
     mock.account = 'CA'
     mock.market = 'CA'
-    mock.area = { city: { name: 'Vancouver', state: { country: { code: 'CA' } } } }
+    mock.area = { city: { name: 'Vancouver', state: { name: 'British Columbia', country: { code: 'CA' } } } }
     mock.areaFind.mockImplementation(async () => mock.area)
     mock.category = { id: 'cat', name: 'Plumbing', slug: 'plumbing', isActive: true, countries: '["CA"]' }
     mock.service = { id: 'service', jobCategoryId: 'cat', templateJobId: null, isActive: true, countryCode: 'CA', currency: 'CAD' }
@@ -128,25 +128,36 @@ describe('Phase 01 — job creation validates canonical catalogue against addres
     expect(response.status).toBe(201)
     expect(mock.areaFind).toHaveBeenCalledWith({
       where: { id: 'van-area' },
-      select: { city: { select: { name: true, state: { select: { country: { select: { code: true } } } } } } },
+      select: { city: { select: { name: true, state: { select: { name: true, country: { select: { code: true } } } } } } },
     })
     expect(mock.jobCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ areaId: 'van-area', countryCode: 'CA' }),
     }))
   })
 
+  it('rejects a Vancouver-named area located in Ontario', async () => {
+    mock.area = { city: { name: 'Vancouver', state: { name: 'Ontario', country: { code: 'CA' } } } }
+    await reject({ areaId: 'ontario-van' }, 'AREA_MARKET_MISMATCH')
+  })
+
+  it('accepts the BC province abbreviation as a valid Vancouver area', async () => {
+    mock.area = { city: { name: 'Vancouver', state: { name: 'BC', country: { code: 'CA' } } } }
+    expect((await create({ areaId: 'vancouver-bc' })).status).toBe(201)
+    expect(mock.jobCreate).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects Vancouver booking tied to a Burnaby area', async () => {
-    mock.area = { city: { name: 'Burnaby', state: { country: { code: 'CA' } } } }
+    mock.area = { city: { name: 'Burnaby', state: { name: 'British Columbia', country: { code: 'CA' } } } }
     await reject({ areaId: 'burnaby-area' }, 'AREA_MARKET_MISMATCH')
   })
 
   it('rejects Vancouver booking tied to a North Vancouver area', async () => {
-    mock.area = { city: { name: 'North Vancouver', state: { country: { code: 'CA' } } } }
+    mock.area = { city: { name: 'North Vancouver', state: { name: 'British Columbia', country: { code: 'CA' } } } }
     await reject({ areaId: 'north-van-area' }, 'AREA_MARKET_MISMATCH')
   })
 
   it('rejects a Sri Lankan area ID for a Vancouver booking', async () => {
-    mock.area = { city: { name: 'Colombo', state: { country: { code: 'LK' } } } }
+    mock.area = { city: { name: 'Colombo', state: { name: 'Western Province', country: { code: 'LK' } } } }
     await reject({ areaId: 'colombo-area' }, 'AREA_MARKET_MISMATCH')
   })
 
@@ -159,7 +170,7 @@ describe('Phase 01 — job creation validates canonical catalogue against addres
     mock.account = 'LK'
     mock.market = 'LK'
     mock.category.countries = '["LK"]'
-    mock.area = { city: { name: 'Kandy', state: { country: { code: 'LK' } } } }
+    mock.area = { city: { name: 'Kandy', state: { name: 'Western Province', country: { code: 'LK' } } } }
     const response = await create({ areaId: 'kandy-area', latitude: 7.2906, longitude: 80.6337 })
     expect(response.status).toBe(201)
     expect(mock.jobCreate).toHaveBeenCalledWith(expect.objectContaining({

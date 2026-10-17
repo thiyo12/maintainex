@@ -82,7 +82,7 @@ export async function GET() {
 
 type CountryWithRegions = {
   code: string
-  states?: Array<{ cities?: Array<{ name: string; areas?: Array<{ name: string }> }> }>
+  states?: Array<{ name: string; cities?: Array<{ name: string; areas?: Array<{ name: string }> }> }>
 }
 
 /**
@@ -114,6 +114,12 @@ function restrictToLaunchMarket<T extends CountryWithRegions>(country: T): T {
             }
           }),
       }))
-      .filter(state => (state.cities || []).length > 0),
+      // Only the City of Vancouver in British Columbia is in the CA launch
+      // scope. Never display a same-named city from Ontario or another province.
+      .filter(state =>
+        (state.cities || []).length > 0 &&
+        (country.code.toUpperCase() !== 'CA' ||
+          ['british columbia', 'bc'].includes(state.name.trim().toLowerCase()))
+      ),
   } as T
 }

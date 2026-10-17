@@ -214,14 +214,19 @@ export async function POST(request: NextRequest) {
           city: {
             select: {
               name: true,
-              state: { select: { country: { select: { code: true } } } },
+              state: { select: { name: true, country: { select: { code: true } } } },
             },
           },
         },
       })
       const areaCountry = requestedArea?.city?.state?.country?.code?.trim().toUpperCase()
       const areaCity = requestedArea?.city?.name?.trim().toLowerCase()
-      if (areaCountry !== finalCountryCode || (finalCountryCode === 'CA' && areaCity !== 'vancouver')) {
+      const areaProvince = requestedArea?.city?.state?.name?.trim().toLowerCase()
+      // A city name alone is not sufficient: Vancouver must be in BC,
+      // not a similarly named or misfiled city in another Canadian province.
+      const validVancouverArea = areaCity === 'vancouver' &&
+        (areaProvince === 'british columbia' || areaProvince === 'bc')
+      if (areaCountry !== finalCountryCode || (finalCountryCode === 'CA' && !validVancouverArea)) {
         return NextResponse.json({
           error: 'Selected area does not belong to the verified service location',
           code: 'AREA_MARKET_MISMATCH',

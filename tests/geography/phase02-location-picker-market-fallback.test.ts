@@ -109,13 +109,45 @@ describe('Phase 02 — launch locations stay scoped during normal and fallback r
   it('never exposes countries outside the two launch markets from the DB', async () => {
     mock.findCountries.mockResolvedValue([
       { id: 'us', name: 'United States', code: 'US', states: [{ name: 'New York', cities: [{ name: 'New York', areas: [] }] }] },
-      { id: 'ca', name: 'Canada', code: 'CA', states: [{ name: 'Ontario', cities: [{ name: 'Toronto', areas: [] }, { name: 'Vancouver', areas: [] }] }] },
+      { id: 'ca', name: 'Canada', code: 'CA', states: [
+        { name: 'Ontario', cities: [{ name: 'Toronto', areas: [] }, { name: 'Vancouver', areas: [] }] },
+        { name: 'British Columbia', cities: [{ name: 'Vancouver', areas: [] }] },
+      ] },
       { id: 'lk', name: 'Sri Lanka', code: 'LK', states: [] },
     ])
     const { body } = await locations()
     expect(body.countries.map((c: { code: string }) => c.code).sort()).toEqual(['CA', 'LK'])
     const canada = body.countries.find((c: { code: string }) => c.code === 'CA')
     expect(cities(canada)).toEqual(['Vancouver'])
+  })
+
+  it('does not accept a Vancouver-named city placed in Ontario', async () => {
+    mock.findCountries.mockResolvedValue([
+      {
+        id: 'ca', code: 'CA', name: 'Canada',
+        states: [
+          { name: 'Ontario', cities: [{ name: 'Vancouver', areas: [] }] },
+          { name: 'BC', cities: [{ name: 'Vancouver', areas: [{ name: 'Downtown' }] }] },
+        ],
+      },
+    ])
+    const { body } = await locations()
+    const canada = body.countries.find((country: { code: string }) => country.code === 'CA')
+    expect(canada.states).toHaveLength(1)
+    expect(canada.states[0].name).toBe('BC')
+    expect(cities(canada)).toEqual(['Vancouver'])
+  })
+
+  it('returns no Canadian cities when DB places Vancouver only outside BC', async () => {
+    mock.findCountries.mockResolvedValue([
+      {
+        id: 'ca', code: 'CA', name: 'Canada',
+        states: [{ name: 'Ontario', cities: [{ name: 'Vancouver', areas: [] }] }],
+      },
+    ])
+    const { body } = await locations()
+    const canada = body.countries.find((country: { code: string }) => country.code === 'CA')
+    expect(canada.states).toEqual([])
   })
 
   it('fails closed rather than revealing any locations when runtime policy is unavailable', async () => {
