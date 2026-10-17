@@ -88,6 +88,9 @@ export async function POST(request: NextRequest) {
     title = typeof title === 'string' ? sanitize(title, 200) : ''
     description = typeof description === 'string' ? sanitize(description, 5000) : ''
     categoryId = typeof categoryId === 'string' ? sanitize(categoryId, 80) : ''
+    if (areaId != null && areaId !== '' && typeof areaId !== 'string') {
+      return NextResponse.json({ error: 'areaId must be a valid area identifier', code: 'INVALID_AREA_ID' }, { status: 400 })
+    }
     if (typeof areaId === 'string') areaId = sanitize(areaId, 80)
     if (typeof postalCode === 'string') postalCode = sanitize(postalCode, 20)
     if (typeof serviceTemplateId === 'string') serviceTemplateId = sanitize(serviceTemplateId, 80)
@@ -198,6 +201,32 @@ export async function POST(request: NextRequest) {
         error: 'Country mismatch: you cannot create jobs in a different country',
         code: 'COUNTRY_MISMATCH',
       }, { status: 403 })
+    }
+
+    // Phase 02: areaId is a database ID, not proof of location. Verify its
+    // country and, for Canada, its exact municipality before any pricing,
+    // provider matching, or job creation. Coordinates remain authoritative
+    // for the precise Vancouver municipal boundary.
+    if (areaId) {
+      const requestedArea = await prisma.area.findUnique({
+        where: { id: areaId },
+        select: {
+          city: {
+            select: {
+              name: true,
+              state: { select: { country: { select: { code: true } } } },
+            },
+          },
+        },
+      })
+      const areaCountry = requestedArea?.city?.state?.country?.code?.trim().toUpperCase()
+      const areaCity = requestedArea?.city?.name?.trim().toLowerCase()
+      if (areaCountry !== finalCountryCode || (finalCountryCode === 'CA' && areaCity !== 'vancouver')) {
+        return NextResponse.json({
+          error: 'Selected area does not belong to the verified service location',
+          code: 'AREA_MARKET_MISMATCH',
+        }, { status: 400 })
+      }
     }
 
     // An active catalogue ID is not an authorization to book it in every market.

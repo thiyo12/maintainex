@@ -6,10 +6,13 @@ const mock = vi.hoisted(() => ({
   category: { id: 'cat', name: 'Plumbing', slug: 'plumbing', isActive: true, countries: '["CA"]' },
   service: { id: 'service', jobCategoryId: 'cat', templateJobId: null as string | null, isActive: true, countryCode: 'CA', currency: 'CAD' },
   job: { id: 'service-job', categoryId: 'cat', isActive: true, countries: '["CA"]', currency: 'CAD' },
+  area: { city: { name: 'Vancouver', state: { country: { code: 'CA' } } } } as null | { city: { name: string; state: { country: { code: string } } } },
+  areaFind: vi.fn(),
   categoryFind: vi.fn(), serviceFind: vi.fn(), templateFind: vi.fn(),
   jobCreate: vi.fn(), price: vi.fn(), blast: vi.fn(), location: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({ prisma: {
+  area: { findUnique: mock.areaFind },
   jobCategory: { findUnique: mock.categoryFind },
   serviceTemplate: { findUnique: mock.serviceFind },
   templateJob: { findUnique: mock.templateFind },
@@ -46,6 +49,8 @@ describe('Phase 01 — job creation validates canonical catalogue against addres
     vi.clearAllMocks()
     mock.account = 'CA'
     mock.market = 'CA'
+    mock.area = { city: { name: 'Vancouver', state: { country: { code: 'CA' } } } }
+    mock.areaFind.mockImplementation(async () => mock.area)
     mock.category = { id: 'cat', name: 'Plumbing', slug: 'plumbing', isActive: true, countries: '["CA"]' }
     mock.service = { id: 'service', jobCategoryId: 'cat', templateJobId: null, isActive: true, countryCode: 'CA', currency: 'CAD' }
     mock.job = { id: 'service-job', categoryId: 'cat', isActive: true, countries: '["CA"]', currency: 'CAD' }
@@ -115,6 +120,71 @@ describe('Phase 01 — job creation validates canonical catalogue against addres
     mock.job.countries = '["LK"]'; mock.job.currency = 'LKR'
     expect((await create({ serviceTemplateId: 'service', templateJobId: 'service-job', postalCode: '00100' })).status).toBe(201)
     expect(mock.jobCreate).toHaveBeenCalledTimes(1)
+  })
+
+
+  it('keeps Vancouver area IDs when the city and country both match', async () => {
+    const response = await create({ areaId: 'van-area' })
+    expect(response.status).toBe(201)
+    expect(mock.areaFind).toHaveBeenCalledWith({
+      where: { id: 'van-area' },
+      select: { city: { select: { name: true, state: { select: { country: { select: { code: true } } } } } } },
+    })
+    expect(mock.jobCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ areaId: 'van-area', countryCode: 'CA' }),
+    }))
+  })
+
+  it('rejects Vancouver booking tied to a Burnaby area', async () => {
+    mock.area = { city: { name: 'Burnaby', state: { country: { code: 'CA' } } } }
+    await reject({ areaId: 'burnaby-area' }, 'AREA_MARKET_MISMATCH')
+  })
+
+  it('rejects Vancouver booking tied to a North Vancouver area', async () => {
+    mock.area = { city: { name: 'North Vancouver', state: { country: { code: 'CA' } } } }
+    await reject({ areaId: 'north-van-area' }, 'AREA_MARKET_MISMATCH')
+  })
+
+  it('rejects a Sri Lankan area ID for a Vancouver booking', async () => {
+    mock.area = { city: { name: 'Colombo', state: { country: { code: 'LK' } } } }
+    await reject({ areaId: 'colombo-area' }, 'AREA_MARKET_MISMATCH')
+  })
+
+  it('rejects a missing or stale area ID before pricing or job creation', async () => {
+    mock.area = null
+    await reject({ areaId: 'deleted-area' }, 'AREA_MARKET_MISMATCH')
+  })
+
+  it('accepts a valid Sri Lankan area ID when the market is LK', async () => {
+    mock.account = 'LK'
+    mock.market = 'LK'
+    mock.category.countries = '["LK"]'
+    mock.area = { city: { name: 'Kandy', state: { country: { code: 'LK' } } } }
+    const response = await create({ areaId: 'kandy-area', latitude: 7.2906, longitude: 80.6337 })
+    expect(response.status).toBe(201)
+    expect(mock.jobCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ areaId: 'kandy-area', countryCode: 'LK' }),
+    }))
+  })
+
+  it('rejects a Canadian area ID on a Sri Lankan booking', async () => {
+    mock.account = 'LK'
+    mock.market = 'LK'
+    mock.category.countries = '["LK"]'
+    await reject({ areaId: 'van-area', latitude: 7.2906, longitude: 80.6337 }, 'AREA_MARKET_MISMATCH')
+  })
+
+  it('rejects malformed areaId values before database lookup', async () => {
+    const response = await create({ areaId: { id: 'van-area' } })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'INVALID_AREA_ID' })
+    expect(mock.areaFind).not.toHaveBeenCalled()
+    expect(mock.jobCreate).not.toHaveBeenCalled()
+  })
+
+  it('does not require area lookup for old clients that omit areaId', async () => {
+    expect((await create()).status).toBe(201)
+    expect(mock.areaFind).not.toHaveBeenCalled()
   })
 
   it('does not accept latitude-only coordinates with a Sri Lankan postal code', async () => {
