@@ -84,6 +84,7 @@ jobs:
             tests/security/phase07-company-commercial-history-access.test.ts \
             tests/security/phase07-company-evidence-membership.test.ts \
             tests/security/phase07-company-inspection-read-access.test.ts \
+            tests/catalog/phase01-job-creation-market-integrity.test.ts \
             tests/quotes/inspection-company-membership.test.ts \
             tests/security/phase07-company-change-order-read-access.test.ts \
             tests/security/phase07-company-change-order-staff-revocation.test.ts \

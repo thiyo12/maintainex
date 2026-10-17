@@ -15,6 +15,7 @@ import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } f
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { checkCompanyEligibility, checkIndividualProviderEligibility } from '@/lib/phase6/provider-eligibility'
 import { readStoredList } from '@/lib/db-utils'
+import { isCatalogAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
 
@@ -104,15 +105,16 @@ export async function POST(request: NextRequest) {
 
     const category = await prisma.jobCategory.findUnique({
       where: { id: categoryId },
-      select: { id: true, name: true, slug: true, isActive: true },
+      select: { id: true, name: true, slug: true, isActive: true, countries: true },
     })
     if (!category?.isActive) return NextResponse.json({ error: 'Invalid or inactive categoryId' }, { status: 400 })
 
-    let serviceTemplate: { id: string; jobCategoryId: string; templateJobId: string | null; isActive: boolean } | null = null
+    let serviceTemplate: { id: string; jobCategoryId: string; templateJobId: string | null; isActive: boolean; countryCode: string; currency: string } | null = null
+    let selectedTemplateJob: { id: string; categoryId: string; isActive: boolean; countries: string; currency: string } | null = null
     if (serviceTemplateId) {
       serviceTemplate = await prisma.serviceTemplate.findUnique({
         where: { id: serviceTemplateId },
-        select: { id: true, jobCategoryId: true, templateJobId: true, isActive: true },
+        select: { id: true, jobCategoryId: true, templateJobId: true, isActive: true, countryCode: true, currency: true },
       })
       if (!serviceTemplate?.isActive || serviceTemplate.jobCategoryId !== categoryId) {
         return NextResponse.json({ error: 'serviceTemplateId does not belong to categoryId' }, { status: 400 })
@@ -122,8 +124,9 @@ export async function POST(request: NextRequest) {
     if (templateJobId) {
       const templateJob = await prisma.templateJob.findUnique({
         where: { id: templateJobId },
-        select: { id: true, categoryId: true, isActive: true },
+        select: { id: true, categoryId: true, isActive: true, countries: true, currency: true },
       })
+      selectedTemplateJob = templateJob
       if (!templateJob?.isActive || templateJob.categoryId !== categoryId) {
         return NextResponse.json({ error: 'templateJobId does not belong to categoryId' }, { status: 400 })
       }
@@ -137,8 +140,9 @@ export async function POST(request: NextRequest) {
     if (serviceTemplate?.templateJobId) {
       const linked = await prisma.templateJob.findUnique({
         where: { id: serviceTemplate.templateJobId },
-        select: { categoryId: true, isActive: true },
+        select: { id: true, categoryId: true, isActive: true, countries: true, currency: true },
       })
+      selectedTemplateJob = linked
       if (!linked?.isActive || linked.categoryId !== categoryId) {
         return NextResponse.json({ error: 'Service template has invalid TemplateJob relationship' }, { status: 400 })
       }
@@ -180,6 +184,19 @@ export async function POST(request: NextRequest) {
         error: 'Country mismatch: you cannot create jobs in a different country',
         code: 'COUNTRY_MISMATCH',
       }, { status: 403 })
+    }
+
+    // An active catalogue ID is not an authorization to book it in every market.
+    // Validate the selected category and each optional service against the
+    // authoritative address market BEFORE pricing, matching or job creation.
+    if (!isCatalogAvailableInMarket(category.countries, finalCountryCode)) {
+      return NextResponse.json({ error: 'Category is not available at this service address', code: 'CATEGORY_MARKET_MISMATCH' }, { status: 400 })
+    }
+    if (serviceTemplate && (serviceTemplate.countryCode !== finalCountryCode || serviceTemplate.currency !== currency)) {
+      return NextResponse.json({ error: 'Service template is not available in this market', code: 'SERVICE_TEMPLATE_MARKET_MISMATCH' }, { status: 400 })
+    }
+    if (selectedTemplateJob && (!isCatalogAvailableInMarket(selectedTemplateJob.countries, finalCountryCode) || selectedTemplateJob.currency !== currency)) {
+      return NextResponse.json({ error: 'Selected job service is not available in this market', code: 'TEMPLATE_JOB_MARKET_MISMATCH' }, { status: 400 })
     }
 
     if (targetTaskerId) {
