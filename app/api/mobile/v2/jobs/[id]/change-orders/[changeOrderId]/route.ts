@@ -70,6 +70,24 @@ export async function PATCH(
       }))?.userId ?? ''
     }
 
+    // Revoking an employee's company membership must revoke their ability to
+    // submit/cancel historical drafts too. The domain transition verifies the
+    // original creator; this endpoint additionally enforces CURRENT authority.
+    // Customers retain their own cancellation/approval rights.
+    if ((action === 'submit' || action === 'cancel') && user.id !== co.job.customerId) {
+      if (acceptedQuote?.providerType === 'COMPANY') {
+        const { error } = await resolveCompanyContext(
+          user.id, acceptedQuote.providerId, 'quotes:submit',
+        )
+        if (error) return error
+      } else if (
+        acceptedQuote?.providerType !== 'INDIVIDUAL' ||
+        acceptedQuote.providerId !== user.id
+      ) {
+        return NextResponse.json({ error: 'Not authorized for this provider' }, { status: 403 })
+      }
+    }
+
     if (action === 'approve') {
       const result = await approveChangeOrder(prisma, changeOrderId, user.id, idempotencyKey)
       if (!result.success) {
