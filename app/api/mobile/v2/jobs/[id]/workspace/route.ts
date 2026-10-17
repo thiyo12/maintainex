@@ -4,7 +4,12 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { transitionJobWorkspace, type ActorType, type WorkspaceStatus } from '@/lib/domain/job-lifecycle'
 
-async function resolveJobActor(jobId: string, customerId: string, userId: string): Promise<ActorType | null> {
+async function resolveJobActor(
+  jobId: string,
+  customerId: string,
+  userId: string,
+  requireAcceptedWorkerAssignment = false,
+): Promise<ActorType | null> {
   if (customerId === userId) return 'CUSTOMER'
 
   const acceptedQuote = await prisma.jobQuote.findFirst({
@@ -20,7 +25,22 @@ async function resolveJobActor(jobId: string, customerId: string, userId: string
       where: { companyId: acceptedQuote.providerId, userId, status: 'ACTIVE' },
       select: { id: true },
     })
-    if (membership) return 'COMPANY'
+    if (!membership) return null
+    if (!requireAcceptedWorkerAssignment) return 'COMPANY'
+
+    // Company membership alone cannot pause an active customer's booking.
+    // Only the worker explicitly assigned to this job and actually accepted
+    // (or started) may request WAITING_CUSTOMER. Managers retain read access.
+    const assignment = await prisma.companyJobAssignment.findFirst({
+      where: {
+        jobId,
+        companyId: acceptedQuote.providerId,
+        workerUserId: userId,
+        status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
+      },
+      select: { id: true },
+    })
+    if (assignment) return 'COMPANY'
   }
 
   return null
@@ -79,7 +99,7 @@ export async function PATCH(
       )
     }
 
-    const actorType = await resolveJobActor(job.id, job.customerId, user.id)
+    const actorType = await resolveJobActor(job.id, job.customerId, user.id, true)
     if (!actorType) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     if (progressStatus === 'WAITING_CUSTOMER' && actorType === 'CUSTOMER') {
