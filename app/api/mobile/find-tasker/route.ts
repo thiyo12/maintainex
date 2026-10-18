@@ -111,8 +111,12 @@ export async function GET(request: NextRequest) {
         isVerified: c.profile.isVerified,
         isOnline: c.profile.isOnline,
         profileImage: c.profile.profileImage,
-        distance: c.distanceKm,
-        score: Math.round(c.score * 100),
+        // Exact distance and the distance-weighted score can be probed from
+        // multiple client-chosen coordinates to triangulate a provider's GPS.
+        // Keep the legacy keys nullable for mobile compatibility; candidate
+        // ordering is still calculated server-side.
+        distance: null,
+        score: null,
         skills: c.skills,
         hourlyRate: c.profile.hourlyRate,
         fixedRate: 0,

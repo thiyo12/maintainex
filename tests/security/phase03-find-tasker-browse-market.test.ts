@@ -94,6 +94,47 @@ describe('Phase 03 — compatibility provider browse must enforce the service ma
     mock.template.countries = '["LK","CA"]'
     await denied('', 'SERVICE_MARKET_UNAVAILABLE')
   })
+  it('never returns precise provider distance or a distance-derived ranking score', async () => {
+    mock.match.mockResolvedValue([
+      {
+        profile: {
+          id: 'p', userId: 'u1', user: { name: 'Provider' },
+          rating: 4.8, completedJobs: 9, isVerified: true,
+          isOnline: true, bio: 'Plumbing', profileImage: null,
+          hourlyRate: 60,
+        },
+        skills: ['plumbing'],
+        distanceKm: 1.234567,
+        score: 1.12345,
+      },
+    ])
+    const { status, body } = await browse('&latitude=49.2827&longitude=-123.1207')
+    expect(status).toBe(200)
+    expect(body).toHaveLength(1)
+    expect(body[0]).toMatchObject({
+      id: 'p', name: 'Provider', distance: null, score: null,
+    })
+    expect(JSON.stringify(body)).not.toContain('1.234567')
+    expect(JSON.stringify(body)).not.toContain('112')
+  })
+
+  it('keeps provider identity and server-side ordering when public scores are withheld', async () => {
+    mock.match.mockResolvedValue([
+      { profile: { id: 'first', userId: 'u1', user: { name: 'First' },
+        rating: 4, completedJobs: 5, isVerified: true, isOnline: true,
+        bio: '', profileImage: null, hourlyRate: 40 },
+        skills: ['plumbing'], distanceKm: 1, score: 99 },
+      { profile: { id: 'second', userId: 'u2', user: { name: 'Second' },
+        rating: 5, completedJobs: 20, isVerified: true, isOnline: true,
+        bio: '', profileImage: null, hourlyRate: 45 },
+        skills: ['plumbing'], distanceKm: 9, score: 11 },
+    ])
+    const { body } = await browse('&latitude=49.2827&longitude=-123.1207')
+    expect(body.map((x: { id: string }) => x.id)).toEqual(['first', 'second'])
+    expect(body.map((x: { distance: null; score: null }) => [x.distance, x.score]))
+      .toEqual([[null, null], [null, null]])
+  })
+
   it('preserves Sri Lankan discovery for a valid LKR job', async () => {
     mock.account = 'LK'
     mock.template.currency = 'LKR'
