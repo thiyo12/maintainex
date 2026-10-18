@@ -5,13 +5,13 @@ const mock = vi.hoisted(() => ({
   user: { id: 'provider', role: 'TASKER', countryCode: 'CA' } as
     { id: string; role: string; countryCode: string | null } | null,
   suspended: false,
-  upsert: vi.fn(), getProfessions: vi.fn(), assign: vi.fn(),
+  upsert: vi.fn(), profileFind: vi.fn(), getProfessions: vi.fn(), assign: vi.fn(),
   getTaskerProfession: vi.fn(), addSkill: vi.fn(),
   profession: vi.fn(), professionSkills: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    taskerProfile: { upsert: mock.upsert },
+    taskerProfile: { upsert: mock.upsert, findUnique: mock.profileFind },
     taskerProfession: { findUnique: mock.getTaskerProfession },
     profession: { findUnique: mock.profession },
     professionSkill: { findMany: mock.professionSkills },
@@ -67,6 +67,7 @@ describe('Phase 04 — profession onboarding must never default foreign accounts
     mock.user = { id: 'provider', role: 'TASKER', countryCode: 'CA' }
     mock.suspended = false
     mock.upsert.mockResolvedValue({ id: 'profile-1' })
+    mock.profileFind.mockResolvedValue({ id: 'profile-1' })
     mock.getProfessions.mockResolvedValue([])
     mock.getTaskerProfession.mockImplementation(async ({ where }) =>
       where.id ? { id: 'joined-1', taskerProfileId: 'profile-1' } : null)
@@ -139,6 +140,40 @@ describe('Phase 04 — profession onboarding must never default foreign accounts
     expect(response.status).toBe(400)
     expect(await response.json()).toMatchObject({ code: 'INVALID_PROFESSION_SKILL' })
     expect(mock.upsert).not.toHaveBeenCalled()
+  })
+
+  it('rejects adding skills without an existing provider profile and creates no records', async () => {
+    mock.profileFind.mockResolvedValue(null)
+    const response = await skillPOST()
+    expect(response.status).toBe(404)
+    expect(await response.json()).toMatchObject({ code: 'TASKER_PROFILE_NOT_FOUND' })
+    expect(mock.profileFind).toHaveBeenCalledWith({
+      where: { userId: 'provider' }, select: { id: true },
+    })
+    expect(mock.upsert).not.toHaveBeenCalled()
+    expect(mock.getTaskerProfession).not.toHaveBeenCalled()
+    expect(mock.addSkill).not.toHaveBeenCalled()
+  })
+
+  it('blocks skill changes to a profession owned by another provider', async () => {
+    mock.getTaskerProfession.mockResolvedValueOnce({
+      id: 'joined-foreign', taskerProfileId: 'another-profile',
+    })
+    const response = await skillPOST({
+      taskerProfessionId: 'joined-foreign', professionSkillId: 'skill-1',
+    })
+    expect(response.status).toBe(403)
+    expect(mock.profileFind).toHaveBeenCalledTimes(1)
+    expect(mock.upsert).not.toHaveBeenCalled()
+    expect(mock.addSkill).not.toHaveBeenCalled()
+  })
+
+  it('attaches a skill using the existing profile without updating profile metadata', async () => {
+    const response = await skillPOST()
+    expect(response.status).toBe(201)
+    expect(mock.profileFind).toHaveBeenCalledTimes(1)
+    expect(mock.upsert).not.toHaveBeenCalled()
+    expect(mock.addSkill).toHaveBeenCalledTimes(1)
   })
 
   it('normalizes padded identifiers before querying ownership or saving the skill', async () => {

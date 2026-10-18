@@ -34,13 +34,18 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Verify ownership
-    const tasker = await prisma.taskerProfile.upsert({
+    // Attaching a skill requires a pre-existing provider profile and owned
+    // profession. Never create a new profile while processing a guessed ID.
+    const tasker = await prisma.taskerProfile.findUnique({
       where: { userId: user.id },
-      update: {},
-      create: { userId: user.id, countryCode: market },
       select: { id: true },
     })
+    if (!tasker) {
+      return NextResponse.json({
+        error: 'Tasker profile not found',
+        code: 'TASKER_PROFILE_NOT_FOUND',
+      }, { status: 404 })
+    }
 
     const taskerProfession = await prisma.taskerProfession.findUnique({
       where: { id: taskerProfessionId.trim() },
