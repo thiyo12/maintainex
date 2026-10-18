@@ -2,6 +2,7 @@ import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
+import { isCatalogAvailableInMarket, isBookNowCatalogueAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 
 function parseQuestions(questionsJson: string | null | undefined): any[] {
   if (!questionsJson) return []
@@ -20,7 +21,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const jobCategoryId = searchParams.get('jobCategoryId')
     const slug = searchParams.get('slug')
-    const country = (searchParams.get('country') || 'LK').toUpperCase()
+    const country = (searchParams.get('country') || 'LK').trim().toUpperCase()
+    if (country !== 'LK' && country !== 'CA') {
+      return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } })
+    }
     const runtime = await getPlatformRuntimeConfig(country)
     if (
       runtime.maintenance.enabled ||
@@ -38,14 +42,26 @@ export async function GET(request: NextRequest) {
     const templates = await prisma.serviceTemplate.findMany({
       where,
       include: {
-        jobCategory: { select: { id: true, name: true, slug: true } },
-        templateJob: { select: { id: true, name: true, typicalDurationMinutes: true, priceMin: true, priceMax: true } },
+        jobCategory: { select: { id: true, name: true, slug: true, isActive: true, countries: true } },
+        templateJob: { select: { id: true, name: true, typicalDurationMinutes: true, priceMin: true, priceMax: true, isActive: true, countries: true, currency: true } },
       },
       orderBy: { sortOrder: 'asc' },
     })
 
+    const expectedCurrency = country === 'CA' ? 'CAD' : 'LKR'
+    // A service-template country tag alone is insufficient for bookability.
+    // The active parent category and any linked TemplateJob must authorize
+    // the same market/currency, exactly as in direct booking.
+    const bookableTemplates = templates.filter(t =>
+      t.currency === expectedCurrency &&
+      t.jobCategory?.isActive === true &&
+      isCatalogAvailableInMarket(t.jobCategory.countries, country) &&
+      (!t.templateJob ||
+        isBookNowCatalogueAvailableInMarket(t.templateJob, t.jobCategory, country))
+    )
+
     return NextResponse.json(
-      templates.map((t) => ({
+      bookableTemplates.map((t) => ({
         id: t.id,
         slug: t.slug,
         name: t.name,
