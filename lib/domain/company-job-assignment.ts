@@ -31,23 +31,72 @@ export interface AssignmentResult {
   reasons?: string[]
 }
 
-async function lockAndAssertWorkerScheduleAvailable(
+export async function lockAndAssertWorkerScheduleAvailable(
   tx: PrismaClientOrTx,
   workerUserId: string,
   jobId: string,
   preferredDate: Date | null,
   preferredTimeSlot: string | null,
+  companyId: string,
+  photoCheckRequired: boolean,
 ): Promise<void> {
-  const lockedWorker = await tx.$queryRaw<Array<{ id: string }>>`
-    SELECT id
+  // Serialize competing dispatches and revalidate identity in the exact same
+  // transaction that changes the assignment, not just in HTTP preflight.
+  const lockedWorker = await tx.$queryRaw<Array<{
+    id: string
+    isActive: boolean
+    isSuspended: boolean
+    isBanned: boolean
+    identityStatus: string
+  }>>`
+    SELECT id, "isActive", "isSuspended", "isBanned", "identityStatus"
     FROM "User"
     WHERE id = ${workerUserId}
     FOR UPDATE
   `
-  if (lockedWorker.length !== 1) {
-    throw new Error('Worker account not found')
+  const worker = lockedWorker[0]
+  if (!worker) throw new Error('Worker account not found')
+  if (!worker.isActive || worker.isSuspended || worker.isBanned || worker.identityStatus !== 'VERIFIED') {
+    throw new Error('Worker identity or account status changed before assignment')
   }
-  if (!preferredDate) return
+
+  const memberships = await tx.$queryRaw<Array<{ role: string; status: string }>>`
+    SELECT role, status
+    FROM "TeamMember"
+    WHERE "companyId" = ${companyId} AND "userId" = ${workerUserId}
+    FOR UPDATE
+  `
+  if (memberships.length !== 1 || memberships[0].status !== 'ACTIVE' || memberships[0].role !== 'WORKER') {
+    throw new Error('Worker membership or role changed before assignment')
+  }
+
+  if (photoCheckRequired) {
+    const identities = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM "ProviderIdentity"
+      WHERE "currentUserId" = ${workerUserId}
+        AND "identityType" IN ('TASKER', 'COMPANY_WORKER')
+        AND "kycStatus" = 'VERIFIED'
+        AND "verifiedPhotoUrl" IS NOT NULL
+      FOR UPDATE
+    `
+    if (identities.length === 0) {
+      throw new Error('Worker verified photo is no longer approved')
+    }
+  }
+
+  if (!preferredDate) {
+    const ongoing = await tx.companyJobAssignment.findFirst({
+      where: {
+        workerUserId,
+        jobId: { not: jobId },
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+      },
+      select: { id: true, jobId: true },
+    })
+    if (ongoing) throw new Error('Worker scheduling conflict changed concurrently')
+    return
+  }
 
   const dayStart = new Date(preferredDate)
   dayStart.setHours(0, 0, 0, 0)
@@ -71,8 +120,10 @@ async function lockAndAssertWorkerScheduleAvailable(
       jobId: { not: jobId },
       status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
       job: {
-        preferredDate: { gte: dayStart, lt: dayEnd },
-        ...slotFilter,
+        OR: [
+          { preferredDate: null },
+          { preferredDate: { gte: dayStart, lt: dayEnd }, ...slotFilter },
+        ],
       },
     },
     select: { id: true, jobId: true },
@@ -144,6 +195,8 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
         jobId,
         job.preferredDate,
         job.preferredTimeSlot,
+        companyId,
+        job.workerIdentityCheckRequired,
       )
 
       const claimed = await tx.marketplaceJob.updateMany({
@@ -211,7 +264,10 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
       (
         error.message.includes('concurrently') ||
         error.message.includes('scheduling conflict') ||
-        error.message === 'Worker account not found'
+        error.message === 'Worker account not found' ||
+        error.message.includes('Worker identity or account status changed') ||
+        error.message.includes('Worker membership or role changed') ||
+        error.message.includes('Worker verified photo is no longer approved')
       )
     ) {
       return { success: false, error: error.message }
@@ -306,6 +362,8 @@ export async function reassignWorker(
         jobId,
         job.preferredDate,
         job.preferredTimeSlot,
+        companyId,
+        job.workerIdentityCheckRequired,
       )
 
       const claimed = await tx.marketplaceJob.updateMany({
@@ -389,7 +447,10 @@ export async function reassignWorker(
       (
         error.message.includes('reassignment') ||
         error.message.includes('scheduling conflict') ||
-        error.message === 'Worker account not found'
+        error.message === 'Worker account not found' ||
+        error.message.includes('Worker identity or account status changed') ||
+        error.message.includes('Worker membership or role changed') ||
+        error.message.includes('Worker verified photo is no longer approved')
       )
     ) {
       return { success: false, error: error.message }
