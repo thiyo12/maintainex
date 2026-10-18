@@ -95,6 +95,36 @@ describe('Phase 03 — compatibility matcher cannot bypass verification or radiu
     ])
     expect(await match()).toEqual([])
   })
+  it.each([
+    ['latitude only', { lat: 49.2827, lng: null }],
+    ['longitude only', { lat: null, lng: -123.1207 }],
+    ['NaN latitude', { lat: NaN, lng: -123.1207 }],
+    ['infinite longitude', { lat: 49.2827, lng: Infinity }],
+    ['outside launch markets', { lat: 0, lng: 0 }],
+    ['Burnaby with Vancouver country', { lat: 49.2596, lng: -122.998 }],
+    ['Colombo with Canadian market', { lat: 6.9271, lng: 79.8612 }],
+  ])('rejects %s at matcher boundary without reading candidate profiles', async (_label, coords) => {
+    expect(await match(coords)).toEqual([])
+    expect(mock.profiles).not.toHaveBeenCalled()
+  })
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects invalid radius %s before querying candidate profiles', async radiusKm => {
+      expect(await match({ radiusKm })).toEqual([])
+      expect(mock.profiles).not.toHaveBeenCalled()
+    },
+  )
+  it('still accepts valid coordinates in the Sri Lankan launch market', async () => {
+    mock.profiles.mockResolvedValue([profile({
+      countryCode: 'LK', latitude: 6.9271, longitude: 79.8612,
+    })])
+    const candidates = await match({
+      countryCode: 'LK', lat: 6.9271, lng: 79.8612,
+    })
+    expect(candidates).toHaveLength(1)
+    expect(mock.profiles).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ countryCode: 'LK' }),
+    }))
+  })
   it('never queries providers across all markets if the market is unknown', async () => {
     await match({ countryCode: undefined })
     expect(mock.profiles).toHaveBeenCalledWith(expect.objectContaining({

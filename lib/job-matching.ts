@@ -5,7 +5,7 @@
  * @deprecated since Phase 10.2
  */
 import { prisma } from './prisma'
-import { isSupportedMarket } from './geography/market-engine'
+import { isSupportedMarket, resolveMarketFromServiceAddress } from './geography/market-engine'
 import { getSetting } from './settings'
 import { haversineKm } from './distance'
 
@@ -100,6 +100,22 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
   // falsy, listing online providers from every launch market.
   const market = (input.countryCode || '').trim().toUpperCase()
   const marketFilter = isSupportedMarket(market) ? { countryCode: market } : { countryCode: '__none__' }
+  const hasCoords = input.lat != null && input.lng != null
+  const hasAnyCoords = input.lat != null || input.lng != null
+
+  // The old browse API checks the requested address, but this exported
+  // matcher has other possible callers. Invalid radius and incomplete GPS
+  // must never downgrade into unrestricted no-location discovery.
+  if (!Number.isFinite(radiusKm) || radiusKm <= 0) return []
+  if (hasAnyCoords) {
+    if (!hasCoords || !Number.isFinite(input.lat) || !Number.isFinite(input.lng)) return []
+    const resolved = resolveMarketFromServiceAddress({
+      latitude: input.lat,
+      longitude: input.lng,
+      claimedCountryCode: market,
+    })
+    if (!resolved.ok || resolved.countryCode !== market) return []
+  }
 
   const allProfiles = await prisma.taskerProfile.findMany({
     where: targeted
@@ -132,7 +148,6 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
   })
 
   const busy = await busyProviderIds()
-  const hasCoords = input.lat != null && input.lng != null
 
   const candidates: MatchCandidate[] = []
 
