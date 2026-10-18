@@ -574,6 +574,7 @@ async function resolvePinVerifierTx(
           companyId: acceptedQuote.providerId,
           userId,
           status: 'ACTIVE',
+          role: 'WORKER',
         },
         select: { id: true },
       }),

@@ -51,9 +51,9 @@ export async function checkWorkStartAuthorization(
   // The work-start PIN checks the same accepted-assignment boundary.
   let isAssignedCompanyWorker = false
   if (acceptedQuote.providerType === 'COMPANY') {
-    const [membership, assignment] = await Promise.all([
+    const [membership, assignment, actor] = await Promise.all([
       client.teamMember.findFirst({
-        where: { companyId: acceptedQuote.providerId, userId: providerId, status: 'ACTIVE' },
+        where: { companyId: acceptedQuote.providerId, userId: providerId, status: 'ACTIVE', role: 'WORKER' },
         select: { id: true },
       }),
       client.companyJobAssignment.findFirst({
@@ -65,8 +65,15 @@ export async function checkWorkStartAuthorization(
         },
         select: { id: true },
       }),
+      client.user.findUnique({
+        where: { id: providerId },
+        select: { isActive: true, isSuspended: true, isBanned: true, identityStatus: true },
+      }),
     ])
-    isAssignedCompanyWorker = Boolean(membership && assignment)
+    isAssignedCompanyWorker = Boolean(
+      membership && assignment && actor && actor.isActive &&
+      !actor.isSuspended && !actor.isBanned && actor.identityStatus === 'VERIFIED'
+    )
   }
 
   if (!isProvider && !isAssignedCompanyWorker) {

@@ -6,6 +6,7 @@ function client(options: {
   providerType?: 'INDIVIDUAL' | 'COMPANY'
   providerId?: string
   member?: boolean
+  actorStatus?: 'ACTIVE' | 'SUSPENDED' | 'UNVERIFIED'
   assigned?: boolean
   assignmentStatus?: string
   jobStatus?: string
@@ -28,6 +29,14 @@ function client(options: {
         id: 'accepted-quote',
         providerId: options.providerId ?? 'company',
         providerType: options.providerType ?? 'COMPANY',
+      }),
+    },
+    user: {
+      findUnique: vi.fn().mockResolvedValue({
+        isActive: true,
+        isSuspended: options.actorStatus === 'SUSPENDED',
+        isBanned: false,
+        identityStatus: options.actorStatus === 'UNVERIFIED' ? 'PENDING' : 'VERIFIED',
       }),
     },
     teamMember: {
@@ -74,6 +83,14 @@ describe('Phase 07 — company work-start authorization follows the actual assig
     const { c } = client({ assignmentStatus: 'ASSIGNED' })
     const result = await checkWorkStartAuthorization(c, 'job', 'worker')
     expect(result).toEqual({ authorized: false, reason: 'NOT_PROVIDER' })
+  })
+
+  it('blocks a suspended or unverified assigned worker before work start', async () => {
+    for (const actorStatus of ['SUSPENDED', 'UNVERIFIED'] as const) {
+      const { c } = client({ actorStatus })
+      expect(await checkWorkStartAuthorization(c, 'job', 'worker'))
+        .toEqual({ authorized: false, reason: 'NOT_PROVIDER' })
+    }
   })
 
   it('allows an active, accepted company worker with no inspection requirement', async () => {
