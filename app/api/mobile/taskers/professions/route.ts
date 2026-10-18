@@ -15,10 +15,28 @@ export async function GET(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
+    // Do not create LK-labelled profiles for an unknown or foreign account.
+    const market = (user.countryCode || '').trim().toUpperCase()
+    if (market !== 'LK' && market !== 'CA') {
+      return NextResponse.json({
+        error: 'Provider market is not supported',
+        code: 'MARKET_NOT_SUPPORTED',
+      }, { status: 400 })
+    }
+
+    // Do not create LK-labelled profiles for an unknown or foreign account.
+    const market = (user.countryCode || '').trim().toUpperCase()
+    if (market !== 'LK' && market !== 'CA') {
+      return NextResponse.json({
+        error: 'Provider market is not supported',
+        code: 'MARKET_NOT_SUPPORTED',
+      }, { status: 400 })
+    }
+
     const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
       update: {},
-      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
+      create: { userId: user.id, countryCode: market },
       select: { id: true },
     })
 
@@ -43,7 +61,7 @@ export async function POST(request: NextRequest) {
     const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
       update: {},
-      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
+      create: { userId: user.id, countryCode: market },
       select: { id: true },
     })
 
