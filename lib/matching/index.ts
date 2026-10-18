@@ -63,6 +63,9 @@ export async function resolveJobRequirements(
       select: { id: true, categoryId: true },
     })
     if (!directTemplateJob || directTemplateJob.categoryId !== category.id) return null
+    // A service template already pointing to one canonical job cannot be
+    // relabelled as a sibling through an inconsistent direct booking pointer.
+    if (templateJobIds.length > 0 && !templateJobIds.includes(directTemplateJob.id)) return null
     if (!templateJobIds.includes(directTemplateJob.id)) templateJobIds.push(directTemplateJob.id)
   }
 
@@ -100,8 +103,10 @@ export function hasCompanySpecialtyCapability(
   jobReqs: JobRequirements,
 ): boolean {
   return specialties.some((specialty) =>
-    specialty.categoryId === jobReqs.categoryId ||
-    (!!specialty.jobId && jobReqs.templateJobIds.includes(specialty.jobId))
+    jobReqs.templateJobIds.length > 0
+      ? (!!specialty.jobId && jobReqs.templateJobIds.includes(specialty.jobId)) ||
+        (specialty.jobId === null && specialty.categoryId === jobReqs.categoryId)
+      : specialty.categoryId === jobReqs.categoryId
   )
 }
 
