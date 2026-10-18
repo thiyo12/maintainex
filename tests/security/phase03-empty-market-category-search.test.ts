@@ -135,6 +135,36 @@ describe('Phase 03 — search omits market categories with no bookable service',
     expect(body.totalResults).toBe(2)
   })
 
+  it('honors category-only filtering without listing any subservices', async () => {
+    const body = await (await search('country=CA&q=repair&type=category')).json()
+    expect(body.categories.map((c: { id: string }) => c.id)).toEqual(['plumbing-id'])
+    expect(body.subServices).toEqual([])
+    expect(body.totalResults).toBe(1)
+  })
+
+  it('honors subService-only filtering without listing category cards', async () => {
+    const body = await (await search('country=CA&q=repair&type=subService')).json()
+    expect(body.categories).toEqual([])
+    expect(body.subServices.map((s: { id: string }) => s.id)).toEqual(['valid-ca-job'])
+    expect(body.totalResults).toBe(1)
+  })
+
+  it('supports plural service/category aliases without changing the underlying catalogue', async () => {
+    const services = await (await search('country=CA&q=repair&type=services')).json()
+    const categories = await (await search('country=CA&q=repair&type=categories')).json()
+    expect(services.categories).toEqual([])
+    expect(services.subServices).toHaveLength(1)
+    expect(categories.categories).toHaveLength(1)
+    expect(categories.subServices).toEqual([])
+  })
+
+  it('treats unknown type values as all for backward compatibility', async () => {
+    const body = await (await search('country=CA&q=repair&type=all-legacy')).json()
+    expect(body.categories).toHaveLength(1)
+    expect(body.subServices).toHaveLength(1)
+    expect(body.totalResults).toBe(2)
+  })
+
   it('never broadens unsupported market searches to LK defaults', async () => {
     const b = await (await search('country=US&q=repair')).json()
     expect(b.categories).toEqual([])

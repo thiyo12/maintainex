@@ -177,13 +177,21 @@ export async function GET(request: NextRequest) {
 
     await logSearch(null, q.trim(), null, bestMatch?.score || categories[0]?.score || subServices[0]?.score || 0, null, market)
 
+    // The 'type' query parameter has always been parsed but was ignored.
+    // Keep unknown values backward-compatible with 'all'; accepted filters
+    // suppress the other result type rather than returning a mixed response.
+    const categoriesOnly = type === 'category' || type === 'categories'
+    const servicesOnly = type === 'subService' || type === 'services' || type === 'service'
+    const filteredCategories = servicesOnly ? [] : categories
+    const filteredSubServices = categoriesOnly ? [] : subServices
+
     return NextResponse.json({
       query: q,
       lang,
       correctedQuery,
-      categories: categories.slice(0, 5),
-      subServices: subServices.slice(0, 5),
-      totalResults: categories.length + subServices.length,
+      categories: filteredCategories.slice(0, 5),
+      subServices: filteredSubServices.slice(0, 5),
+      totalResults: filteredCategories.length + filteredSubServices.length,
     })
   } catch (error: any) {
     return NextResponse.json({ error: 'Search failed' }, { status: 500 })
