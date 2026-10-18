@@ -40,14 +40,19 @@ async function ownedGET() {
   const { GET } = await import('@/app/api/mobile/taskers/professions/route')
   return GET(request('/api/mobile/taskers/professions'))
 }
-async function professionPOST() {
+async function professionPOST(payload: unknown = { professionId: 'prof-1' }, raw?: string) {
   const { POST } = await import('@/app/api/mobile/taskers/professions/route')
-  return POST(request('/api/mobile/taskers/professions', 'POST', { professionId: 'prof-1' }))
+  const req = raw === undefined
+    ? request('/api/mobile/taskers/professions', 'POST', payload)
+    : new NextRequest('http://localhost/api/mobile/taskers/professions', { method: 'POST', body: raw })
+  return POST(req)
 }
-async function skillPOST() {
+async function skillPOST(payload: unknown = { taskerProfessionId: 'joined-1', professionSkillId: 'skill-1' }, raw?: string) {
   const { POST } = await import('@/app/api/mobile/taskers/professions/skills/route')
-  return POST(request('/api/mobile/taskers/professions/skills', 'POST',
-    { taskerProfessionId: 'joined-1', professionSkillId: 'skill-1' }))
+  const req = raw === undefined
+    ? request('/api/mobile/taskers/professions/skills', 'POST', payload)
+    : new NextRequest('http://localhost/api/mobile/taskers/professions/skills', { method: 'POST', body: raw })
+  return POST(req)
 }
 async function publicSkills() {
   const { GET } = await import('@/app/api/mobile/v2/professions/[id]/skills/route')
@@ -91,6 +96,63 @@ describe('Phase 04 — profession onboarding must never default foreign accounts
       expect(mock.assign).toHaveBeenCalledTimes(1)
     },
   )
+  it.each([
+    ['null', null],
+    ['missing field', {}],
+    ['empty', { professionId: '' }],
+    ['whitespace', { professionId: '   ' }],
+    ['array', { professionId: ['prof-1'] }],
+    ['object', { professionId: { id: 'prof-1' } }],
+    ['number', { professionId: 5 }],
+  ])('rejects invalid profession payload %s without creating a provider profile', async (_label, payload) => {
+    const response = await professionPOST(payload)
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'INVALID_PROFESSION_ID' })
+    expect(mock.upsert).not.toHaveBeenCalled()
+    expect(mock.assign).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed profession JSON without creating a provider profile', async () => {
+    const response = await professionPOST({}, '{broken json')
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'INVALID_PROFESSION_ID' })
+    expect(mock.upsert).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['null', null],
+    ['missing skill', { taskerProfessionId: 'joined-1' }],
+    ['empty parent', { taskerProfessionId: '', professionSkillId: 'skill-1' }],
+    ['whitespace parent', { taskerProfessionId: '  ', professionSkillId: 'skill-1' }],
+    ['array skill', { taskerProfessionId: 'joined-1', professionSkillId: ['skill-1'] }],
+    ['object skill', { taskerProfessionId: 'joined-1', professionSkillId: { id: 'skill-1' } }],
+  ])('rejects invalid profession-skill payload %s without creating a provider profile', async (_label, payload) => {
+    const response = await skillPOST(payload)
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'INVALID_PROFESSION_SKILL' })
+    expect(mock.upsert).not.toHaveBeenCalled()
+    expect(mock.addSkill).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed profession-skill JSON before any database writes', async () => {
+    const response = await skillPOST({}, '{broken json')
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'INVALID_PROFESSION_SKILL' })
+    expect(mock.upsert).not.toHaveBeenCalled()
+  })
+
+  it('normalizes padded identifiers before querying ownership or saving the skill', async () => {
+    expect((await skillPOST({
+      taskerProfessionId: ' joined-1 ', professionSkillId: ' skill-1 ',
+    })).status).toBe(201)
+    expect(mock.getTaskerProfession).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'joined-1' },
+    }))
+    expect(mock.addSkill).toHaveBeenCalledWith(expect.anything(), {
+      taskerProfessionId: 'joined-1', professionSkillId: 'skill-1',
+    })
+  })
+
   it('preserves authorized skill and profession reads', async () => {
     expect((await ownedGET()).status).toBe(200)
     expect((await skillPOST()).status).toBe(201)

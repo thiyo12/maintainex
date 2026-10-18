@@ -23,10 +23,15 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const body = await request.json()
-    const { taskerProfessionId, professionSkillId } = body
-    if (!taskerProfessionId || !professionSkillId) {
-      return NextResponse.json({ error: 'taskerProfessionId and professionSkillId required' }, { status: 400 })
+    const body = await request.json().catch(() => null)
+    const taskerProfessionId = body?.taskerProfessionId
+    const professionSkillId = body?.professionSkillId
+    if (typeof taskerProfessionId !== 'string' || !taskerProfessionId.trim() ||
+        typeof professionSkillId !== 'string' || !professionSkillId.trim()) {
+      return NextResponse.json({
+        error: 'taskerProfessionId and professionSkillId must be nonempty strings',
+        code: 'INVALID_PROFESSION_SKILL',
+      }, { status: 400 })
     }
 
     // Verify ownership
@@ -38,7 +43,7 @@ export async function POST(request: NextRequest) {
     })
 
     const taskerProfession = await prisma.taskerProfession.findUnique({
-      where: { id: taskerProfessionId },
+      where: { id: taskerProfessionId.trim() },
       select: { id: true, taskerProfileId: true },
     })
     if (!taskerProfession) {
@@ -49,8 +54,8 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await addTaskerProfessionSkill(prisma, {
-      taskerProfessionId,
-      professionSkillId,
+      taskerProfessionId: taskerProfessionId.trim(),
+      professionSkillId: professionSkillId.trim(),
     })
 
     return NextResponse.json({ skill: result }, { status: 201 })

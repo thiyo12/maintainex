@@ -58,6 +58,14 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Validate the request BEFORE creating a profile. Objects, arrays and
+    // malformed JSON used to reach Prisma or trigger an avoidable 500.
+    const body = await request.json().catch(() => null)
+    const professionId = body?.professionId
+    if (typeof professionId !== 'string' || !professionId.trim()) {
+      return NextResponse.json({ error: 'professionId must be a nonempty string', code: 'INVALID_PROFESSION_ID' }, { status: 400 })
+    }
+
     const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
       update: {},
@@ -65,17 +73,11 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     })
 
-    const body = await request.json()
-    const { professionId } = body
-    if (!professionId) {
-      return NextResponse.json({ error: 'professionId required' }, { status: 400 })
-    }
-
     const existing = await prisma.taskerProfession.findUnique({
       where: {
         taskerProfileId_professionId: {
           taskerProfileId: tasker.id,
-          professionId,
+          professionId: professionId.trim(),
         },
       },
       select: { id: true, status: true },
@@ -89,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     const result = await assignTaskerProfession(prisma, {
       taskerProfileId: tasker.id,
-      professionId,
+      professionId: professionId.trim(),
     })
 
     return NextResponse.json({ profession: result }, { status: 201 })
