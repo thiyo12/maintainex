@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
       update: {},
-      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
+      create: { userId: user.id, countryCode: market },
       select: { id: true },
     })
 
@@ -105,21 +105,19 @@ export async function PUT(request: NextRequest) {
     if (market !== 'LK' && market !== 'CA') {
       return NextResponse.json({ error: 'Provider market is not supported' }, { status: 400 })
     }
-    const tasker = await prisma.taskerProfile.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
-      select: { id: true },
-    })
-
-    const body = await request.json()
+    // Reject malformed or incomplete replacement requests; treating missing
+    // skills as [] previously deleted genuine active service selections.
+    const body = await request.json().catch(() => null)
+    if (!body || !Array.isArray(body.skills)) {
+      return NextResponse.json({ error: 'skills must be an array', code: 'INVALID_SKILL_SELECTION' }, { status: 400 })
+    }
     const skills: Array<{
       jobId: string
       hourlyRate?: number
       fixedRate?: number
       experienceYears?: number
       experienceLevel?: number
-    }> = Array.isArray(body?.skills) ? body.skills : []
+    }> = body.skills
     if (skills.length > 200) {
       return NextResponse.json({ error: 'Too many services' }, { status: 400 })
     }
@@ -155,6 +153,18 @@ export async function PUT(request: NextRequest) {
     }
 
     const jobIds = [...new Set(skills.map(s => s.jobId.trim()))]
+    // Multiple entries for one job introduce ambiguous rates and duplicate
+    // writes; never perform a partial replacement in that case.
+    if (jobIds.length !== skills.length) {
+      return NextResponse.json({ error: 'Duplicate jobId in service selection', code: 'DUPLICATE_SERVICE' }, { status: 400 })
+    }
+
+    const tasker = await prisma.taskerProfile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, countryCode: market },
+      select: { id: true },
+    })
     const jobs = await prisma.templateJob.findMany({
       where: { id: { in: jobIds }, isActive: true },
       select: {

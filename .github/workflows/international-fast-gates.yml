@@ -78,6 +78,7 @@ jobs:
             tests/security/phase04-tasker-service-market.test.ts \
             tests/security/phase04-service-template-market-integrity.test.ts \
             tests/security/phase04-profession-market-authority.test.ts \
+            tests/security/phase04-tasker-skill-save-payload.test.ts \
             tests/security/phase04-company-catalogue-write-validation.test.ts \
             tests/security/phase07-company-workspace-authorization.test.ts \
             tests/security/phase07-safety-report-separation.test.ts \
