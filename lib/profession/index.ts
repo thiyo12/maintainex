@@ -167,9 +167,18 @@ export async function addTaskerProfessionSkill(
 ) {
   const taskerProfession = await client.taskerProfession.findUnique({
     where: { id: input.taskerProfessionId },
-    select: { id: true, professionId: true },
+    select: {
+      id: true, professionId: true, status: true,
+      profession: { select: { isActive: true } },
+    },
   })
   if (!taskerProfession) throw new Error('Tasker profession not found')
+  // Pending capability requests may collect skills for review; rejected,
+  // suspended, or deactivated professions must not accept new skills.
+  if (!taskerProfession.profession.isActive ||
+      !['PENDING', 'APPROVED'].includes(taskerProfession.status)) {
+    throw new Error('Cannot add skill to inactive profession')
+  }
 
   const skill = await client.professionSkill.findUnique({
     where: { id: input.professionSkillId },
@@ -261,9 +270,16 @@ export async function addCompanyProfessionSkill(
 ) {
   const companyProfession = await client.companyProfession.findUnique({
     where: { id: input.companyProfessionId },
-    select: { id: true, professionId: true },
+    select: {
+      id: true, professionId: true, status: true,
+      profession: { select: { isActive: true } },
+    },
   })
   if (!companyProfession) throw new Error('Company profession not found')
+  if (!companyProfession.profession.isActive ||
+      !['PENDING', 'APPROVED'].includes(companyProfession.status)) {
+    throw new Error('Cannot add skill to inactive profession')
+  }
 
   const skill = await client.professionSkill.findUnique({
     where: { id: input.professionSkillId },
