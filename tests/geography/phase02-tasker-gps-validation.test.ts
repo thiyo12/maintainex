@@ -68,7 +68,7 @@ describe('Phase 02 — tasker GPS writes reject corrupt coordinates', () => {
     [{ latitude: 'NaN', longitude: 79.8612 }, 'invalid number string'],
     [{ latitude: 90.01, longitude: 79.8612 }, 'latitude outside range'],
     [{ latitude: 6.9271, longitude: -180.01 }, 'longitude outside range'],
-  ])('rejects %s (%s) before writing any location', async (payload) => {
+  ] as Array<[unknown, string]>)('rejects %s (%s) before writing any location', async (payload) => {
     const response = await put(payload)
     expect(response.status).toBe(400)
     expect(mock.update).not.toHaveBeenCalled()

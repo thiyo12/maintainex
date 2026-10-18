@@ -177,8 +177,11 @@ describe('Part W — Negative Security Tests', () => {
     it('canonical matching applies job countryCode to scoped queries in Prisma where', () => {
       const matcher = readFile('lib/matching/index.ts')
       expect(matcher).not.toContain('countryCode: job.countryCode } : undefined')
-      expect(matcher).toContain("equals: job.countryCode || '__none__'")
-      expect(matcher.match(/equals: job\.countryCode \|\| '__none__'/g)?.length).toBe(2)
+      // Both provider DB queries honor the market resolved from the job's service address.
+      expect(matcher).toContain('const jobMarket = requireJobMarket(job)')
+      expect(matcher).toContain('countryCode: jobMarket.countryCode')
+      expect(matcher).toContain("equals: canonicalInput.countryCode || '__none__'")
+      expect(matcher.match(/equals: canonicalInput\.countryCode \|\| '__none__'/g)?.length).toBe(2)
     })
   })
 })

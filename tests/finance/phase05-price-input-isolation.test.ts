@@ -45,9 +45,11 @@ describe('Phase 05 — independent LKR/CAD price precision and market safeguards
   it('checks provider rates before mutating capability selections', () => {
     const source = readFileSync(resolve(process.cwd(), 'app/api/mobile/taskers/skills/route.ts'), 'utf8')
     const validate = source.indexOf('parseNonNegativeMajorUnitPrice(value, getCurrencyForCountry(market))')
-    const mutation = source.indexOf('await prisma.taskerSkill.deleteMany')
+    const transaction = source.indexOf('await prisma.$transaction(async tx =>')
+    const mutation = source.indexOf('await tx.taskerSkill.deleteMany')
     expect(validate).toBeGreaterThan(-1)
-    expect(mutation).toBeGreaterThan(validate)
+    expect(transaction).toBeGreaterThan(validate)
+    expect(mutation).toBeGreaterThan(transaction)
   })
 
   it('stores precisely validated provider major-unit prices in both mutation paths', () => {
