@@ -153,6 +153,8 @@ afterAll(async () => {
     { customerId: { in: testUserIds } },
   ] } })
   const jids = [dataIds.jobAId, dataIds.jobBId].filter(Boolean)
+  // Company work-start creates workspaces; remove them before deleting fixture jobs.
+  if (jids.length) await prisma.jobWorkspace.deleteMany({ where: { jobId: { in: jids } } })
   if (jids.length) await prisma.jobEscrow.deleteMany({ where: { jobId: { in: jids } } })
   if (jids.length) await prisma.jobQuote.deleteMany({ where: { jobId: { in: jids } } })
   if (jids.length) await prisma.marketplaceJob.deleteMany({ where: { id: { in: jids } } })

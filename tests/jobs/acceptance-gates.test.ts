@@ -126,6 +126,9 @@ beforeAll(async () => {
 afterAll(async () => {
   if (createdJobIds.length) {
     await prisma.companyJobAssignment.deleteMany({ where: { jobId: { in: createdJobIds } } })
+    // Assignment/work-start flows can create a workspace without a database FK.
+    // Delete that child before its MarketplaceJob or the orphan audit catches it.
+    await prisma.jobWorkspace.deleteMany({ where: { jobId: { in: createdJobIds } } })
     await prisma.jobQuote.deleteMany({ where: { jobId: { in: createdQuoteJobIds } } })
     await prisma.marketplaceJob.deleteMany({ where: { id: { in: createdJobIds } } })
   }
