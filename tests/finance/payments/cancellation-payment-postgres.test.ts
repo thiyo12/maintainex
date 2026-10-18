@@ -136,6 +136,9 @@ describe.skipIf(!isTestDb)('Release gate — cancellation/payment serialization'
   afterAll(async () => {
     await prisma.paymentIntent.deleteMany({ where: { id: paymentIntentId } }).catch(() => {})
     await prisma.jobEscrow.deleteMany({ where: { id: escrowId } }).catch(() => {})
+    // Cancellation flows may leave a workspace. It must be cleaned before
+    // its parent job or the final isolated-Postgres FK/orphan audit fails.
+    await prisma.jobWorkspace.deleteMany({ where: { jobId } }).catch(() => {})
     await prisma.jobQuote.deleteMany({ where: { id: quoteId } }).catch(() => {})
     await prisma.marketplaceJob.deleteMany({ where: { id: jobId } }).catch(() => {})
     await prisma.jobCategory.deleteMany({ where: { id: categoryId } }).catch(() => {})

@@ -110,6 +110,7 @@ jobs:
             tests/security/phase03-tasker-directory-category-filter.test.ts \
             tests/security/phase03-postgres-fixture-cleanup.test.ts \
             tests/integration/phase11-orphan-audit-diagnostics.test.ts \
+            tests/integration/phase11-payment-fixture-dependency-cleanup.test.ts \
             tests/matching/phase03-legacy-provider-gps-eligibility.test.ts \
             tests/matching/phase03-eligibility-authoritative-job-market.test.ts \
             tests/quotes/inspection-company-membership.test.ts \
