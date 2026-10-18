@@ -92,6 +92,7 @@ describe('Phase 03 — profile visibility resolves from real transaction evidenc
 
   afterAll(async () => {
     try {
+      await prisma.jobWorkspace.deleteMany({ where: { jobId: { in: [lkJobId, caJobId] } } })
       await prisma.jobQuote.deleteMany({ where: { jobId: { in: [lkJobId, caJobId] } } })
       await prisma.marketplaceJob.deleteMany({ where: { id: { in: [lkJobId, caJobId] } } })
       await prisma.jobCategory.deleteMany({ where: { id: categoryId } })

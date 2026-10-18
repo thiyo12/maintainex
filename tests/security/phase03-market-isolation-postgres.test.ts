@@ -155,6 +155,9 @@ describe('Phase 03 — LK/CA market isolation (PostgreSQL)', () => {
   afterAll(async () => {
     try {
       for (const jobId of created.jobIds) {
+        // These legacy fixtures do not have a workspace-on-delete cascade.
+        await prisma.jobWorkspace.deleteMany({ where: { jobId } })
+        await prisma.jobEscrow.deleteMany({ where: { jobId } })
         await prisma.jobQuote.deleteMany({ where: { jobId } })
         await prisma.marketplaceJob.deleteMany({ where: { id: jobId } })
       }
@@ -442,6 +445,7 @@ describe('Phase 03 — payment market isolation (PostgreSQL, no gateway calls)',
   afterAll(async () => {
     try {
       await prisma.jobEscrow.deleteMany({ where: { customerId } })
+      await prisma.jobWorkspace.deleteMany({ where: { jobId: { in: createdJobIds } } })
       await prisma.jobQuote.deleteMany({ where: { jobId: { in: createdJobIds } } })
       await prisma.marketplaceJob.deleteMany({ where: { customerId } })
       await prisma.jobCategory.deleteMany({ where: { slug: { startsWith: 'iso-paycat' } } })
