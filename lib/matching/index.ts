@@ -151,6 +151,7 @@ export async function findCandidates(
     ...input,
     categoryId: job.categoryId,
     serviceTemplateId: job.serviceTemplateId || undefined,
+    templateJobId: job.templateJobId || undefined,
     latitude: job.latitude ?? input.latitude,
     longitude: job.longitude ?? input.longitude,
     urgency: ((job.urgency || input.urgency || 'NORMAL').toUpperCase()) as MatchingInput['urgency'],

@@ -93,6 +93,8 @@ export interface MatchingInput {
   urgency: UrgencyLevel
   categoryId: string
   serviceTemplateId?: string
+  /** Canonical TemplateJob selected by the customer, when present. */
+  templateJobId?: string
   latitude?: number | null
   longitude?: number | null
   countryCode?: string

@@ -85,7 +85,8 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
     where: { id: company.userId },
     select: { isActive: true, isSuspended: true, isBanned: true },
   })
-  if (user?.isActive === false) reasons.push('Company owner account is inactive')
+  if (!user) reasons.push('Company owner account is missing')
+  else if (user.isActive === false) reasons.push('Company owner account is inactive')
   if (user?.isSuspended) reasons.push('Company owner account is suspended')
   if (user?.isBanned) reasons.push('Company owner account is banned')
 

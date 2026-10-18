@@ -85,6 +85,17 @@ describe('Phase 04 — provider onboarding requires actual declared capabilities
     expect(result.eligible).toBe(true)
   })
 
+  it('fails closed when an approved company owner account has been deleted', async () => {
+    mocks.companyFindUnique.mockResolvedValue({
+      isVerified: true, verificationStatus: 'VERIFIED',
+      services: '["plumbing"]', subscriptionStatus: 'ACTIVE', userId: 'missing-owner',
+    })
+    mocks.userFindUnique.mockResolvedValue(null)
+    const result = await checkCompanyEligibility('company')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Company owner account is missing')
+  })
+
   it('blocks an individual verified provider with blank capabilities', async () => {
     const result = await checkIndividualProviderEligibility('tasker-user')
     expect(result.eligible).toBe(false)

@@ -271,6 +271,33 @@ interface ProfessionEvaluation {
   preferredSkillsMatched: string[]
 }
 
+/**
+ * Phase 04: selecting one canonical TemplateJob never grants permission to
+ * perform every sibling service under its parent JobCategory. Keep category
+ * fallback only for legacy jobs with no identified TemplateJob, or for an
+ * explicitly category-wide CompanySpecialty (jobId is null).
+ */
+export function matchesLegacyTaskerJob(
+  skills: ReadonlyArray<{ jobId: string; job: { categoryId: string } }>,
+  job: Pick<MatchingInput, 'categoryId' | 'templateJobId'>,
+): boolean {
+  return job.templateJobId
+    ? skills.some(skill => skill.jobId === job.templateJobId)
+    : skills.some(skill => skill.job.categoryId === job.categoryId)
+}
+
+export function matchesLegacyCompanyJob(
+  specialties: ReadonlyArray<{ categoryId: string | null; jobId: string | null }>,
+  job: Pick<MatchingInput, 'categoryId' | 'templateJobId'>,
+): boolean {
+  return specialties.some(specialty =>
+    job.templateJobId
+      ? specialty.jobId === job.templateJobId ||
+        (specialty.jobId === null && specialty.categoryId === job.categoryId)
+      : specialty.categoryId === job.categoryId
+  )
+}
+
 async function evaluateTaskerProfession(
   client: PrismaClient,
   taskerId: string,
@@ -300,8 +327,8 @@ async function evaluateTaskerProfession(
     if (!profile) {
       return { gate: { gate: 'PROFESSION_MATCH', passed: false, reason: 'No provider profile' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
     }
-    // Legacy fallback: check if any taskerSkill matches the job category
-    const hasLegacy = profile.taskerSkills.some(s => s.job.categoryId === job.categoryId)
+    // Exact job selection is authoritative when the booking identifies a TemplateJob.
+    const hasLegacy = matchesLegacyTaskerJob(profile.taskerSkills, job)
     if (hasLegacy) {
       return {
         gate: { gate: 'PROFESSION_MATCH', passed: true, detail: 'Legacy capability match' },
@@ -416,7 +443,7 @@ async function evaluateCompanyProfession(
     if (!company) {
       return { gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: false, reason: 'Company not found' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
     }
-    const hasSpecialty = company.specialties.some(s => s.categoryId === job.categoryId)
+    const hasSpecialty = matchesLegacyCompanyJob(company.specialties, job)
     if (hasSpecialty) {
       return {
         gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: true, detail: 'Legacy specialty match' },
