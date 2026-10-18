@@ -565,10 +565,10 @@ export async function getProviderProfessionEligibility(
   const requirements = await client.serviceProfessionRequirement.findMany({
     where: { serviceTemplateId },
     include: {
-      profession: { select: { id: true } },
+      profession: { select: { id: true, isActive: true } },
       skillRequirements: {
         include: {
-          professionSkill: { select: { id: true } },
+          professionSkill: { select: { id: true, isActive: true } },
         },
       },
     },
@@ -580,44 +580,64 @@ export async function getProviderProfessionEligibility(
 
   const providerProfessions = providerType === 'tasker'
     ? await client.taskerProfession.findMany({
-        where: { taskerProfileId: providerId, status: 'APPROVED' },
+        where: {
+          taskerProfileId: providerId, status: 'APPROVED',
+          profession: { isActive: true },
+        },
         include: {
-          skills: { select: { professionSkillId: true } },
+          profession: { select: { isActive: true } },
+          skills: {
+            where: { professionSkill: { isActive: true } },
+            select: { professionSkillId: true },
+          },
         },
       })
     : await client.companyProfession.findMany({
-        where: { companyProfileId: providerId, status: 'APPROVED' },
+        where: {
+          companyProfileId: providerId, status: 'APPROVED',
+          profession: { isActive: true },
+        },
         include: {
-          skills: { select: { professionSkillId: true } },
+          profession: { select: { isActive: true } },
+          skills: {
+            where: { professionSkill: { isActive: true } },
+            select: { professionSkillId: true },
+          },
         },
       })
 
-  const professionIds = new Set(providerProfessions.map(p => p.professionId))
+  // Query filters protect the real DB. Check returned relations as well so
+  // stale or incorrectly materialized eligibility evidence also fails closed.
+  const activeProfessions = providerProfessions.filter(p => p.profession?.isActive === true)
+  const professionIds = new Set(activeProfessions.map(p => p.professionId))
   const skillIds = new Set(
-    providerProfessions.flatMap(p =>
+    activeProfessions.flatMap(p =>
       p.skills.map((s: { professionSkillId: string }) => s.professionSkillId)
     ),
   )
 
   for (const req of requirements) {
-    if (!professionIds.has(req.professionId)) continue
+    // Deactivation never silently waives the service's profession rule.
+    if (!req.profession.isActive || !professionIds.has(req.professionId)) continue
 
     const allSkills = req.skillRequirements.map(sr => ({
       skillId: sr.professionSkillId,
+      active: sr.professionSkill.isActive,
       mode: sr.requirementMode as RequirementMode,
     }))
 
     const requiredAll = allSkills.filter(s => s.mode === 'REQUIRED_ALL')
     const requiredAny = allSkills.filter(s => s.mode === 'REQUIRED_ANY_OF')
 
-    const hasAllRequired = requiredAll.every(s => skillIds.has(s.skillId))
-    const hasAnyRequired = requiredAny.length === 0 || requiredAny.some(s => skillIds.has(s.skillId))
+    const hasAllRequired = requiredAll.every(s => s.active && skillIds.has(s.skillId))
+    const hasAnyRequired = requiredAny.length === 0 ||
+      requiredAny.some(s => s.active && skillIds.has(s.skillId))
 
     if (hasAllRequired && hasAnyRequired) {
       return {
         eligible: true,
         matchedProfessionId: req.professionId,
-        matchedSkills: allSkills.filter(s => skillIds.has(s.skillId)).map(s => s.skillId),
+        matchedSkills: allSkills.filter(s => s.active && skillIds.has(s.skillId)).map(s => s.skillId),
       }
     }
   }
