@@ -53,6 +53,31 @@ export async function PATCH(request: NextRequest) {
             FOR UPDATE
           `
 
+          // Serialize role transitions with dispatch, which locks the same
+          // membership row before writing a worker assignment. Otherwise a
+          // WORKER could become FINANCE after the dispatch preflight passed.
+          await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "TeamMember" WHERE id = ${member.id} FOR UPDATE
+          `
+          const lockedMember = await tx.teamMember.findUnique({
+            where: { id: member.id },
+            select: { role: true, status: true },
+          })
+          if (!lockedMember || lockedMember.role !== oldRole || lockedMember.status === 'REMOVED') {
+            throw new Error('MEMBER_ROLE_CHANGED')
+          }
+
+          if (oldRole === 'WORKER' && role !== 'WORKER') {
+            const activeAssignments = await tx.companyJobAssignment.count({
+              where: {
+                companyId,
+                workerUserId: memberUserId,
+                status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+              },
+            })
+            if (activeAssignments > 0) throw new Error('WORKER_HAS_ACTIVE_ASSIGNMENT')
+          }
+
           if (oldRole === 'COMPANY_OWNER' && role !== 'COMPANY_OWNER') {
             const ownerCount = await tx.teamMember.count({
               where: { companyId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
@@ -195,6 +220,15 @@ export async function PATCH(request: NextRequest) {
     if (err instanceof Error) {
       if (err.message === 'LAST_COMPANY_OWNER') {
         return NextResponse.json({ error: 'Cannot remove or demote the last active company owner' }, { status: 409 })
+      }
+      if (err.message === 'WORKER_HAS_ACTIVE_ASSIGNMENT') {
+        return NextResponse.json(
+          { error: 'Reassign or finish the worker\'s active jobs before changing their role.' },
+          { status: 409 }
+        )
+      }
+      if (err.message === 'MEMBER_ROLE_CHANGED') {
+        return NextResponse.json({ error: 'Member role changed concurrently; retry the request' }, { status: 409 })
       }
       if (err.message === 'WORKER_HAS_IN_PROGRESS_JOB') {
         return NextResponse.json(
