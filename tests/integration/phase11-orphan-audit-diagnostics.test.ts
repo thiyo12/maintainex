@@ -17,10 +17,10 @@ describe('Phase 11 — orphan audit remains strict and reports bounded fixture I
     expect(audit).toContain("JobWorkspace.jobId orphans = 0")
     expect(audit).toContain("expect(Number(count),")
     expect(audit).toContain('.toBe(0)')
-    expect(audit).not.toMatch(/\\b(?:deleteMany|delete|truncate|DROP|DELETE FROM)\\b/i)
+    expect(audit).not.toMatch(/\b(?:deleteMany|delete|truncate|DROP|DELETE FROM)\b/i)
   })
   it('reports only bounded, read-only samples for each failing relation', () => {
-    expect(audit.match(/ORDER BY [a-z]+\\.id LIMIT 25/g)).toHaveLength(3)
+    expect(audit.match(/ORDER BY [a-z]+\.id LIMIT 25/g)).toHaveLength(3)
     expect(audit).toContain('orphaned fixture IDs')
     expect(audit).not.toContain('LIMIT 0')
   })
