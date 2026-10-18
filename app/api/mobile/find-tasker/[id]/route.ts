@@ -10,6 +10,11 @@ import {
 } from '@/lib/domain/provider-profile-visibility'
 import { requireJobMarket, getMarketConfig } from '@/lib/geography/market-engine'
 
+// Shared by requested-job and owned-job checks. This MUST be initialized
+// before GET invokes resolveViewerEvidence; a declaration inside GET after
+// the call was in the temporal dead zone and returned HTTP 500.
+const ACTIVE_PROFILE_JOB_STATUSES = ['OPEN', 'QUOTE_ACCEPTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED']
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -166,7 +171,6 @@ async function resolveViewerEvidence(
   }
 }
 
-const ACTIVE_PROFILE_JOB_STATUSES = ['OPEN', 'QUOTE_ACCEPTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED']
 
 function viewerJobsForProvider(viewerUserId: string) {
   return prisma.marketplaceJob.findMany({
