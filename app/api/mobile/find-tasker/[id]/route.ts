@@ -112,6 +112,12 @@ async function resolveViewerEvidence(
   providerId: string,
   requestedJobId: string | null,
 ) {
+  const quotedJobs = await prisma.jobQuote.findMany({
+    where: { providerId },
+    select: { jobId: true },
+  })
+  const quotedJobIds = [...new Set(quotedJobs.map(q => q.jobId))]
+
   // A client may PROPOSE a job id for browsing context, but the server proves
   // the viewer is authorised on it before its market is trusted.
   if (requestedJobId) {
@@ -128,7 +134,7 @@ async function resolveViewerEvidence(
       if (market.ok) {
         return {
           hasAuthorizedServiceContext: true,
-          hasActiveTransactionWithProvider: false,
+          hasActiveTransactionWithProvider: quotedJobIds.includes(proposed.id),
           transactionMarket: market.countryCode,
           activeJobId: proposed.id,
         }
@@ -136,21 +142,16 @@ async function resolveViewerEvidence(
     }
   }
 
-  // Otherwise fall back to any job this viewer participates in with the
-  // provider (owned, or one the provider quoted).
-  const quotedJobs = await prisma.jobQuote.findMany({
-    where: { providerId },
-    select: { jobId: true },
-  })
-  const quotedJobIds = [...new Set(quotedJobs.map(q => q.jobId))]
-  const viewerJobs = await viewerJobsForProvider(viewer.id, quotedJobIds)
+  // A provider having quoted an unrelated customer's job is never evidence
+  // of this viewer's market or their transaction with that provider.
+  const viewerJobs = await viewerJobsForProvider(viewer.id)
 
   for (const job of viewerJobs) {
     const market = requireJobMarket(job)
     if (market.ok) {
       return {
         hasAuthorizedServiceContext: true,
-        hasActiveTransactionWithProvider: true,
+        hasActiveTransactionWithProvider: quotedJobIds.includes(job.id),
         transactionMarket: market.countryCode,
         activeJobId: job.id,
       }
@@ -167,13 +168,10 @@ async function resolveViewerEvidence(
 
 const ACTIVE_PROFILE_JOB_STATUSES = ['OPEN', 'QUOTE_ACCEPTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED']
 
-function viewerJobsForProvider(viewerUserId: string, quotedJobIds: string[]) {
+function viewerJobsForProvider(viewerUserId: string) {
   return prisma.marketplaceJob.findMany({
     where: {
-      OR: [
-        { customerId: viewerUserId },
-        ...(quotedJobIds.length > 0 ? [{ id: { in: quotedJobIds } }] : []),
-      ],
+      customerId: viewerUserId,
       status: { in: ['OPEN', 'QUOTE_ACCEPTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED'] },
     },
     select: { id: true, countryCode: true, latitude: true, longitude: true },

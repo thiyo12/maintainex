@@ -153,10 +153,9 @@ export async function GET(
 
     const viewerJobs = await prisma.marketplaceJob.findMany({
       where: {
-        OR: [
-          { customerId: viewer.id },
-          ...(quotedJobIds.length > 0 ? [{ id: { in: quotedJobIds } }] : []),
-        ],
+        // Provider quote history is not viewer authorization. The viewer must
+        // own the job before it can grant a service market context.
+        customerId: viewer.id,
         status: { in: ['OPEN', 'QUOTE_ACCEPTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED'] },
       },
       select: { id: true, countryCode: true, latitude: true, longitude: true },
@@ -166,12 +165,14 @@ export async function GET(
 
     let transactionMarket: string | null = proposedContext?.countryCode ?? null
     let activeJobId: string | null = proposedContext?.id ?? null
-    for (const job of viewerJobs) {
-      const market = requireJobMarket(job)
-      if (market.ok) {
-        transactionMarket = market.countryCode
-        activeJobId = job.id
-        break
+    if (!proposedContext) {
+      for (const job of viewerJobs) {
+        const market = requireJobMarket(job)
+        if (market.ok) {
+          transactionMarket = market.countryCode
+          activeJobId = job.id
+          break
+        }
       }
     }
 
@@ -182,7 +183,9 @@ export async function GET(
       },
       {
         hasAuthorizedServiceContext: activeJobId !== null,
-        hasActiveTransactionWithProvider: activeJobId !== null,
+        // A job owned by the viewer provides same-market PUBLIC visibility;
+        // only this provider's quote on THAT owned job makes it a transaction.
+        hasActiveTransactionWithProvider: activeJobId !== null && quotedJobIds.includes(activeJobId),
         transactionMarket,
       },
     )
