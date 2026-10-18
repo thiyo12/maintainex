@@ -65,7 +65,10 @@ describe('Phase 04 — service selection route boundary', () => {
 
   it('rejects wrong-market selections before modifying persisted skills', () => {
     const rejected = route.indexOf('if (allowedIds.size !== jobIds.length)')
-    const deleted = route.indexOf('await prisma.taskerSkill.deleteMany')
+    const transaction = route.indexOf('await prisma.$transaction(async tx =>')
+    const deleted = route.indexOf('await tx.taskerSkill.deleteMany')
+    expect(transaction).toBeGreaterThan(rejected)
+    expect(deleted).toBeGreaterThan(transaction)
     expect(rejected).toBeGreaterThan(-1)
     expect(deleted).toBeGreaterThan(rejected)
     expect(route).toContain('unavailable in your market')
@@ -74,6 +77,9 @@ describe('Phase 04 — service selection route boundary', () => {
   it('never uses an unrestricted delete to replace market-scoped selections', () => {
     expect(route).not.toContain('where: { taskerId: tasker.id, jobId: { notIn: saveIds } }')
     expect(route).not.toContain('await prisma.taskerSkill.deleteMany({ where: { taskerId: tasker.id } })')
+    expect(route).not.toContain('await prisma.taskerSkill.deleteMany({')
+    expect(route).toContain('await tx.taskerSkill.deleteMany({')
+    expect(route).toContain('await syncCategorySkills(tx, tasker.id, [')
     expect(route).toContain('jobId: { in: toRemove }')
     expect(route).toContain('preservedSelections')
   })
