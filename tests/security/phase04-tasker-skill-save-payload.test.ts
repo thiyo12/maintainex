@@ -43,7 +43,10 @@ describe('Phase 04 — service selection PUT preserves data on invalid payloads'
     mock.suspended = false
     mock.tasker.mockResolvedValue({ id: 'tasker-1' })
     mock.taskerUpdate.mockResolvedValue({ id: 'tasker-1' })
-    mock.jobs.mockResolvedValue([job])
+    // Prisma's id: { in: [] } returns no rows; preserve that behavior
+    // so explicit empty selection remains a valid clear operation.
+    mock.jobs.mockImplementation(async ({ where }) =>
+      where.id.in.includes(job.id) ? [job] : [])
     mock.categoryJobs.mockResolvedValue([{ id: 'plumbing', name: 'Plumbing', slug: 'plumbing' }])
     mock.legacyCategories.mockResolvedValue([])
     mock.selections.mockResolvedValue([])
