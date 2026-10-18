@@ -120,6 +120,9 @@ export async function checkWorkerEligibility(
     return { eligible: false, reasons: ['User account not found'] }
   }
 
+  if (requiredJobId && member.role !== 'WORKER') {
+    reasons.push('Company member does not hold the worker role')
+  }
   if (user.isActive === false) reasons.push('Worker account is inactive')
   if (user.isSuspended) reasons.push('Worker account is suspended')
   if (user.isBanned) reasons.push('Worker account is banned')
@@ -135,6 +138,7 @@ export async function checkWorkerEligibility(
         preferredDate: true,
         preferredTimeSlot: true,
         workerIdentityCheckRequired: true,
+        workersCount: true,
         countryCode: true,
         latitude: true,
         longitude: true,
@@ -170,6 +174,12 @@ export async function checkWorkerEligibility(
     }
 
     if (job) {
+      // PostgreSQL permits only one active CompanyJobAssignment per job.
+      // Until a crew workflow exists, a single assignee cannot represent a
+      // multi-worker service. Do not claim full capacity from one worker.
+      if (job.workersCount > 1) {
+        reasons.push('Job requires a multi-worker crew; one worker is insufficient')
+      }
       const [profile, category, template] = await Promise.all([
         prisma.taskerProfile.findUnique({
           where: { userId },
@@ -254,7 +264,21 @@ export async function checkWorkerEligibility(
         }
       }
 
-      if (job.preferredDate) {
+      if (!job.preferredDate) {
+        // No date cannot establish a non-overlapping appointment.
+        // A worker already performing any active assignment is unavailable.
+        const busy = await prisma.companyJobAssignment.findFirst({
+          where: {
+            workerUserId: userId,
+            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+            jobId: { not: requiredJobId },
+          },
+          select: { id: true },
+        })
+        if (busy) {
+          reasons.push('Worker has an active assignment and no date to prove capacity')
+        }
+      } else {
         const dayStart = new Date(job.preferredDate)
         dayStart.setHours(0, 0, 0, 0)
         const dayEnd = new Date(dayStart)
@@ -277,8 +301,10 @@ export async function checkWorkerEligibility(
             status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
             jobId: { not: requiredJobId },
             job: {
-              preferredDate: { gte: dayStart, lt: dayEnd },
-              ...slotFilter,
+              OR: [
+                { preferredDate: null },
+                { preferredDate: { gte: dayStart, lt: dayEnd }, ...slotFilter },
+              ],
             },
           },
           select: { id: true, jobId: true },

@@ -3,7 +3,7 @@ import { checkWorkerEligibility } from '@/lib/phase6/provider-eligibility'
 
 const db = vi.hoisted(() => ({
   member: vi.fn(), user: vi.fn(), job: vi.fn(), profile: vi.fn(),
-  category: vi.fn(), service: vi.fn(), skill: vi.fn(), conflicts: vi.fn(),
+  category: vi.fn(), service: vi.fn(), skill: vi.fn(), conflicts: vi.fn(), busy: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -14,7 +14,7 @@ vi.mock('@/lib/prisma', () => ({
     jobCategory: { findUnique: db.category },
     serviceTemplate: { findUnique: db.service },
     taskerSkill: { findFirst: db.skill },
-    companyJobAssignment: { findMany: db.conflicts },
+    companyJobAssignment: { findMany: db.conflicts, findFirst: db.busy },
   },
 }))
 
@@ -35,7 +35,7 @@ describe('Phase 04 — company worker assignment respects exact service selectio
     vi.resetAllMocks()
     db.member.mockResolvedValue({
       id: 'member', companyId: 'company', userId: 'worker',
-      status: 'ACTIVE', skills: '[]',
+      status: 'ACTIVE', role: 'WORKER', skills: '[]',
     })
     db.user.mockResolvedValue({
       id: 'worker', identityStatus: 'VERIFIED', isActive: true,
@@ -52,6 +52,7 @@ describe('Phase 04 — company worker assignment respects exact service selectio
     })
     db.skill.mockResolvedValue({ id: 'tasker-skill' })
     db.conflicts.mockResolvedValue([])
+    db.busy.mockResolvedValue(null)
   })
 
   it('allows the selected exact service and queries by its TemplateJob ID', async () => {
@@ -73,7 +74,7 @@ describe('Phase 04 — company worker assignment respects exact service selectio
 
   it('preserves explicitly category-wide legacy membership skills', async () => {
     db.skill.mockResolvedValue(null)
-    db.member.mockResolvedValue({ id: 'member', skills: '["plumbing"]' })
+    db.member.mockResolvedValue({ id: 'member', role: 'WORKER', skills: '["plumbing"]' })
     expect((await checkWorkerEligibility('company', 'worker', 'booking')).eligible).toBe(true)
   })
 
@@ -109,6 +110,36 @@ describe('Phase 04 — company worker assignment respects exact service selectio
     const result = await checkWorkerEligibility('company', 'worker', 'booking')
     expect(result.eligible).toBe(false)
     expect(result.reasons).toContain('Job service category does not match its catalogue selection')
+  })
+
+  it('refuses a finance-only company member even with exact job skills', async () => {
+    db.member.mockResolvedValue({ id: 'member', role: 'FINANCE', skills: '["plumbing"]' })
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Company member does not hold the worker role')
+  })
+
+  it('does not dispatch a single worker to a booking that requires a crew', async () => {
+    db.job.mockResolvedValue({ ...validJob, workersCount: 3 })
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Job requires a multi-worker crew; one worker is insufficient')
+  })
+
+  it('blocks undated dispatch when the worker already has an active assignment', async () => {
+    db.busy.mockResolvedValue({ id: 'existing' })
+    // Another assignment blocks capacity even when neither job has a date.
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Worker has an active assignment and no date to prove capacity')
+    expect(db.busy).toHaveBeenCalledWith({
+      where: {
+        workerUserId: 'worker',
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+        jobId: { not: 'booking' },
+      },
+      select: { id: true },
+    })
   })
 
   it('refuses a qualified worker whose account belongs to a different market', async () => {
