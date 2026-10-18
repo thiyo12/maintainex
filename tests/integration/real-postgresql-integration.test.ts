@@ -665,8 +665,8 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
 
     await prisma.user.createMany({
       data: [
-        { id: customerId, email: `${PREFIX}@test.com`, passwordHash: 'hash', name: 'Test Customer', role: 'CUSTOMER', isActive: true, updatedAt: new Date() },
-        { id: providerId, email: `${PREFIX}-p@test.com`, passwordHash: 'hash', name: 'Provider', role: 'TASKER', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
+        { id: customerId, email: `${PREFIX}@test.com`, passwordHash: 'hash', name: 'Test Customer', role: 'CUSTOMER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
+        { id: providerId, email: `${PREFIX}-p@test.com`, passwordHash: 'hash', name: 'Provider', role: 'TASKER', countryCode: 'LK', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
       ],
     })
 
@@ -711,13 +711,17 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
         priceMin: 3000,
         priceMax: 5000,
         countryCode: 'LK',
+        currency: 'LKR',
+        isActive: true,
       },
     })
 
     const taskerProfile = await prisma.taskerProfile.create({
       data: {
         userId: providerId,
+        countryCode: 'LK',
         skills: '[]',
+        serviceAreas: '["Colombo"]',
         rating: 4.5,
         completedJobs: 10,
         hourlyRate: 500,
@@ -734,6 +738,8 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
         experienceYears: 2,
         experienceLevel: 2,
         hourlyRate: 500,
+        countryCode: 'LK',
+        currency: 'LKR',
       },
     })
   })
