@@ -106,11 +106,13 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
       ? {
           userId: input.targetTaskerId!,
           isVerified: true,
+          verificationStatus: 'VERIFIED',
           ...marketFilter,
         }
       : {
           isOnline: true,
           isVerified: true,
+          verificationStatus: 'VERIFIED',
           ...marketFilter,
         },
     include: {
@@ -143,10 +145,20 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
     const skills = parseSkills(p.skills)
     if (!skills.some((s) => input.matchKeys.includes(s))) continue
 
+    // Do not pass a GPS-targeted search by skipping the distance check.
+    // Providers with absent, partial or corrupt coordinates have no verified
+    // distance and cannot satisfy a radius-constrained match.
+    if (hasCoords && (
+      p.latitude == null || p.longitude == null ||
+      !Number.isFinite(p.latitude) || !Number.isFinite(p.longitude) ||
+      p.latitude < -90 || p.latitude > 90 ||
+      p.longitude < -180 || p.longitude > 180
+    )) continue
+
     let distanceKm: number | undefined
     let distScore = 0
-    if (hasCoords && p.latitude != null && p.longitude != null) {
-      distanceKm = haversineKm(input.lat!, input.lng!, p.latitude, p.longitude)
+    if (hasCoords) {
+      distanceKm = haversineKm(input.lat!, input.lng!, p.latitude!, p.longitude!)
       const effectiveRadius = Math.min(radiusKm, p.serviceRadius ?? radiusKm)
       if (distanceKm > effectiveRadius) continue
       distScore = Math.max(0, 1 - distanceKm / Math.max(radiusKm, 1))
