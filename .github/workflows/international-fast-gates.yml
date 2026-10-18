@@ -75,6 +75,7 @@ jobs:
             tests/auth/work-start-auth.test.ts \
             tests/security/phase07-company-work-start-authorization.test.ts \
             tests/security/phase04-company-profile-market-write.test.ts \
+            tests/security/phase04-tasker-service-market.test.ts \
             tests/security/phase04-company-catalogue-write-validation.test.ts \
             tests/security/phase07-company-workspace-authorization.test.ts \
             tests/security/phase07-safety-report-separation.test.ts \

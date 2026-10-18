@@ -28,12 +28,16 @@ export function isTaskerServiceAvailableInMarket(
   market: 'LK' | 'CA',
 ): boolean {
   const expectedCurrency = market === 'CA' ? 'CAD' : 'LKR'
+  const otherMarket = market === 'CA' ? 'LK' : 'CA'
   return (
     job.isActive &&
     !job.isCompanyOnly &&
     category.isActive &&
     job.currency === expectedCurrency &&
     isCatalogAvailableInMarket(job.countries, market) &&
+    // A service has only one TemplateJob currency. Granting a single-priced
+    // job to both markets makes it fail booking checks after provider onboarding.
+    !isCatalogAvailableInMarket(job.countries, otherMarket) &&
     isCatalogAvailableInMarket(category.countries, market)
   )
 }

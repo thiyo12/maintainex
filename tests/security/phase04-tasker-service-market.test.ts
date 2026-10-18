@@ -39,6 +39,17 @@ describe('Phase 04 — individual provider service selection by verified market'
     expect(isTaskerServiceAvailableInMarket(jobCA, { isActive: true, countries: 'not json' }, 'CA')).toBe(false)
   })
 
+  it('rejects a dual-market single-currency job for both markets', () => {
+    const dual = { ...jobCA, countries: '["LK","CA"]' }
+    expect(isTaskerServiceAvailableInMarket(dual, categoryBoth, 'CA')).toBe(false)
+    expect(isTaskerServiceAvailableInMarket({ ...dual, currency: 'LKR' }, categoryBoth, 'LK')).toBe(false)
+  })
+
+  it('still lets each market onboard its own separately priced single-market service', () => {
+    expect(isTaskerServiceAvailableInMarket(jobLK, categoryBoth, 'LK')).toBe(true)
+    expect(isTaskerServiceAvailableInMarket(jobCA, categoryBoth, 'CA')).toBe(true)
+  })
+
   it('refuses malformed job market metadata', () => {
     expect(isTaskerServiceAvailableInMarket({ ...jobCA, countries: 'CA' }, categoryCA, 'CA')).toBe(false)
   })
