@@ -65,6 +65,13 @@ describe('Phase 02 — domain BOOK_NOW callers cannot bypass verified GPS market
   ])('rejects %s before provider resolution or pricing', async (_label, fields) => {
     await rejected(fields)
   })
+  it('rejects coordinate-less Canadian bookings rather than assuming all of Canada is Vancouver', async () => {
+    await rejected({ countryCode: 'CA', district: 'Vancouver' })
+  })
+  it('rejects explicit null coordinates for Canadian bookings', async () => {
+    await rejected({ countryCode: 'CA', district: 'Vancouver',
+      latitude: null, longitude: null })
+  })
   it('rejects a mismatched Canadian district even within the Vancouver polygon', async () => {
     await rejected({ countryCode: 'CA', district: 'Burnaby',
       latitude: 49.2827, longitude: -123.1207 })

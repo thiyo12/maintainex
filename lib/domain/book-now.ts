@@ -156,6 +156,12 @@ export async function createBookNowJob(input: BookNowInput) {
   // Coordinate-less historical LK jobs retain the legacy compatibility path.
   const hasAnyCoordinates = input.latitude !== undefined && input.latitude !== null ||
     input.longitude !== undefined && input.longitude !== null
+  // Canadian launch permission is municipal, not country-wide. Without
+  // GPS there is no proof that the job is inside Vancouver; a caller must
+  // not skip the mobile route to book in Burnaby or another Canadian city.
+  if (finalCountryCode === 'CA' && !hasAnyCoordinates) {
+    throw new Error('Service address does not match booking country')
+  }
   if (hasAnyCoordinates) {
     const addressMarket = resolveMarketFromServiceAddress({
       latitude: input.latitude,
