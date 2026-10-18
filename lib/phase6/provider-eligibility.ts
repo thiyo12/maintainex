@@ -131,6 +131,7 @@ export async function checkWorkerEligibility(
       select: {
         categoryId: true,
         serviceTemplateId: true,
+        templateJobId: true,
         preferredDate: true,
         preferredTimeSlot: true,
         workerIdentityCheckRequired: true,
@@ -181,17 +182,35 @@ export async function checkWorkerEligibility(
         job.serviceTemplateId
           ? prisma.serviceTemplate.findUnique({
               where: { id: job.serviceTemplateId },
-              select: { id: true, jobCategoryId: true },
+              select: { id: true, jobCategoryId: true, templateJobId: true },
             })
           : Promise.resolve(null),
       ])
 
-      const requiredCategoryId = template?.jobCategoryId || job.categoryId
+      // Reject contradictory catalogue pointers rather than using an unrelated
+      // service's category to grant a worker permission. Historical jobs with
+      // no service template remain supported as category-level bookings.
+      if (job.serviceTemplateId && (
+        !template ||
+        template.jobCategoryId !== job.categoryId ||
+        (job.templateJobId && template.templateJobId &&
+          job.templateJobId !== template.templateJobId)
+      )) {
+        reasons.push('Job service category does not match its catalogue selection')
+      }
+
+      const requiredCategoryId = job.categoryId
+      const requiredTemplateJobId = job.templateJobId || template?.templateJobId || null
       const relationalCapability = profile
         ? await prisma.taskerSkill.findFirst({
             where: {
               taskerId: profile.id,
-              job: { categoryId: requiredCategoryId },
+              // A worker selecting one TemplateJob must not inherit every
+              // sibling capability in the same category. Category matching is
+              // retained only for legacy bookings without a specific job ID.
+              ...(requiredTemplateJobId
+                ? { jobId: requiredTemplateJobId }
+                : { job: { categoryId: requiredCategoryId } }),
             },
             select: { id: true },
           })
@@ -209,6 +228,7 @@ export async function checkWorkerEligibility(
         category?.name,
         category?.slug,
         job.serviceTemplateId,
+        requiredTemplateJobId,
       ]
         .filter((value): value is string => !!value)
         .map(value => value.trim().toLowerCase())
