@@ -98,6 +98,7 @@ jobs:
             tests/geography/phase02-incomplete-coordinate-market.test.ts \
             tests/security/phase03-empty-market-category-search.test.ts \
             tests/security/phase03-provider-profile-job-ownership.test.ts \
+            tests/security/phase03-tasker-directory-private-data.test.ts \
             tests/matching/phase03-eligibility-authoritative-job-market.test.ts \
             tests/quotes/inspection-company-membership.test.ts \
             tests/security/phase07-company-change-order-read-access.test.ts \

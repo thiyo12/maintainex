@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { jsonArrayContains, safeParseJsonArr } from '@/lib/db-utils'
 import { isSupportedMarket } from '@/lib/geography/market-engine'
+import { toBroadCoverageAreas } from '@/lib/domain/provider-profile-visibility'
 
 // List taskers (public-ish, requires auth)
 export async function GET(request: NextRequest) {
@@ -37,6 +38,10 @@ export async function GET(request: NextRequest) {
 
     const where: any = {
       isVerified: true,
+      verificationStatus: 'VERIFIED',
+      // A verified profile owned by a suspended, banned, or inactive account
+      // is NOT an eligible provider and must not appear in discovery.
+      user: { isActive: true, isSuspended: false, isBanned: false },
       // TaskerProfile carries the provider market; fall back to the owning
       // account's market for legacy profiles that predate the field.
       OR: [{ countryCode: market }, { countryCode: null, user: { countryCode: market } }],
@@ -46,7 +51,8 @@ export async function GET(request: NextRequest) {
     let taskers = await prisma.taskerProfile.findMany({
       where,
       include: {
-        user: { select: { id: true, name: true, phone: true, email: true } },
+        // Public directory responses never need account contact details.
+        user: { select: { id: true, name: true } },
       },
       orderBy: [{ rating: 'desc' }, { completedJobs: 'desc' }],
     })
@@ -71,15 +77,16 @@ export async function GET(request: NextRequest) {
         bio: t.bio,
         hourlyRate: t.hourlyRate,
         skills: safeParseJsonArr(t.skills),
-        serviceAreas: safeParseJsonArr(t.serviceAreas),
+        // Free-form provider-entered areas can contain street addresses.
+        // Return broad city/district labels only.
+        serviceAreas: toBroadCoverageAreas(safeParseJsonArr(t.serviceAreas)),
         rating: t.rating,
         completedJobs: t.completedJobs,
         isVerified: t.isVerified,
         isOnline: t.isOnline,
-        latitude: t.latitude,
-        longitude: t.longitude,
-        locationUpdatedAt: t.locationUpdatedAt?.toISOString(),
-        user: t.user,
+        // Exact provider GPS is available only from the authorized,
+        // time-bound job tracking endpoint, never from browse results.
+        user: { id: t.user.id, name: t.user.name },
       }))
     )
   } catch (error) {
