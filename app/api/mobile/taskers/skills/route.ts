@@ -1,6 +1,7 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { getCurrencyForCountry, parseNonNegativeMajorUnitPrice } from '@/lib/shared/money/money'
 import { isCatalogAvailableInMarket, isTaskerServiceAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
@@ -159,12 +160,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Duplicate jobId in service selection', code: 'DUPLICATE_SERVICE' }, { status: 400 })
     }
 
-    const tasker = await prisma.taskerProfile.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: { userId: user.id, countryCode: market },
-      select: { id: true },
-    })
+    // Validate the requested catalogue before creating a provider profile.
     const jobs = await prisma.templateJob.findMany({
       where: { id: { in: jobIds }, isActive: true },
       select: {
@@ -192,78 +188,90 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    const tasker = await prisma.taskerProfile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, countryCode: market },
+      select: { id: true },
+    })
     const toSave = skills.filter(s => allowedIds.has(s.jobId.trim()))
     const saveIds = toSave.map(s => s.jobId.trim())
     const saveIdSet = new Set(saveIds)
 
     // A market-specific replacement must not delete historical capabilities
     // from another market or inactive templates still attached to past jobs.
-    const existingSelections = await prisma.taskerSkill.findMany({
-      where: { taskerId: tasker.id },
-      select: {
-        jobId: true,
-        job: {
-          select: {
-            id: true,
-            categoryId: true,
-            isActive: true,
-            isCompanyOnly: true,
-            countries: true,
-            currency: true,
-            category: { select: { isActive: true, countries: true } },
+    // The old flow deleted selections first and then upserted jobs one by
+    // one. A later failure could leave the provider with missing capabilities.
+    // The entire market-scoped replacement and denormalized key update must
+    // commit or roll back together.
+    const saved = await prisma.$transaction(async tx => {
+      const existingSelections = await tx.taskerSkill.findMany({
+        where: { taskerId: tasker.id },
+        select: {
+          jobId: true,
+          job: {
+            select: {
+              id: true,
+              categoryId: true,
+              isActive: true,
+              isCompanyOnly: true,
+              countries: true,
+              currency: true,
+              category: { select: { isActive: true, countries: true } },
+            },
           },
         },
-      },
+      })
+      const toRemove = existingSelections
+        .filter(selection =>
+          isTaskerServiceAvailableInMarket(selection.job, selection.job.category, market) &&
+          !saveIdSet.has(selection.jobId),
+        )
+        .map(selection => selection.jobId)
+      if (toRemove.length > 0) {
+        await tx.taskerSkill.deleteMany({
+          where: { taskerId: tasker.id, jobId: { in: toRemove } },
+        })
+      }
+
+      for (const s of toSave) {
+        await tx.taskerSkill.upsert({
+          where: {
+            taskerId_jobId: { taskerId: tasker.id, jobId: s.jobId.trim() },
+          },
+          update: {
+            hourlyRate: s.hourlyRate != null ? parseNonNegativeMajorUnitPrice(s.hourlyRate, getCurrencyForCountry(market))! : undefined,
+            fixedRate: s.fixedRate != null ? parseNonNegativeMajorUnitPrice(s.fixedRate, getCurrencyForCountry(market))! : undefined,
+            experienceYears: s.experienceYears != null ? Number(s.experienceYears) : undefined,
+            experienceLevel: s.experienceLevel != null ? Number(s.experienceLevel) : undefined,
+            currency: getCurrencyForCountry(market),
+            countryCode: market,
+          },
+          create: {
+            taskerId: tasker.id,
+            jobId: s.jobId.trim(),
+            hourlyRate: parseNonNegativeMajorUnitPrice(s.hourlyRate ?? 0, getCurrencyForCountry(market))!,
+            fixedRate: parseNonNegativeMajorUnitPrice(s.fixedRate ?? 0, getCurrencyForCountry(market))!,
+            experienceYears: Number(s.experienceYears ?? 0),
+            experienceLevel: Number(s.experienceLevel ?? 1),
+            currency: getCurrencyForCountry(market),
+            countryCode: market,
+          },
+        })
+      }
+
+      // Keep the category-level skills (used by job matching + the tasker job feed)
+      // in sync with the detailed service selection.
+      const preservedSelections = existingSelections
+        .filter(selection => !toRemove.includes(selection.jobId) && !saveIdSet.has(selection.jobId))
+        .map(selection => ({ id: selection.jobId, categoryId: selection.job.categoryId }))
+      await syncCategorySkills(tx, tasker.id, [
+        ...preservedSelections,
+        ...jobs.filter(j => allowedIds.has(j.id)),
+      ])
+      return toSave.length
+
     })
-    const toRemove = existingSelections
-      .filter(selection =>
-        isTaskerServiceAvailableInMarket(selection.job, selection.job.category, market) &&
-        !saveIdSet.has(selection.jobId),
-      )
-      .map(selection => selection.jobId)
-    if (toRemove.length > 0) {
-      await prisma.taskerSkill.deleteMany({
-        where: { taskerId: tasker.id, jobId: { in: toRemove } },
-      })
-    }
-
-    let saved = 0
-    for (const s of toSave) {
-      await prisma.taskerSkill.upsert({
-        where: {
-          taskerId_jobId: { taskerId: tasker.id, jobId: s.jobId.trim() },
-        },
-        update: {
-          hourlyRate: s.hourlyRate != null ? parseNonNegativeMajorUnitPrice(s.hourlyRate, getCurrencyForCountry(market))! : undefined,
-          fixedRate: s.fixedRate != null ? parseNonNegativeMajorUnitPrice(s.fixedRate, getCurrencyForCountry(market))! : undefined,
-          experienceYears: s.experienceYears != null ? Number(s.experienceYears) : undefined,
-          experienceLevel: s.experienceLevel != null ? Number(s.experienceLevel) : undefined,
-          currency: getCurrencyForCountry(market),
-          countryCode: market,
-        },
-        create: {
-          taskerId: tasker.id,
-          jobId: s.jobId.trim(),
-          hourlyRate: parseNonNegativeMajorUnitPrice(s.hourlyRate ?? 0, getCurrencyForCountry(market))!,
-          fixedRate: parseNonNegativeMajorUnitPrice(s.fixedRate ?? 0, getCurrencyForCountry(market))!,
-          experienceYears: Number(s.experienceYears ?? 0),
-          experienceLevel: Number(s.experienceLevel ?? 1),
-          currency: getCurrencyForCountry(market),
-          countryCode: market,
-        },
-      })
-      saved++
-    }
-
-    // Keep the category-level skills (used by job matching + the tasker job feed)
-    // in sync with the detailed service selection.
-    const preservedSelections = existingSelections
-      .filter(selection => !toRemove.includes(selection.jobId) && !saveIdSet.has(selection.jobId))
-      .map(selection => ({ id: selection.jobId, categoryId: selection.job.categoryId }))
-    await syncCategorySkills(tasker.id, [
-      ...preservedSelections,
-      ...jobs.filter(j => allowedIds.has(j.id)),
-    ])
 
     return NextResponse.json({ saved })
   } catch (error) {
@@ -272,14 +280,18 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-async function syncCategorySkills(taskerId: string, selectedJobs: { id: string; categoryId: string }[]): Promise<void> {
+async function syncCategorySkills(
+  client: Prisma.TransactionClient,
+  taskerId: string,
+  selectedJobs: { id: string; categoryId: string }[],
+): Promise<void> {
   const categoryIds = [...new Set(selectedJobs.map(j => j.categoryId).filter(Boolean))]
   if (categoryIds.length === 0) {
-    await prisma.taskerProfile.update({ where: { id: taskerId }, data: { skills: '[]' } })
+    await client.taskerProfile.update({ where: { id: taskerId }, data: { skills: '[]' } })
     return
   }
 
-  const jobCats = await prisma.jobCategory.findMany({
+  const jobCats = await client.jobCategory.findMany({
     where: { id: { in: categoryIds } },
     select: { id: true, name: true, slug: true },
   })
@@ -287,7 +299,7 @@ async function syncCategorySkills(taskerId: string, selectedJobs: { id: string; 
   // Store the JobCategory id + slug (the canonical namespace used by job
   // matching/blasting and the tasker search). A mapped legacy Category slug is
   // retained as an alias so previously-onboarded taskers keep matching.
-  const marketplace = await prisma.category.findMany({
+  const marketplace = await client.category.findMany({
     where: { isActive: true },
     select: { name: true, slug: true },
   })
@@ -308,7 +320,7 @@ async function syncCategorySkills(taskerId: string, selectedJobs: { id: string; 
     if (alias && alias !== jc.slug) keys.push(alias)
   }
 
-  await prisma.taskerProfile.update({
+  await client.taskerProfile.update({
     where: { id: taskerId },
     data: { skills: JSON.stringify([...new Set(keys)]) },
   })

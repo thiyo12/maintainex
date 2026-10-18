@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const mock = vi.hoisted(() => ({
   account: 'CA',
-  suspended: false,
+  suspended: false, transaction: vi.fn(),
   tasker: vi.fn(), taskerUpdate: vi.fn(),
   jobs: vi.fn(), categoryJobs: vi.fn(), legacyCategories: vi.fn(),
   selections: vi.fn(), deleteSkills: vi.fn(), saveSkill: vi.fn(),
@@ -16,6 +16,7 @@ vi.mock('@/lib/auth/compatibility/mobile-auth', () => ({
     ? NextResponse.json({ error: 'Suspended' }, { status: 403 }) : null,
 }))
 vi.mock('@/lib/prisma', () => ({ prisma: {
+  $transaction: mock.transaction,
   taskerProfile: { upsert: mock.tasker, update: mock.taskerUpdate },
   templateJob: { findMany: mock.jobs },
   jobCategory: { findMany: mock.categoryJobs },
@@ -51,12 +52,23 @@ describe('Phase 04 — service selection PUT preserves data on invalid payloads'
     mock.legacyCategories.mockResolvedValue([])
     mock.selections.mockResolvedValue([])
     mock.saveSkill.mockResolvedValue({ id: 'saved' })
+    mock.transaction.mockImplementation(async fn => fn({
+      taskerProfile: { update: mock.taskerUpdate },
+      taskerSkill: {
+        findMany: mock.selections,
+        deleteMany: mock.deleteSkills,
+        upsert: mock.saveSkill,
+      },
+      jobCategory: { findMany: mock.categoryJobs },
+      category: { findMany: mock.legacyCategories },
+    }))
   })
   async function noMutation() {
     expect(mock.tasker).not.toHaveBeenCalled()
     expect(mock.deleteSkills).not.toHaveBeenCalled()
     expect(mock.saveSkill).not.toHaveBeenCalled()
     expect(mock.taskerUpdate).not.toHaveBeenCalled()
+    expect(mock.transaction).not.toHaveBeenCalled()
   }
   it.each([
     ['missing skills', {}],
@@ -109,6 +121,37 @@ describe('Phase 04 — service selection PUT preserves data on invalid payloads'
       create: expect.objectContaining({ countryCode: 'CA', currency: 'CAD' }),
     }))
   })
+  it('validates active market jobs before creating any provider profile', async () => {
+    mock.jobs.mockResolvedValue([])
+    const result = await put({ skills: [{ jobId: 'foreign-or-inactive' }] })
+    expect(result.response.status).toBe(400)
+    expect(mock.tasker).not.toHaveBeenCalled()
+    expect(mock.transaction).not.toHaveBeenCalled()
+  })
+
+  it('wraps deletion, upserts and category sync in one transaction', async () => {
+    mock.selections.mockResolvedValue([{
+      jobId: 'old-service',
+      job: { ...job, id: 'old-service' },
+    }])
+    const result = await put({ skills: [{ jobId: 'local-service' }] })
+    expect(result.response.status).toBe(200)
+    expect(mock.transaction).toHaveBeenCalledTimes(1)
+    expect(mock.deleteSkills).toHaveBeenCalledWith({
+      where: { taskerId: 'tasker-1', jobId: { in: ['old-service'] } },
+    })
+    expect(mock.saveSkill).toHaveBeenCalledTimes(1)
+    expect(mock.taskerUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it('never sends a success response if a service upsert fails inside the transaction', async () => {
+    mock.saveSkill.mockRejectedValue(new Error('database write failed'))
+    const result = await put({ skills: [{ jobId: 'local-service' }] })
+    expect(result.response.status).toBe(500)
+    expect(mock.transaction).toHaveBeenCalledTimes(1)
+    expect(mock.taskerUpdate).not.toHaveBeenCalled()
+  })
+
   it('normalizes lowercase account country when creating a profile', async () => {
     mock.account = 'ca'
     expect((await put({ skills: [] })).response.status).toBe(200)
