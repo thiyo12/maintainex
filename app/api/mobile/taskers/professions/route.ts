@@ -24,12 +24,13 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const tasker = await prisma.taskerProfile.upsert({
+    // Listing professions is read-only. Viewing the onboarding screen must
+    // not implicitly create a provider profile or change its market.
+    const tasker = await prisma.taskerProfile.findUnique({
       where: { userId: user.id },
-      update: {},
-      create: { userId: user.id, countryCode: market },
       select: { id: true },
     })
+    if (!tasker) return NextResponse.json({ professions: [] })
 
     const professions = await getTaskerProfessions(prisma, tasker.id)
     return NextResponse.json({ professions })
@@ -64,6 +65,19 @@ export async function POST(request: NextRequest) {
     const professionId = body?.professionId
     if (typeof professionId !== 'string' || !professionId.trim()) {
       return NextResponse.json({ error: 'professionId must be a nonempty string', code: 'INVALID_PROFESSION_ID' }, { status: 400 })
+    }
+
+    // Check the global profession exists and is active BEFORE creating an
+    // account profile. A forged or archived ID is not onboarding intent.
+    const validProfession = await prisma.profession.findUnique({
+      where: { id: professionId.trim() },
+      select: { id: true, isActive: true },
+    })
+    if (!validProfession) {
+      return NextResponse.json({ error: 'Profession not found' }, { status: 404 })
+    }
+    if (!validProfession.isActive) {
+      return NextResponse.json({ error: 'Cannot assign inactive profession' }, { status: 400 })
     }
 
     const tasker = await prisma.taskerProfile.upsert({

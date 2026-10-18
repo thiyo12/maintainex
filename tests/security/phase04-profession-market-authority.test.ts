@@ -68,6 +68,7 @@ describe('Phase 04 — profession onboarding must never default foreign accounts
     mock.suspended = false
     mock.upsert.mockResolvedValue({ id: 'profile-1' })
     mock.profileFind.mockResolvedValue({ id: 'profile-1' })
+    mock.profession.mockResolvedValue({ id: 'prof-1', isActive: true })
     mock.getProfessions.mockResolvedValue([])
     mock.getTaskerProfession.mockImplementation(async ({ where }) =>
       where.id ? { id: 'joined-1', taskerProfileId: 'profile-1' } : null)
@@ -186,6 +187,40 @@ describe('Phase 04 — profession onboarding must never default foreign accounts
     expect(mock.addSkill).toHaveBeenCalledWith(expect.anything(), {
       taskerProfessionId: 'joined-1', professionSkillId: 'skill-1',
     })
+  })
+
+  it('lists an empty profession set without creating a profile for a new provider', async () => {
+    mock.profileFind.mockResolvedValue(null)
+    const response = await ownedGET()
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ professions: [] })
+    expect(mock.upsert).not.toHaveBeenCalled()
+    expect(mock.getProfessions).not.toHaveBeenCalled()
+  })
+
+  it('reads assigned professions without writing or changing profile country', async () => {
+    expect((await ownedGET()).status).toBe(200)
+    expect(mock.profileFind).toHaveBeenCalledWith({
+      where: { userId: 'provider' }, select: { id: true },
+    })
+    expect(mock.getProfessions).toHaveBeenCalledWith(expect.anything(), 'profile-1')
+    expect(mock.upsert).not.toHaveBeenCalled()
+  })
+
+  it('does not create a profile for a nonexistent profession ID', async () => {
+    mock.profession.mockResolvedValueOnce(null)
+    const response = await professionPOST({ professionId: 'forged-profession' })
+    expect(response.status).toBe(404)
+    expect(mock.upsert).not.toHaveBeenCalled()
+    expect(mock.assign).not.toHaveBeenCalled()
+  })
+
+  it('does not create a profile for a deactivated profession', async () => {
+    mock.profession.mockResolvedValueOnce({ id: 'prof-1', isActive: false })
+    const response = await professionPOST()
+    expect(response.status).toBe(400)
+    expect(mock.upsert).not.toHaveBeenCalled()
+    expect(mock.assign).not.toHaveBeenCalled()
   })
 
   it('preserves authorized skill and profession reads', async () => {
