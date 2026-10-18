@@ -530,6 +530,10 @@ describe('Phase 03 — payment market isolation (PostgreSQL, no gateway calls)',
 
     try {
       await prisma.jobEscrow.deleteMany({ where: { jobId: job.id } })
+      // Keep database integrity even if payment intent code creates a
+      // workspace on a previously rejected job.
+      await prisma.jobWorkspace.deleteMany({ where: { jobId: job.id } })
+      await prisma.jobQuote.deleteMany({ where: { jobId: job.id } })
       await prisma.marketplaceJob.deleteMany({ where: { id: job.id } })
       await prisma.jobCategory.deleteMany({ where: { id: category.id } })
     } catch { /* best effort */ }
@@ -588,6 +592,10 @@ describe('Phase 03 — payment market isolation (PostgreSQL, no gateway calls)',
 
     try {
       await prisma.jobEscrow.deleteMany({ where: { jobId: job.id } })
+      // Keep database integrity even if payment intent code creates a
+      // workspace on a previously rejected job.
+      await prisma.jobWorkspace.deleteMany({ where: { jobId: job.id } })
+      await prisma.jobQuote.deleteMany({ where: { jobId: job.id } })
       await prisma.marketplaceJob.deleteMany({ where: { id: job.id } })
       await prisma.jobCategory.deleteMany({ where: { id: repeatCategory.id } })
     } catch { /* best effort */ }
