@@ -5,6 +5,7 @@ import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { jsonArrayContains, safeParseJsonArr } from '@/lib/db-utils'
 import { isSupportedMarket } from '@/lib/geography/market-engine'
 import { toBroadCoverageAreas } from '@/lib/domain/provider-profile-visibility'
+import { isCatalogAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 
 // List taskers (public-ish, requires auth)
 export async function GET(request: NextRequest) {
@@ -58,13 +59,16 @@ export async function GET(request: NextRequest) {
     })
 
     if (category) {
-      const matchKeys = await resolveCategoryMatchKeys(category)
-      if (matchKeys.length > 0) {
-        taskers = taskers.filter(t => {
-          const skills = safeParseJsonArr(t.skills)
-          return skills.some(s => matchKeys.includes(s))
-        })
+      const matchKeys = await resolveCategoryMatchKeys(category, market as 'LK' | 'CA')
+      if (matchKeys.length === 0) {
+        // An unknown, inactive or unpriced category cannot turn a filtered
+        // request into an unrestricted provider directory.
+        return NextResponse.json([])
       }
+      taskers = taskers.filter(t => {
+        const skills = safeParseJsonArr(t.skills)
+        return skills.some(s => matchKeys.includes(s))
+      })
     }
     if (area) {
       taskers = taskers.filter(t => jsonArrayContains(t.serviceAreas, area))
@@ -95,50 +99,70 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function resolveCategoryMatchKeys(category: string): Promise<string[]> {
-  const keys = new Set<string>([category])
+async function resolveCategoryMatchKeys(category: string, market: 'LK' | 'CA'): Promise<string[]> {
+  const expectedCurrency = market === 'LK' ? 'LKR' : 'CAD'
+  const otherMarket = market === 'LK' ? 'CA' : 'LK'
 
+  // The original code seeded unknown IDs into the allowed skill keys, and
+  // skipped filtering when no category record existed. Both outcomes could
+  // return unrelated providers for an invalid or inactive service.
   const jobCat = await prisma.jobCategory.findFirst({
     where: { OR: [{ id: category }, { slug: category }] },
+    select: { id: true, slug: true, name: true, isActive: true, countries: true },
   })
 
+  // A linked V2 department must have at least one active, correctly priced,
+  // single-market service before its providers can be discovered.
+  const categoryBookable = async (c: {
+    id: string; isActive: boolean; countries: string
+  }): Promise<boolean> => {
+    if (!c.isActive || !isCatalogAvailableInMarket(c.countries, market)) return false
+    const services = await prisma.templateJob.findMany({
+      where: { categoryId: c.id, isActive: true },
+      select: { currency: true, countries: true },
+    })
+    return services.some(service =>
+      service.currency === expectedCurrency &&
+      isCatalogAvailableInMarket(service.countries, market) &&
+      !isCatalogAvailableInMarket(service.countries, otherMarket))
+  }
+
   if (jobCat) {
-    keys.add(jobCat.id)
-    if (jobCat.slug) keys.add(jobCat.slug)
-    // Include any legacy Category slug that relates to this JobCategory so
-    // previously-onboarded taskers (stored with legacy slugs) still match.
-    const legacy = await prisma.category.findMany({ where: { isActive: true }, select: { name: true, slug: true } })
+    if (!(await categoryBookable(jobCat))) return []
+    const keys = new Set<string>([jobCat.id, ...(jobCat.slug ? [jobCat.slug] : [])])
+    const legacy = await prisma.category.findMany({
+      where: { isActive: true }, select: { name: true, slug: true },
+    })
     for (const c of legacy) {
-      if (
-        c.name.toLowerCase().includes(jobCat.name.toLowerCase()) ||
-        jobCat.name.toLowerCase().includes(c.name.toLowerCase())
-      ) {
+      if (c.name.toLowerCase().includes(jobCat.name.toLowerCase()) ||
+          jobCat.name.toLowerCase().includes(c.name.toLowerCase())) {
         keys.add(c.slug)
       }
     }
     return [...keys]
   }
 
-  // Not a JobCategory — treat as a legacy Category id/slug.
+  // Keep historical skill slugs, but only when they map to an eligible V2
+  // department. Unmapped legacy/unknown input must never widen discovery.
   const legacyCat = await prisma.category.findFirst({
-    where: { OR: [{ id: category }, { slug: category }] },
+    where: { OR: [{ id: category }, { slug: category }], isActive: true },
     select: { name: true, slug: true },
   })
-  if (legacyCat) {
-    if (legacyCat.slug) keys.add(legacyCat.slug)
-    // Map back to the JobCategory namespace where possible.
-    const jobCatByName = await prisma.jobCategory.findMany({ select: { id: true, name: true, slug: true } })
-    for (const jc of jobCatByName) {
-      if (
-        legacyCat.name.toLowerCase().includes(jc.name.toLowerCase()) ||
-        jc.name.toLowerCase().includes(legacyCat.name.toLowerCase())
-      ) {
-        keys.add(jc.id)
-        if (jc.slug) keys.add(jc.slug)
-      }
-    }
-  }
+  if (!legacyCat) return []
 
+  const candidates = await prisma.jobCategory.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, slug: true, isActive: true, countries: true },
+  })
+  const keys = new Set<string>()
+  for (const jc of candidates) {
+    if (!legacyCat.name.toLowerCase().includes(jc.name.toLowerCase()) &&
+        !jc.name.toLowerCase().includes(legacyCat.name.toLowerCase())) continue
+    if (!(await categoryBookable(jc))) continue
+    if (legacyCat.slug) keys.add(legacyCat.slug)
+    keys.add(jc.id)
+    if (jc.slug) keys.add(jc.slug)
+  }
   return [...keys]
 }
 
