@@ -113,6 +113,10 @@ describe('Phase 03 — compatibility matcher cannot bypass verification or radiu
       expect(mock.profiles).not.toHaveBeenCalled()
     },
   )
+  it('rejects verified GPS with no claimed launch market before querying profiles', async () => {
+    expect(await match({ countryCode: undefined })).toEqual([])
+    expect(mock.profiles).not.toHaveBeenCalled()
+  })
   it('still accepts valid coordinates in the Sri Lankan launch market', async () => {
     mock.profiles.mockResolvedValue([profile({
       countryCode: 'LK', latitude: 6.9271, longitude: 79.8612,
@@ -125,8 +129,8 @@ describe('Phase 03 — compatibility matcher cannot bypass verification or radiu
       where: expect.objectContaining({ countryCode: 'LK' }),
     }))
   })
-  it('never queries providers across all markets if the market is unknown', async () => {
-    await match({ countryCode: undefined })
+  it('keeps the explicit nonmatching country sentinel for locationless legacy calls', async () => {
+    await match({ countryCode: undefined, lat: null, lng: null })
     expect(mock.profiles).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ countryCode: '__none__' }),
     }))
