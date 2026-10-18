@@ -677,7 +677,7 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
         slug: `${PREFIX}-cat`,
         iconName: 'wrench',
         colorHex: '#FF0000',
-        countries: 'LK',
+        countries: '["LK"]',
         isActive: true,
       },
     })
@@ -692,7 +692,9 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
         priceMax: 5000,
         whatIsIncluded: 'Basic service',
         typicalDurationMinutes: 60,
-        countries: 'LK',
+        countries: '["LK"]',
+        currency: 'LKR',
+        isActive: true,
       },
     })
 
