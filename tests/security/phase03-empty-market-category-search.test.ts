@@ -131,7 +131,8 @@ describe('Phase 03 — search omits market categories with no bookable service',
   it('deduplicates the same V2 job found by AI and direct name search', async () => {
     const body = await (await search('country=CA&q=leaking pipe')).json()
     expect(body.subServices.map((j: { id: string }) => j.id)).toEqual(['valid-ca-job'])
-    expect(body.totalResults).toBe(1)
+    // The AI category hit is intentionally retained, alongside one job.
+    expect(body.totalResults).toBe(2)
   })
 
   it('never broadens unsupported market searches to LK defaults', async () => {
