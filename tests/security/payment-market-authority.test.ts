@@ -89,12 +89,13 @@ describe('LEGACY COMPATIBILITY: coordinate-less jobs must behave exactly as befo
     if (result.ok) expect(result.countryCode).toBe('CA')
   })
 
-  it('a partial coordinate pair is treated as absent, not as a rejection', () => {
-    // Latitude without longitude must not become a new failure mode.
+  it('rejects an incomplete coordinate pair instead of falling back to a stored country', () => {
+    // Phase 02 explicitly made partial GPS fail closed. Otherwise a caller
+    // can bypass service-location checks by omitting one coordinate.
     const latOnly = requireJobMarket({ countryCode: 'LK', latitude: 6.9271, longitude: null })
     const lonOnly = requireJobMarket({ countryCode: 'LK', latitude: null, longitude: 79.8612 })
-    expect(latOnly.ok).toBe(true)
-    expect(lonOnly.ok).toBe(true)
+    expect(latOnly).toMatchObject({ ok: false, code: 'JOB_MARKET_UNRESOLVED' })
+    expect(lonOnly).toMatchObject({ ok: false, code: 'JOB_MARKET_UNRESOLVED' })
   })
 
   it('unknown stored countries are still rejected', () => {
@@ -230,15 +231,15 @@ describe('BEHAVIOURAL: resolvePaymentMarketForIntent executes real decisions', (
     if (result.ok) expect(result.countryCode).toBe('CA')
   })
 
-  it('PRESERVES the partial-coordinate-pair fallback', () => {
+  it('REJECTS partial payment coordinates without stored-country fallback', () => {
     const latOnly = resolvePaymentMarketForIntent({
       countryCode: 'LK', latitude: 6.9271, longitude: null,
     })
     const lonOnly = resolvePaymentMarketForIntent({
       countryCode: 'CA', latitude: null, longitude: -123.1156,
     })
-    expect(latOnly.ok).toBe(true)
-    expect(lonOnly.ok).toBe(true)
+    expect(latOnly).toMatchObject({ ok: false, code: 'JOB_MARKET_UNRESOLVED' })
+    expect(lonOnly).toMatchObject({ ok: false, code: 'JOB_MARKET_UNRESOLVED' })
   })
 
   it('REJECTS unsupported stored countries', () => {
@@ -265,9 +266,9 @@ describe('BEHAVIOURAL: resolvePaymentMarketForIntent executes real decisions', (
       const result = resolvePaymentMarketForIntent({
         countryCode: 'LK', latitude: bad, longitude: 79.8612,
       })
-      // Treated as an incomplete pair, so the legacy stored country still applies.
-      expect(result.ok).toBe(true)
-      if (result.ok) expect(result.countryCode).toBe('LK')
+      // An invalid numeric coordinate cannot authorize payment by the
+      // claimed stored country; only fully absent legacy GPS may fall back.
+      expect(result).toMatchObject({ ok: false, code: 'JOB_MARKET_UNRESOLVED' })
     }
   })
 
