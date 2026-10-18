@@ -529,14 +529,16 @@ function buildIneligibleResult(
   }
 }
 
-async function evaluateJurisdictionCredential(
+export async function evaluateJurisdictionCredential(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
   countryCode: string | undefined,
   matchedProfessionId: string,
 ): Promise<{ gate: EligibilityGate }> {
-  if (!countryCode) return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: 'No jurisdiction specified' } }
+  if (!countryCode) {
+    return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: false, reason: 'Job jurisdiction is unknown' } }
+  }
 
   const requirements = await client.professionJurisdictionRequirement.findMany({
     where: { countryCode, professionId: matchedProfessionId, isActive: true, credentialRequired: true },
@@ -544,25 +546,40 @@ async function evaluateJurisdictionCredential(
 
   if (requirements.length === 0) return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: 'No jurisdiction credential required' } }
 
-  const holderType = providerType === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'COMPANY'
-  const credentialTypes = requirements.map(r => r.credentialType).filter(Boolean) as string[]
-
-  if (credentialTypes.length === 0) return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: 'No credential type required' } }
-
-  const validCerts = await client.certification.count({
-    where: {
-      holderType,
-      holderId: providerId,
-      certificationType: { in: credentialTypes },
-      verificationStatus: 'VERIFIED',
-      isActive: true,
-    },
-  })
-
-  if (validCerts === 0) {
-    return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: false, reason: `Missing jurisdiction credential: ${credentialTypes.join(', ')}` } }
+  // A mandatory credential with no configured type cannot be satisfied.
+  // An unrelated verified certificate is not evidence for a different license.
+  if (requirements.some(r => !r.credentialType?.trim())) {
+    return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: false, reason: 'Jurisdiction credential requirement is not configured' } }
   }
-  return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: `Has ${validCerts} jurisdiction credential(s)` } }
+
+  const holderType = providerType === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'COMPANY'
+  const credentialTypes = [...new Set(requirements.map(r => r.credentialType!.trim()))]
+  const missing: string[] = []
+  const today = new Date()
+
+  // All independently required license types must be verified and unexpired.
+  // Never count an expired, suspended, or merely submitted certificate.
+  for (const certificationType of credentialTypes) {
+    const valid = await client.certification.count({
+      where: {
+        holderType,
+        holderId: providerId,
+        certificationType,
+        verificationStatus: 'VERIFIED',
+        isActive: true,
+        OR: [
+          { expiryDate: null },
+          { expiryDate: { gt: today } },
+        ],
+      },
+    })
+    if (valid === 0) missing.push(certificationType)
+  }
+
+  if (missing.length > 0) {
+    return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: false, reason: `Missing jurisdiction credential: ${missing.join(', ')}` } }
+  }
+  return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: `Has all ${credentialTypes.length} required jurisdiction credential(s)` } }
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
