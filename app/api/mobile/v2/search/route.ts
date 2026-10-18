@@ -58,13 +58,19 @@ export async function GET(request: NextRequest) {
       select: { id: true, name: true, categoryId: true, countries: true, currency: true },
     })
     const expectedCurrency = market === 'LK' ? 'LKR' : 'CAD'
+    const otherMarket = market === 'LK' ? 'CA' : 'LK'
     const marketJobs = eligibleJobs.filter(j =>
-      j.currency === expectedCurrency && isCatalogAvailableInMarket(j.countries, market)
+      j.currency === expectedCurrency &&
+      isCatalogAvailableInMarket(j.countries, market) &&
+      // One TemplateJob has one priced currency. A dual-country grant must
+      // not make that single-price record look bookable in either country.
+      !isCatalogAvailableInMarket(j.countries, otherMarket)
     )
     // A department with zero market-priced active services is not a bookable
     // search result. Otherwise static category aliases create dead-end listings.
     const categoryIdsWithServices = new Set(marketJobs.map(j => j.categoryId))
     const availableCategories = eligibleCategories.filter(c => categoryIdsWithServices.has(c.id))
+    const availableCategoryById = new Map(availableCategories.map(c => [c.id, c]))
     const bySlug = new Map(availableCategories.filter(c => c.slug).map(c => [c.slug!, c]))
     const byCategoryAndName = new Map(
       marketJobs.map(j => [j.categoryId + ':' + j.name.toLowerCase(), j]),
@@ -86,7 +92,17 @@ export async function GET(request: NextRequest) {
         ...availableCategories.map(c => c.name.toLowerCase()),
         ...marketJobs.map(j => j.name.toLowerCase()),
       ])
-      const suggestions = getAutocompleteSuggestions(q).filter(name => allowedNames.has(name.toLowerCase()))
+      // New approved catalogue names need not be in the historic AI keyword
+      // dictionary. Use the same market-scoped DB records for autocomplete.
+      const term = q.trim().toLowerCase()
+      const directNames = term.length >= 2 ? [
+        ...availableCategories.filter(c => c.name.toLowerCase().includes(term)).map(c => c.name),
+        ...marketJobs.filter(j => j.name.toLowerCase().includes(term)).map(j => j.name),
+      ] : []
+      const suggestions = [...new Set([
+        ...getAutocompleteSuggestions(q).filter(name => allowedNames.has(name.toLowerCase())),
+        ...directNames,
+      ])].slice(0, 10)
       return NextResponse.json({ query: q, suggestions })
     }
 
@@ -121,10 +137,45 @@ export async function GET(request: NextRequest) {
         }
       })
 
+    // A newly approved service may not have an entry in lib/ai-search yet.
+    // Preserve existing natural-language rankings, then add direct name hits
+    // from ACTIVE, correctly priced, single-market catalogue records only.
+    const term = q.trim().toLowerCase()
+    if (term.length >= 2) {
+      for (const category of availableCategories) {
+        if (category.name.toLowerCase().includes(term) &&
+            !categories.some(result => result.id === category.id)) {
+          categories.push({
+            id: category.id,
+            name: category.name,
+            icon: 'grid',
+            colorHex: '#64748B',
+            score: 90,
+            correctedQuery: undefined,
+          })
+        }
+      }
+      for (const job of marketJobs) {
+        if (!job.name.toLowerCase().includes(term) ||
+            subServices.some(result => result.id === job.id)) continue
+        const category = availableCategoryById.get(job.categoryId)
+        if (!category) continue
+        subServices.push({
+          id: job.id,
+          name: job.name,
+          categoryId: category.id,
+          categoryName: category.name,
+          categoryIcon: 'grid',
+          categoryColor: '#64748B',
+          score: 90,
+        })
+      }
+    }
+
     const bestMatch = eligibleResults[0]
     const correctedQuery = bestMatch?.score && bestMatch.score < 85 ? bestMatch.correctedQuery : undefined
 
-    await logSearch(null, q.trim(), null, bestMatch?.score || 0, null, market)
+    await logSearch(null, q.trim(), null, bestMatch?.score || categories[0]?.score || subServices[0]?.score || 0, null, market)
 
     return NextResponse.json({
       query: q,

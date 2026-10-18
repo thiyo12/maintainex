@@ -83,6 +83,57 @@ describe('Phase 03 — search omits market categories with no bookable service',
     expect(b.subServices.map((s: { id: string }) => s.id)).toEqual(['lk-job'])
   })
 
+  it('discovers a new active market-priced V2 job even without a static AI dictionary entry', async () => {
+    mock.ai.mockReturnValue([])
+    mock.jobs.mockResolvedValue([
+      { id: 'basement-1', categoryId: 'plumbing-id', name: 'Basement waterproofing', countries: '["CA"]', currency: 'CAD' },
+    ])
+    const response = await search('country=CA&q=basement')
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.subServices.map((j: { id: string }) => j.id)).toEqual(['basement-1'])
+    expect(body.subServices[0]).toMatchObject({
+      categoryId: 'plumbing-id', categoryName: 'Plumbing', name: 'Basement waterproofing',
+    })
+  })
+
+  it('autocompletes market-scoped new jobs omitted from the static keyword library', async () => {
+    mock.jobs.mockResolvedValue([
+      { id: 'basement-1', categoryId: 'plumbing-id', name: 'Basement waterproofing', countries: '["CA"]', currency: 'CAD' },
+    ])
+    mock.suggest.mockReturnValue([])
+    const body = await (await search('country=CA&q=basement&suggest=true')).json()
+    expect(body.suggestions).toEqual(['Basement waterproofing'])
+  })
+
+  it('never exposes new jobs with foreign currency through name search or suggestions', async () => {
+    mock.ai.mockReturnValue([])
+    mock.jobs.mockResolvedValue([
+      { id: 'wrong-currency', categoryId: 'plumbing-id', name: 'Basement waterproofing', countries: '["CA"]', currency: 'LKR' },
+    ])
+    const body = await (await search('country=CA&q=basement')).json()
+    expect(body.subServices).toEqual([])
+    const suggestions = await (await search('country=CA&q=basement&suggest=true')).json()
+    expect(suggestions.suggestions).toEqual([])
+  })
+
+  it('rejects a dual-market single-currency service from discovery', async () => {
+    mock.ai.mockReturnValue([])
+    mock.jobs.mockResolvedValue([
+      { id: 'dual', categoryId: 'plumbing-id', name: 'Basement waterproofing', countries: '["LK","CA"]', currency: 'CAD' },
+    ])
+    const body = await (await search('country=CA&q=basement')).json()
+    expect(body.subServices).toEqual([])
+    const suggestions = await (await search('country=CA&q=basement&suggest=true')).json()
+    expect(suggestions.suggestions).toEqual([])
+  })
+
+  it('deduplicates the same V2 job found by AI and direct name search', async () => {
+    const body = await (await search('country=CA&q=leaking pipe')).json()
+    expect(body.subServices.map((j: { id: string }) => j.id)).toEqual(['valid-ca-job'])
+    expect(body.totalResults).toBe(1)
+  })
+
   it('never broadens unsupported market searches to LK defaults', async () => {
     const b = await (await search('country=US&q=repair')).json()
     expect(b.categories).toEqual([])
