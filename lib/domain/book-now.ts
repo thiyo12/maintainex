@@ -7,6 +7,7 @@ import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availabili
 import { readStoredList } from '@/lib/db-utils'
 import { haversineKm } from '@/lib/distance'
 import { isBookNowCatalogueAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
+import { resolveMarketFromServiceAddress } from '@/lib/geography/market-engine'
 
 export interface BookNowInput {
   customerId: string
@@ -147,6 +148,26 @@ export async function createBookNowJob(input: BookNowInput) {
   if (!finalCountryCode) throw new Error('Booking country is required')
   if (finalCountryCode !== 'LK' && finalCountryCode !== 'CA') {
     throw new Error('Unsupported booking country')
+  }
+
+  // The mobile route verifies a customer's address, but this domain function
+  // is also called directly. Never allow partial GPS or an out-of-market
+  // coordinate pair to authorize a booking using only claimed countryCode.
+  // Coordinate-less historical LK jobs retain the legacy compatibility path.
+  const hasAnyCoordinates = input.latitude !== undefined && input.latitude !== null ||
+    input.longitude !== undefined && input.longitude !== null
+  if (hasAnyCoordinates) {
+    const addressMarket = resolveMarketFromServiceAddress({
+      latitude: input.latitude,
+      longitude: input.longitude,
+      claimedCountryCode: finalCountryCode,
+    })
+    if (!addressMarket.ok || addressMarket.countryCode !== finalCountryCode) {
+      throw new Error('Service address does not match booking country')
+    }
+    if (finalCountryCode === 'CA' && input.district.trim().toLowerCase() !== 'vancouver') {
+      throw new Error('Service address does not match booking country')
+    }
   }
 
   const category = await prisma.jobCategory.findUnique({
