@@ -192,8 +192,11 @@ afterAll(async () => {
   await prisma.companyJobAssignment.deleteMany({ where: { companyId: { in: [companyAId, companyBId].filter(Boolean) } } })
   const jobIds = [jobAId, jobBId].filter(Boolean)
   if (jobIds.length > 0) {
-    await prisma.marketplaceJob.deleteMany({ where: { id: { in: jobIds } } })
+    // Worker acceptance can create a JobWorkspace without a database FK;
+    // delete child rows before removing the job that owns them.
+    await prisma.jobWorkspace.deleteMany({ where: { jobId: { in: jobIds } } })
     await prisma.jobQuote.deleteMany({ where: { jobId: { in: jobIds } } })
+    await prisma.marketplaceJob.deleteMany({ where: { id: { in: jobIds } } })
   }
   await prisma.teamMember.deleteMany({ where: { companyId: { in: [companyAId, companyBId].filter(Boolean) } } })
   await prisma.companyProfile.deleteMany({ where: { id: { in: [companyAId, companyBId].filter(Boolean) } } })
