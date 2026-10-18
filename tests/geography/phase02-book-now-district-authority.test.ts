@@ -75,6 +75,29 @@ describe('Phase 02 — direct booking district must match verified address marke
     expect(result.status).toBe(400)
     expect(mock.book).not.toHaveBeenCalled()
   })
+  it.each([
+    ['Template job is not available in booking country', 403],
+    ['Unsupported booking country', 400],
+    ['Booking country is required', 400],
+    ['Provider is not eligible for the job', 403],
+    ['Provider currently unavailable', 409],
+  ])('returns HTTP %s domain errors as the correct client status for %s',
+    async (message, expectedStatus) => {
+      mock.book.mockRejectedValueOnce(new Error(message))
+      const response = await book()
+      expect(response.status).toBe(expectedStatus)
+      expect(await response.json()).toMatchObject({ error: message })
+      expect(mock.book).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('keeps unexpected domain failures as generic 500 responses', async () => {
+    mock.book.mockRejectedValueOnce(new Error('Sensitive internal connection failure'))
+    const response = await book()
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ error: 'Server error' })
+  })
+
   it('retains account-country mismatch protection', async () => {
     mock.customerMarket = 'LK'
     const result = await book({ countryCode: 'LK', district: 'Vancouver' })

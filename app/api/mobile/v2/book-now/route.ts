@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
       message.includes('Cannot book yourself') ||
       message.includes('Cannot book your own company') ||
       message.includes('Invalid template/category') ||
+      message.includes('Template job is not available in booking country') ||
       message.includes('does not match booking country') ||
       message.includes('does not serve the requested district')
     ) {
@@ -124,6 +125,7 @@ export async function POST(request: NextRequest) {
     }
     if (
       message.includes('Booking country is required') ||
+      message.includes('Unsupported booking country') ||
       message.includes('availability configuration is invalid')
     ) {
       return NextResponse.json({ error: message }, { status: 400 })
