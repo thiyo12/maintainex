@@ -95,7 +95,7 @@ async function lockCrewForDecision(tx: Prisma.TransactionClient, input: CrewWork
     throw new CrewCommitGateError('Crew market or booking target changed')
   }
 
-  const slots = await tx.companyJobAssignment.findMany({
+  const slots: CrewSlot[] = await tx.companyJobAssignment.findMany({
     where: { crewDispatchId: crew.id },
     select: {
       id: true, companyId: true, jobId: true, workerUserId: true,
@@ -184,6 +184,97 @@ export async function acceptStagedCrewMemberInsideTransaction(
     acceptedWorkersCount: slots.filter(item => item.status === 'CREW_ACCEPTED').length + 1,
     requiredWorkersCount: crew.requiredWorkersCount,
     status: 'FORMING',
+    dispatchEnabled: false,
+  }
+}
+
+/**
+ * A refusal invalidates the entire still-FORMING crew epoch atomically.
+ * The refusing member is REJECTED; all other reserved/accepted members are
+ * REVOKED, releasing their scheduling holds together. The crew moves to
+ * BLOCKED with a new version so no stale acceptance can succeed.
+ *
+ * Does not erase identity mismatch/safety evidence and cannot authorize
+ * work. There is no HTTP caller; a future route MUST pass authenticated
+ * workerUserId and run this inside a SERIALIZABLE transaction.
+ */
+export async function rejectStagedCrewMemberInsideTransaction(
+  tx: Prisma.TransactionClient,
+  input: CrewWorkerDecision & { reason?: string },
+): Promise<{
+  crewDispatchId: string
+  status: 'BLOCKED'
+  version: number
+  releasedWorkersCount: number
+  dispatchEnabled: false
+}> {
+  if (input.reason !== undefined &&
+      (typeof input.reason !== 'string' || input.reason.length > 250)) {
+    throw new CrewCommitGateError('Invalid crew refusal reason', 400)
+  }
+  const { crew, slot, slots } = await lockCrewForDecision(tx, input)
+  if (!['CREW_RESERVED', 'CREW_ACCEPTED'].includes(slot.status)) {
+    throw new CrewCommitGateError('Crew invitation has already been answered')
+  }
+
+  // Serialize an account closure with refusal; unlike acceptance, a blocked
+  // member must still be permitted to relinquish an outstanding reservation.
+  const accounts = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM "User" WHERE id = ${input.workerUserId} FOR UPDATE
+  `
+  if (accounts.length !== 1) throw new CrewCommitGateError('Worker account no longer exists')
+
+  const now = new Date()
+  const rejected = await tx.companyJobAssignment.updateMany({
+    where: {
+      id: slot.id, companyId: crew.companyId, jobId: crew.jobId,
+      workerUserId: input.workerUserId,
+      crewDispatchId: crew.id, status: slot.status,
+    },
+    data: {
+      status: 'REJECTED',
+      rejectedAt: now,
+      rejectReason: input.reason?.trim() || 'Worker declined crew invitation',
+    },
+  })
+  if (rejected.count !== 1) {
+    throw new CrewCommitGateError('Crew invitation changed concurrently')
+  }
+  const released = await tx.companyJobAssignment.updateMany({
+    where: {
+      crewDispatchId: crew.id,
+      id: { not: slot.id },
+      status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] },
+    },
+    data: {
+      status: 'REVOKED',
+      revokedAt: now,
+      revokedReason: 'Crew blocked by worker refusal',
+    },
+  })
+  if (released.count !== slots.length - 1) {
+    throw new CrewCommitGateError('Crew slots changed during refusal')
+  }
+  const blocked = await tx.companyCrewDispatch.updateMany({
+    where: { id: crew.id, status: 'FORMING', version: crew.version },
+    data: { status: 'BLOCKED', version: { increment: 1 } },
+  })
+  if (blocked.count !== 1) {
+    throw new CrewCommitGateError('Crew version changed during refusal')
+  }
+  await writeCompanyAuditLog({
+    companyId: crew.companyId,
+    actorId: input.workerUserId, actorRole: 'WORKER',
+    action: 'CREW_MEMBER_REJECT',
+    targetType: 'CompanyCrewDispatch', targetId: crew.id,
+    description: 'Worker refused staged crew and all slots were released',
+    metadata: { jobId: crew.jobId, oldCrewVersion: crew.version },
+  }, tx)
+  return {
+    crewDispatchId: crew.id,
+    status: 'BLOCKED',
+    version: crew.version + 1,
+    releasedWorkersCount: slots.length,
     dispatchEnabled: false,
   }
 }
