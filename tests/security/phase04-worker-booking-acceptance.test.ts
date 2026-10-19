@@ -5,6 +5,7 @@ const mock = vi.hoisted(() => ({
   assignment: vi.fn(),
   claim: vi.fn(),
   eligible: vi.fn(),
+  lock: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -12,6 +13,10 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: mock.assignment,
       updateMany: mock.claim,
     },
+    $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({
+      $queryRaw: mock.lock,
+      companyJobAssignment: { updateMany: mock.claim },
+    }),
   },
 }))
 vi.mock('@/lib/phase6/provider-eligibility', () => ({
@@ -27,6 +32,11 @@ describe('Phase 04 — worker cannot accept a cancelled or reassigned booking', 
     mock.assignment.mockResolvedValue({
       id: 'a', companyId: 'c', jobId: 'j', workerUserId: 'w', status: 'ASSIGNED',
     })
+    mock.lock.mockImplementation(async (strings: TemplateStringsArray) =>
+      strings.join(' ').includes('FROM "User"')
+        ? [{ isActive: true, isSuspended: false, isBanned: false, identityStatus: 'VERIFIED' }]
+        : [{ role: 'WORKER', status: 'ACTIVE' }],
+    )
     mock.eligible.mockResolvedValue({ eligible: true, reasons: [] })
     mock.claim.mockResolvedValue({ count: 1 })
   })
@@ -35,7 +45,7 @@ describe('Phase 04 — worker cannot accept a cancelled or reassigned booking', 
     expect(await workerAcceptAssignment('a', 'w')).toEqual({ success: true, assignmentId: 'a' })
     expect(mock.claim).toHaveBeenCalledWith({
       where: {
-        id: 'a', workerUserId: 'w', status: 'ASSIGNED',
+        id: 'a', workerUserId: 'w', companyId: 'c', status: 'ASSIGNED',
         job: { status: 'QUOTE_ACCEPTED', targetTaskerId: 'w' },
         worker: {
           isActive: true, isSuspended: false, isBanned: false,
@@ -72,6 +82,23 @@ describe('Phase 04 — worker cannot accept a cancelled or reassigned booking', 
         },
       }),
     }))
+  })
+
+  it('fails closed when a member is suspended or promoted before commit', async () => {
+    mock.lock.mockImplementation(async (strings: TemplateStringsArray) =>
+      strings.join(' ').includes('FROM "User"')
+        ? [{ isActive: true, isSuspended: false, isBanned: false, identityStatus: 'VERIFIED' }]
+        : [{ role: 'MANAGER', status: 'ACTIVE' }],
+    )
+    expect((await workerAcceptAssignment('a', 'w')).success).toBe(false)
+    expect(mock.claim).not.toHaveBeenCalled()
+  })
+
+  it('locks the worker account and membership before claiming the assignment', async () => {
+    expect((await workerAcceptAssignment('a', 'w')).success).toBe(true)
+    expect(mock.lock).toHaveBeenCalledTimes(2)
+    expect(mock.lock.mock.invocationCallOrder[1])
+      .toBeLessThan(mock.claim.mock.invocationCallOrder[0])
   })
 
   it('does not allow another worker to accept an assignment', async () => {

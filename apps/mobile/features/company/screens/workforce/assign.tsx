@@ -21,7 +21,8 @@ type TeamMember = {
   userId: string | null
   name: string
   role: string
-  status?: string
+  status: string
+  identityVerified?: boolean
   skills: string[]
   isOnline: boolean
   rating: number
@@ -34,6 +35,8 @@ type DispatchJob = {
   status: string
   preferredDate?: string | null
   preferredTimeSlot?: string | null
+  workersCount?: number
+  workerIdentityCheckRequired?: boolean
 }
 
 export default function AssignWorkerScreen() {
@@ -69,7 +72,7 @@ export default function AssignWorkerScreen() {
       )
 
       const candidateJobs = (quotedJobs.jobs || []).filter(job =>
-        ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status) && !activeAssignedJobs.has(job.id)
+        job.status === 'QUOTE_ACCEPTED' && !activeAssignedJobs.has(job.id)
       )
 
       const details = await Promise.all(
@@ -81,6 +84,7 @@ export default function AssignWorkerScreen() {
       setJobs(
         details
           .filter((job): job is any => Boolean(job))
+          .filter(job => (job.workersCount ?? 1) === 1)
           .filter(job =>
             (job.quotes || []).some((quote: any) =>
               quote.providerType === 'COMPANY'
@@ -94,6 +98,8 @@ export default function AssignWorkerScreen() {
             status: job.status,
             preferredDate: job.preferredDate,
             preferredTimeSlot: job.preferredTimeSlot,
+            workersCount: job.workersCount,
+            workerIdentityCheckRequired: job.workerIdentityCheckRequired,
           }))
       )
 
@@ -101,7 +107,7 @@ export default function AssignWorkerScreen() {
         (teamData.members || []).filter(member =>
           Boolean(member.userId)
           && member.status === 'ACTIVE'
-          && ['WORKER', 'DISPATCHER', 'MANAGER', 'COMPANY_OWNER'].includes(member.role)
+          && member.role === 'WORKER'
         )
       )
     } catch (error: any) {
@@ -124,6 +130,10 @@ export default function AssignWorkerScreen() {
 
   const assign = async () => {
     if (!companyId || !selectedWorker || !selectedJob) return
+    if (selectedJobData?.workerIdentityCheckRequired && !selectedWorkerData?.identityVerified) {
+      Alert.alert('Verified photo required', 'This booking requires an approved worker identity photo before dispatch.')
+      return
+    }
     setSubmitting(true)
     try {
       await v2Request('/api/mobile/company/assign', {
@@ -173,7 +183,7 @@ export default function AssignWorkerScreen() {
           <View style={styles.empty}>
             <Briefcase size={25} color={v3.colors.textMuted} />
             <Text style={styles.emptyTitle}>No jobs waiting for assignment</Text>
-            <Text style={styles.emptyText}>A company quote must be accepted before the job can be dispatched to an employee.</Text>
+            <Text style={styles.emptyText}>Only accepted, single-worker company jobs can be dispatched here. Multi-worker crew bookings require a separately verified crew workflow.</Text>
           </View>
         ) : jobs.map(job => {
           const active = selectedJob === job.id
@@ -217,7 +227,7 @@ export default function AssignWorkerScreen() {
               <View style={styles.optionCopy}>
                 <Text style={styles.optionTitle}>{worker.name}</Text>
                 <Text style={styles.optionMeta}>
-                  {worker.role.replaceAll('_', ' ')} · {worker.completedJobs || 0} jobs
+                  {worker.role.replaceAll('_', ' ')} · {worker.completedJobs || 0} jobs{worker.identityVerified ? ' · ID verified' : ' · ID photo not verified'}
                   {worker.rating > 0 ? ` · ${worker.rating.toFixed(1)}★` : ''}
                 </Text>
               </View>

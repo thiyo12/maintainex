@@ -534,28 +534,46 @@ export async function workerAcceptAssignment(
     return { success: false, error: 'Worker is no longer eligible for this assignment', reasons: eligibility.reasons }
   }
 
-  const claimed = await prisma.companyJobAssignment.updateMany({
-    where: {
-      id: assignmentId,
-      workerUserId,
-      status: 'ASSIGNED',
-      // An assignment created for a quote-accepted booking must not be
-      // accepted after cancellation, replacement or worker reassignment.
-      // The parent condition is checked atomically with the state change.
-      job: {
-        status: 'QUOTE_ACCEPTED',
-        targetTaskerId: workerUserId,
+  const claimed = await prisma.$transaction(async tx => {
+    // Serialize acceptance with account restriction and membership edits.
+    // Dispatch and workforce transitions lock User before TeamMember.
+    const users = await tx.$queryRaw<Array<{
+      isActive: boolean; isSuspended: boolean; isBanned: boolean; identityStatus: string
+    }>>`
+      SELECT "isActive", "isSuspended", "isBanned", "identityStatus"
+      FROM "User" WHERE id = ${workerUserId} FOR UPDATE
+    `
+    if (
+      users.length !== 1 || !users[0].isActive ||
+      users[0].isSuspended || users[0].isBanned ||
+      users[0].identityStatus !== 'VERIFIED'
+    ) return { count: 0 }
+
+    const members = await tx.$queryRaw<Array<{ role: string; status: string }>>`
+      SELECT role, status FROM "TeamMember"
+      WHERE "companyId" = ${assignment.companyId} AND "userId" = ${workerUserId}
+      FOR UPDATE
+    `
+    if (members.length !== 1 || members[0].role !== 'WORKER' || members[0].status !== 'ACTIVE') {
+      return { count: 0 }
+    }
+
+    return tx.companyJobAssignment.updateMany({
+      where: {
+        id: assignmentId,
+        workerUserId,
+        companyId: assignment.companyId,
+        status: 'ASSIGNED',
+        job: { status: 'QUOTE_ACCEPTED', targetTaskerId: workerUserId },
+        worker: {
+          isActive: true,
+          isSuspended: false,
+          isBanned: false,
+          identityStatus: 'VERIFIED',
+        },
       },
-      // The worker may have been suspended after the earlier eligibility
-      // read. Recheck the related account in this atomic state transition.
-      worker: {
-        isActive: true,
-        isSuspended: false,
-        isBanned: false,
-        identityStatus: 'VERIFIED',
-      },
-    },
-    data: { status: 'ACCEPTED', acceptedAt: new Date() },
+      data: { status: 'ACCEPTED', acceptedAt: new Date() },
+    })
   })
   if (claimed.count !== 1) {
     return { success: false, error: 'Assignment changed before it could be accepted' }
@@ -638,35 +656,47 @@ export async function revokeAssignment(
     return { success: false, error: `Cannot revoke: current status is ${assignment.status}` }
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.companyJobAssignment.update({
-      where: { id: assignmentId },
-      data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: reason || undefined },
-    })
+  try {
+    await prisma.$transaction(async tx => {
+      await lockAndAssertAssignmentActorAuthorized(tx, companyId, actorUserId, actorRole)
+      const claimed = await tx.companyJobAssignment.updateMany({
+        where: {
+          id: assignmentId, companyId, workerUserId: assignment.workerUserId,
+          status: { in: ['ASSIGNED', 'ACCEPTED'] },
+          job: { status: 'QUOTE_ACCEPTED', targetTaskerId: assignment.workerUserId },
+        },
+        data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: reason || undefined },
+      })
+      if (claimed.count !== 1) throw new Error('Assignment changed before it could be revoked')
 
-    const targetRestored = await tx.marketplaceJob.updateMany({
-      where: {
-        id: assignment.jobId,
-        status: 'QUOTE_ACCEPTED',
-        targetTaskerId: assignment.workerUserId,
-      },
-      data: { targetTaskerId: companyId },
+      const targetRestored = await tx.marketplaceJob.updateMany({
+        where: {
+          id: assignment.jobId, status: 'QUOTE_ACCEPTED',
+          targetTaskerId: assignment.workerUserId,
+        },
+        data: { targetTaskerId: companyId },
+      })
+      if (targetRestored.count !== 1) {
+        throw new Error('Job target changed before assignment revocation')
+      }
+
+      await writeCompanyAuditLog({
+        companyId, actorId: actorUserId, actorRole, action: 'WORKER_ASSIGN',
+        targetType: 'CompanyJobAssignment', targetId: assignmentId,
+        description: `Revoked assignment for job ${assignment.jobId}`,
+        metadata: { workerUserId: assignment.workerUserId, reason },
+      }, tx)
     })
-    if (targetRestored.count !== 1) {
-      throw new Error('Job target changed before assignment revocation')
+  } catch (error) {
+    if (error instanceof Error && (
+      error.message === 'Assigning actor is no longer authorized' ||
+      error.message === 'Assignment changed before it could be revoked' ||
+      error.message === 'Job target changed before assignment revocation'
+    )) {
+      return { success: false, error: error.message }
     }
-
-    await writeCompanyAuditLog({
-      companyId,
-      actorId: actorUserId,
-      actorRole,
-      action: 'WORKER_ASSIGN',
-      targetType: 'CompanyJobAssignment',
-      targetId: assignmentId,
-      description: `Revoked assignment for job ${assignment.jobId}`,
-      metadata: { workerUserId: assignment.workerUserId, reason },
-    }, tx)
-  })
+    throw error
+  }
 
   return { success: true, assignmentId }
 }

@@ -92,6 +92,14 @@ describe('Phase 04 — company assignment detail requires active membership', ()
     expect(body.capabilities.canManageAssignment).toBe(true)
   })
 
+  it('grants a transferred owner access based on active role, not the historical founder link', async () => {
+    mock.userId = 'successor'
+    mock.membership = { role: 'COMPANY_OWNER' }
+    const response = await readAssignment()
+    expect(response.status).toBe(200)
+    expect((await response.json()).capabilities.canManageAssignment).toBe(true)
+  })
+
   it('allows active manager to view and manage with existing RBAC', async () => {
     mock.userId = 'manager'
     mock.membership = { role: 'MANAGER' }

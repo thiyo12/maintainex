@@ -32,6 +32,27 @@ must not be described as locally executed.
 | Scheduling and worker capacity | `lib/phase6/provider-eligibility.ts`, `lib/domain/company-job-assignment.ts`; `tests/security/phase04-company-worker-exact-job.test.ts`, `phase04-dispatch-transaction-identity.test.ts` | Single-worker conflict protection; multi-worker crew unsupported |
 | Ownership change and account restriction | `lib/phase6/company-ownership.ts`; `tests/security/phase04-owner-transfer-account-lock.test.ts`, `tests/company/ownership-transfer.test.ts` | New regression pending full latest-commit CI |
 
+## Final engineering pass — exact-head CI required
+
+This single-commit batch restores the company dispatch workforce API contract:
+team members include authoritative membership status, removed rows are excluded,
+and suspended memberships are not offered verified worker photographs. The
+mobile picker only accepts active WORKER accounts and unstarted single-worker
+bookings, and checks required worker photo verification before submitting.
+
+The server additionally locks worker global account and membership rows before
+assignment acceptance, preventing suspended/demoted members racing an accept.
+Assignment revocation now locks and rechecks actor authority during the
+transaction and refuses a job that began or changed assignees. Current member
+roles, not the historical company founder link, govern assignment details.
+Fast gates and regression tests cover these changes; **CI evidence applies
+only to the exact pushed commit**, not an earlier green run.
+
+Crew bookings remain deliberately blocked until a real multi-person workflow
+supports crew identity, scheduling, acceptance, PIN, cancellation, safety and
+migration. Device testing, geographically isolated real-world fixtures and
+operational sign-off also remain open. **Status: IN PROGRESS — NOT ACCEPTED.**
+
 ## Remaining blockers — cannot mark Phase 04 accepted
 
 1. **Multi-worker crew support.** The job has a `workersCount` requirement,

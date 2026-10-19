@@ -28,7 +28,7 @@ export async function GET(
       include: {
         job: { select: { id: true, title: true, status: true, countryCode: true, createdAt: true } },
         worker: { select: { id: true, name: true, email: true } },
-        company: { select: { id: true, companyName: true, userId: true } },
+        company: { select: { id: true, companyName: true } },
       },
     })
 
@@ -43,9 +43,6 @@ export async function GET(
       select: { role: true },
     })
     const isWorker = !!membership && assignment.workerUserId === user.id
-    const isOwner = !!membership &&
-      assignment.company.userId === user.id && membership.role === 'COMPANY_OWNER'
-
     const canReadAssignment =
       isWorker ||
       (!!membership && hasCompanyPermission(membership.role as CompanyRole, 'workers:read'))

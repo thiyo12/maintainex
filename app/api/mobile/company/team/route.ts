@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const [members, invites] = await Promise.all([
       prisma.teamMember.findMany({
-        where: { companyId: context!.companyId },
+        where: { companyId: context!.companyId, status: { not: 'REMOVED' } },
         include: {
           user: {
             select: {
@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     ])
 
     const memberUserIds = members
+      .filter(member => member.status === 'ACTIVE')
       .map(member => member.userId)
       .filter((value): value is string => Boolean(value))
     const personIdentities = memberUserIds.length
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
       members: members.map(m => {
         const identity = m.userId ? identityByUser.get(m.userId) : null
         const identityVerified =
+          m.status === 'ACTIVE' &&
           m.user?.identityStatus === 'VERIFIED' &&
           identity?.kycStatus === 'VERIFIED' &&
           Boolean(identity?.verifiedPhotoUrl)
@@ -76,6 +78,7 @@ export async function GET(request: NextRequest) {
         userId: m.userId,
         name: m.name,
         role: m.role,
+        status: m.status,
         skills: safeParseJsonArr(m.skills),
         isOnline: m.isOnline,
         rating: m.rating,

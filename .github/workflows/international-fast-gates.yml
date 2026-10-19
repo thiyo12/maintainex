@@ -125,6 +125,10 @@ jobs:
             tests/pricing/phase10-canonical-payment-choice-boundary.test.ts \
             tests/security/phase07-safety-quick-exit-contract.test.ts \
             tests/security/phase04-company-profile-owner-reactivation.test.ts \
+            tests/security/phase04-worker-booking-acceptance.test.ts \
+            tests/security/phase04-company-assignment-detail-access.test.ts \
+            tests/security/phase04-company-team-dispatch-contract.test.ts \
+            tests/security/phase04-revoke-commit-authorization.test.ts \
             tests/security/phase11-inactive-company-owner-matching.test.ts \
             tests/regions/phase11-provider-coverage-audit-contract.test.ts \
             --reporter=verbose
