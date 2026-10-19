@@ -128,7 +128,7 @@ export default function DirectTaskerBooking() {
             <CaretRight size={16} color={v3.colors.ink} />
           </View>
           <View style={styles.detailRow}>
-            <View style={styles.iconCircle}><Text style={styles.priceIcon}>{selectedCountry?.code === 'CA' ? '</View>
+            <View style={styles.iconCircle}><Text style={styles.priceIcon}>{selectedCountry?.code === 'CA' ? 'CAD' : 'LKR'}</Text></View>
             <View style={styles.rowCopy}><Text style={styles.rowTitle}>Indicative price guide</Text><Text style={styles.rowSub}>{estimate}</Text></View>
             <CaretRight size={16} color={v3.colors.ink} />
           </View>
