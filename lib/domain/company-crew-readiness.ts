@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { checkCrewCandidateEligibility } from '@/lib/phase6/provider-eligibility'
+import { checkCompanyEligibility, checkCrewCandidateEligibility } from '@/lib/phase6/provider-eligibility'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 
 export const MAX_CREW_PREVIEW_WORKERS = 12
 
@@ -63,7 +64,7 @@ export async function previewCompanyCrewReadiness(input: {
 
   const job = await prisma.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { status: true, workersCount: true },
+    select: { status: true, workersCount: true, countryCode: true, latitude: true, longitude: true },
   })
   if (!job) throw new CrewReadinessError('Accepted company booking not found', 404)
   if (job.status !== 'QUOTE_ACCEPTED') {
@@ -82,6 +83,19 @@ export async function previewCompanyCrewReadiness(input: {
     },
     select: { id: true },
   })
+
+  // A roster cannot be considered preflight-ready if the quote's company has
+  // since lost verification, its active owner, subscription or market authority.
+  // These are point-in-time checks, not authorization to dispatch; dispatch
+  // must repeat them under locks before any future crew roster is persisted.
+  const [companyEligibility, companyMarket] = await Promise.all([
+    checkCompanyEligibility(companyId),
+    prisma.companyProfile.findUnique({
+      where: { id: companyId },
+      select: { countryCode: true },
+    }),
+  ])
+  const jobMarket = requireJobMarket(job)
 
   const workers = await Promise.all(workerUserIds.map(async workerUserId => {
     const result = await checkCrewCandidateEligibility(companyId, workerUserId, jobId)
@@ -107,6 +121,16 @@ export async function previewCompanyCrewReadiness(input: {
   }))
 
   const blockers: string[] = []
+  if (!companyEligibility.eligible) {
+    blockers.push('Company is not eligible to dispatch: ' + companyEligibility.reasons.join('; '))
+  }
+  if (!companyMarket) {
+    blockers.push('Company registration is unavailable')
+  } else if (!jobMarket.ok) {
+    blockers.push('Booking service address is not in a supported launch market')
+  } else if (companyMarket.countryCode.trim().toUpperCase() !== jobMarket.countryCode) {
+    blockers.push('Company registered market does not match the booking service market')
+  }
   if (workerUserIds.length !== job.workersCount) {
     blockers.push(`Select exactly ${job.workersCount} distinct workers for this booking`)
   }

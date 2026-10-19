@@ -3563,7 +3563,7 @@ model CompanyJobAssignment {
   workerUserId  String
   worker        User     @relation(fields: [workerUserId], references: [id], onDelete: Cascade)
   crewDispatchId String?
-  crewDispatch   CompanyCrewDispatch? @relation(fields: [crewDispatchId], references: [id], onDelete: SetNull)
+  crewDispatch   CompanyCrewDispatch? @relation(fields: [crewDispatchId], references: [id], onDelete: Restrict)
   crewSlot       Int?
   crewRole       String? // LEAD, MEMBER; null for legacy single-worker assignments
   crewArrivedAt  DateTime?

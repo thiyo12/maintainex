@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   assignment: vi.fn(),
   eligibility: vi.fn(),
   photo: vi.fn(),
+  companyEligibility: vi.fn(),
+  companyProfile: vi.fn(),
+  jobMarket: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -18,10 +21,16 @@ vi.mock('@/lib/prisma', () => ({
     marketplaceJob: { findUnique: mocks.job },
     companyJobAssignment: { findFirst: mocks.assignment },
     providerIdentity: { findFirst: mocks.photo },
+    companyProfile: { findUnique: mocks.companyProfile },
   },
 }))
 vi.mock('@/lib/phase6/provider-eligibility', () => ({
   checkCrewCandidateEligibility: mocks.eligibility,
+  checkCompanyEligibility: mocks.companyEligibility,
+}))
+
+vi.mock('@/lib/geography/market-engine', () => ({
+  requireJobMarket: mocks.jobMarket,
 }))
 
 const review = (workerUserIds: string[] = ['worker-a', 'worker-b']) =>
@@ -35,6 +44,9 @@ describe('Phase 04 — company crew readiness is a non-mutating preflight', () =
     mocks.assignment.mockResolvedValue(null)
     mocks.eligibility.mockResolvedValue({ eligible: true, reasons: [] })
     mocks.photo.mockResolvedValue({ id: 'approved-worker-photo' })
+    mocks.companyEligibility.mockResolvedValue({ eligible: true, reasons: [] })
+    mocks.companyProfile.mockResolvedValue({ countryCode: 'LK' })
+    mocks.jobMarket.mockReturnValue({ ok: true, countryCode: 'LK' })
   })
 
   it('returns a complete, non-dispatchable report for qualified distinct workers', async () => {
@@ -151,6 +163,31 @@ describe('Phase 04 — company crew readiness is a non-mutating preflight', () =
     expect(report.dispatchEnabled).toBe(false)
     expect(report.workers[1].reasons)
       .toContain('Worker lacks required capability for this job')
+  })
+
+  it('refuses a readiness success when the company loses verification or an unrestricted owner', async () => {
+    mocks.companyEligibility.mockResolvedValue({
+      eligible: false, reasons: ['No unrestricted active company owner'],
+    })
+    const report = await review()
+    expect(report.preflightReady).toBe(false)
+    expect(report.dispatchEnabled).toBe(false)
+    expect(report.blockers).toContain('Company is not eligible to dispatch: No unrestricted active company owner')
+    expect(report.workers.every(worker => worker.eligible)).toBe(true)
+  })
+
+  it('rejects company-country drift even when every selected worker passes individual checks', async () => {
+    mocks.companyProfile.mockResolvedValue({ countryCode: 'CA' })
+    const report = await review()
+    expect(report.preflightReady).toBe(false)
+    expect(report.blockers).toContain('Company registered market does not match the booking service market')
+  })
+
+  it('fails closed on an unresolved municipal or district service address', async () => {
+    mocks.jobMarket.mockReturnValue({ ok: false, code: 'JOB_MARKET_UNRESOLVED' })
+    const report = await review()
+    expect(report.preflightReady).toBe(false)
+    expect(report.blockers).toContain('Booking service address is not in a supported launch market')
   })
 
   it('never exposes mutation methods or claims a reserved crew', async () => {

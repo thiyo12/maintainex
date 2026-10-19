@@ -43,4 +43,4 @@ CREATE UNIQUE INDEX "CompanyJobAssignment_crewDispatchId_crewSlot_key"
   ON "CompanyJobAssignment"("crewDispatchId", "crewSlot");
 CREATE INDEX "CompanyJobAssignment_crewDispatchId_idx" ON "CompanyJobAssignment"("crewDispatchId");
 ALTER TABLE "CompanyJobAssignment" ADD CONSTRAINT "CompanyJobAssignment_crewDispatchId_fkey"
-  FOREIGN KEY ("crewDispatchId") REFERENCES "CompanyCrewDispatch"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  FOREIGN KEY ("crewDispatchId") REFERENCES "CompanyCrewDispatch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
