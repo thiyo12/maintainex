@@ -130,8 +130,8 @@ export function verifiedLocalPriceRange(
   const eligible = categoryJobs
     .filter(job => job && job.currency === currency)
     .map(job => ({ min: majorValue(job.priceMin), max: majorValue(job.priceMax) }))
-    .filter(range => range.min !== null && range.max !== null && range.max >= range.min)
-    as Array<{ min: number; max: number }>
+    .filter((range): range is { min: number; max: number } =>
+      range.min !== null && range.max !== null && range.max >= range.min)
   if (eligible.length === 0) return null
 
   return {
