@@ -7,7 +7,7 @@ const mock = vi.hoisted(() => ({
     id: 'job', isActive: true, countries: '["CA"]', currency: 'CAD',
     category: { id: 'cat', isActive: true, countries: '["CA"]' },
   } as any,
-  find: vi.fn(), keys: vi.fn(), match: vi.fn(), setting: vi.fn(),
+  find: vi.fn(), keys: vi.fn(), match: vi.fn(), setting: vi.fn(), companies: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({ prisma: { templateJob: { findUnique: mock.find } } }))
 vi.mock('@/lib/auth/compatibility/mobile-auth', () => ({
@@ -16,6 +16,7 @@ vi.mock('@/lib/auth/compatibility/mobile-auth', () => ({
 vi.mock('@/lib/job-matching', () => ({
   resolveJobCategoryKeys: mock.keys, matchTaskerCandidates: mock.match,
 }))
+vi.mock('@/lib/domain/company-provider-discovery', () => ({ findCompanyCandidatesForTemplate: mock.companies }))
 vi.mock('@/lib/settings', () => ({ getSetting: mock.setting }))
 
 async function browse(params = '') {
@@ -34,12 +35,14 @@ describe('Phase 03 — compatibility provider browse must enforce the service ma
     mock.find.mockImplementation(async () => mock.template)
     mock.keys.mockResolvedValue({ keys: ['plumbing'], name: 'Plumbing' })
     mock.match.mockResolvedValue([])
+    mock.companies.mockResolvedValue([])
     mock.setting.mockResolvedValue(50)
   })
   async function denied(params: string, expected: string) {
     const { body } = await browse(params)
     expect(body).toMatchObject({ code: expected, candidates: [] })
     expect(mock.match).not.toHaveBeenCalled()
+    expect(mock.companies).not.toHaveBeenCalled()
   }
   it('allows active, Canadian-priced catalogue browsing without GPS for compatibility', async () => {
     const { status, body } = await browse()
@@ -54,6 +57,25 @@ describe('Phase 03 — compatibility provider browse must enforce the service ma
       lat: 49.2827, lng: -123.1207, countryCode: 'CA',
     }))
   })
+  it('includes only the approved public company candidate shape alongside taskers', async () => {
+    mock.companies.mockResolvedValue([{
+      id: 'selected-company', providerType: 'COMPANY',
+      companyName: 'Approved Local Team', logo: null,
+      rating: 4.4, completedJobs: 9, teamSize: 3,
+      isVerified: true, isOnline: false, distance: null, score: null,
+    }])
+    const response = await browse('&latitude=49.2827&longitude=-123.1207')
+    expect(response.status).toBe(200)
+    expect(response.body).toHaveLength(1)
+    expect(response.body[0]).toMatchObject({
+      id: 'selected-company', providerType: 'COMPANY', distance: null, score: null,
+    })
+    expect(mock.companies).toHaveBeenCalledWith(expect.objectContaining({
+      templateJobId: 'job', categoryId: 'cat', countryCode: 'CA',
+      latitude: 49.2827, longitude: -123.1207,
+    }))
+  })
+
   it('rejects Burnaby coordinates even if caller claims Canada', async () => {
     const result = await browse('&country=CA&latitude=49.2596&longitude=-122.998')
     expect(result.status).toBe(400)
