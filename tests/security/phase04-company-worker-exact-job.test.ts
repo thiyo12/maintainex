@@ -72,6 +72,36 @@ describe('Phase 04 — company worker assignment respects exact service selectio
     expect(db.skill.mock.calls[0][0].where).not.toHaveProperty('job')
   })
 
+  it('does not turn a derived tasker-profile category into every sibling service', async () => {
+    db.skill.mockResolvedValue(null) // relational selection belongs to another TemplateJob
+    db.profile.mockResolvedValue({
+      id: 'profile', countryCode: 'LK', skills: '["plumbing","cat-plumbing"]',
+    })
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Worker lacks required capability for this job')
+  })
+
+  it('honors an exact job token on the profile without widening its category', async () => {
+    db.skill.mockResolvedValue(null)
+    db.profile.mockResolvedValue({
+      id: 'profile', countryCode: 'LK',
+      skills: '["cat-plumbing","job-pipe-repair"]',
+    })
+    expect((await checkWorkerEligibility('company', 'worker', 'booking')).eligible).toBe(true)
+  })
+
+  it('keeps historical category-only bookings compatible with profile category skills', async () => {
+    db.skill.mockResolvedValue(null)
+    db.job.mockResolvedValue({
+      ...validJob, serviceTemplateId: null, templateJobId: null,
+    })
+    db.profile.mockResolvedValue({
+      id: 'profile', countryCode: 'LK', skills: '["plumbing"]',
+    })
+    expect((await checkWorkerEligibility('company', 'worker', 'booking')).eligible).toBe(true)
+  })
+
   it('preserves explicitly category-wide legacy membership skills', async () => {
     db.skill.mockResolvedValue(null)
     db.member.mockResolvedValue({ id: 'member', role: 'WORKER', skills: '["plumbing"]' })

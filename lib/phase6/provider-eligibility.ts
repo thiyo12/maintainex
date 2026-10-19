@@ -226,24 +226,28 @@ export async function checkWorkerEligibility(
           })
         : null
 
-      const capabilityTokens = new Set(
-        readStoredList(member.skills)
-          .concat(profile ? readStoredList(profile.skills) : [])
-          .map(value => value.trim().toLowerCase())
-          .filter(Boolean)
-      )
+      const normalize = (stored: string | null | undefined) =>
+        new Set(readStoredList(stored).map(value => value.trim().toLowerCase()).filter(Boolean))
+      // Company membership skills are explicitly granted by dispatch/management.
+      // TaskerProfile.skills contains *derived* category labels written by
+      // syncCategorySkills after selecting any one TemplateJob. Combining the
+      // two gave a worker every sibling service in that category.
+      const memberTokens = normalize(member.skills)
+      const profileTokens = normalize(profile?.skills)
       const categoryTokens = [
-        requiredCategoryId,
-        category?.id,
-        category?.name,
-        category?.slug,
-        job.serviceTemplateId,
-        requiredTemplateJobId,
-      ]
-        .filter((value): value is string => !!value)
-        .map(value => value.trim().toLowerCase())
+        requiredCategoryId, category?.id, category?.name, category?.slug,
+      ].filter((value): value is string => !!value).map(value => value.trim().toLowerCase())
+      const exactTokens = [
+        job.serviceTemplateId, requiredTemplateJobId,
+      ].filter((value): value is string => !!value).map(value => value.trim().toLowerCase())
 
-      const declaredCapability = categoryTokens.some(token => capabilityTokens.has(token))
+      const explicitMemberCategoryGrant = categoryTokens.some(token => memberTokens.has(token))
+      const exactDeclaredCapability = exactTokens.some(token =>
+        memberTokens.has(token) || profileTokens.has(token))
+      const historicalCategoryCapability =
+        !requiredTemplateJobId && categoryTokens.some(token => profileTokens.has(token))
+      const declaredCapability =
+        explicitMemberCategoryGrant || exactDeclaredCapability || historicalCategoryCapability
 
       if (!relationalCapability && !declaredCapability) {
         reasons.push('Worker lacks required capability for this job')
