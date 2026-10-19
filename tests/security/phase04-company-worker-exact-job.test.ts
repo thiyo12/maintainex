@@ -222,6 +222,74 @@ describe('Phase 04 — company worker assignment respects exact service selectio
     })
   })
 
+
+  it.each(['CREW_RESERVED', 'CREW_ACCEPTED'] as const)(
+    'treats %s crew capacity as busy for undated single-worker booking eligibility',
+    async status => {
+      // The mock represents a committed crew slot in another booking. Verify
+      // the real eligibility query includes this status, not only the result
+      // of an unrelated source-string test.
+      db.busy.mockImplementation(async ({ where }: { where: {
+        jobId: { not: string }; status: { in: string[] }; workerUserId: string
+      } }) => {
+        expect(where.workerUserId).toBe('worker')
+        expect(where.jobId).toEqual({ not: 'booking' })
+        return where.status.in.includes(status) ? { id: `other-${status}` } : null
+      })
+      const result = await checkWorkerEligibility('company', 'worker', 'booking')
+      expect(result.eligible).toBe(false)
+      expect(result.reasons).toContain('Worker has an active assignment and no date to prove capacity')
+      expect(db.busy).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it.each(['CREW_RESERVED', 'CREW_ACCEPTED'] as const)(
+    'blocks a same-day %s crew booking without blocking the current job itself',
+    async status => {
+      db.job.mockResolvedValue({
+        ...validJob, preferredDate: new Date('2026-11-02T09:00:00.000Z'),
+        preferredTimeSlot: 'morning',
+      })
+      db.conflicts.mockImplementation(async ({ where }: { where: {
+        workerUserId: string; jobId: { not: string }
+        OR: Array<Record<string, any>>
+      } }) => {
+        expect(where.workerUserId).toBe('worker')
+        expect(where.jobId).toEqual({ not: 'booking' })
+        const scheduled = where.OR[1]
+        expect(scheduled.status.in).toContain(status)
+        expect(scheduled.job.OR[0]).toEqual({ preferredDate: null })
+        const appointment = scheduled.job.OR[1]
+        expect(appointment.preferredDate.gte).toBeInstanceOf(Date)
+        expect(appointment.preferredDate.lt).toBeInstanceOf(Date)
+        expect(appointment.OR).toEqual([
+          { preferredTimeSlot: 'morning' },
+          { preferredTimeSlot: 'anytime' },
+          { preferredTimeSlot: null },
+        ])
+        return [{ id: `other-${status}`, jobId: 'other-booking' }]
+      })
+      const result = await checkCrewCandidateEligibility('company', 'worker', 'booking')
+      expect(result.eligible).toBe(false)
+      expect(result.reasons).toContain(
+        'Worker has a scheduling conflict with another assignment on the same date/time',
+      )
+      expect(db.conflicts).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('does not block on a terminal revoked crew slot after roster refusal', async () => {
+    // Only non-terminal assignment states are considered by the query.
+    // A released crew slot does not consume worker capacity.
+    db.busy.mockImplementation(async ({ where }: { where: { status: { in: string[] } } }) => {
+      expect(where.status.in).not.toContain('REVOKED')
+      expect(where.status.in).not.toContain('REJECTED')
+      return null
+    })
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(true)
+  })
+
   it('refuses a qualified worker whose account belongs to a different market', async () => {
     db.user.mockResolvedValue({
       identityStatus: 'VERIFIED', isActive: true, isSuspended: false,
