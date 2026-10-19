@@ -135,6 +135,7 @@ jobs:
             tests/security/phase04-company-team-dispatch-contract.test.ts \
             tests/security/phase04-crew-readiness-preview.test.ts \
             tests/security/phase04-crew-schema-foundation.test.ts \
+            tests/security/phase04-crew-readiness-mobile-freshness.test.ts \
             tests/security/phase04-crew-readiness-route.test.ts \
             tests/security/phase04-company-worker-exact-job.test.ts \
             tests/security/phase04-worker-rejection-atomicity.test.ts \

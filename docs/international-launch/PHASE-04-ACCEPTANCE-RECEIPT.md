@@ -219,3 +219,21 @@ crew roster fails preflight with a per-worker reason. This does **not** reserve
 capacity, approve a crew booking, dispatch workers, or replace customer
 identity confirmation; each of those still requires the crew lifecycle
 implementation and physical acceptance.
+
+## Phase 04 — versioned crew scaffold and stricter readiness preflight
+
+The feature branch now contains an **additive, unused** database model for
+`CompanyCrewDispatch` and optional per-worker crew slot / identity / arrival
+evidence fields on `CompanyJobAssignment`. The migration does not remove the
+single-active-worker uniqueness index. No crew roster can be persisted by an
+application endpoint yet, and crew PIN/work-start, per-worker acceptance and
+worker/customer lifecycle stay deliberately blocked. No production migration
+has been run.
+
+Read-only crew preview now also blocks unverified/restricted companies,
+missing unrestricted active owners, cancelled subscriptions, unsupported
+job-address markets and company/job country drift. The mobile screen discards
+slow preview responses once the selected job, roster or team changes. These
+are engineering prerequisites only, **not Phase 04 approval**. Latest-commit
+CI and isolated PostgreSQL migration verification are still required; LK and
+Vancouver physical-device and operational acceptance remain outstanding.

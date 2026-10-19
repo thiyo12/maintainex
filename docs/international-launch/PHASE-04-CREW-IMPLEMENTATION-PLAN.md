@@ -108,3 +108,21 @@ Stage 2 remains the proposed schema and migration below.
 blocked from assignment, PIN generation/rotation/verification and work-start.
 Existing single-worker paths remain operational. This document is a design,
 not a claim of implemented crew staffing.
+
+## Stage 2.1 — additive crew persistence scaffold (not activated)
+
+Branch development commits `456387a` and `83cd375` add a versioned
+`CompanyCrewDispatch` model and nullable slot/role, arrival and customer
+identity-confirmation evidence fields on `CompanyJobAssignment`. Migration
+`20261019010000_phase04_crew_lifecycle_scaffold` is additive: 2–12 worker
+count, legal status, positive version, and distinct slot constraints. It has
+**no writer or dispatch endpoint**, and the existing one-active-assignment
+index, target worker selection, work-start and PIN guards stay in place.
+
+The same development batch makes preview eligibility fail closed when company
+verification/active-owner eligibility or its registered market no longer
+matches the job's authoritative supported service-address market. A preview
+is still non-binding. Stage 2.2 must deliver atomic whole-roster reservation,
+all-worker acceptance, identity and PIN barriers and lifecycle transitions
+before any crew can be dispatched. The migration is committed, not applied
+to production by this work.

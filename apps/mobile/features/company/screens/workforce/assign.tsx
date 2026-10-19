@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -65,8 +65,17 @@ export default function AssignWorkerScreen() {
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  // Prevent a slow preview response for a previous roster/job from being
+  // presented as eligibility for the currently selected crew.
+  const crewRequestVersion = useRef(0)
+  const invalidateCrewReview = () => {
+    crewRequestVersion.current += 1
+    setCrewReadiness(null)
+    setCheckingCrew(false)
+  }
 
   const load = async () => {
+    invalidateCrewReview()
     setLoading(true)
     setCrewBookingsBlocked(0)
     setCrewJobs([])
@@ -168,7 +177,7 @@ export default function AssignWorkerScreen() {
   const selectedCrewJobData = crewJobs.find(job => job.id === selectedCrewJob)
 
   const toggleCrewWorker = (workerUserId: string) => {
-    setCrewReadiness(null)
+    invalidateCrewReview()
     setSelectedCrewWorkers(current =>
       current.includes(workerUserId)
         ? current.filter(id => id !== workerUserId)
@@ -178,6 +187,10 @@ export default function AssignWorkerScreen() {
 
   const reviewCrewReadiness = async () => {
     if (!companyId || !selectedCrewJob) return
+    const requestVersion = ++crewRequestVersion.current
+    const requestedCompanyId = companyId
+    const requestedJobId = selectedCrewJob
+    const requestedWorkers = [...selectedCrewWorkers]
     setCheckingCrew(true)
     setCrewReadiness(null)
     try {
@@ -186,17 +199,19 @@ export default function AssignWorkerScreen() {
         {
           method: 'POST',
           body: JSON.stringify({
-            companyId,
-            jobId: selectedCrewJob,
-            workerUserIds: selectedCrewWorkers,
+            companyId: requestedCompanyId,
+            jobId: requestedJobId,
+            workerUserIds: requestedWorkers,
           }),
         }
       )
-      setCrewReadiness(report)
+      if (crewRequestVersion.current === requestVersion) setCrewReadiness(report)
     } catch (error: any) {
-      Alert.alert('Crew readiness unavailable', error?.message || 'Please try again.')
+      if (crewRequestVersion.current === requestVersion) {
+        Alert.alert('Crew readiness unavailable', error?.message || 'Please try again.')
+      }
     } finally {
-      setCheckingCrew(false)
+      if (crewRequestVersion.current === requestVersion) setCheckingCrew(false)
     }
   }
 
@@ -271,9 +286,9 @@ export default function AssignWorkerScreen() {
                 key={job.id}
                 style={[styles.option, selectedCrewJob === job.id && styles.optionActive]}
                 onPress={() => {
+                  invalidateCrewReview()
                   setSelectedCrewJob(job.id)
                   setSelectedCrewWorkers([])
-                  setCrewReadiness(null)
                 }}
               >
                 <UsersThree size={19} color={v3.colors.ink} />
