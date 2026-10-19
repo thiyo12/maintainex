@@ -62,7 +62,6 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
       isVerified: true,
       services: true,
       subscriptionStatus: true,
-      userId: true,
     },
   })
   if (!company) {
@@ -81,19 +80,37 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
   }
   if (company.subscriptionStatus === 'CANCELLED') reasons.push('Subscription cancelled')
 
-  const user = await prisma.user.findUnique({
-    where: { id: company.userId },
-    select: { isActive: true, isSuspended: true, isBanned: true },
-  })
-  if (!user) reasons.push('Company owner account is missing')
-  else if (user.isActive === false) reasons.push('Company owner account is inactive')
-  if (user?.isSuspended) reasons.push('Company owner account is suspended')
-  if (user?.isBanned) reasons.push('Company owner account is banned')
-
-  const ownerCount = await prisma.teamMember.count({
+  // CompanyProfile.userId is the historical creator link. Ownership transfer
+  // changes TeamMember roles, not that creator link. Check the actual active
+  // owners' global restrictions so a suspended successor never authorizes
+  // onboarding and a healthy transferred company is not penalized when the
+  // original creator later becomes inactive.
+  const owners = await prisma.teamMember.findMany({
     where: { companyId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
+    select: {
+      user: {
+        select: { isActive: true, isSuspended: true, isBanned: true },
+      },
+    },
   })
-  if (ownerCount === 0) reasons.push('No active company owner')
+  const unrestrictedOwner = owners.some(owner =>
+    owner.user && owner.user.isActive && !owner.user.isSuspended && !owner.user.isBanned
+  )
+  if (owners.length === 0) {
+    reasons.push('No active company owner')
+  } else if (!unrestrictedOwner) {
+    if (owners.every(owner => !owner.user)) {
+      reasons.push('Company owner account is missing')
+    } else if (owners.every(owner => !owner.user || owner.user.isActive === false)) {
+      reasons.push('Company owner account is inactive')
+    } else if (owners.every(owner => !owner.user || owner.user.isSuspended)) {
+      reasons.push('Company owner account is suspended')
+    } else if (owners.every(owner => !owner.user || owner.user.isBanned)) {
+      reasons.push('Company owner account is banned')
+    } else {
+      reasons.push('No unrestricted active company owner')
+    }
+  }
 
   return { eligible: reasons.length === 0, reasons }
 }

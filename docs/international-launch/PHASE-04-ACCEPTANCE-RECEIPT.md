@@ -45,10 +45,12 @@ must not be described as locally executed.
    confirmation on real test accounts/devices for both supported markets.
    Confirm role/member transitions do not alter customers' existing bookings.
 3. **Owner identity and authority semantics.** Ownership transfer changes
-   active `TeamMember` roles but the historical `CompanyProfile.userId`
-   remains the original linked owner. Reconcile this with eligibility and
-   account-ownership queries before declaring transferred-company onboarding
-   complete; do not blindly rewrite historical owner data.
+   active `TeamMember` roles while `CompanyProfile.userId` retains the
+   historical creator. `checkCompanyEligibility` now verifies current active
+   owner memberships rather than this historical link, with regressions for
+   suspended successor owners. Continue auditing other owner-linked access
+   and UI paths before transferred-company onboarding is accepted; do not
+   blindly rewrite historical owner data.
 4. **Cross-market live acceptance.** Exercise real test fixtures for LK
    district service addresses and City-of-Vancouver-only addresses. Confirm
    tasker/company matching, dispatch, identity check and work-start behavior.

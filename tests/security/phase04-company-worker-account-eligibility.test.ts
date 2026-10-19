@@ -10,7 +10,7 @@ const mock = vi.hoisted(() => ({
   taskerFindUnique: vi.fn(),
   companyFindUnique: vi.fn(),
   memberFindFirst: vi.fn(),
-  teamOwnerCount: vi.fn(),
+  ownersFindMany: vi.fn(),
   taskerSkillCount: vi.fn(),
   companySpecialtyCount: vi.fn(),
 }))
@@ -20,7 +20,7 @@ vi.mock('@/lib/prisma', () => ({
     user: { findUnique: mock.userFindUnique },
     taskerProfile: { findUnique: mock.taskerFindUnique },
     companyProfile: { findUnique: mock.companyFindUnique },
-    teamMember: { findFirst: mock.memberFindFirst, count: mock.teamOwnerCount },
+    teamMember: { findFirst: mock.memberFindFirst, findMany: mock.ownersFindMany },
     taskerSkill: { count: mock.taskerSkillCount },
     companySpecialty: { count: mock.companySpecialtyCount },
   },
@@ -46,7 +46,9 @@ describe('Phase 04 — inactive provider and worker accounts never become eligib
       id: 'tasker', verificationStatus: 'VERIFIED',
       isVerified: true, skills: '["plumbing"]',
     })
-    mock.teamOwnerCount.mockResolvedValue(1)
+    mock.ownersFindMany.mockResolvedValue([{
+      user: { isActive: true, isSuspended: false, isBanned: false },
+    }])
     mock.taskerSkillCount.mockResolvedValue(1)
     mock.companySpecialtyCount.mockResolvedValue(0)
   })
@@ -80,12 +82,30 @@ describe('Phase 04 — inactive provider and worker accounts never become eligib
   })
 
   it('refuses company eligibility when its owner user account is inactive', async () => {
-    mock.userFindUnique.mockResolvedValue({
-      identityStatus: 'VERIFIED', isActive: false, isSuspended: false, isBanned: false,
-    })
+    mock.ownersFindMany.mockResolvedValue([{
+      user: { isActive: false, isSuspended: false, isBanned: false },
+    }])
     const result = await checkCompanyEligibility('company')
     expect(result.eligible).toBe(false)
     expect(result.reasons).toContain('Company owner account is inactive')
+  })
+
+  it('rejects a newly promoted owner whose account was suspended', async () => {
+    mock.ownersFindMany.mockResolvedValue([{
+      user: { isActive: true, isSuspended: true, isBanned: false },
+    }])
+    const result = await checkCompanyEligibility('company')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Company owner account is suspended')
+  })
+
+  it('allows another unrestricted owner when one co-owner is suspended', async () => {
+    mock.ownersFindMany.mockResolvedValue([
+      { user: { isActive: true, isSuspended: true, isBanned: false } },
+      { user: { isActive: true, isSuspended: false, isBanned: false } },
+    ])
+    const result = await checkCompanyEligibility('company')
+    expect(result.eligible).toBe(true)
   })
 
   it('keeps active verified individual providers eligible', async () => {

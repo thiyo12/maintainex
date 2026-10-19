@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   userFindUnique: vi.fn(),
   companyFindUnique: vi.fn(),
   specialtyCount: vi.fn(),
-  ownerCount: vi.fn(),
+  ownersFindMany: vi.fn(),
   taskerFindUnique: vi.fn(),
   taskerSkillCount: vi.fn(),
 }))
@@ -19,7 +19,7 @@ vi.mock('@/lib/prisma', () => ({
     user: { findUnique: mocks.userFindUnique },
     companyProfile: { findUnique: mocks.companyFindUnique },
     companySpecialty: { count: mocks.specialtyCount },
-    teamMember: { count: mocks.ownerCount },
+    teamMember: { findMany: mocks.ownersFindMany },
     taskerProfile: { findUnique: mocks.taskerFindUnique },
     taskerSkill: { count: mocks.taskerSkillCount },
   },
@@ -48,7 +48,9 @@ describe('Phase 04 — provider onboarding requires actual declared capabilities
       skills: '[]',
     })
     mocks.specialtyCount.mockResolvedValue(0)
-    mocks.ownerCount.mockResolvedValue(1)
+    mocks.ownersFindMany.mockResolvedValue([{
+      user: { isActive: true, isSuspended: false, isBanned: false },
+    }])
     mocks.taskerSkillCount.mockResolvedValue(0)
   })
 
@@ -90,10 +92,35 @@ describe('Phase 04 — provider onboarding requires actual declared capabilities
       isVerified: true, verificationStatus: 'VERIFIED',
       services: '["plumbing"]', subscriptionStatus: 'ACTIVE', userId: 'missing-owner',
     })
-    mocks.userFindUnique.mockResolvedValue(null)
+    mocks.ownersFindMany.mockResolvedValue([{ user: null }])
     const result = await checkCompanyEligibility('company')
     expect(result.eligible).toBe(false)
     expect(result.reasons).toContain('Company owner account is missing')
+  })
+
+  it('rejects companies with no actual active owner membership', async () => {
+    mocks.ownersFindMany.mockResolvedValue([])
+    mocks.companyFindUnique.mockResolvedValue({
+      isVerified: true, verificationStatus: 'VERIFIED', services: '["plumbing"]',
+      subscriptionStatus: 'ACTIVE', userId: 'historical-owner',
+    })
+    const result = await checkCompanyEligibility('company')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('No active company owner')
+  })
+
+  it('keeps a transferred company eligible when its original creator is no longer an active owner', async () => {
+    mocks.companyFindUnique.mockResolvedValue({
+      isVerified: true, verificationStatus: 'VERIFIED', services: '["plumbing"]',
+      subscriptionStatus: 'ACTIVE', userId: 'historical-owner',
+    })
+    mocks.userFindUnique.mockResolvedValue(null)
+    const result = await checkCompanyEligibility('company')
+    expect(result.eligible).toBe(true)
+    expect(mocks.ownersFindMany).toHaveBeenCalledWith({
+      where: { companyId: 'company', role: 'COMPANY_OWNER', status: 'ACTIVE' },
+      select: { user: { select: { isActive: true, isSuspended: true, isBanned: true } } },
+    })
   })
 
   it('blocks an individual verified provider with blank capabilities', async () => {
