@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
 import { requireJobMarket } from '@/lib/geography/market-engine'
 import { readStoredList } from '@/lib/db-utils'
 
@@ -52,10 +52,10 @@ export async function checkIndividualProviderEligibility(userId: string): Promis
   return { eligible: reasons.length === 0, reasons }
 }
 
-export async function checkCompanyEligibility(companyId: string): Promise<ProviderEligibility> {
+export async function checkCompanyEligibility(companyId: string, db: PrismaClientOrTx = prisma): Promise<ProviderEligibility> {
   const reasons: string[] = []
 
-  const company = await prisma.companyProfile.findUnique({
+  const company = await db.companyProfile.findUnique({
     where: { id: companyId },
     select: {
       verificationStatus: true,
@@ -73,7 +73,7 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
 
   const hasLegacyServices = hasDeclaredProviderCapabilities(company.services)
   if (!hasLegacyServices) {
-    const relationalSpecialtyCount = await prisma.companySpecialty.count({ where: { companyId } })
+    const relationalSpecialtyCount = await db.companySpecialty.count({ where: { companyId } })
     if (relationalSpecialtyCount === 0) {
       reasons.push('No service capabilities declared')
     }
@@ -85,7 +85,7 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
   // owners' global restrictions so a suspended successor never authorizes
   // onboarding and a healthy transferred company is not penalized when the
   // original creator later becomes inactive.
-  const owners = await prisma.teamMember.findMany({
+  const owners = await db.teamMember.findMany({
     where: { companyId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
     select: {
       user: {
@@ -120,17 +120,18 @@ async function checkWorkerEligibilityCore(
   userId: string,
   requiredJobId: string | undefined,
   allowCrewPreview: boolean,
+  db: PrismaClientOrTx,
 ): Promise<ProviderEligibility> {
   const reasons: string[] = []
 
-  const member = await prisma.teamMember.findFirst({
+  const member = await db.teamMember.findFirst({
     where: { companyId, userId, status: 'ACTIVE' },
   })
   if (!member) {
     return { eligible: false, reasons: ['Not an active member of this company'] }
   }
 
-  const user = await prisma.user.findUnique({
+  const user = await db.user.findUnique({
     where: { id: userId },
     select: { identityStatus: true, isActive: true, isSuspended: true, isBanned: true },
   })
@@ -147,7 +148,7 @@ async function checkWorkerEligibilityCore(
   if (user.identityStatus !== 'VERIFIED') reasons.push('Worker identity not verified')
 
   if (requiredJobId) {
-    const job = await prisma.marketplaceJob.findUnique({
+    const job = await db.marketplaceJob.findUnique({
       where: { id: requiredJobId },
       select: {
         categoryId: true,
@@ -172,11 +173,11 @@ async function checkWorkerEligibilityCore(
       if (!jobMarket.ok) {
         reasons.push('Job service address is not in a supported market')
       } else {
-        const workerProfile = await prisma.taskerProfile.findUnique({
+        const workerProfile = await db.taskerProfile.findUnique({
           where: { userId },
           select: { countryCode: true },
         })
-        const workerUser = await prisma.user.findUnique({
+        const workerUser = await db.user.findUnique({
           where: { id: userId },
           select: { countryCode: true },
         })
@@ -199,16 +200,16 @@ async function checkWorkerEligibilityCore(
         reasons.push('Job requires a multi-worker crew; one worker is insufficient')
       }
       const [profile, category, template] = await Promise.all([
-        prisma.taskerProfile.findUnique({
+        db.taskerProfile.findUnique({
           where: { userId },
           select: { id: true, skills: true },
         }),
-        prisma.jobCategory.findUnique({
+        db.jobCategory.findUnique({
           where: { id: job.categoryId },
           select: { id: true, name: true, slug: true },
         }),
         job.serviceTemplateId
-          ? prisma.serviceTemplate.findUnique({
+          ? db.serviceTemplate.findUnique({
               where: { id: job.serviceTemplateId },
               select: { id: true, jobCategoryId: true, templateJobId: true },
             })
@@ -230,7 +231,7 @@ async function checkWorkerEligibilityCore(
       const requiredCategoryId = job.categoryId
       const requiredTemplateJobId = job.templateJobId || template?.templateJobId || null
       const relationalCapability = profile
-        ? await prisma.taskerSkill.findFirst({
+        ? await db.taskerSkill.findFirst({
             where: {
               taskerId: profile.id,
               // A worker selecting one TemplateJob must not inherit every
@@ -272,7 +273,7 @@ async function checkWorkerEligibilityCore(
       }
 
       if (job.workerIdentityCheckRequired) {
-        const approvedIdentity = await prisma.providerIdentity.findFirst({
+        const approvedIdentity = await db.providerIdentity.findFirst({
           where: {
             currentUserId: userId,
             identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
@@ -289,7 +290,7 @@ async function checkWorkerEligibilityCore(
       if (!job.preferredDate) {
         // No date cannot establish a non-overlapping appointment.
         // A worker already performing any active assignment is unavailable.
-        const busy = await prisma.companyJobAssignment.findFirst({
+        const busy = await db.companyJobAssignment.findFirst({
           where: {
             workerUserId: userId,
             status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
@@ -317,7 +318,7 @@ async function checkWorkerEligibilityCore(
               }
             : {}
 
-        const conflictingAssignments = await prisma.companyJobAssignment.findMany({
+        const conflictingAssignments = await db.companyJobAssignment.findMany({
           where: {
             workerUserId: userId,
             jobId: { not: requiredJobId },
@@ -358,7 +359,7 @@ export async function checkWorkerEligibility(
   userId: string,
   requiredJobId?: string,
 ): Promise<ProviderEligibility> {
-  return checkWorkerEligibilityCore(companyId, userId, requiredJobId, false)
+  return checkWorkerEligibilityCore(companyId, userId, requiredJobId, false, prisma)
 }
 
 /** Read-only planning check. Never use to create assignments or authorize work. */
@@ -366,6 +367,7 @@ export async function checkCrewCandidateEligibility(
   companyId: string,
   userId: string,
   jobId: string,
+  db: PrismaClientOrTx = prisma,
 ): Promise<ProviderEligibility> {
-  return checkWorkerEligibilityCore(companyId, userId, jobId, true)
+  return checkWorkerEligibilityCore(companyId, userId, jobId, true, db)
 }
