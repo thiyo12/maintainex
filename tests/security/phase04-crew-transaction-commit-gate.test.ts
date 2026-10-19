@@ -175,6 +175,9 @@ describe('Phase 04 — future crew reservation commit gate is locked and non-mut
       ],
     })
     expect(mock.audit).toHaveBeenCalledOnce()
+    expect(mock.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'CREW_ROSTER_STAGE', actorId: 'manager', targetId: 'crew-1' }), tx,
+    )
   })
 
   it('refuses any unselected lead before touching the database', async () => {
