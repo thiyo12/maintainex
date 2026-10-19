@@ -11,25 +11,28 @@ const job: MatchingInput = {
   countryCode: 'CA',
 }
 
-function mockClient(owner: null | { isActive?: boolean; isSuspended?: boolean; isBanned?: boolean }) {
+function mockClient(owner: null | { isActive?: boolean; isSuspended?: boolean; isBanned?: boolean }, hasMembership = true) {
   const database = {
     companyProfile: {
       findUnique: vi.fn().mockResolvedValue({
         id: 'company',
         userId: 'owner',
-        verificationStatus: 'VERIFIED',
+        // Stop the happy owner path at the next gate, so this fixture tests
+        // owner authority without mocking every downstream profession gate.
+        verificationStatus: 'PENDING',
         isVerified: true,
         subscriptionStatus: 'ACTIVE',
       }),
     },
-    user: { findUnique: vi.fn().mockResolvedValue(owner) },
-    teamMember: { count: vi.fn().mockResolvedValue(0) },
+    teamMember: {
+      findMany: vi.fn().mockResolvedValue(hasMembership ? [{ user: owner }] : []),
+    },
   }
   return { client: database as unknown as PrismaClient, mock: database }
 }
 
-async function checkOwner(owner: null | { isActive?: boolean; isSuspended?: boolean; isBanned?: boolean }) {
-  const { client, mock } = mockClient(owner)
+async function checkOwner(owner: null | { isActive?: boolean; isSuspended?: boolean; isBanned?: boolean }, hasMembership = true) {
+  const { client, mock } = mockClient(owner, hasMembership)
   const result = await evaluateEligibility({
     providerType: 'COMPANY',
     providerId: 'company',
@@ -50,10 +53,9 @@ describe('Phase 11 — company matching refuses missing or inactive owners', () 
       passed: false,
       reason: 'Company owner account is inactive or missing',
     })
-    expect(mock.teamMember.count).not.toHaveBeenCalled()
-    expect(mock.user.findUnique).toHaveBeenCalledWith({
-      where: { id: 'owner' },
-      select: { isActive: true, isSuspended: true, isBanned: true },
+    expect(mock.teamMember.findMany).toHaveBeenCalledWith({
+      where: { companyId: 'company', role: 'COMPANY_OWNER', status: 'ACTIVE' },
+      select: { user: { select: { isActive: true, isSuspended: true, isBanned: true } } },
     })
   })
 
@@ -61,7 +63,7 @@ describe('Phase 11 — company matching refuses missing or inactive owners', () 
     const { result, mock } = await checkOwner(null)
     expect(result.eligible).toBe(false)
     expect(result.gates.find(gate => gate.gate === 'COMPANY_OWNER_ACTIVE')?.passed).toBe(false)
-    expect(mock.teamMember.count).not.toHaveBeenCalled()
+    expect(mock.teamMember.findMany).toHaveBeenCalledOnce()
   })
 
   it('retains the suspension and banning checks for active owners', async () => {
@@ -75,17 +77,29 @@ describe('Phase 11 — company matching refuses missing or inactive owners', () 
     }
   })
 
-  it('lets a genuinely active owner proceed to the separate active-membership gate', async () => {
+  it('fails the owner-exists gate when there is no active owner membership', async () => {
     const { result, mock } = await checkOwner({
       isActive: true, isSuspended: false, isBanned: false,
-    })
-    expect(result.eligible).toBe(false) // Mock intentionally has no active owner membership.
-    expect(result.gates).toContainEqual({ gate: 'COMPANY_OWNER_ACTIVE', passed: true })
+    }, false)
+    expect(result.eligible).toBe(false)
     expect(result.gates).toContainEqual({
       gate: 'COMPANY_OWNER_EXISTS',
       passed: false,
       reason: 'No active company owner',
     })
-    expect(mock.teamMember.count).toHaveBeenCalledOnce()
+    expect(mock.teamMember.findMany).toHaveBeenCalledOnce()
+  })
+
+  it('lets a real unrestricted active owner proceed to the company verification gate', async () => {
+    const { result } = await checkOwner({
+      isActive: true, isSuspended: false, isBanned: false,
+    })
+    expect(result.eligible).toBe(false) // Verification is intentionally pending in this fixture.
+    expect(result.gates).toContainEqual({ gate: 'COMPANY_OWNER_ACTIVE', passed: true })
+    expect(result.gates).toContainEqual({
+      gate: 'COMPANY_VERIFIED',
+      passed: false,
+      reason: 'Company not verified',
+    })
   })
 })
