@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import {
-  directRequestPriceGuide,
-  providerDistanceLabel,
-  providerPriceGuide,
-} from '../../apps/mobile/lib/provider-discovery-display'
+import { runInNewContext } from 'node:vm'
+import { transpileModule, ModuleKind, ScriptTarget } from 'typescript'
+
+// This isolated server-side Vitest job installs only the root dependencies.
+// Importing a mobile .ts file directly asks Vite to resolve Expo's tsconfig
+// without Expo installed. Execute the exact pure helper through TypeScript's
+// standard in-memory transpilation rather than testing a duplicate function.
+const original = readFileSync(resolve(process.cwd(),
+  'apps/mobile/lib/provider-discovery-display.ts'), 'utf8')
+const compiled = transpileModule(original, {
+  compilerOptions: { module: ModuleKind.CommonJS, target: ScriptTarget.ES2020 },
+}).outputText
+const sandbox = { exports: {} as Record<string, (...args: any[]) => string> }
+runInNewContext(compiled, sandbox, { timeout: 1000 })
+const { directRequestPriceGuide, providerDistanceLabel, providerPriceGuide } = sandbox.exports
 
 describe('Phase 12 market-aware public provider price/availability hints', () => {
   it('preserves historical LKR-only provider-rate hints without currency conversion', () => {
