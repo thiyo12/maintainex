@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       job: result.job,
       quote: result.quote,
       notifiedCount: result.notifiedCount,
-      message: 'BOOK_NOW job created. Accept the quote to proceed.',
+      message: 'Service request sent. The provider must confirm the quote and appointment before it is booked.',
     }, { status: 201 })
   } catch (error: any) {
     secureConsole.error('BOOK_NOW error:', error)
