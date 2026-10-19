@@ -106,6 +106,38 @@ describe('Phase 05 — legacy estimate must obey independent local pricing', () 
     expect(fake.calculate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ countryCode: 'CA' }))
   })
 
+  it.each([1.5, '2.5', true, 9007199254740992])(
+    'rejects fractional, nonnumeric or unsafe quantity input: %s', async quantity => {
+      const { POST } = await import('@/app/api/mobile/v2/pricing/estimate/route')
+      const response = await POST(new NextRequest('http://localhost/api/mobile/v2/pricing/estimate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          categoryId: 'category', serviceTemplateId: 'template',
+          countryCode: 'CA', quantity,
+        }),
+      }))
+      expect(response.status).toBe(400)
+      expect(fake.calculate).not.toHaveBeenCalled()
+    },
+  )
+
+  it('preserves an integer quantity for the canonical pricing engine', async () => {
+    const { POST } = await import('@/app/api/mobile/v2/pricing/estimate/route')
+    const response = await POST(new NextRequest('http://localhost/api/mobile/v2/pricing/estimate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        categoryId: 'category', serviceTemplateId: 'template',
+        countryCode: 'CA', quantity: '3',
+      }),
+    }))
+    expect(response.status).toBe(200)
+    expect(fake.calculate).toHaveBeenCalledWith(
+      expect.anything(), expect.objectContaining({ quantity: 3, countryCode: 'CA' }),
+    )
+  })
+
   it('refuses inactive market category before using any price template', async () => {
     fake.category.mockResolvedValue({ isActive: false, countries: '["CA"]' })
     const response = await estimate({ templateId: 'template', categoryId: 'category', countryCode: 'CA' })
