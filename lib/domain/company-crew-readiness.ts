@@ -77,6 +77,10 @@ export async function previewCompanyCrewReadiness(input: {
     throw new CrewReadinessError('Booking exceeds the supported crew-preview size', 409)
   }
 
+  const existingCrew = await prisma.companyCrewDispatch.findUnique({
+    where: { jobId },
+    select: { id: true },
+  })
   const activeAssignment = await prisma.companyJobAssignment.findFirst({
     where: {
       jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
@@ -136,6 +140,9 @@ export async function previewCompanyCrewReadiness(input: {
   }
   if (activeAssignment) {
     blockers.push('Booking already has an active single-worker assignment')
+  }
+  if (existingCrew) {
+    blockers.push('Booking already has an internal crew roster; changes require versioned lifecycle handling')
   }
   if (workers.some(worker => !worker.eligible)) {
     blockers.push('One or more crew candidates fail mandatory eligibility checks')

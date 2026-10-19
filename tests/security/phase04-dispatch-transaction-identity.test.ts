@@ -47,7 +47,7 @@ describe('Phase 04 — dispatch transaction locks and rechecks worker identity a
       where: {
         workerUserId: 'worker',
         jobId: { not: 'new-job' },
-        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED'] },
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
       },
       select: { id: true, jobId: true },
     })
@@ -107,7 +107,7 @@ describe('Phase 04 — dispatch transaction locks and rechecks worker identity a
           OR: expect.arrayContaining([
             { status: 'IN_PROGRESS' },
             expect.objectContaining({
-              status: { in: ['ASSIGNED', 'ACCEPTED', 'CREW_RESERVED'] },
+              status: { in: ['ASSIGNED', 'ACCEPTED', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
               job: expect.objectContaining({
                 OR: expect.arrayContaining([{ preferredDate: null }]),
               }),

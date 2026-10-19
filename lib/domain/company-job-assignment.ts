@@ -90,7 +90,7 @@ export async function lockAndAssertWorkerScheduleAvailable(
       where: {
         workerUserId,
         jobId: { not: jobId },
-        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED'] },
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
       },
       select: { id: true, jobId: true },
     })
@@ -121,7 +121,7 @@ export async function lockAndAssertWorkerScheduleAvailable(
       OR: [
         { status: 'IN_PROGRESS' },
         {
-          status: { in: ['ASSIGNED', 'ACCEPTED', 'CREW_RESERVED'] },
+          status: { in: ['ASSIGNED', 'ACCEPTED', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
           job: {
             OR: [
               { preferredDate: null },

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   quote: vi.fn(),
   job: vi.fn(),
   assignment: vi.fn(),
+  existingCrew: vi.fn(),
   eligibility: vi.fn(),
   photo: vi.fn(),
   companyEligibility: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('@/lib/prisma', () => ({
     jobQuote: { findFirst: mocks.quote },
     marketplaceJob: { findUnique: mocks.job },
     companyJobAssignment: { findFirst: mocks.assignment },
+    companyCrewDispatch: { findUnique: mocks.existingCrew },
     providerIdentity: { findFirst: mocks.photo },
     companyProfile: { findUnique: mocks.companyProfile },
   },
@@ -42,6 +44,7 @@ describe('Phase 04 — company crew readiness is a non-mutating preflight', () =
     mocks.quote.mockResolvedValue({ id: 'accepted-quote' })
     mocks.job.mockResolvedValue({ status: 'QUOTE_ACCEPTED', workersCount: 2 })
     mocks.assignment.mockResolvedValue(null)
+    mocks.existingCrew.mockResolvedValue(null)
     mocks.eligibility.mockResolvedValue({ eligible: true, reasons: [] })
     mocks.photo.mockResolvedValue({ id: 'approved-worker-photo' })
     mocks.companyEligibility.mockResolvedValue({ eligible: true, reasons: [] })
@@ -151,6 +154,16 @@ describe('Phase 04 — company crew readiness is a non-mutating preflight', () =
     const report = await review()
     expect(report.preflightReady).toBe(false)
     expect(report.blockers).toContain('Booking already has an active single-worker assignment')
+  })
+
+  it('blocks a new preview from claiming readiness after an internal roster was staged', async () => {
+    mocks.existingCrew.mockResolvedValue({ id: 'old-crew' })
+    const report = await review()
+    expect(report.preflightReady).toBe(false)
+    expect(report.dispatchEnabled).toBe(false)
+    expect(report.blockers).toContain(
+      'Booking already has an internal crew roster; changes require versioned lifecycle handling',
+    )
   })
 
   it('reports all capability and identity failures without granting dispatch', async () => {

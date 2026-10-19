@@ -48,6 +48,7 @@ describe('Phase 04 — accepting a staged crew slot never authorizes work', () =
     mocks.crewLookup.mockResolvedValue({ companyId: 'company', jobId: 'booking' })
     mocks.sql.mockResolvedValueOnce([{ id: 'accepted-quote' }])
       .mockResolvedValueOnce([job]).mockResolvedValueOnce([crew])
+      .mockResolvedValueOnce([{ id: 'worker-a' }])
     mocks.company.mockResolvedValue({ countryCode: 'LK', userId: 'founder' })
     mocks.slots.mockResolvedValue(slots)
     mocks.update.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 1 })

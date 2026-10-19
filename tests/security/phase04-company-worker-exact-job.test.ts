@@ -203,7 +203,7 @@ describe('Phase 04 — company worker assignment respects exact service selectio
     const query = db.conflicts.mock.calls[0][0].where
     expect(query.OR[0]).toEqual({ status: 'IN_PROGRESS' })
     expect(query.OR[0]).not.toHaveProperty('job')
-    expect(query.OR[1].status).toEqual({ in: ['ASSIGNED', 'ACCEPTED', 'CREW_RESERVED'] })
+    expect(query.OR[1].status).toEqual({ in: ['ASSIGNED', 'ACCEPTED', 'CREW_RESERVED', 'CREW_ACCEPTED'] })
   })
 
   it('blocks undated dispatch when the worker already has an active assignment', async () => {
@@ -215,7 +215,7 @@ describe('Phase 04 — company worker assignment respects exact service selectio
     expect(db.busy).toHaveBeenCalledWith({
       where: {
         workerUserId: 'worker',
-        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED'] },
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
         jobId: { not: 'booking' },
       },
       select: { id: true },
