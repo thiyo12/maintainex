@@ -117,6 +117,24 @@ export async function PATCH(request: NextRequest) {
             FOR UPDATE
           `
 
+          // Dispatch locks this same TeamMember row before writing an
+          // assignment. Hold it until the assignment lookup and revocation
+          // finish, or a competing dispatch can escape the suspension.
+          await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "TeamMember" WHERE id = ${member.id} FOR UPDATE
+          `
+          const lockedMember = await tx.teamMember.findUnique({
+            where: { id: member.id },
+            select: { role: true, status: true },
+          })
+          if (
+            !lockedMember ||
+            lockedMember.role !== member.role ||
+            lockedMember.status !== 'ACTIVE'
+          ) {
+            throw new Error('MEMBER_STATUS_CHANGED')
+          }
+
           if (member.role === 'COMPANY_OWNER') {
             const ownerCount = await tx.teamMember.count({
               where: { companyId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
@@ -224,6 +242,12 @@ export async function PATCH(request: NextRequest) {
       if (err.message === 'WORKER_HAS_ACTIVE_ASSIGNMENT') {
         return NextResponse.json(
           { error: 'Reassign or finish the worker\'s active jobs before changing their role.' },
+          { status: 409 }
+        )
+      }
+      if (err.message === 'MEMBER_STATUS_CHANGED') {
+        return NextResponse.json(
+          { error: 'Member status changed concurrently; retry the request' },
           { status: 409 }
         )
       }

@@ -61,7 +61,7 @@ export const COMPANY_PERMISSIONS: Record<CompanyRole, string[]> = {
 }
 
 export function isValidCompanyRole(role: string): role is CompanyRole {
-  return role in COMPANY_ROLES
+  return Object.prototype.hasOwnProperty.call(COMPANY_ROLES, role)
 }
 
 export function getRoleHierarchyLevel(role: CompanyRole): number {
