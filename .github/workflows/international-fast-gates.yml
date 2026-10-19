@@ -127,6 +127,8 @@ jobs:
             tests/security/phase04-company-profile-owner-reactivation.test.ts \
             tests/security/phase04-worker-booking-acceptance.test.ts \
             tests/security/phase04-workforce-actor-commit-authorization.test.ts \
+            tests/security/phase04-workforce-route-export.test.ts \
+            tests/security/phase04-dispatch-booking-requirement-race.test.ts \
             tests/security/phase04-company-assignment-detail-access.test.ts \
             tests/security/phase04-company-team-dispatch-contract.test.ts \
             tests/security/phase04-worker-rejection-atomicity.test.ts \

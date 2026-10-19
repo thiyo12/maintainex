@@ -70,9 +70,21 @@ describe('Phase 04 — company assignment completion is compare-and-set', () => 
       error: 'Assignment state changed before completion',
     })
     expect(mock.updateMany).toHaveBeenCalledWith({
-      where: { id: 'assignment', companyId: 'company', status: 'IN_PROGRESS' },
+      where: {
+        id: 'assignment', companyId: 'company', status: 'IN_PROGRESS',
+        job: { status: 'COMPLETED' },
+      },
       data: { status: 'COMPLETED', completedAt: expect.any(Date) },
     })
+  })
+
+  it('guards against the parent job status reverting before completion is written', async () => {
+    // The database conditional update returns zero after concurrent status change.
+    mock.updateMany.mockResolvedValue({ count: 0 })
+    expect((await completeAssignment('assignment', 'company')).success).toBe(false)
+    expect(mock.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ job: { status: 'COMPLETED' } }),
+    }))
   })
 
   it('succeeds only after one row is actually marked completed', async () => {

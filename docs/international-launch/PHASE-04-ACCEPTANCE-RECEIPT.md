@@ -94,6 +94,23 @@ a suspended team membership. The company row and actor locks are acquired
 before the target membership. Dedicated regressions cover all actions;
 exact-head CI and physical acceptance are still required.
 
+## Phase 04 — build-gate repair and mutable-booking dispatch races
+
+The previous head `22a9bae` passed fast gates and the security audit,
+but **failed full CRM validation** because the Next.js API route exported an
+internal helper (`assertCurrentWorkforceManager`) as an unsupported route
+export. The helper is now file-private; a fast-gate structural regression
+guards against that exact production-build failure.
+
+Company dispatch and reassignment now conditionally claim only a job that
+is still single-worker and whose identity-photo requirement, preferred date
+and preferred time slot match the eligibility/schedule snapshot. If any
+changed while the dispatcher was working, the atomic claim fails and no
+worker assignment or workspace mutation is committed. Assignment
+completion also conditionally requires the parent job to remain COMPLETED.
+New tests cover these stale-state conditions. No crew enablement, actual
+device signoff or go-live certification is implied.
+
 ## Remaining blockers — cannot mark Phase 04 accepted
 
 1. **Multi-worker crew support.** The job has a `workersCount` requirement,

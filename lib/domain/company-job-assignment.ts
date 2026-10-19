@@ -246,6 +246,12 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
       where: {
         id: jobId,
         status: 'QUOTE_ACCEPTED',
+        // Do not staff a booking whose worker count, identity requirement
+        // or schedule changed since eligibility and availability preflight.
+        workersCount: 1,
+        workerIdentityCheckRequired: job.workerIdentityCheckRequired,
+        preferredDate: job.preferredDate,
+        preferredTimeSlot: job.preferredTimeSlot,
         OR: [
           { targetTaskerId: null },
           { targetTaskerId: companyId },
@@ -417,6 +423,10 @@ export async function reassignWorker(
         where: {
           id: jobId,
           status: 'QUOTE_ACCEPTED',
+          workersCount: 1,
+          workerIdentityCheckRequired: job.workerIdentityCheckRequired,
+          preferredDate: job.preferredDate,
+          preferredTimeSlot: job.preferredTimeSlot,
           targetTaskerId: currentAssignment.workerUserId,
         },
         data: { targetTaskerId: newWorkerUserId },
@@ -758,7 +768,10 @@ export async function completeAssignment(
   }
 
   const claimed = await prisma.companyJobAssignment.updateMany({
-    where: { id: assignmentId, companyId, status: 'IN_PROGRESS' },
+    where: {
+      id: assignmentId, companyId, status: 'IN_PROGRESS',
+      job: { status: 'COMPLETED' },
+    },
     data: { status: 'COMPLETED', completedAt: new Date() },
   })
   if (claimed.count !== 1) {

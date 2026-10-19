@@ -8,7 +8,7 @@ import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 
 /** Recheck the actor's live account and role under the same transaction that
  * modifies workforce. Caller holds the company row lock before invoking. */
-export async function assertCurrentWorkforceManager(
+async function assertCurrentWorkforceManager(
   tx: PrismaClientOrTx, companyId: string, actorUserId: string, actorRole: string,
 ): Promise<void> {
   const accounts = await tx.$queryRaw<Array<{
