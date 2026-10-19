@@ -85,10 +85,24 @@ export async function previewCompanyCrewReadiness(input: {
 
   const workers = await Promise.all(workerUserIds.map(async workerUserId => {
     const result = await checkCrewCandidateEligibility(companyId, workerUserId, jobId)
+    // Crew operations need an approved photo for *every* person who will
+    // enter the customer's premises. The booking's single-worker optional
+    // photo flag must not make a multi-person roster appear identity-ready.
+    const photo = await prisma.providerIdentity.findFirst({
+      where: {
+        currentUserId: workerUserId,
+        identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
+        kycStatus: 'VERIFIED',
+        verifiedPhotoUrl: { not: null },
+      },
+      select: { id: true },
+    })
+    const reasons = [...result.reasons]
+    if (!photo) reasons.push('Crew member verified profile photo not approved')
     return {
       workerUserId,
-      eligible: result.eligible,
-      reasons: result.reasons,
+      eligible: reasons.length === 0,
+      reasons,
     }
   }))
 

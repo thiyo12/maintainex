@@ -209,3 +209,13 @@ No merge/deployment; no production data edits; no payment-provider enablement;
 no new paid geocoding; no publication of the unapproved catalogue.
 Maintain original customer and provider data, permissions and identity records.
 Any CI test records are isolated and must be cleaned up by owned fixture IDs.
+
+## Crew candidate photo requirement (preview-only)
+
+The read-only crew readiness preview now separately checks every selected
+worker for an approved verified identity photo, even if the booking's
+single-worker `workerIdentityCheckRequired` flag was not set. An incomplete
+crew roster fails preflight with a per-worker reason. This does **not** reserve
+capacity, approve a crew booking, dispatch workers, or replace customer
+identity confirmation; each of those still requires the crew lifecycle
+implementation and physical acceptance.

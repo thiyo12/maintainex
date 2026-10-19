@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   job: vi.fn(),
   assignment: vi.fn(),
   eligibility: vi.fn(),
+  photo: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -16,6 +17,7 @@ vi.mock('@/lib/prisma', () => ({
     jobQuote: { findFirst: mocks.quote },
     marketplaceJob: { findUnique: mocks.job },
     companyJobAssignment: { findFirst: mocks.assignment },
+    providerIdentity: { findFirst: mocks.photo },
   },
 }))
 vi.mock('@/lib/phase6/provider-eligibility', () => ({
@@ -32,6 +34,7 @@ describe('Phase 04 — company crew readiness is a non-mutating preflight', () =
     mocks.job.mockResolvedValue({ status: 'QUOTE_ACCEPTED', workersCount: 2 })
     mocks.assignment.mockResolvedValue(null)
     mocks.eligibility.mockResolvedValue({ eligible: true, reasons: [] })
+    mocks.photo.mockResolvedValue({ id: 'approved-worker-photo' })
   })
 
   it('returns a complete, non-dispatchable report for qualified distinct workers', async () => {
@@ -59,6 +62,26 @@ describe('Phase 04 — company crew readiness is a non-mutating preflight', () =
     })
     expect(mocks.eligibility).toHaveBeenCalledWith('company', 'worker-a', 'job')
     expect(mocks.eligibility).toHaveBeenCalledWith('company', 'worker-b', 'job')
+  })
+
+  it('requires approved identity photos for every crew candidate regardless of optional job flag', async () => {
+    mocks.photo.mockImplementation(async ({ where }: { where: { currentUserId: string } }) =>
+      where.currentUserId === 'worker-a' ? { id: 'approved-photo' } : null)
+    const report = await review()
+    expect(report.preflightReady).toBe(false)
+    expect(report.dispatchEnabled).toBe(false)
+    expect(report.workers[0].eligible).toBe(true)
+    expect(report.workers[1].eligible).toBe(false)
+    expect(report.workers[1].reasons).toContain('Crew member verified profile photo not approved')
+    expect(mocks.photo).toHaveBeenCalledWith({
+      where: {
+        currentUserId: 'worker-b',
+        identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
+        kycStatus: 'VERIFIED',
+        verifiedPhotoUrl: { not: null },
+      },
+      select: { id: true },
+    })
   })
 
   it('marks a partial crew blocked while showing eligible candidate results', async () => {
