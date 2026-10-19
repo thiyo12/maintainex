@@ -4,6 +4,7 @@ import { requireJobMarket } from '@/lib/geography/market-engine'
 import { checkCompanyEligibility, checkCrewCandidateEligibility } from '@/lib/phase6/provider-eligibility'
 import { lockAndAssertAssignmentActorAuthorized, lockAndAssertWorkerScheduleAvailable } from '@/lib/domain/company-job-assignment'
 import { MAX_CREW_PREVIEW_WORKERS } from '@/lib/domain/company-crew-readiness'
+import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 
 export class CrewCommitGateError extends Error {
   constructor(message: string, public readonly status = 409) {
@@ -129,7 +130,7 @@ export async function assertCrewRosterReadyInsideTransaction(
       throw new CrewCommitGateError('Company is no longer eligible for crew dispatch')
     }
 
-    const [activeAssignment, existingCrew, priorArrival, safetyMismatch] = await Promise.all([
+    const [activeAssignment, existingCrew, priorArrival, activePin, safetyMismatch] = await Promise.all([
       tx.companyJobAssignment.findFirst({
         where: { jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
         select: { id: true },
@@ -139,12 +140,16 @@ export async function assertCrewRosterReadyInsideTransaction(
         where: { jobId, arrivalVerifiedAt: { not: null } },
         select: { id: true },
       }),
+      tx.jobVerificationPin.findFirst({
+        where: { jobId, status: 'ACTIVE' },
+        select: { id: true },
+      }),
       tx.jobWorkerIdentityCheck.findFirst({
         where: { jobId, status: { in: ['MISMATCH_REPORTED', 'REVIEW_REQUIRED'] } },
         select: { id: true },
       }),
     ])
-    if (activeAssignment || existingCrew || priorArrival || safetyMismatch) {
+    if (activeAssignment || existingCrew || priorArrival || activePin || safetyMismatch) {
       throw new CrewCommitGateError('Booking has existing dispatch, arrival or unresolved safety state')
     }
 
@@ -173,4 +178,60 @@ export async function assertCrewRosterReadyInsideTransaction(
       readyForFutureReservation: true as const,
       dispatchEnabled: false as const,
     }
+}
+
+/**
+ * Internal persistence primitive for FORMING only. Its caller MUST keep the
+ * same SERIALIZABLE transaction open for the guard AND all slot writes.
+ * There is deliberately no HTTP route, notification, worker acceptance,
+ * payment, workspace or PIN integration. This is NOT live crew dispatch.
+ */
+export async function stageCrewReservationInsideTransaction(
+  tx: Prisma.TransactionClient,
+  input: CrewCommitGateInput & { leadWorkerUserId: string },
+): Promise<{
+  crewDispatchId: string
+  version: number
+  status: 'FORMING'
+  reservedWorkersCount: number
+  dispatchEnabled: false
+}> {
+  const roster = validateRoster(input.workerUserIds)
+  if (!roster.includes(input.leadWorkerUserId)) {
+    throw new CrewCommitGateError('Crew lead must be a selected verified worker', 400)
+  }
+  const gate = await assertCrewRosterReadyInsideTransaction(tx, input)
+  const dispatch = await tx.companyCrewDispatch.create({
+    data: {
+      companyId: gate.companyId, jobId: gate.jobId,
+      requiredWorkersCount: gate.requiredWorkersCount,
+      leadWorkerUserId: input.leadWorkerUserId,
+      status: 'FORMING', version: 1,
+    },
+    select: { id: true, version: true },
+  })
+  const reserved = await tx.companyJobAssignment.createMany({
+    data: gate.workerUserIds.map((workerUserId, index) => ({
+      companyId: gate.companyId, jobId: gate.jobId, workerUserId,
+      assignedBy: input.actorUserId, status: 'CREW_RESERVED',
+      crewDispatchId: dispatch.id, crewSlot: index + 1,
+      crewRole: workerUserId === input.leadWorkerUserId ? 'LEAD' : 'MEMBER',
+    })),
+  })
+  if (reserved.count !== gate.requiredWorkersCount) {
+    throw new CrewCommitGateError('Crew reservation must be all-or-nothing')
+  }
+  await writeCompanyAuditLog({
+    companyId: gate.companyId,
+    actorId: input.actorUserId, actorRole: input.actorRole,
+    action: 'CREW_ROSTER_STAGE',
+    targetType: 'CompanyCrewDispatch', targetId: dispatch.id,
+    description: 'Staged complete company crew roster without granting dispatch authority',
+    metadata: { jobId: gate.jobId, workerCount: gate.requiredWorkersCount, crewVersion: dispatch.version },
+  }, tx)
+  return {
+    crewDispatchId: dispatch.id, version: dispatch.version,
+    status: 'FORMING', reservedWorkersCount: reserved.count,
+    dispatchEnabled: false,
+  }
 }

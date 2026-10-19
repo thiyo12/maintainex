@@ -293,7 +293,7 @@ async function checkWorkerEligibilityCore(
         const busy = await db.companyJobAssignment.findFirst({
           where: {
             workerUserId: userId,
-            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED'] },
             jobId: { not: requiredJobId },
           },
           select: { id: true },
@@ -327,7 +327,7 @@ async function checkWorkerEligibilityCore(
               // its original appointment date: it is active real-world work.
               { status: 'IN_PROGRESS' },
               {
-                status: { in: ['ASSIGNED', 'ACCEPTED'] },
+                status: { in: ['ASSIGNED', 'ACCEPTED', 'CREW_RESERVED'] },
                 job: {
                   OR: [
                     { preferredDate: null },

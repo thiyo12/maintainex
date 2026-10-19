@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Prisma } from '@prisma/client'
-import { checkCrewRosterAtCommit, assertCrewRosterReadyInsideTransaction } from '@/lib/domain/company-crew-commit-gate'
+import { checkCrewRosterAtCommit, assertCrewRosterReadyInsideTransaction, stageCrewReservationInsideTransaction } from '@/lib/domain/company-crew-commit-gate'
 
 const mock = vi.hoisted(() => ({
   txWork: vi.fn(),
@@ -14,12 +14,15 @@ const mock = vi.hoisted(() => ({
   crew: vi.fn(),
   pin: vi.fn(),
   mismatch: vi.fn(),
+  createCrew: vi.fn(),
+  createMany: vi.fn(),
+  audit: vi.fn(),
 }))
 
 const tx = {
   $queryRaw: mock.sql,
-  companyJobAssignment: { findFirst: mock.assignment },
-  companyCrewDispatch: { findUnique: mock.crew },
+  companyJobAssignment: { findFirst: mock.assignment, createMany: mock.createMany },
+  companyCrewDispatch: { findUnique: mock.crew, create: mock.createCrew },
   jobVerificationPin: { findFirst: mock.pin },
   jobWorkerIdentityCheck: { findFirst: mock.mismatch },
 }
@@ -36,6 +39,7 @@ vi.mock('@/lib/phase6/provider-eligibility', () => ({
   checkCrewCandidateEligibility: mock.workerEligible,
 }))
 vi.mock('@/lib/geography/market-engine', () => ({ requireJobMarket: mock.market }))
+vi.mock('@/lib/phase6/audit', () => ({ writeCompanyAuditLog: mock.audit }))
 
 const input = {
   companyId: 'company', jobId: 'booking', actorUserId: 'manager',
@@ -61,6 +65,8 @@ describe('Phase 04 — future crew reservation commit gate is locked and non-mut
     mock.crew.mockResolvedValue(null)
     mock.pin.mockResolvedValue(null)
     mock.mismatch.mockResolvedValue(null)
+    mock.createCrew.mockResolvedValue({ id: 'crew-1', version: 1 })
+    mock.createMany.mockResolvedValue({ count: 2 })
   })
 
   it('locks and evaluates the entire unique roster in deterministic worker order', async () => {
@@ -143,6 +149,48 @@ describe('Phase 04 — future crew reservation commit gate is locked and non-mut
     expect(result.dispatchEnabled).toBe(false)
     expect(mock.txWork).not.toHaveBeenCalled()
     expect(mock.schedule.mock.calls.map(call => call[1])).toEqual(['a-worker', 'z-worker'])
+  })
+
+  it('stages all slots atomically with exactly one nominated lead and no dispatch', async () => {
+    const result = await stageCrewReservationInsideTransaction(tx as any, {
+      ...input, leadWorkerUserId: 'z-worker',
+    })
+    expect(result).toEqual({
+      crewDispatchId: 'crew-1', version: 1, status: 'FORMING',
+      reservedWorkersCount: 2, dispatchEnabled: false,
+    })
+    expect(mock.createCrew).toHaveBeenCalledWith({
+      data: { companyId: 'company', jobId: 'booking', requiredWorkersCount: 2,
+        leadWorkerUserId: 'z-worker', status: 'FORMING', version: 1 },
+      select: { id: true, version: true },
+    })
+    expect(mock.createMany).toHaveBeenCalledWith({
+      data: [
+        { companyId: 'company', jobId: 'booking', workerUserId: 'a-worker',
+          assignedBy: 'manager', status: 'CREW_RESERVED', crewDispatchId: 'crew-1',
+          crewSlot: 1, crewRole: 'MEMBER' },
+        { companyId: 'company', jobId: 'booking', workerUserId: 'z-worker',
+          assignedBy: 'manager', status: 'CREW_RESERVED', crewDispatchId: 'crew-1',
+          crewSlot: 2, crewRole: 'LEAD' },
+      ],
+    })
+    expect(mock.audit).toHaveBeenCalledOnce()
+  })
+
+  it('refuses any unselected lead before touching the database', async () => {
+    await expect(stageCrewReservationInsideTransaction(tx as any, {
+      ...input, leadWorkerUserId: 'stranger',
+    })).rejects.toMatchObject({ status: 400 })
+    expect(mock.actor).not.toHaveBeenCalled()
+    expect(mock.createCrew).not.toHaveBeenCalled()
+  })
+
+  it('throws on a partial slot write so the caller transaction must roll back', async () => {
+    mock.createMany.mockResolvedValue({ count: 1 })
+    await expect(stageCrewReservationInsideTransaction(tx as any, {
+      ...input, leadWorkerUserId: 'a-worker',
+    })).rejects.toThrow('all-or-nothing')
+    expect(mock.audit).not.toHaveBeenCalled()
   })
 
   it('does not expose a persistence or dispatch endpoint', async () => {
