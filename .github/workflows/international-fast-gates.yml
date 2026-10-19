@@ -129,6 +129,8 @@ jobs:
             tests/security/phase04-workforce-actor-commit-authorization.test.ts \
             tests/security/phase04-workforce-route-export.test.ts \
             tests/security/phase04-dispatch-booking-requirement-race.test.ts \
+            tests/security/phase04-crew-pin-and-reassignment-boundary.test.ts \
+            tests/security/phase07-company-work-start-authorization.test.ts \
             tests/security/phase04-company-assignment-detail-access.test.ts \
             tests/security/phase04-company-team-dispatch-contract.test.ts \
             tests/security/phase04-worker-rejection-atomicity.test.ts \

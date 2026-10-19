@@ -111,6 +111,44 @@ completion also conditionally requires the parent job to remain COMPLETED.
 New tests cover these stale-state conditions. No crew enablement, actual
 device signoff or go-live certification is implied.
 
+## Phase 04 — crew/PIN boundary and per-assignment identity freshness
+
+Worker dispatch and reassignment now invalidate earlier customer `MATCHED`
+worker-photo confirmations and revoke still-active PINs within their respective
+transactions. An old
+approval can no longer be replayed if a worker leaves a job and is assigned
+again. `MISMATCH_REPORTED` and `REVIEW_REQUIRED` records are preserved for
+Trust & Safety review.
+
+The current single-worker PIN system now explicitly refuses crew bookings
+at PIN generation, rotation and verification, and the work-start eligibility
+gate rejects them too. The PIN verifier locks the job row to serialize arrival
+with worker reassignment. Both initial assignment and reassignment fail closed
+if any arrival PIN for that booking was previously verified, rather than
+inheriting a previous worker's proof of arrival.
+Regression coverage locks these boundaries. This deliberately **does not
+activate multi-worker crews**: shared/individual PIN design, crew identities,
+each-worker acceptance, scheduling, safety and lifecycle remain unimplemented.
+
+## Crew readiness design and physical acceptance evidence
+
+The mobile company dispatcher now identifies how many accepted crew bookings
+were omitted from the single-person picker and tells owners why they are
+blocked. The defence-in-depth submit check also refuses any multi-worker
+selection rather than silently assigning one person.
+
+[Multi-worker schema and lifecycle implementation plan](PHASE-04-CREW-IMPLEMENTATION-PLAN.md)
+defines the necessary migration, full-crew capacity lock, individual
+acceptances, all-worker identity/PIN barrier, cancellation semantics,
+backward-compatible target resolution and exact tests. It is a **design,
+not crew implementation**. The
+[LK/Vancouver physical-device acceptance runbook](PHASE-04-DEVICE-ACCEPTANCE-RUNBOOK.md)
+enumerates independent human checks and evidence fields. None are marked
+completed without actual test devices and operational reviewers.
+
+The last exact-head three-workflow green baseline is `614a0ec`; subsequent
+batch changes require their own exact-commit CI.
+
 ## Remaining blockers — cannot mark Phase 04 accepted
 
 1. **Multi-worker crew support.** The job has a `workersCount` requirement,

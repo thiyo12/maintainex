@@ -45,6 +45,7 @@ export default function AssignWorkerScreen() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [workers, setWorkers] = useState<TeamMember[]>([])
   const [jobs, setJobs] = useState<DispatchJob[]>([])
+  const [crewBookingsBlocked, setCrewBookingsBlocked] = useState(0)
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -52,6 +53,7 @@ export default function AssignWorkerScreen() {
 
   const load = async () => {
     setLoading(true)
+    setCrewBookingsBlocked(0)
     try {
       const activeCompanyId = await getActiveCompanyId()
       if (!activeCompanyId) {
@@ -82,17 +84,21 @@ export default function AssignWorkerScreen() {
         )
       )
 
-      setJobs(
-        details
-          .filter((job): job is any => Boolean(job))
-          .filter(job => (job.workersCount ?? 1) === 1)
-          .filter(job =>
-            (job.quotes || []).some((quote: any) =>
-              quote.providerType === 'COMPANY'
-              && quote.providerId === activeCompanyId
-              && quote.status === 'ACCEPTED'
-            )
+      const acceptedCompanyJobs = details
+        .filter((job): job is any => Boolean(job))
+        .filter(job =>
+          (job.quotes || []).some((quote: any) =>
+            quote.providerType === 'COMPANY'
+            && quote.providerId === activeCompanyId
+            && quote.status === 'ACCEPTED'
           )
+        )
+      setCrewBookingsBlocked(
+        acceptedCompanyJobs.filter(job => (job.workersCount ?? 1) > 1).length
+      )
+      setJobs(
+        acceptedCompanyJobs
+          .filter(job => (job.workersCount ?? 1) === 1)
           .map(job => ({
             id: job.id,
             title: job.title,
@@ -132,6 +138,10 @@ export default function AssignWorkerScreen() {
 
   const assign = async () => {
     if (!companyId || !selectedWorker || !selectedJob) return
+    if ((selectedJobData?.workersCount ?? 1) !== 1) {
+      Alert.alert('Crew dispatch not available', 'This booking needs multiple verified workers. It cannot be assigned to one person.')
+      return
+    }
     if (selectedJobData?.workerIdentityCheckRequired && !selectedWorkerData?.identityVerified) {
       Alert.alert('Verified photo required', 'This booking requires an approved worker identity photo before dispatch.')
       return
@@ -181,6 +191,13 @@ export default function AssignWorkerScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <Text style={styles.sectionTitle}>1 · Select accepted job</Text>
+        {crewBookingsBlocked > 0 ? (
+          <View style={styles.empty}>
+            <UsersThree size={25} color={v3.colors.textMuted} />
+            <Text style={styles.emptyTitle}>{crewBookingsBlocked} crew booking{crewBookingsBlocked === 1 ? '' : 's'} blocked</Text>
+            <Text style={styles.emptyText}>These bookings require multiple verified workers. Single-person dispatch is unavailable until crew scheduling, acceptance, identity and PIN checks are supported.</Text>
+          </View>
+        ) : null}
         {jobs.length === 0 ? (
           <View style={styles.empty}>
             <Briefcase size={25} color={v3.colors.textMuted} />

@@ -26,11 +26,17 @@ export async function checkWorkStartAuthorization(
       approvedQuoteId: true,
       status: true,
       customerId: true,
+      workersCount: true,
     },
   })
 
   if (!job) {
     return { authorized: false, reason: 'JOB_NOT_FOUND' }
+  }
+  // A job with multiple people cannot be represented by one accepted
+  // assignment or one work-start PIN. Never silently start partial crews.
+  if ((job.workersCount ?? 1) !== 1) {
+    return { authorized: false, reason: 'CREW_UNSUPPORTED' }
   }
 
   const acceptedQuote = await client.jobQuote.findFirst({

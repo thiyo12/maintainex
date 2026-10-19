@@ -10,6 +10,7 @@ function client(options: {
   assigned?: boolean
   assignmentStatus?: string
   jobStatus?: string
+  workersCount?: number
   requiresInspection?: boolean
   inspectionVerified?: boolean
   accepted?: boolean
@@ -22,6 +23,7 @@ function client(options: {
         requiresInspection: options.requiresInspection ?? false,
         approvedQuoteId: 'accepted-quote',
         customerId: 'customer',
+        workersCount: options.workersCount ?? 1,
       }),
     },
     jobQuote: {
@@ -91,6 +93,13 @@ describe('Phase 07 — company work-start authorization follows the actual assig
       expect(await checkWorkStartAuthorization(c, 'job', 'worker'))
         .toEqual({ authorized: false, reason: 'NOT_PROVIDER' })
     }
+  })
+
+  it('refuses a partial crew even if an individual assignment is accepted', async () => {
+    const { c, mocked } = client({ workersCount: 3 })
+    expect(await checkWorkStartAuthorization(c, 'job', 'worker'))
+      .toEqual({ authorized: false, reason: 'CREW_UNSUPPORTED' })
+    expect(mocked.companyJobAssignment.findFirst).not.toHaveBeenCalled()
   })
 
   it('allows an active, accepted company worker with no inspection requirement', async () => {

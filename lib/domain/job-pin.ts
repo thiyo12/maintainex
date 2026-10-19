@@ -84,6 +84,9 @@ export async function generateJobPin(
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
   if (job.customerId !== customerId) throw new Error('Only the job owner can generate a PIN')
+  if ((job.workersCount ?? 1) !== 1) {
+    throw new Error('Multi-worker jobs require crew-specific PIN verification')
+  }
   if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
     throw new Error('PIN is only available for an accepted active booking')
   }
@@ -150,6 +153,9 @@ export async function rotateJobPin(
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
   if (job.customerId !== customerId) throw new Error('Only the job owner can rotate a PIN')
+  if ((job.workersCount ?? 1) !== 1) {
+    throw new Error('Multi-worker jobs require crew-specific PIN verification')
+  }
   if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
     throw new Error('PIN is only available for an accepted active booking')
   }
@@ -246,8 +252,17 @@ export async function verifyJobPin(
 ): Promise<PinVerifyResult> {
   return prisma.$transaction(async (tx) => {
     // 1. Read job within transaction for consistency
+    // Dispatch modifies the job row first. Locking the same row serializes
+    // arrival verification against worker reassignment, so a prior worker's
+    // arrival proof cannot race into a new assignment.
+    await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM "MarketplaceJob" WHERE id = ${jobId} FOR UPDATE
+    `
     const job = await tx.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) return { valid: false, error: 'Job not found' }
+    if ((job.workersCount ?? 1) !== 1) {
+      return { valid: false, error: 'Multi-worker jobs require crew-specific PIN verification' }
+    }
 
     // 2. Resolve verifier (authorization before PIN comparison)
     const verifierType = await resolvePinVerifierTx(tx, jobId, actorId)

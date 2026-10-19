@@ -262,6 +262,27 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
     })
     if (claimed.count !== 1) throw new Error('Job state changed concurrently')
 
+    // A new first assignment may follow an accepted worker being revoked.
+    // Never let the new worker inherit a previous worker's verified arrival.
+    const priorArrival = await tx.jobVerificationPin.findFirst({
+      where: { jobId, arrivalVerifiedAt: { not: null } },
+      select: { id: true },
+    })
+    if (priorArrival) throw new Error('Cannot assign after arrival PIN verification; contact support')
+
+    // A previous MATCHED photo must never authorize a later assignment of
+    // the same worker after they were revoked and selected again. Preserve
+    // MISMATCH_REPORTED/REVIEW_REQUIRED records for Trust & Safety.
+    await tx.jobWorkerIdentityCheck.updateMany({
+      where: { jobId, status: 'MATCHED' },
+      data: { status: 'PENDING', confirmedAt: null },
+    })
+    // Stale customer PINs must be rotated after worker selection changes.
+    await tx.jobVerificationPin.updateMany({
+      where: { jobId, status: 'ACTIVE' },
+      data: { status: 'REVOKED', revokedAt: new Date() },
+    })
+
     await tx.jobWorkspace.upsert({
       where: { jobId },
       create: { jobId, progressStatus: 'ACCEPTED' },
@@ -313,6 +334,7 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
       (
         error.message.includes('concurrently') ||
         error.message.includes('scheduling conflict') ||
+        error.message.includes('Cannot assign after arrival PIN verification') ||
         error.message === 'Worker account not found' ||
         error.message.includes('Worker identity or account status changed') ||
         error.message.includes('Worker membership or role changed') ||
@@ -433,6 +455,25 @@ export async function reassignWorker(
       })
       if (claimed.count !== 1) throw new Error('Job target changed before reassignment')
 
+      // Arrival belongs to the person who attended, not a replacement worker.
+      // Before a crew-safe PIN generation model exists, refuse reassignment
+      // after any arrival verification instead of reusing the old PIN proof.
+      const priorArrival = await tx.jobVerificationPin.findFirst({
+        where: { jobId, arrivalVerifiedAt: { not: null } },
+        select: { id: true },
+      })
+      if (priorArrival) throw new Error('Cannot reassign after arrival PIN verification; contact support')
+
+      await tx.jobWorkerIdentityCheck.updateMany({
+        where: { jobId, status: 'MATCHED' },
+        data: { status: 'PENDING', confirmedAt: null },
+      })
+      // Stale customer PINs must be rotated after worker selection changes.
+      await tx.jobVerificationPin.updateMany({
+        where: { jobId, status: 'ACTIVE' },
+        data: { status: 'REVOKED', revokedAt: new Date() },
+      })
+
       const revoked = await tx.companyJobAssignment.updateMany({
         where: {
           id: currentAssignment.id,
@@ -503,6 +544,7 @@ export async function reassignWorker(
       error instanceof Error &&
       (
         error.message.includes('reassignment') ||
+        error.message.includes('Cannot reassign after arrival PIN verification') ||
         error.message.includes('scheduling conflict') ||
         error.message === 'Worker account not found' ||
         error.message.includes('Worker identity or account status changed') ||

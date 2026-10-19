@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
   existing: vi.fn(), reusable: vi.fn(), sql: vi.fn(), busy: vi.fn(),
   claim: vi.fn(), revoke: vi.fn(), create: vi.fn(), update: vi.fn(),
   workspace: vi.fn(), eligible: vi.fn(), audit: vi.fn(), notify: vi.fn(),
+  invalidateIdentity: vi.fn(), priorArrival: vi.fn(), revokePins: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -22,6 +23,8 @@ vi.mock('@/lib/prisma', () => ({
         findFirst: db.busy, updateMany: db.revoke, create: db.create, update: db.update,
       },
       jobWorkspace: { upsert: db.workspace },
+      jobWorkerIdentityCheck: { updateMany: db.invalidateIdentity },
+      jobVerificationPin: { findFirst: db.priorArrival, updateMany: db.revokePins },
     }),
   },
 }))
@@ -50,6 +53,9 @@ describe('Phase 04 — final dispatch claim uses unchanged booking requirements'
     db.eligible.mockResolvedValue({ eligible: true, reasons: [] })
     db.busy.mockResolvedValue(null)
     db.claim.mockResolvedValue({ count: 1 })
+    db.priorArrival.mockResolvedValue(null)
+    db.invalidateIdentity.mockResolvedValue({ count: 0 })
+    db.revokePins.mockResolvedValue({ count: 0 })
     db.revoke.mockResolvedValue({ count: 1 })
     db.create.mockResolvedValue({ id: 'assignment' })
     db.update.mockResolvedValue({ id: 'assignment' })
@@ -83,6 +89,14 @@ describe('Phase 04 — final dispatch claim uses unchanged booking requirements'
       data: { targetTaskerId: 'worker' },
     })
     expect(db.create).toHaveBeenCalledOnce()
+    expect(db.invalidateIdentity).toHaveBeenCalledWith({
+      where: { jobId: 'job', status: 'MATCHED' },
+      data: { status: 'PENDING', confirmedAt: null },
+    })
+    expect(db.revokePins).toHaveBeenCalledWith({
+      where: { jobId: 'job', status: 'ACTIVE' },
+      data: { status: 'REVOKED', revokedAt: expect.any(Date) },
+    })
   })
 
   it('returns a conflict if a crew or photo requirement was changed since preflight', async () => {
@@ -93,6 +107,19 @@ describe('Phase 04 — final dispatch claim uses unchanged booking requirements'
     })
     expect(result.success).toBe(false)
     expect(result.error).toContain('concurrently')
+    expect(db.workspace).not.toHaveBeenCalled()
+    expect(db.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses a first assignment if the previous worker already proved arrival', async () => {
+    db.priorArrival.mockResolvedValue({ id: 'previous-arrival' })
+    const result = await createAssignment({
+      companyId: 'company', jobId: 'job', workerUserId: 'worker',
+      assignedByUserId: 'owner', actorRole: 'COMPANY_OWNER',
+    })
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('arrival PIN')
+    expect(db.invalidateIdentity).not.toHaveBeenCalled()
     expect(db.workspace).not.toHaveBeenCalled()
     expect(db.create).not.toHaveBeenCalled()
   })
@@ -113,9 +140,31 @@ describe('Phase 04 — final dispatch claim uses unchanged booking requirements'
       data: { targetTaskerId: 'worker' },
     })
     expect(db.revoke).toHaveBeenCalledOnce()
+    expect(db.invalidateIdentity).toHaveBeenCalledWith({
+      where: { jobId: 'job', status: 'MATCHED' },
+      data: { status: 'PENDING', confirmedAt: null },
+    })
+    expect(db.revokePins).toHaveBeenCalledWith({
+      where: { jobId: 'job', status: 'ACTIVE' },
+      data: { status: 'REVOKED', revokedAt: expect.any(Date) },
+    })
   })
 
-  it('refuses to revoke the previous worker when the booking changed', async () => {
+  it('refuses reassignment if the prior worker has already verified arrival', async () => {
+    db.existing.mockResolvedValue({
+      id: 'old-assignment', companyId: 'company', jobId: 'job',
+      workerUserId: 'old-worker', status: 'ACCEPTED',
+    })
+    db.priorArrival.mockResolvedValue({ id: 'verified-arrival' })
+    const result = await reassignWorker('company', 'job', 'worker', 'owner', 'COMPANY_OWNER')
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('arrival PIN')
+    expect(db.invalidateIdentity).not.toHaveBeenCalled()
+    expect(db.revoke).not.toHaveBeenCalled()
+    expect(db.audit).not.toHaveBeenCalled()
+  })
+
+  it('refuses to revoke the previous worker when the booking changed', async () {
     db.existing.mockResolvedValue({
       id: 'old-assignment', companyId: 'company', jobId: 'job',
       workerUserId: 'old-worker', status: 'ACCEPTED',
