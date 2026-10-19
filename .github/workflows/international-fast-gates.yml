@@ -139,6 +139,7 @@ jobs:
             tests/security/phase12-company-discovery-market.test.ts \
             tests/security/phase12-company-quote-entry-target.test.ts \
             tests/security/phase12-provider-discovery-presentation.test.ts \
+            tests/security/phase12-local-price-range-market.test.ts \
             tests/security/phase04-crew-schema-foundation.test.ts \
             tests/security/phase04-crew-readiness-mobile-freshness.test.ts \
             tests/security/phase04-crew-readiness-route.test.ts \

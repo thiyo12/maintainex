@@ -93,3 +93,51 @@ export function providerDistanceLabel(provider: {
   if (km < 1) return `${Math.max(1, Math.round(km * 1000))} m away`
   return `${km.toFixed(km < 10 ? 1 : 0)} km away`
 }
+
+
+export type VerifiedPriceRange = {
+  min: number
+  max: number
+  currency: 'LKR' | 'CAD'
+  source: 'ENGINE' | 'CATALOGUE'
+}
+
+/**
+ * A "local" estimate requires an explicit matching currency. Never infer
+ * CAD from a country's selection or combine LK and CA template prices.
+ * This is display-only: the server pricing engine remains authoritative.
+ */
+export function verifiedLocalPriceRange(
+  estimate: unknown,
+  categoryJobs: unknown,
+  market?: string | null,
+): VerifiedPriceRange | null {
+  const currency = expectedCurrency(market)
+  if (!currency) return null
+
+  const quote = estimate as {
+    priceRange?: { min?: unknown; max?: unknown }
+    currency?: unknown
+  } | null
+  const estimateMin = majorValue(quote?.priceRange?.min)
+  const estimateMax = majorValue(quote?.priceRange?.max)
+  if (quote?.currency === currency && estimateMin !== null &&
+      estimateMax !== null && estimateMax >= estimateMin) {
+    return { min: estimateMin, max: estimateMax, currency, source: 'ENGINE' }
+  }
+
+  if (!Array.isArray(categoryJobs)) return null
+  const eligible = categoryJobs
+    .filter(job => job && job.currency === currency)
+    .map(job => ({ min: majorValue(job.priceMin), max: majorValue(job.priceMax) }))
+    .filter(range => range.min !== null && range.max !== null && range.max >= range.min)
+    as Array<{ min: number; max: number }>
+  if (eligible.length === 0) return null
+
+  return {
+    min: Math.min(...eligible.map(range => range.min)),
+    max: Math.max(...eligible.map(range => range.max)),
+    currency,
+    source: 'CATALOGUE',
+  }
+}
