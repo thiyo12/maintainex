@@ -1,5 +1,13 @@
 # MaintainEX International Launch — Phase Status
 
+> **Historical snapshot, not today's phase verdict.** This status was generated
+> against commit `721837dc`; its Phase 04–11 "NOT STARTED" entries describe
+> that older SHA only. For the current Phase 04 implementation/evidence and
+> explicit remaining gates see
+> [PHASE-04-ACCEPTANCE-RECEIPT.md](./PHASE-04-ACCEPTANCE-RECEIPT.md).
+> Do not claim any phase accepted from this historical record.
+
+
 **This file is a factual status record only.** It does not replace, rewrite or reinterpret
 `MASTER-IMPLEMENTATION-PLAN.md` or `PHASE-00-AUDIT-RECEIPT.md`, which are restored here
 byte-for-byte from their original revisions.
