@@ -45,7 +45,12 @@ export async function canRemoveMemberSafe(
     return { allowed: false, reason: 'Not a member of this company' }
   }
 
-  if (actorRole !== 'COMPANY_OWNER' && actorRole !== 'MANAGER') {
+  // The caller's role is not authority. Check the persisted, still-active
+  // company membership, or a demoted worker could claim an old owner role.
+  if (
+    actorMembership.role !== actorRole ||
+    (actorMembership.role !== 'COMPANY_OWNER' && actorMembership.role !== 'MANAGER')
+  ) {
     return { allowed: false, reason: 'Insufficient permissions' }
   }
 
