@@ -27,7 +27,9 @@ function mockPrisma(overrides: Record<string, any> = {}) {
       }),
     },
     teamMember: {
-      count: vi.fn().mockResolvedValue(1),
+      findMany: vi.fn().mockResolvedValue([{
+        user: { isActive: true, isSuspended: false, isBanned: false },
+      }]),
     },
     companyProfile: {
       findUnique: vi.fn().mockResolvedValue(null),
@@ -310,10 +312,10 @@ describe('Phase 10.2 — Eligibility Engine', () => {
             subscriptionStatus: 'ACTIVE',
           }),
         },
-        user: {
-          findUnique: vi.fn().mockResolvedValue({
-            id: 'owner-1', isSuspended: true, isBanned: false,
-          }),
+        teamMember: {
+          findMany: vi.fn().mockResolvedValue([{
+            user: { isActive: true, isSuspended: true, isBanned: false },
+          }]),
         },
       })
       const input = {
@@ -331,7 +333,61 @@ describe('Phase 10.2 — Eligibility Engine', () => {
       expect(result.gates.find(g => g.gate === 'COMPANY_OWNER_ACTIVE')?.passed).toBe(false)
     })
 
-    it('fails COMPANY_SUBSCRIPTION when subscription cancelled', async () => {
+    it('uses current active company owners after transfer, not the historical creator account', async () => {
+      const client = mockPrisma({
+        companyProfile: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: 'company-1', userId: 'historical-owner',
+            verificationStatus: 'VERIFIED', isVerified: true,
+            subscriptionStatus: 'ACTIVE',
+          }),
+        },
+        user: { findUnique: vi.fn().mockResolvedValue(null) },
+      })
+      const result = await evaluateEligibility({
+        providerType: 'COMPANY',
+        providerId: 'company-1',
+        job: {
+          jobId: 'job-1', categoryId: 'cat-1',
+          jobMode: 'QUOTE', urgency: 'NORMAL', countryCode: 'US',
+        },
+        client,
+      })
+      expect(result.gates.find(g => g.gate === 'COMPANY_OWNER_ACTIVE')?.passed).toBe(true)
+      expect(client.user.findUnique).not.toHaveBeenCalled()
+    })
+
+    it('refuses a globally banned successor owner before offering the company for matching', async () => {
+      const client = mockPrisma({
+        companyProfile: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: 'company-1', userId: 'historical-owner',
+            verificationStatus: 'VERIFIED', isVerified: true,
+            subscriptionStatus: 'ACTIVE',
+          }),
+        },
+        teamMember: {
+          findMany: vi.fn().mockResolvedValue([{
+            user: { isActive: true, isSuspended: false, isBanned: true },
+          }]),
+        },
+      })
+      const result = await evaluateEligibility({
+        providerType: 'COMPANY',
+        providerId: 'company-1',
+        job: {
+          jobId: 'job-1', categoryId: 'cat-1',
+          jobMode: 'QUOTE', urgency: 'NORMAL', countryCode: 'US',
+        },
+        client,
+      })
+      expect(result.eligible).toBe(false)
+      expect(result.gates.find(g => g.gate === 'COMPANY_OWNER_ACTIVE')).toMatchObject({
+        passed: false, reason: 'Company owner banned',
+      })
+    })
+
+    it('fails COMPANY_SUBSCRIPTION when subscription cancelled', async () {
       const client = mockPrisma({
         companyProfile: {
           findUnique: vi.fn().mockResolvedValue({
@@ -375,7 +431,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
             id: 'owner-1', isSuspended: false, isBanned: false,
           }),
         },
-        teamMember: { count: vi.fn().mockResolvedValue(0) },
+        teamMember: { findMany: vi.fn().mockResolvedValue([]) },
       })
       const input = {
         providerType: 'COMPANY' as ProviderType,

@@ -97,7 +97,7 @@ export async function evaluateEligibility(
     // COMPANY eligibility
     const company = await client.companyProfile.findUnique({
       where: { id: providerId },
-      select: { id: true, userId: true, verificationStatus: true, isVerified: true, subscriptionStatus: true },
+      select: { id: true, verificationStatus: true, isVerified: true, subscriptionStatus: true },
     })
     if (!company) {
       gates.push({ gate: 'COMPANY_EXISTS', passed: false, reason: 'Company not found' })
@@ -105,23 +105,30 @@ export async function evaluateEligibility(
     }
     gates.push({ gate: 'COMPANY_EXISTS', passed: true })
 
-    // Check owner account
-    const ownerUser = await client.user.findUnique({
-      where: { id: company.userId },
-      select: { isActive: true, isSuspended: true, isBanned: true },
+    // The company profile's userId is the original creator link. The active
+    // COMPANY_OWNER memberships define current authority after an ownership
+    // transfer. Match only with an unrestricted actual owner, even if the
+    // original creator is still active and the new owner is suspended.
+    const activeOwners = await client.teamMember.findMany({
+      where: { companyId: providerId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
+      select: { user: { select: { isActive: true, isSuspended: true, isBanned: true } } },
     })
-    // Matching must enforce the same owner-account boundary as provider
-    // onboarding. A deactivated/missing owner cannot receive new work.
-    if (!ownerUser || ownerUser.isActive === false) {
-      gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: false, reason: 'Company owner account is inactive or missing' })
+    if (activeOwners.length === 0) {
+      gates.push({ gate: 'COMPANY_OWNER_EXISTS', passed: false, reason: 'No active company owner' })
       return buildIneligibleResult(gates)
     }
-    if (ownerUser.isSuspended) {
-      gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: false, reason: 'Company owner suspended' })
-      return buildIneligibleResult(gates)
-    }
-    if (ownerUser?.isBanned) {
-      gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: false, reason: 'Company owner banned' })
+    const unrestrictedOwner = activeOwners.some(owner =>
+      owner.user && owner.user.isActive && !owner.user.isSuspended && !owner.user.isBanned
+    )
+    if (!unrestrictedOwner) {
+      const reason = activeOwners.every(owner => !owner.user || !owner.user.isActive)
+        ? 'Company owner account is inactive or missing'
+        : activeOwners.every(owner => !owner.user || owner.user.isSuspended)
+          ? 'Company owner suspended'
+          : activeOwners.every(owner => !owner.user || owner.user.isBanned)
+            ? 'Company owner banned'
+            : 'Company owner account is restricted'
+      gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: false, reason })
       return buildIneligibleResult(gates)
     }
     gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: true })
@@ -138,13 +145,6 @@ export async function evaluateEligibility(
     }
     gates.push({ gate: 'COMPANY_SUBSCRIPTION', passed: true })
 
-    const ownerCount = await client.teamMember.count({
-      where: { companyId: providerId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
-    })
-    if (ownerCount === 0) {
-      gates.push({ gate: 'COMPANY_OWNER_EXISTS', passed: false, reason: 'No active company owner' })
-      return buildIneligibleResult(gates)
-    }
     gates.push({ gate: 'COMPANY_OWNER_EXISTS', passed: true })
 
     // Gate: Has APPROVED company profession for this service
