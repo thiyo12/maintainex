@@ -109,6 +109,27 @@ export async function transferOwnership(
 
   try {
     await prisma.$transaction(async (tx) => {
+      // A previously authorized owner or recipient can be globally suspended
+      // while their TeamMember row remains ACTIVE. Lock both user accounts in
+      // stable ID order so that transfer cannot elevate a restricted account.
+      const accounts = await tx.$queryRaw<Array<{
+        id: string
+        isActive: boolean
+        isSuspended: boolean
+        isBanned: boolean
+      }>>`
+        SELECT id, "isActive", "isSuspended", "isBanned"
+        FROM "User"
+        WHERE id IN (${currentOwnerId}, ${newOwnerId})
+        ORDER BY id FOR UPDATE
+      `
+      if (
+        accounts.length !== 2 ||
+        accounts.some(account => !account.isActive || account.isSuspended || account.isBanned)
+      ) {
+        throw new Error('TRANSFER_ACCOUNT_RESTRICTED')
+      }
+
       const promoted = await tx.$executeRaw`
         UPDATE "TeamMember"
         SET "role" = 'COMPANY_OWNER', "updatedAt" = NOW()
@@ -149,6 +170,9 @@ export async function transferOwnership(
   } catch (err: any) {
     if (err?.message === 'TRANSFER_CONCURRENT') {
       return { success: false, error: 'Concurrent transfer detected' }
+    }
+    if (err?.message === 'TRANSFER_ACCOUNT_RESTRICTED') {
+      return { success: false, error: 'Current or new owner account is restricted' }
     }
     throw err
   }
