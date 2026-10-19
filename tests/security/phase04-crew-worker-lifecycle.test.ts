@@ -121,7 +121,7 @@ describe('Phase 04 — accepting a staged crew slot never authorizes work', () =
   })
 
   it('fails closed if the conditional slot update loses an acceptance race', async () => {
-    mocks.update.mockResolvedValue({ count: 0 })
+    mocks.update.mockReset().mockResolvedValue({ count: 0 })
     await expect(accept()).rejects.toThrow('concurrently')
     expect(mocks.audit).not.toHaveBeenCalled()
   })
