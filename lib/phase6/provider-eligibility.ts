@@ -115,10 +115,11 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
   return { eligible: reasons.length === 0, reasons }
 }
 
-export async function checkWorkerEligibility(
+async function checkWorkerEligibilityCore(
   companyId: string,
   userId: string,
-  requiredJobId?: string
+  requiredJobId: string | undefined,
+  allowCrewPreview: boolean,
 ): Promise<ProviderEligibility> {
   const reasons: string[] = []
 
@@ -194,7 +195,7 @@ export async function checkWorkerEligibility(
       // PostgreSQL permits only one active CompanyJobAssignment per job.
       // Until a crew workflow exists, a single assignee cannot represent a
       // multi-worker service. Do not claim full capacity from one worker.
-      if (job.workersCount > 1) {
+      if (!allowCrewPreview && job.workersCount > 1) {
         reasons.push('Job requires a multi-worker crew; one worker is insufficient')
       }
       const [profile, category, template] = await Promise.all([
@@ -345,4 +346,26 @@ export async function checkWorkerEligibility(
   }
 
   return { eligible: reasons.length === 0, reasons }
+}
+
+/**
+ * Production assignment callers must use checkWorkerEligibility() and retain
+ * its strict one-worker capacity guard. Crew-preview callers may evaluate
+ * individual eligibility without granting dispatch, PIN or job permissions.
+ */
+export async function checkWorkerEligibility(
+  companyId: string,
+  userId: string,
+  requiredJobId?: string,
+): Promise<ProviderEligibility> {
+  return checkWorkerEligibilityCore(companyId, userId, requiredJobId, false)
+}
+
+/** Read-only planning check. Never use to create assignments or authorize work. */
+export async function checkCrewCandidateEligibility(
+  companyId: string,
+  userId: string,
+  jobId: string,
+): Promise<ProviderEligibility> {
+  return checkWorkerEligibilityCore(companyId, userId, jobId, true)
 }

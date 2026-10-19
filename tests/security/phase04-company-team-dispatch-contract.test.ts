@@ -77,6 +77,11 @@ describe('Phase 04 — team read contract and dispatch client workforce', () => 
     expect(screen).toContain('setCrewBookingsBlocked(')
     expect(screen).toContain('crewBookingsBlocked > 0')
     expect(screen).toContain('Crew dispatch not available')
+    expect(screen).toContain('/api/mobile/company/crew/readiness')
+    expect(screen).toContain('Check crew eligibility · preview only')
+    expect(screen).toContain('dispatchEnabled: false')
+    expect(screen).toContain('setCrewJobs(crewBookings)')
+
     expect(screen).toContain('workerIdentityCheckRequired && !selectedWorkerData?.identityVerified')
   })
 })

@@ -18,6 +18,21 @@ until this entire specification is implemented and approved.
   one active assigned worker. Dropping the uniqueness constraint alone would
   introduce under-staffed paid jobs, ambiguous start authority and safety gaps.
 
+## Completed first implementation slice — nonbinding roster preview
+
+The company app now shows a read-only multi-worker roster chooser for
+accepted company crew bookings. The server checks the authorized manager,
+the company's accepted quote, roster-size limits, distinct workers, exact
+service capabilities, worker identity, country and current availability.
+It reports blockers without creating assignments, holding capacity,
+generating PINs or changing a payment/booking. The result includes
+`previewOnly: true`, `dispatchEnabled: false` and a preflight status that
+**does not imply dispatch can proceed**. A future crew-dispatch transaction
+must redo every mutable check while holding locks.
+
+This is *not* the implementation of crew acceptance/start/completion.
+Stage 2 remains the proposed schema and migration below.
+
 ## Proposed backward-compatible schema and migration
 
 1. Introduce `CompanyCrewDispatch` with `jobId` unique, `companyId`,

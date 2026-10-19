@@ -149,6 +149,27 @@ completed without actual test devices and operational reviewers.
 The last exact-head three-workflow green baseline is `614a0ec`; subsequent
 batch changes require their own exact-commit CI.
 
+## Phase 04 — read-only crew candidate readiness implementation
+
+At validated baseline `7c6df6c` the three workflows were all green.
+This batch adds `checkCrewCandidateEligibility`, which shares the exact
+service, country, membership, identity and schedule rules of production worker
+eligibility but may inspect multi-worker bookings **only in preview mode**.
+The existing `checkWorkerEligibility` dispatch guard is unchanged, and
+single-worker assignment, PIN and work-start remain fail-closed for crews.
+
+An authenticated company owner/manager/dispatcher with `workers:assign`
+may POST to `/api/mobile/company/crew/readiness` to evaluate a bounded
+list of distinct members, but only when their company has the accepted quote.
+Results show missing crew slots, individual blockers, and existing
+single-worker assignment conflicts. Every result is
+`previewOnly: true` / `dispatchEnabled: false`, with no persistence,
+notifications or reservation. The mobile dispatch screen allows a proposed
+roster to be selected and inspected without assigning it. The report is
+explicitly point-in-time and MUST be revalidated under transaction locks in
+the eventual full crew workflow. Negative unit/route/mobile tests are part
+of the international fast gates. These edits are not crew acceptance.
+
 ## Remaining blockers — cannot mark Phase 04 accepted
 
 1. **Multi-worker crew support.** The job has a `workersCount` requirement,

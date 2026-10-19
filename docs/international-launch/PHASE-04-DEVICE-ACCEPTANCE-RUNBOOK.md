@@ -45,8 +45,13 @@ production bookings. Preserve the approved 24-category / 239-service catalogue.
    incorrect PIN, duplicate use, mismatched identity, removed member and
    concurrent reassignment. Record resulting safe states and audit events.
 7. For workersCount >= 2, **expect explicit blocked crew dispatch and PIN**.
-   Do not simulate a single worker as completing a multi-person requirement.
-   Full crew positive tests are pending the separate verified crew model.
+   Use the separate read-only roster readiness preview to inspect exactly
+   the required number of workers, missing skills/identity, wrong-market
+   accounts, and scheduling conflicts. Even a green preview must report
+   `dispatchEnabled: false`. Verify no assignment, PIN, payment or booking
+   row was written by the preview. Do not simulate a single worker as
+   completing a multi-person requirement. Positive crew dispatch is pending
+   the separately verified crew model.
 8. Verify unrelated company members cannot access private booking documents,
    address/coordinates, accepted quotes, financials, work-start or worker
    photos. Verify country/municipality separation and cleanup of only

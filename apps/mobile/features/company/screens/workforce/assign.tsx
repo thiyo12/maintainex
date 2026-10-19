@@ -40,12 +40,27 @@ type DispatchJob = {
   workerIdentityCheckRequired?: boolean
 }
 
+type CrewReadinessReport = {
+  previewOnly: true
+  dispatchEnabled: false
+  requiredWorkersCount: number
+  selectedWorkersCount: number
+  preflightReady: boolean
+  blockers: string[]
+  workers: { workerUserId: string; eligible: boolean; reasons: string[] }[]
+}
+
 export default function AssignWorkerScreen() {
   const router = useRouter()
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [workers, setWorkers] = useState<TeamMember[]>([])
   const [jobs, setJobs] = useState<DispatchJob[]>([])
   const [crewBookingsBlocked, setCrewBookingsBlocked] = useState(0)
+  const [crewJobs, setCrewJobs] = useState<DispatchJob[]>([])
+  const [selectedCrewJob, setSelectedCrewJob] = useState<string | null>(null)
+  const [selectedCrewWorkers, setSelectedCrewWorkers] = useState<string[]>([])
+  const [crewReadiness, setCrewReadiness] = useState<CrewReadinessReport | null>(null)
+  const [checkingCrew, setCheckingCrew] = useState(false)
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -54,6 +69,10 @@ export default function AssignWorkerScreen() {
   const load = async () => {
     setLoading(true)
     setCrewBookingsBlocked(0)
+    setCrewJobs([])
+    setSelectedCrewJob(null)
+    setSelectedCrewWorkers([])
+    setCrewReadiness(null)
     try {
       const activeCompanyId = await getActiveCompanyId()
       if (!activeCompanyId) {
@@ -93,9 +112,19 @@ export default function AssignWorkerScreen() {
             && quote.status === 'ACCEPTED'
           )
         )
-      setCrewBookingsBlocked(
-        acceptedCompanyJobs.filter(job => (job.workersCount ?? 1) > 1).length
-      )
+      const crewBookings = acceptedCompanyJobs
+        .filter(job => (job.workersCount ?? 1) > 1)
+        .map(job => ({
+          id: job.id,
+          title: job.title,
+          status: job.status,
+          preferredDate: job.preferredDate,
+          preferredTimeSlot: job.preferredTimeSlot,
+          workersCount: job.workersCount,
+          workerIdentityCheckRequired: job.workerIdentityCheckRequired,
+        }))
+      setCrewBookingsBlocked(crewBookings.length)
+      setCrewJobs(crewBookings)
       setJobs(
         acceptedCompanyJobs
           .filter(job => (job.workersCount ?? 1) === 1)
@@ -135,6 +164,41 @@ export default function AssignWorkerScreen() {
     () => jobs.find(job => job.id === selectedJob),
     [jobs, selectedJob]
   )
+
+  const selectedCrewJobData = crewJobs.find(job => job.id === selectedCrewJob)
+
+  const toggleCrewWorker = (workerUserId: string) => {
+    setCrewReadiness(null)
+    setSelectedCrewWorkers(current =>
+      current.includes(workerUserId)
+        ? current.filter(id => id !== workerUserId)
+        : [...current, workerUserId].slice(0, 12)
+    )
+  }
+
+  const reviewCrewReadiness = async () => {
+    if (!companyId || !selectedCrewJob) return
+    setCheckingCrew(true)
+    setCrewReadiness(null)
+    try {
+      const report = await v2Request<CrewReadinessReport>(
+        '/api/mobile/company/crew/readiness',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            companyId,
+            jobId: selectedCrewJob,
+            workerUserIds: selectedCrewWorkers,
+          }),
+        }
+      )
+      setCrewReadiness(report)
+    } catch (error: any) {
+      Alert.alert('Crew readiness unavailable', error?.message || 'Please try again.')
+    } finally {
+      setCheckingCrew(false)
+    }
+  }
 
   const assign = async () => {
     if (!companyId || !selectedWorker || !selectedJob) return
@@ -196,6 +260,75 @@ export default function AssignWorkerScreen() {
             <UsersThree size={25} color={v3.colors.textMuted} />
             <Text style={styles.emptyTitle}>{crewBookingsBlocked} crew booking{crewBookingsBlocked === 1 ? '' : 's'} blocked</Text>
             <Text style={styles.emptyText}>These bookings require multiple verified workers. Single-person dispatch is unavailable until crew scheduling, acceptance, identity and PIN checks are supported.</Text>
+          </View>
+        ) : null}
+        {crewBookingsBlocked > 0 ? (
+          <View style={styles.crewPreview}>
+            <Text style={styles.sectionTitle}>Crew readiness preview · no dispatch</Text>
+            <Text style={styles.emptyText}>Review eligible workers and conflicts. This does not reserve workers, change a booking, or authorize work.</Text>
+            {crewJobs.map(job => (
+              <TouchableOpacity
+                key={job.id}
+                style={[styles.option, selectedCrewJob === job.id && styles.optionActive]}
+                onPress={() => {
+                  setSelectedCrewJob(job.id)
+                  setSelectedCrewWorkers([])
+                  setCrewReadiness(null)
+                }}
+              >
+                <UsersThree size={19} color={v3.colors.ink} />
+                <View style={styles.optionCopy}>
+                  <Text style={styles.optionTitle}>{job.title}</Text>
+                  <Text style={styles.optionMeta}>Needs {job.workersCount} workers · dispatch blocked</Text>
+                </View>
+                {selectedCrewJob === job.id ? <CheckCircle size={20} color={v3.colors.success} weight="fill" /> : null}
+              </TouchableOpacity>
+            ))}
+            {selectedCrewJobData ? (
+              <>
+                <Text style={styles.emptyText}>Select {selectedCrewJobData.workersCount} distinct workers to check. You can review an incomplete roster.</Text>
+                {workers.map(worker => (
+                  <TouchableOpacity
+                    key={worker.id}
+                    style={[styles.option, selectedCrewWorkers.includes(worker.userId || '') && styles.optionActive]}
+                    onPress={() => worker.userId && toggleCrewWorker(worker.userId)}
+                  >
+                    <UserCircle size={20} color={v3.colors.ink} />
+                    <View style={styles.optionCopy}>
+                      <Text style={styles.optionTitle}>{worker.name}</Text>
+                      <Text style={styles.optionMeta}>{worker.identityVerified ? 'Verified photo present' : 'Photo approval not confirmed'}</Text>
+                    </View>
+                    {selectedCrewWorkers.includes(worker.userId || '')
+                      ? <CheckCircle size={20} color={v3.colors.success} weight="fill" />
+                      : null}
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[styles.assignButton, checkingCrew && styles.disabled]}
+                  disabled={checkingCrew}
+                  onPress={reviewCrewReadiness}
+                >
+                  {checkingCrew
+                    ? <ActivityIndicator size="small" color={v3.colors.paper} />
+                    : <Text style={styles.assignText}>Check crew eligibility · preview only</Text>}
+                </TouchableOpacity>
+                {crewReadiness ? (
+                  <View style={styles.empty}>
+                    <Text style={styles.emptyTitle}>{crewReadiness.preflightReady ? 'Roster eligible (not dispatchable)' : 'Crew readiness blocked'}</Text>
+                    <Text style={styles.emptyText}>{crewReadiness.selectedWorkersCount} of {crewReadiness.requiredWorkersCount} workers selected. Crew dispatch and PINs remain disabled.</Text>
+                    {crewReadiness.blockers.map((blocker, index) => (
+                      <Text key={index} style={styles.emptyText}>{blocker}</Text>
+                    ))}
+                    {crewReadiness.workers.map(worker => (
+                      <Text key={worker.workerUserId} style={styles.emptyText}>
+                        {workers.find(person => person.userId === worker.workerUserId)?.name || 'Worker'}:
+                        {worker.eligible ? ' eligible in preview' : ` ${worker.reasons.join('; ')}`}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
+              </>
+            ) : null}
           </View>
         ) : null}
         {jobs.length === 0 ? (
@@ -294,6 +427,7 @@ const styles = StyleSheet.create({
   title: { ...v3.typography.title, color: v3.colors.ink, marginTop: 1 },
   content: { paddingHorizontal: 18, paddingBottom: 34 },
   sectionTitle: { ...v3.typography.bodyLarge, color: v3.colors.ink, marginTop: 18, marginBottom: 8 },
+  crewPreview: { marginTop: 12, marginBottom: 8 },
   option: { minHeight: 72, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
   optionActive: { borderColor: v3.colors.amber, borderWidth: 2 },
   optionIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },

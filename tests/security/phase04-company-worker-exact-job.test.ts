@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { checkWorkerEligibility } from '@/lib/phase6/provider-eligibility'
+import { checkWorkerEligibility, checkCrewCandidateEligibility } from '@/lib/phase6/provider-eligibility'
 
 const db = vi.hoisted(() => ({
   member: vi.fn(), user: vi.fn(), job: vi.fn(), profile: vi.fn(),
@@ -53,6 +53,40 @@ describe('Phase 04 — company worker assignment respects exact service selectio
     db.skill.mockResolvedValue({ id: 'tasker-skill' })
     db.conflicts.mockResolvedValue([])
     db.busy.mockResolvedValue(null)
+  })
+
+  it('preserves strict production dispatch blocking for a two-worker job', async () => {
+    db.job.mockResolvedValue({ ...validJob, workersCount: 2 })
+    const production = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(production.eligible).toBe(false)
+    expect(production.reasons).toContain(
+      'Job requires a multi-worker crew; one worker is insufficient',
+    )
+    const preview = await checkCrewCandidateEligibility('company', 'worker', 'booking')
+    expect(preview.eligible).toBe(true)
+    expect(preview.reasons).not.toContain(
+      'Job requires a multi-worker crew; one worker is insufficient',
+    )
+  })
+
+  it('keeps exact-service eligibility mandatory in crew-only preview', async () => {
+    db.job.mockResolvedValue({ ...validJob, workersCount: 3 })
+    db.skill.mockResolvedValue(null)
+    const preview = await checkCrewCandidateEligibility('company', 'worker', 'booking')
+    expect(preview.eligible).toBe(false)
+    expect(preview.reasons).toContain('Worker lacks required capability for this job')
+  })
+
+  it('still denies out-of-market crew candidates in the preview', async () => {
+    db.job.mockResolvedValue({ ...validJob, workersCount: 2 })
+    db.user.mockResolvedValue({
+      id: 'worker', identityStatus: 'VERIFIED', isActive: true,
+      isSuspended: false, isBanned: false, countryCode: 'CA',
+    })
+    db.profile.mockResolvedValue({ id: 'profile', countryCode: 'CA', skills: '[]' })
+    const result = await checkCrewCandidateEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Worker market does not match the job market')
   })
 
   it('allows the selected exact service and queries by its TemplateJob ID', async () => {
