@@ -2,7 +2,7 @@ name: International Fast Gates
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feature/international-launch-12phase]
     paths:
       - 'app/**'
       - 'apps/mobile/**'
