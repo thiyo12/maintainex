@@ -37,6 +37,10 @@ describe('Phase 04 — worker cannot accept a cancelled or reassigned booking', 
       where: {
         id: 'a', workerUserId: 'w', status: 'ASSIGNED',
         job: { status: 'QUOTE_ACCEPTED', targetTaskerId: 'w' },
+        worker: {
+          isActive: true, isSuspended: false, isBanned: false,
+          identityStatus: 'VERIFIED',
+        },
       },
       data: { status: 'ACCEPTED', acceptedAt: expect.any(Date) },
     })
@@ -49,6 +53,25 @@ describe('Phase 04 — worker cannot accept a cancelled or reassigned booking', 
     const result = await workerAcceptAssignment('a', 'w')
     expect(result.success).toBe(false)
     expect(result.error).toContain('changed')
+  })
+
+  it('fails closed if worker suspension, ban, inactivity, or identity revocation races acceptance', async () => {
+    // A real relational Prisma updateMany returns count 0 when any atomic
+    // User condition fails, even when the earlier eligibility check passed.
+    mock.claim.mockResolvedValue({ count: 0 })
+    const result = await workerAcceptAssignment('a', 'w')
+    expect(result).toEqual({
+      success: false, error: 'Assignment changed before it could be accepted',
+    })
+    expect(mock.eligible).toHaveBeenCalledWith('c', 'w', 'j')
+    expect(mock.claim).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        worker: {
+          isActive: true, isSuspended: false, isBanned: false,
+          identityStatus: 'VERIFIED',
+        },
+      }),
+    }))
   })
 
   it('does not allow another worker to accept an assignment', async () => {

@@ -503,6 +503,14 @@ export async function workerAcceptAssignment(
         status: 'QUOTE_ACCEPTED',
         targetTaskerId: workerUserId,
       },
+      // The worker may have been suspended after the earlier eligibility
+      // read. Recheck the related account in this atomic state transition.
+      worker: {
+        isActive: true,
+        isSuspended: false,
+        isBanned: false,
+        identityStatus: 'VERIFIED',
+      },
     },
     data: { status: 'ACCEPTED', acceptedAt: new Date() },
   })
