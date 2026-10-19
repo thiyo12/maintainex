@@ -13,26 +13,12 @@ import { templateJobs, findTasker } from '@/api/jobs'
 import { useCountry } from '@/lib/country'
 import { v3 } from '@/theme/v3/tokens'
 import AvatarCircle from '@/components/ui/AvatarCircle'
+import { providerDistanceLabel, providerPriceGuide } from '@/lib/provider-discovery-display'
 
 type Filter = 'all' | 'available' | 'taskers' | 'companies'
 
 const providerName = (item: any) =>
   item?.companyName || item?.name || item?.user?.name || 'Provider'
-
-function priceFrom(item: any, job: any) {
-  const value = item?.startingPrice || item?.hourlyRate || item?.minimumPrice || job?.priceMin
-  const n = Number(value)
-  return Number.isFinite(n) && n > 0 ? `From LKR ${n.toLocaleString()}` : 'Quote after request'
-}
-
-function distanceLabel(item: any) {
-  const km = Number(item.distance ?? item.distanceKm)
-  if (Number.isFinite(km)) {
-    if (km < 1) return `${Math.max(1, Math.round(km * 1000))} m away`
-    return `${km.toFixed(km < 10 ? 1 : 0)} km away`
-  }
-  return item.isOnline || item.availableNow ? 'Available now' : 'Nearby'
-}
 
 export default function ProviderResults() {
   const { jobId, title: titleParam, categoryId: categoryParam } = useLocalSearchParams<{
@@ -203,7 +189,7 @@ export default function ProviderResults() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
           {([
             ['all', `All ${providers.length}`],
-            ['available', `Available ${counts.available}`],
+            ['available', `Online ${counts.available}`],
             ['taskers', `Taskers ${counts.taskers}`],
             ['companies', `Companies ${counts.companies}`],
           ] as [Filter, string][]).map(([key, label]) => (
@@ -257,7 +243,7 @@ export default function ProviderResults() {
 
                     <View style={[styles.liveBadge, !online && styles.liveBadgeMuted]}>
                       <View style={[styles.liveDot, !online && styles.liveDotMuted]} />
-                      <Text style={[styles.liveText, !online && styles.liveTextMuted]}>{online ? 'Available' : 'Today'}</Text>
+                      <Text style={[styles.liveText, !online && styles.liveTextMuted]}>{online ? 'Online' : 'Schedule unconfirmed'}</Text>
                     </View>
                   </View>
 
@@ -273,7 +259,7 @@ export default function ProviderResults() {
                     </View>
                     <View style={styles.metricDivider} />
                     <View style={styles.metric}>
-                      <Text style={styles.metricValue}>{distanceLabel(item)}</Text>
+                      <Text style={styles.metricValue}>{providerDistanceLabel(item)}</Text>
                       <Text style={styles.metricLabel}>Distance</Text>
                     </View>
                   </View>
@@ -312,7 +298,7 @@ export default function ProviderResults() {
                     </View>
                   ) : null}
                   <View style={styles.providerBottom}>
-                    <Text style={styles.price}>{priceFrom(item, job)}</Text>
+                    <Text style={styles.price}>{providerPriceGuide(item, job, selectedCountry?.code)}</Text>
                     {isCompany ? (
                       <TouchableOpacity activeOpacity={0.8} style={styles.requestButton} onPress={() => postCompanyJob(item)}>
                         <Text style={styles.requestButtonText}>Request this company</Text>

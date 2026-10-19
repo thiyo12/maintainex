@@ -8,14 +8,12 @@ import { taskers } from '@/api/taskers'
 import { templateJobs } from '@/api/jobs'
 import { v3 } from '@/theme/v3/tokens'
 import AvatarCircle from '@/components/ui/AvatarCircle'
-
-const money = (value: unknown) => {
-  const n = Number(value)
-  return Number.isFinite(n) && n > 0 ? `LKR ${n.toLocaleString()}` : null
-}
+import { useCountry } from '@/lib/country'
+import { directRequestPriceGuide } from '@/lib/provider-discovery-display'
 
 export default function DirectTaskerBooking() {
   const router = useRouter()
+  const { selectedCountry } = useCountry()
   const { jobId, taskerId } = useLocalSearchParams<{ jobId: string; taskerId?: string }>()
   const [job, setJob] = useState<any>(null)
   const [tasker, setTasker] = useState<any>(null)
@@ -45,14 +43,10 @@ export default function DirectTaskerBooking() {
 
   const name = tasker?.user?.name || tasker?.name || 'Professional'
   const categoryId = job?.categoryId || job?.category?.id
-  const estimate = useMemo(() => {
-    const providerRate = Number(tasker?.startingPrice || tasker?.hourlyRate || 0)
-    if (providerRate > 0) return money(providerRate)
-    const min = Number(job?.priceMin || 0)
-    const max = Number(job?.priceMax || 0)
-    if (min && max) return `${money(min)}–${max.toLocaleString()}`
-    return 'Calculated before posting'
-  }, [job, tasker])
+  const estimate = useMemo(
+    () => directRequestPriceGuide(tasker, job, selectedCountry?.code),
+    [job, tasker, selectedCountry?.code],
+  )
 
   const continueBooking = () => {
     if (!jobId || !categoryId) {
@@ -134,7 +128,58 @@ export default function DirectTaskerBooking() {
             <CaretRight size={16} color={v3.colors.ink} />
           </View>
           <View style={styles.detailRow}>
-            <View style={styles.iconCircle}><Text style={styles.priceIcon}>L</Text></View>
+            <View style={styles.iconCircle}><Text style={styles.priceIcon}>{selectedCountry?.code === 'CA' ? '</View>
+            <View style={styles.rowCopy}><Text style={styles.rowTitle}>Indicative price guide</Text><Text style={styles.rowSub}>{estimate}</Text></View>
+            <CaretRight size={16} color={v3.colors.ink} />
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.bottomBar}>
+        <TouchableOpacity style={styles.primaryButton} onPress={continueBooking} activeOpacity={0.82}>
+          <Text style={styles.primaryButtonText}>Continue service request</Text>
+        </TouchableOpacity>
+        <Text style={styles.protectionNote}>Confirm service details and estimated budget before submitting. Provider acceptance and payment happen later.</Text>
+      </View>
+    </SafeAreaView>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  header: { height: 52, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerButton: { width: 36, height: 36, alignItems: 'flex-start', justifyContent: 'center' },
+  headerButtonRight: { width: 36, height: 36, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { flex: 1, textAlign: 'center', marginHorizontal: 8, fontSize: 13, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: { flex: 1, paddingHorizontal: 18, paddingTop: 8 },
+  eyebrow: { fontSize: 8.4, fontFamily: 'Outfit_900Black', color: v3.colors.amberDark, letterSpacing: 0.45 },
+  title: { marginTop: 8, fontSize: 25, lineHeight: 29, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  subtitle: { marginTop: 10, maxWidth: 354, fontSize: 10.2, lineHeight: 16, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  providerCard: { marginTop: 18, minHeight: 88, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  providerCopy: { flex: 1 },
+  providerName: { fontSize: 13, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  providerMeta: { marginTop: 3, fontSize: 9, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  availabilityPill: { alignSelf: 'flex-start', marginTop: 8, minHeight: 25, paddingHorizontal: 10, borderRadius: 13, backgroundColor: v3.colors.successSoft, alignItems: 'center', justifyContent: 'center' },
+  availabilityText: { fontSize: 8.6, fontFamily: 'Outfit_800ExtraBold', color: '#087A44' },
+  rows: { marginTop: 20 },
+  detailRow: { minHeight: 66, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, marginBottom: 9, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  iconCircle: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
+  priceIcon: { fontSize: 10, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  rowCopy: { flex: 1 },
+  rowTitle: { fontSize: 11.2, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  rowSub: { marginTop: 3, fontSize: 8.8, lineHeight: 13, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  bottomBar: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 22, backgroundColor: v3.colors.paper, borderTopWidth: 1, borderTopColor: v3.colors.line },
+  primaryButton: { height: 54, borderRadius: 17, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  primaryButtonText: { fontSize: 12, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.paper },
+  protectionNote: { marginTop: 8, fontSize: 8.5, lineHeight: 12, fontFamily: 'Outfit_500Medium', color: v3.colors.textMuted, textAlign: 'center' },
+  errorWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
+  errorTitle: { fontSize: 18, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  errorBody: { marginTop: 6, fontSize: 11, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary, textAlign: 'center' },
+  retryButton: { marginTop: 16, height: 42, paddingHorizontal: 20, borderRadius: 14, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  retryText: { fontSize: 10.5, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.paper },
+})
+ : 'Rs'}</Text></View>
             <View style={styles.rowCopy}><Text style={styles.rowTitle}>Estimated price</Text><Text style={styles.rowSub}>{estimate}</Text></View>
             <CaretRight size={16} color={v3.colors.ink} />
           </View>
