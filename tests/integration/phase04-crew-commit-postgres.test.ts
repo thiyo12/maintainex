@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import { randomUUID } from 'node:crypto'
-import { checkCrewRosterAtCommit } from '@/lib/domain/company-crew-commit-gate'
+import { checkCrewRosterAtCommit, stageCrewReservationInsideTransaction } from '@/lib/domain/company-crew-commit-gate'
+import { lockAndAssertWorkerScheduleAvailable } from '@/lib/domain/company-job-assignment'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
 // All generated IDs are scoped to this suite and deleted in dependency order.
@@ -148,31 +149,49 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
     }
   })
 
-  it('permits only one competing versioned crew record for a given job', async () => {
+  it('serializes competing full-roster staging so exactly one atomic reservation survives', async () => {
     const attempts = await Promise.allSettled(
-      Array.from({ length: 4 }, () => db!.companyCrewDispatch.create({
-        data: { companyId, jobId, requiredWorkersCount: 2, status: 'FORMING', version: 1 },
-      })),
+      Array.from({ length: 4 }, () => db!.$transaction(
+        tx => stageCrewReservationInsideTransaction(tx, {
+          ...input(), leadWorkerUserId: workerIds[0],
+        }),
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 15000, timeout: 15000,
+        },
+      )),
     )
     const successful = attempts.filter(result => result.status === 'fulfilled')
     expect(successful).toHaveLength(1)
     const onlyCrew = await db!.companyCrewDispatch.findUniqueOrThrow({
-      where: { jobId }, select: { id: true },
+      where: { jobId }, select: { id: true, version: true, status: true },
     })
     crewId = onlyCrew.id
-    expect(await db!.companyCrewDispatch.count({ where: { jobId } })).toBe(1)
-    // This is only a data model race test, NOT enabled crew dispatch.
+    expect(onlyCrew.status).toBe('FORMING')
+    expect(onlyCrew.version).toBe(1)
+    const slots = await db!.companyJobAssignment.findMany({
+      where: { crewDispatchId: crewId },
+      orderBy: { crewSlot: 'asc' },
+    })
+    expect(slots).toHaveLength(2)
+    expect(slots.map(row => row.workerUserId).sort()).toEqual([...workerIds].sort())
+    expect(slots.map(row => row.crewRole).sort()).toEqual(['LEAD', 'MEMBER'])
+    expect(slots.every(row => row.status === 'CREW_RESERVED')).toBe(true)
+    // No target worker rewrite, work-start, PIN or customer notification.
+    expect((await db!.marketplaceJob.findUniqueOrThrow({ where: { id: jobId } })).status)
+      .toBe('QUOTE_ACCEPTED')
+  })
+
+  it('makes staged crew capacity block subsequent single-worker allocations on other jobs', async () => {
+    await expect(db!.$transaction(async tx => {
+      await lockAndAssertWorkerScheduleAvailable(
+        tx, workerIds[0], 'different-booking', null, null, companyId, false,
+      )
+    })).rejects.toThrow('scheduling conflict')
   })
 
   it('enforces distinct crew slots while retaining the original single-worker index', async () => {
     expect(crewId).toBeTruthy()
-    await db!.companyJobAssignment.createMany({
-      data: workerIds.map((workerUserId, index) => ({
-        companyId, jobId, workerUserId, assignedBy: ownerId,
-        status: 'CREW_RESERVED', crewDispatchId: crewId,
-        crewSlot: index + 1, crewRole: index === 0 ? 'LEAD' : 'MEMBER',
-      })),
-    })
     expect(await db!.companyJobAssignment.count({
       where: { jobId, status: 'CREW_RESERVED' },
     })).toBe(2)

@@ -266,3 +266,26 @@ The separately exported `assertCrewRosterReadyInsideTransaction(tx, input)`
 allows a future writer to reuse the exact guard **within the same still-open
 SERIALIZABLE reservation transaction** before staging all slots atomically.
 No writer, crew acceptance or PIN route is enabled here.
+
+## Phase 04 — internal all-or-nothing FORMING crew staging
+
+The internal `stageCrewReservationInsideTransaction` primitive now writes a
+`CompanyCrewDispatch` FORMING row and **all required** `CREW_RESERVED`
+worker slot rows in the same existing SERIALIZABLE transaction as the
+commit-time authorization/identity/market/schedule gate. The nominated
+lead must be in the selected roster; a partial slot insert aborts. It writes
+an audit entry but does **not** send invitations/notifications, update the
+booking target, publish worker identity, create PINs/workspaces, or enable
+work-start or payment. There is no API or mobile caller.
+
+Both preflight and existing single-worker transaction scheduling now count
+`CREW_RESERVED` slots as consuming capacity on other bookings, to prevent a
+future staged crew from being double-booked. The isolated PostgreSQL test
+races complete staging transactions, checks exactly one whole roster survived,
+and confirms a staged worker blocks single-person scheduling. A FORMING
+roster is **not a dispatched, accepted or start-ready crew**.
+
+Still required before exposing any endpoint: complete all-worker accept/reject,
+revocation/suspension/cancellation, explicit epoch-bound PIN/arrival/photo and
+workspace barriers, company/customer/worker UI, real-device acceptance, and
+approved operational sign-off. Current exact-head CI remains necessary.

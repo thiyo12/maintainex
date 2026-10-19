@@ -126,3 +126,14 @@ is still non-binding. Stage 2.2 must deliver atomic whole-roster reservation,
 all-worker acceptance, identity and PIN barriers and lifecycle transitions
 before any crew can be dispatched. The migration is committed, not applied
 to production by this work.
+
+## Stage 2.2 — internal atomic FORMING staging (not enabled)
+
+The internal transaction helper can now stage an all-or-nothing roster with
+per-worker CREW_RESERVED rows after rerunning exact eligibility under stable
+locks. This is persistence scaffolding only: no external route invokes it,
+no invitations or customer authorization are produced, and the booking
+remains QUOTE_ACCEPTED. Stage 2.3 must enforce a full independent
+acceptance/identity/arrival/PIN/lifecycle state machine before any crew
+record can grant work authority. Existing single-person dispatch considers
+CREW_RESERVED as busy to prevent double booking.
