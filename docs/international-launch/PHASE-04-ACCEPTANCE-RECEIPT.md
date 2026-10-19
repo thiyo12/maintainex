@@ -289,3 +289,24 @@ Still required before exposing any endpoint: complete all-worker accept/reject,
 revocation/suspension/cancellation, explicit epoch-bound PIN/arrival/photo and
 workspace barriers, company/customer/worker UI, real-device acceptance, and
 approved operational sign-off. Current exact-head CI remains necessary.
+
+## Phase 04 — internal staged worker decisions (no launch authority)
+
+New internal transaction-only helpers let a named, authenticated-in-future
+worker **accept** one `CREW_RESERVED` slot as `CREW_ACCEPTED`, rechecking
+the accepted COMPANY quote, unchanged job/crew version, company market and
+status, exact worker capability, verified photo, membership, schedule and
+unresolved safety state. No endpoint invokes this code and even unanimous
+acceptance leaves the crew `FORMING`; no PIN, workspace, payment or work-start
+authority is granted. The future route must derive the worker ID from the
+authenticated session and use one SERIALIZABLE transaction.
+
+An internal **refusal** marks that member `REJECTED` and every other
+`CREW_RESERVED`/`CREW_ACCEPTED` slot `REVOKED` within the same
+transaction; the crew moves to `BLOCKED` with an incremented version,
+invalidating stale responses and releasing all capacity. Safety mismatches
+and audit history are preserved. Legacy single-worker dispatch remains
+separate; a staged crew worker still consumes capacity. Dedicated unit and
+isolated PostgreSQL tests cover these invariants, including release after
+refusal. Neither helper is connected to HTTP or mobile UX, so this is
+**not operational crew invitation/acceptance**, and Phase 04 remains open.

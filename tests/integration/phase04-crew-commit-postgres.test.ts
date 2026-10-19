@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { randomUUID } from 'node:crypto'
 import { checkCrewRosterAtCommit, stageCrewReservationInsideTransaction } from '@/lib/domain/company-crew-commit-gate'
+import { acceptStagedCrewMemberInsideTransaction, rejectStagedCrewMemberInsideTransaction } from '@/lib/domain/company-crew-lifecycle'
 import { lockAndAssertWorkerScheduleAvailable } from '@/lib/domain/company-job-assignment'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -190,6 +191,29 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
     })).rejects.toThrow('scheduling conflict')
   })
 
+  it('records each worker acceptance without granting READY, PIN or work-start authority', async () => {
+    for (const workerUserId of workerIds) {
+      const result = await db!.$transaction(
+        tx => acceptStagedCrewMemberInsideTransaction(tx, {
+          crewDispatchId: crewId, workerUserId, expectedVersion: 1,
+        }),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(result.status).toBe('FORMING')
+      expect(result.dispatchEnabled).toBe(false)
+    }
+    const accepted = await db!.companyJobAssignment.findMany({
+      where: { crewDispatchId: crewId }, select: { status: true, acceptedAt: true },
+    })
+    expect(accepted).toHaveLength(2)
+    expect(accepted.every(row => row.status === 'CREW_ACCEPTED' && row.acceptedAt !== null)).toBe(true)
+    expect((await db!.companyCrewDispatch.findUniqueOrThrow({ where: { id: crewId } })).status)
+      .toBe('FORMING')
+    expect(await db!.jobVerificationPin.count({ where: { jobId } })).toBe(0)
+    expect((await db!.marketplaceJob.findUniqueOrThrow({ where: { id: jobId } })).status)
+      .toBe('QUOTE_ACCEPTED')
+  })
+
   it('enforces distinct crew slots while retaining the original single-worker index', async () => {
     expect(crewId).toBeTruthy()
     expect(await db!.companyJobAssignment.count({
@@ -208,5 +232,38 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         AND indexname = 'CompanyJobAssignment_active_per_job_idx'
     `
     expect(indexes).toHaveLength(1)
+  })
+
+  it('atomically blocks crew and releases all capacity after an accepted member refuses', async () => {
+    const result = await db!.$transaction(
+      tx => rejectStagedCrewMemberInsideTransaction(tx, {
+        crewDispatchId: crewId, workerUserId: workerIds[0],
+        expectedVersion: 1, reason: 'Declined isolated test invitation',
+      }),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    )
+    expect(result).toMatchObject({
+      crewDispatchId: crewId, status: 'BLOCKED',
+      version: 2, releasedWorkersCount: 2, dispatchEnabled: false,
+    })
+    const slots = await db!.companyJobAssignment.findMany({
+      where: { crewDispatchId: crewId },
+    })
+    expect(slots.map(row => row.status).sort()).toEqual(['REJECTED', 'REVOKED'])
+    expect(slots.find(row => row.workerUserId === workerIds[0])?.rejectReason)
+      .toBe('Declined isolated test invitation')
+    expect((await db!.companyCrewDispatch.findUniqueOrThrow({ where: { id: crewId } })).version)
+      .toBe(2)
+  })
+
+  it('rejects stale accepted invitations and releases both workers scheduling holds', async () => {
+    await expect(db!.$transaction(tx => acceptStagedCrewMemberInsideTransaction(tx, {
+      crewDispatchId: crewId, workerUserId: workerIds[1], expectedVersion: 1,
+    }))).rejects.toThrow('Crew version')
+    for (const workerUserId of workerIds) {
+      await expect(db!.$transaction(tx => lockAndAssertWorkerScheduleAvailable(
+        tx, workerUserId, 'other-booking', null, null, companyId, false,
+      ))).resolves.toBeUndefined()
+    }
   })
 })

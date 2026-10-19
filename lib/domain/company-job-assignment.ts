@@ -210,7 +210,7 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
   if (!companyIdentity) return { success: false, error: 'Company not found' }
 
   const existingAssignment = await prisma.companyJobAssignment.findFirst({
-    where: { jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
+    where: { jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] } },
   })
   if (existingAssignment) {
     return { success: false, error: 'Job already has an active assignment. Revoke first.' }

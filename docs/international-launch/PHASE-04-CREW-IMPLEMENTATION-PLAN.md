@@ -137,3 +137,15 @@ remains QUOTE_ACCEPTED. Stage 2.3 must enforce a full independent
 acceptance/identity/arrival/PIN/lifecycle state machine before any crew
 record can grant work authority. Existing single-person dispatch considers
 CREW_RESERVED as busy to prevent double booking.
+
+## Stage 2.3 — internal worker accept/refuse primitives (not wired)
+
+The backend now has internal, SERIALIZABLE-transaction-only acceptance and
+refusal helpers. `CREW_ACCEPTED` is deliberately distinct from legacy
+`ACCEPTED` and counts as busy; even all workers accepting does not advance
+`CompanyCrewDispatch.status` from FORMING. Refusal conditionally blocks the
+crew, increments its version and releases all slots together. No authenticated
+HTTP path, notifications, customer photo confirmation, crew-bound PIN/arrival,
+or work-start authorization is present. These must be implemented and tested
+before activation. LK and Vancouver operational/physical-device signoff is
+still outstanding.
