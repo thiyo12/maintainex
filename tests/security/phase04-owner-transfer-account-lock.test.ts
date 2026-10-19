@@ -48,7 +48,7 @@ describe('Phase 04 — ownership transfer verifies both global accounts under ro
     { id: 'old-owner', isBanned: true },
   ])('denies restricted owner changes without writing memberships: %j', async change => {
     const { id: changedId, ...restrictions } = change
-    mock.sql.mockResolvedValue([
+    mock.sql.mockReset().mockResolvedValue([
       { id: 'old-owner', ...valid, ...(changedId === 'old-owner' ? restrictions : {}) },
       { id: 'new-owner', ...valid, ...(changedId === 'new-owner' ? restrictions : {}) },
     ])
@@ -60,7 +60,7 @@ describe('Phase 04 — ownership transfer verifies both global accounts under ro
   })
 
   it('fails closed if either account disappears between preflight and commit', async () => {
-    mock.sql.mockResolvedValue([{ id: 'old-owner', ...valid }])
+    mock.sql.mockReset().mockResolvedValue([{ id: 'old-owner', ...valid }])
     const result = await transferOwnership('company', 'old-owner', 'new-owner')
     expect(result.success).toBe(false)
     expect(mock.execute).not.toHaveBeenCalled()
