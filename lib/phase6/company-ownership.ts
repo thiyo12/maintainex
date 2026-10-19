@@ -135,6 +135,38 @@ export async function transferOwnership(
         throw new Error('TRANSFER_ACCOUNT_RESTRICTED')
       }
 
+      if (originalRole === 'WORKER') {
+        // Dispatch holds this TeamMember row until assignment commit.
+        // Lock it before checking work, so a concurrent dispatch cannot
+        // attach a job while a worker is being promoted to non-worker owner.
+        const successors = await tx.$queryRaw<Array<{
+          id: string
+          role: string
+          status: string
+        }>>`
+          SELECT id, role, status
+          FROM "TeamMember"
+          WHERE id = ${newOwnerMembership.id} AND "companyId" = ${companyId}
+          FOR UPDATE
+        `
+        if (
+          successors.length !== 1 ||
+          successors[0].status !== 'ACTIVE' ||
+          successors[0].role !== 'WORKER'
+        ) {
+          throw new Error('TRANSFER_CONCURRENT')
+        }
+
+        const busy = await tx.companyJobAssignment.count({
+          where: {
+            companyId,
+            workerUserId: newOwnerId,
+            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+          },
+        })
+        if (busy > 0) throw new Error('TRANSFER_WORKER_HAS_ACTIVE_ASSIGNMENTS')
+      }
+
       const promoted = await tx.$executeRaw`
         UPDATE "TeamMember"
         SET "role" = 'COMPANY_OWNER', "updatedAt" = NOW()
@@ -178,6 +210,9 @@ export async function transferOwnership(
     }
     if (err?.message === 'TRANSFER_ACCOUNT_RESTRICTED') {
       return { success: false, error: 'Current or new owner account is restricted' }
+    }
+    if (err?.message === 'TRANSFER_WORKER_HAS_ACTIVE_ASSIGNMENTS') {
+      return { success: false, error: 'Finish or reassign the worker\'s active jobs before transferring ownership' }
     }
     throw err
   }
