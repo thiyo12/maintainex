@@ -43,9 +43,10 @@ describe('Phase 04 — ownership transfer verifies both global accounts under ro
     { id: 'old-owner', isSuspended: true },
     { id: 'old-owner', isBanned: true },
   ])('denies restricted owner changes without writing memberships: %j', async change => {
+    const { id: changedId, ...restrictions } = change
     mock.sql.mockResolvedValue([
-      { id: 'old-owner', ...valid, ...(change.id === 'old-owner' ? change : {}) },
-      { id: 'new-owner', ...valid, ...(change.id === 'new-owner' ? change : {}) },
+      { id: 'old-owner', ...valid, ...(changedId === 'old-owner' ? restrictions : {}) },
+      { id: 'new-owner', ...valid, ...(changedId === 'new-owner' ? restrictions : {}) },
     ])
     const result = await transferOwnership('company', 'old-owner', 'new-owner')
     expect(result.success).toBe(false)

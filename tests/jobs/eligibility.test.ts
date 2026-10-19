@@ -338,7 +338,9 @@ describe('Phase 10.2 — Eligibility Engine', () => {
         companyProfile: {
           findUnique: vi.fn().mockResolvedValue({
             id: 'company-1', userId: 'historical-owner',
-            verificationStatus: 'VERIFIED', isVerified: true,
+            // Stop after the owner gate: profession/specialty checks are not
+            // populated in this focused ownership mock.
+            verificationStatus: 'PENDING', isVerified: true,
             subscriptionStatus: 'ACTIVE',
           }),
         },
@@ -354,6 +356,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
         client,
       })
       expect(result.gates.find(g => g.gate === 'COMPANY_OWNER_ACTIVE')?.passed).toBe(true)
+      expect(result.gates.find(g => g.gate === 'COMPANY_VERIFIED')?.passed).toBe(false)
       expect(client.user.findUnique).not.toHaveBeenCalled()
     })
 
