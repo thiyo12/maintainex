@@ -23,6 +23,7 @@ type TeamMember = {
   role: string
   status: string
   identityVerified?: boolean
+  workerAccountEligible: boolean
   skills: string[]
   isOnline: boolean
   rating: number
@@ -108,6 +109,7 @@ export default function AssignWorkerScreen() {
           Boolean(member.userId)
           && member.status === 'ACTIVE'
           && member.role === 'WORKER'
+          && member.workerAccountEligible === true
         )
       )
     } catch (error: any) {

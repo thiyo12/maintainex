@@ -6,6 +6,7 @@ const mock = vi.hoisted(() => ({
   claim: vi.fn(),
   eligible: vi.fn(),
   lock: vi.fn(),
+  job: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -16,6 +17,7 @@ vi.mock('@/lib/prisma', () => ({
     $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({
       $queryRaw: mock.lock,
       companyJobAssignment: { updateMany: mock.claim },
+      marketplaceJob: { findUnique: mock.job },
     }),
   },
 }))
@@ -37,6 +39,7 @@ describe('Phase 04 — worker cannot accept a cancelled or reassigned booking', 
         ? [{ isActive: true, isSuspended: false, isBanned: false, identityStatus: 'VERIFIED' }]
         : [{ role: 'WORKER', status: 'ACTIVE' }],
     )
+    mock.job.mockResolvedValue({ workerIdentityCheckRequired: false, workersCount: 1 })
     mock.eligible.mockResolvedValue({ eligible: true, reasons: [] })
     mock.claim.mockResolvedValue({ count: 1 })
   })
@@ -46,7 +49,7 @@ describe('Phase 04 — worker cannot accept a cancelled or reassigned booking', 
     expect(mock.claim).toHaveBeenCalledWith({
       where: {
         id: 'a', workerUserId: 'w', companyId: 'c', status: 'ASSIGNED',
-        job: { status: 'QUOTE_ACCEPTED', targetTaskerId: 'w' },
+        job: { status: 'QUOTE_ACCEPTED', targetTaskerId: 'w', workersCount: 1 },
         worker: {
           isActive: true, isSuspended: false, isBanned: false,
           identityStatus: 'VERIFIED',
@@ -99,6 +102,43 @@ describe('Phase 04 — worker cannot accept a cancelled or reassigned booking', 
     expect(mock.lock).toHaveBeenCalledTimes(2)
     expect(mock.lock.mock.invocationCallOrder[1])
       .toBeLessThan(mock.claim.mock.invocationCallOrder[0])
+  })
+
+  it('requires a currently approved, locked worker photo when the job requires identity checking', async () => {
+    mock.job.mockResolvedValue({ workerIdentityCheckRequired: true, workersCount: 1 })
+    mock.lock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const query = strings.join(' ')
+      if (query.includes('FROM "User"')) {
+        return [{ isActive: true, isSuspended: false, isBanned: false, identityStatus: 'VERIFIED' }]
+      }
+      if (query.includes('FROM "ProviderIdentity"')) return [{ id: 'verified-photo' }]
+      return [{ role: 'WORKER', status: 'ACTIVE' }]
+    })
+    expect((await workerAcceptAssignment('a', 'w')).success).toBe(true)
+    expect(mock.lock).toHaveBeenCalledTimes(3)
+    expect(mock.lock.mock.calls[2][0].join(' ')).toContain('FOR UPDATE')
+    expect(mock.lock.mock.invocationCallOrder[2]).toBeLessThan(mock.claim.mock.invocationCallOrder[0])
+  })
+
+  it('refuses a photo revoked after preflight without changing assignment status', async () => {
+    mock.job.mockResolvedValue({ workerIdentityCheckRequired: true, workersCount: 1 })
+    mock.lock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const query = strings.join(' ')
+      if (query.includes('FROM "User"')) {
+        return [{ isActive: true, isSuspended: false, isBanned: false, identityStatus: 'VERIFIED' }]
+      }
+      if (query.includes('FROM "ProviderIdentity"')) return []
+      return [{ role: 'WORKER', status: 'ACTIVE' }]
+    })
+    expect((await workerAcceptAssignment('a', 'w')).success).toBe(false)
+    expect(mock.claim).not.toHaveBeenCalled()
+  })
+
+  it('refuses unsupported multi-worker bookings even if a stale assignment exists', async () => {
+    mock.job.mockResolvedValue({ workerIdentityCheckRequired: false, workersCount: 3 })
+    const result = await workerAcceptAssignment('a', 'w')
+    expect(result.success).toBe(false)
+    expect(mock.claim).not.toHaveBeenCalled()
   })
 
   it('does not allow another worker to accept an assignment', async () => {

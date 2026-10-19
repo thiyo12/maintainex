@@ -67,6 +67,23 @@ pricing. Existing omitted values continue to default to one worker. All
 multi-worker jobs remain explicitly **not dispatchable** by the single-worker
 workflow. This is not a crew feature or Phase 04 acceptance claim.
 
+## Phase 04 workforce edge-case regression batch
+
+Follow-up work (requires exact commit CI):
+- Worker acceptance now rechecks a job's single-worker requirement and locks
+  a verified provider-identity photo when required, closing the gap between
+  onboarding preflight and acceptance commit.
+- A worker's rejection conditionally claims only the unchanged quote-accepted
+  assignment, restoring the company job target and writing the audit within
+  the same transaction; stale cancellations or reassignments return a domain
+  conflict instead of an opaque 500.
+- Team reads now hide identity-photo approval for globally banned, suspended
+  or inactive workers, and the dispatch picker filters those accounts.
+- Assignment list parameters reject malformed/negative/unsafe pagination and
+  restricted accounts cannot list active company assignments.
+- Regression tests run in the launch fast gates. These code gates do not
+  certify crew coverage, device flows or operational readiness.
+
 ## Remaining blockers — cannot mark Phase 04 accepted
 
 1. **Multi-worker crew support.** The job has a `workersCount` requirement,

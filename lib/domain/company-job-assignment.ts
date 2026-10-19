@@ -558,13 +558,34 @@ export async function workerAcceptAssignment(
       return { count: 0 }
     }
 
+    // Photo approval can be withdrawn after the eligibility preflight.
+    // Check the job's current identity requirement and lock its approved
+    // identity record before committing this acceptance.
+    const job = await tx.marketplaceJob.findUnique({
+      where: { id: assignment.jobId },
+      select: { workerIdentityCheckRequired: true, workersCount: true },
+    })
+    if (!job || job.workersCount !== 1) return { count: 0 }
+
+    if (job.workerIdentityCheckRequired) {
+      const photos = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM "ProviderIdentity"
+        WHERE "currentUserId" = ${workerUserId}
+          AND "identityType" IN ('TASKER', 'COMPANY_WORKER')
+          AND "kycStatus" = 'VERIFIED'
+          AND "verifiedPhotoUrl" IS NOT NULL
+        FOR UPDATE
+      `
+      if (photos.length === 0) return { count: 0 }
+    }
+
     return tx.companyJobAssignment.updateMany({
       where: {
         id: assignmentId,
         workerUserId,
         companyId: assignment.companyId,
         status: 'ASSIGNED',
-        job: { status: 'QUOTE_ACCEPTED', targetTaskerId: workerUserId },
+        job: { status: 'QUOTE_ACCEPTED', targetTaskerId: workerUserId, workersCount: 1 },
         worker: {
           isActive: true,
           isSuspended: false,
@@ -592,36 +613,53 @@ export async function workerRejectAssignment(
   if (assignment.workerUserId !== workerUserId) return { success: false, error: 'Not your assignment' }
   if (assignment.status !== 'ASSIGNED') return { success: false, error: `Cannot reject: current status is ${assignment.status}` }
 
-  await prisma.$transaction(async (tx) => {
-    const claimed = await tx.companyJobAssignment.updateMany({
-      where: { id: assignmentId, workerUserId, status: 'ASSIGNED' },
-      data: { status: 'REJECTED', rejectedAt: new Date(), rejectReason: reason || undefined },
-    })
-    if (claimed.count !== 1) throw new Error('Assignment changed before it could be rejected')
+  try {
+    await prisma.$transaction(async tx => {
+      // Refuse a stale decline when the customer cancelled or a dispatcher
+      // replaced this assignee. The target restoration must commit together
+      // with the rejection and its audit, or all three roll back.
+      const claimed = await tx.companyJobAssignment.updateMany({
+        where: {
+          id: assignmentId,
+          companyId: assignment.companyId,
+          workerUserId,
+          status: 'ASSIGNED',
+          job: { status: 'QUOTE_ACCEPTED', targetTaskerId: workerUserId },
+        },
+        data: { status: 'REJECTED', rejectedAt: new Date(), rejectReason: reason || undefined },
+      })
+      if (claimed.count !== 1) throw new Error('Assignment changed before it could be rejected')
 
-    const targetRestored = await tx.marketplaceJob.updateMany({
-      where: {
-        id: assignment.jobId,
-        status: 'QUOTE_ACCEPTED',
-        targetTaskerId: workerUserId,
-      },
-      data: { targetTaskerId: assignment.companyId },
+      const targetRestored = await tx.marketplaceJob.updateMany({
+        where: {
+          id: assignment.jobId,
+          status: 'QUOTE_ACCEPTED',
+          targetTaskerId: workerUserId,
+        },
+        data: { targetTaskerId: assignment.companyId },
+      })
+      if (targetRestored.count !== 1) throw new Error('Job target changed before assignment rejection')
+
+      await writeCompanyAuditLog({
+        companyId: assignment.companyId,
+        actorId: workerUserId,
+        actorRole: 'WORKER',
+        action: 'WORKER_ASSIGN',
+        targetType: 'CompanyJobAssignment',
+        targetId: assignmentId,
+        description: `Worker rejected assignment for job ${assignment.jobId}`,
+        metadata: { reason },
+      }, tx)
     })
-    if (targetRestored.count !== 1) {
-      throw new Error('Job target changed before assignment rejection')
+  } catch (error) {
+    if (error instanceof Error && (
+      error.message === 'Assignment changed before it could be rejected' ||
+      error.message === 'Job target changed before assignment rejection'
+    )) {
+      return { success: false, error: error.message }
     }
-
-    await writeCompanyAuditLog({
-      companyId: assignment.companyId,
-      actorId: workerUserId,
-      actorRole: 'WORKER',
-      action: 'WORKER_ASSIGN',
-      targetType: 'CompanyJobAssignment',
-      targetId: assignmentId,
-      description: `Worker rejected assignment for job ${assignment.jobId}`,
-      metadata: { reason },
-    }, tx)
-  })
+    throw error
+  }
 
   return { success: true, assignmentId }
 }

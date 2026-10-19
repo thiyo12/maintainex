@@ -128,6 +128,8 @@ jobs:
             tests/security/phase04-worker-booking-acceptance.test.ts \
             tests/security/phase04-company-assignment-detail-access.test.ts \
             tests/security/phase04-company-team-dispatch-contract.test.ts \
+            tests/security/phase04-worker-rejection-atomicity.test.ts \
+            tests/security/phase04-assignment-list-pagination.test.ts \
             tests/security/phase04-revoke-commit-authorization.test.ts \
             tests/domain/phase04-worker-count.test.ts \
             tests/security/phase11-inactive-company-owner-matching.test.ts \

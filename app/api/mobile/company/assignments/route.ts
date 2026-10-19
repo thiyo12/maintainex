@@ -1,6 +1,6 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { listCompanyAssignments } from '@/lib/domain/company-job-assignment'
 
@@ -11,13 +11,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
+
     const { searchParams } = new URL(request.url)
     const companyId = searchParams.get('companyId')
     const status = searchParams.get('status') as string | null
     const jobId = searchParams.get('jobId')
     const workerUserId = searchParams.get('workerUserId')
-    const limit = parseInt(searchParams.get('limit') || '50', 10)
-    const offset = parseInt(searchParams.get('offset') || '0', 10)
+    const limitInput = searchParams.get('limit') ?? '50'
+    const offsetInput = searchParams.get('offset') ?? '0'
+    // parseInt('20garbage') and negative/NaN offsets must not reach Prisma.
+    if (!/^\d+$/.test(limitInput) || !/^\d+$/.test(offsetInput)) {
+      return NextResponse.json({ error: 'Invalid pagination parameters' }, { status: 400 })
+    }
+    const limit = Number(limitInput)
+    const offset = Number(offsetInput)
+    if (!Number.isSafeInteger(limit) || limit < 1 ||
+        !Number.isSafeInteger(offset) || offset < 0 || offset > 100000) {
+      return NextResponse.json({ error: 'Invalid pagination parameters' }, { status: 400 })
+    }
 
     const { context, error } = await resolveCompanyContext(user.id, companyId, 'workers:read')
     if (error) return error

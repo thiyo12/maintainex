@@ -1,6 +1,6 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { safeParseJsonArr } from '@/lib/db-utils'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { prisma } from '@/lib/prisma'
@@ -11,6 +11,9 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { searchParams } = new URL(request.url)
     const companyId = searchParams.get('companyId')
@@ -25,6 +28,9 @@ export async function GET(request: NextRequest) {
           user: {
             select: {
               identityStatus: true,
+              isActive: true,
+              isSuspended: true,
+              isBanned: true,
             },
           },
         },
@@ -37,7 +43,9 @@ export async function GET(request: NextRequest) {
     ])
 
     const memberUserIds = members
-      .filter(member => member.status === 'ACTIVE')
+      .filter(member => member.status === 'ACTIVE'
+        && member.user?.isActive && !member.user.isSuspended && !member.user.isBanned
+        && member.user.identityStatus === 'VERIFIED')
       .map(member => member.userId)
       .filter((value): value is string => Boolean(value))
     const personIdentities = memberUserIds.length
@@ -67,9 +75,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       members: members.map(m => {
         const identity = m.userId ? identityByUser.get(m.userId) : null
-        const identityVerified =
+        const workerAccountEligible = Boolean(
           m.status === 'ACTIVE' &&
-          m.user?.identityStatus === 'VERIFIED' &&
+          m.user?.isActive && !m.user.isSuspended && !m.user.isBanned &&
+          m.user.identityStatus === 'VERIFIED'
+        )
+        const identityVerified =
+          workerAccountEligible &&
           identity?.kycStatus === 'VERIFIED' &&
           Boolean(identity?.verifiedPhotoUrl)
 
@@ -83,6 +95,7 @@ export async function GET(request: NextRequest) {
         isOnline: m.isOnline,
         rating: m.rating,
           completedJobs: m.completedJobs,
+          workerAccountEligible,
           identityVerified,
           profilePhotoVerified: identityVerified,
           verifiedPhotoUrl: identityVerified ? identity?.verifiedPhotoUrl || null : null,

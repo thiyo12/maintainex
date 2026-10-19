@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server'
 const mock = vi.hoisted(() => ({ members: vi.fn(), invites: vi.fn(), identities: vi.fn() }))
 vi.mock('@/lib/auth/marketplace-auth', () => ({
   authenticateMarketplaceUser: async () => ({ id: 'owner' }),
+  assertNotSuspended: () => null,
 }))
 vi.mock('@/lib/phase6/company-context', () => ({
   resolveCompanyContext: async () => ({
@@ -19,19 +20,29 @@ vi.mock('@/lib/prisma', () => ({
     providerIdentity: { findMany: mock.identities },
   },
 }))
-const member = (userId: string, status: string) => ({
+const member = (userId: string, status: string, userOverrides: Record<string, unknown> = {}) => ({
   id: userId, userId, name: userId, role: 'WORKER', status,
   skills: '[]', isOnline: false, rating: 0, completedJobs: 0,
-  joinedAt: new Date('2026-01-01'), user: { identityStatus: 'VERIFIED' },
+  joinedAt: new Date('2026-01-01'),
+  user: {
+    identityStatus: 'VERIFIED', isActive: true, isSuspended: false, isBanned: false,
+    ...userOverrides,
+  },
 })
 describe('Phase 04 — team read contract and dispatch client workforce', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    mock.members.mockResolvedValue([member('active', 'ACTIVE'), member('suspended', 'SUSPENDED')])
+    mock.members.mockResolvedValue([
+      member('active', 'ACTIVE'),
+      member('suspended', 'SUSPENDED'),
+      member('banned', 'ACTIVE', { isBanned: true }),
+      member('inactive', 'ACTIVE', { isActive: false }),
+    ])
     mock.invites.mockResolvedValue([])
     mock.identities.mockResolvedValue([
       { currentUserId: 'active', kycStatus: 'VERIFIED', verifiedPhotoUrl: 'approved' },
       { currentUserId: 'suspended', kycStatus: 'VERIFIED', verifiedPhotoUrl: 'stale' },
+      { currentUserId: 'banned', kycStatus: 'VERIFIED', verifiedPhotoUrl: 'stale-banned' },
     ])
   })
 
@@ -44,8 +55,10 @@ describe('Phase 04 — team read contract and dispatch client workforce', () => 
     }))
     const body = await response.json()
     expect(body.members).toEqual(expect.arrayContaining([
-      expect.objectContaining({ userId: 'active', status: 'ACTIVE', identityVerified: true }),
-      expect.objectContaining({ userId: 'suspended', status: 'SUSPENDED', identityVerified: false, verifiedPhotoUrl: null }),
+      expect.objectContaining({ userId: 'active', status: 'ACTIVE', workerAccountEligible: true, identityVerified: true }),
+      expect.objectContaining({ userId: 'suspended', status: 'SUSPENDED', workerAccountEligible: false, identityVerified: false, verifiedPhotoUrl: null }),
+      expect.objectContaining({ userId: 'banned', status: 'ACTIVE', workerAccountEligible: false, identityVerified: false, verifiedPhotoUrl: null }),
+      expect.objectContaining({ userId: 'inactive', status: 'ACTIVE', workerAccountEligible: false, identityVerified: false, verifiedPhotoUrl: null }),
     ]))
     expect(mock.identities).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ currentUserId: { in: ['active'] } }),
@@ -57,6 +70,7 @@ describe('Phase 04 — team read contract and dispatch client workforce', () => 
       'apps/mobile/features/company/screens/workforce/assign.tsx'), 'utf8')
     expect(screen).toContain("member.status === 'ACTIVE'")
     expect(screen).toContain("member.role === 'WORKER'")
+    expect(screen).toContain('member.workerAccountEligible === true')
     expect(screen).toContain("job.status === 'QUOTE_ACCEPTED'")
     expect(screen).toContain("v2Jobs.get(job.id, 'company')")
     expect(screen).toContain('(job.workersCount ?? 1) === 1')
