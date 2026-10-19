@@ -164,7 +164,7 @@ describe('Phase 04 — final dispatch claim uses unchanged booking requirements'
     expect(db.audit).not.toHaveBeenCalled()
   })
 
-  it('refuses to revoke the previous worker when the booking changed', async () {
+  it('refuses to revoke the previous worker when the booking changed', async () => {
     db.existing.mockResolvedValue({
       id: 'old-assignment', companyId: 'company', jobId: 'job',
       workerUserId: 'old-worker', status: 'ACCEPTED',
