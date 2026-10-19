@@ -58,6 +58,7 @@ describe('Phase 04 — team read contract and dispatch client workforce', () => 
     expect(screen).toContain("member.status === 'ACTIVE'")
     expect(screen).toContain("member.role === 'WORKER'")
     expect(screen).toContain("job.status === 'QUOTE_ACCEPTED'")
+    expect(screen).toContain("v2Jobs.get(job.id, 'company')")
     expect(screen).toContain('(job.workersCount ?? 1) === 1')
     expect(screen).toContain('workerIdentityCheckRequired && !selectedWorkerData?.identityVerified')
   })

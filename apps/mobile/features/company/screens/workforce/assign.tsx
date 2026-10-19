@@ -77,7 +77,7 @@ export default function AssignWorkerScreen() {
 
       const details = await Promise.all(
         candidateJobs.slice(0, 30).map(job =>
-          v2Jobs.get(job.id).then(result => result.job).catch(() => null)
+          v2Jobs.get(job.id, 'company').then(result => result.job).catch(() => null)
         )
       )
 

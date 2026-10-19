@@ -1,5 +1,6 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
+import { parseWorkerCount } from '@/lib/domain/worker-count'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { getLocationName } from '@/lib/locations'
@@ -395,6 +396,17 @@ export async function PATCH(
       if (key in body) {
         data[key] = body[key]
       }
+    }
+
+    if ('workersCount' in data) {
+      const validatedWorkerCount = parseWorkerCount(data.workersCount)
+      if (validatedWorkerCount === null) {
+        return NextResponse.json(
+          { error: 'workersCount must be a positive integer within database limits' },
+          { status: 400 },
+        )
+      }
+      data.workersCount = validatedWorkerCount
     }
 
     if (Object.keys(data).length === 0) {

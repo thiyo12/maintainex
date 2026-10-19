@@ -53,6 +53,20 @@ supports crew identity, scheduling, acceptance, PIN, cancellation, safety and
 migration. Device testing, geographically isolated real-world fixtures and
 operational sign-off also remain open. **Status: IN PROGRESS — NOT ACCEPTED.**
 
+## Phase 04 additional correction — one-batch commit
+
+The company dispatch screen now requests V2 job details with the **company**
+context so an authorized owner/dispatcher can actually read accepted company
+quotes before assignment. Without that context, individual-provider-only
+quote lookup could silently hide otherwise assignable company bookings.
+
+V2 create/edit routes now share positive, database-safe integer validation
+for `workersCount`; zero, fractions, booleans, exponential strings and
+oversized crew counts cannot be stored or passed into canonical BigInt
+pricing. Existing omitted values continue to default to one worker. All
+multi-worker jobs remain explicitly **not dispatchable** by the single-worker
+workflow. This is not a crew feature or Phase 04 acceptance claim.
+
 ## Remaining blockers — cannot mark Phase 04 accepted
 
 1. **Multi-worker crew support.** The job has a `workersCount` requirement,

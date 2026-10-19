@@ -16,6 +16,7 @@ import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { checkCompanyEligibility, checkIndividualProviderEligibility } from '@/lib/phase6/provider-eligibility'
 import { readStoredList } from '@/lib/db-utils'
 import { isCatalogAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
+import { parseWorkerCount } from '@/lib/domain/worker-count'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
 
@@ -84,6 +85,15 @@ export async function POST(request: NextRequest) {
       smartBookingJson, latitude, longitude,
       serviceTemplateId, templateJobId, preferredTimeSlot, countryCode, targetTaskerId,
     } = body
+
+    const validatedWorkerCount = workersCount == null ? 1 : parseWorkerCount(workersCount)
+    if (validatedWorkerCount === null) {
+      return NextResponse.json(
+        { error: 'workersCount must be a positive integer within database limits' },
+        { status: 400 },
+      )
+    }
+    workersCount = validatedWorkerCount
 
     title = typeof title === 'string' ? sanitize(title, 200) : ''
     description = typeof description === 'string' ? sanitize(description, 5000) : ''
@@ -420,7 +430,7 @@ export async function POST(request: NextRequest) {
         serviceTemplateId: serviceTemplateId || undefined,
         mode: budgetType === 'REQUEST_QUOTES' ? 'QUOTE' : 'BOOK_NOW',
         urgency: (urgency?.toUpperCase() || 'NORMAL') as 'NORMAL' | 'URGENT' | 'EMERGENCY',
-        quantity: workersCount ? Number(workersCount) : undefined,
+        quantity: workersCount,
         durationMinutes: estimatedDuration ? Math.round(Number(estimatedDuration) * 60) : undefined,
         countryCode: finalCountryCode,
       })
@@ -459,7 +469,7 @@ export async function POST(request: NextRequest) {
         preferredDate: preferredDate ? new Date(preferredDate) : null,
         urgency: typeof urgency === 'string' ? urgency.toLowerCase() : 'normal',
         estimatedDuration: estimatedDuration ? Number(estimatedDuration) : null,
-        workersCount: workersCount ? Math.max(1, Number(workersCount)) : 1,
+        workersCount,
         status: 'OPEN',
         workerIdentityCheckRequired: true,
         aiEstimateJson,
