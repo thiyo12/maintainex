@@ -13,7 +13,19 @@ vi.mock('@/lib/matching/eligibility', () => ({
   mapEligibilityToExclusionReason: vi.fn(),
 }))
 
-const job = {
+// Keep nullable catalogue pointers typed as their real Prisma field types.
+// Literal inference of "templateJobId: null" hid the meaningful sibling and
+// direct-job fixtures from the release TypeScript gate.
+const job: {
+  id: string
+  categoryId: string
+  countryCode: string
+  latitude: number | null
+  longitude: number | null
+  preferredDate: Date | null
+  serviceTemplateId: string | null
+  templateJobId: string | null
+} = {
   id: 'booking', categoryId: 'category', countryCode: 'LK',
   latitude: null, longitude: null, preferredDate: null,
   serviceTemplateId: 'template', templateJobId: null,
