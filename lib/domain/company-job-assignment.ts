@@ -229,6 +229,9 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
   let assignment: { id: string }
   try {
     assignment = await prisma.$transaction(async (tx) => {
+      // Lock the dispatcher's user/membership first, before the worker.
+      // Keeping a consistent lock order reduces cross-role dispatch deadlocks.
+      await lockAndAssertAssignmentActorAuthorized(tx, companyId, assignedByUserId, actorRole)
       await lockAndAssertWorkerScheduleAvailable(
         tx,
         workerUserId,
@@ -238,7 +241,6 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
         companyId,
         job.workerIdentityCheckRequired,
       )
-      await lockAndAssertAssignmentActorAuthorized(tx, companyId, assignedByUserId, actorRole)
 
       const claimed = await tx.marketplaceJob.updateMany({
       where: {
@@ -398,6 +400,9 @@ export async function reassignWorker(
   let assignment: { id: string }
   try {
     assignment = await prisma.$transaction(async (tx) => {
+      // Lock the dispatcher's user/membership first, before the worker.
+      // Keeping a consistent lock order reduces cross-role dispatch deadlocks.
+      await lockAndAssertAssignmentActorAuthorized(tx, companyId, actorUserId, actorRole)
       await lockAndAssertWorkerScheduleAvailable(
         tx,
         newWorkerUserId,
@@ -407,7 +412,6 @@ export async function reassignWorker(
         companyId,
         job.workerIdentityCheckRequired,
       )
-      await lockAndAssertAssignmentActorAuthorized(tx, companyId, actorUserId, actorRole)
 
       const claimed = await tx.marketplaceJob.updateMany({
         where: {

@@ -387,7 +387,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
       })
     })
 
-    it('fails COMPANY_SUBSCRIPTION when subscription cancelled', async () {
+    it('fails COMPANY_SUBSCRIPTION when subscription cancelled', async () => {
       const client = mockPrisma({
         companyProfile: {
           findUnique: vi.fn().mockResolvedValue({

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import {
   createAssignment,
@@ -120,6 +120,21 @@ beforeAll(async () => {
       userId: { in: [workerAUserId, workerBUserId, workerCUserId] },
     },
     data: { skills: JSON.stringify([catId, 'plumbing']) },
+  })
+})
+
+// Keep each acceptance test independent. An undated active assignment blocks
+// subsequent jobs under Phase 04 capacity rules, so leaving an earlier gate's
+// fixture assigned would turn every later positive scenario into a false
+// scheduling failure. Only touch bookings allocated by this test file.
+afterEach(async () => {
+  if (createdJobIds.length === 0) return
+  await prisma.companyJobAssignment.deleteMany({
+    where: { jobId: { in: createdJobIds } },
+  })
+  await prisma.marketplaceJob.updateMany({
+    where: { id: { in: createdJobIds } },
+    data: { targetTaskerId: null },
   })
 })
 
