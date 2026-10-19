@@ -249,14 +249,12 @@ export async function findCandidates(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      // Phase 03: an unresolved market must not load every verified provider on
-      // the platform. '__none__' matches no real country, so the query fails
-      // closed instead of silently widening to every market.
-      user: {
-        countryCode: {
-          equals: canonicalInput.countryCode || '__none__',
-          mode: 'insensitive',
-        },
+      // CompanyProfile.countryCode represents the registered service market.
+      // Its User relation is the historical creator, not necessarily the
+      // current owner after transfer. Keep country scoping fail-closed.
+      countryCode: {
+        equals: canonicalInput.countryCode || '__none__',
+        mode: 'insensitive',
       },
     },
     include: {
@@ -267,15 +265,9 @@ export async function findCandidates(
 
   for (const company of companies) {
     if (process.env.ALLOW_TEST_OTP !== 'true' && company.user?.email.endsWith('@maintainex-test.lk')) continue
-    if (company.user?.isSuspended) {
-      excluded.push({ providerId: company.id, providerType: 'COMPANY', reason: 'COMPANY_OWNER_SUSPENDED' })
-      continue
-    }
-    if (company.user?.isBanned) {
-      excluded.push({ providerId: company.id, providerType: 'COMPANY', reason: 'COMPANY_OWNER_BANNED' })
-      continue
-    }
-
+    // Canonical eligibility checks the currently active COMPANY_OWNER
+    // memberships. Excluding by a suspended/banned historical creator here
+    // would incorrectly hide a company after a legitimate owner transfer.
     const eligibility = await evaluateEligibility({
       providerType: 'COMPANY',
       providerId: company.id,
@@ -598,8 +590,8 @@ export async function getEligibleCompanies(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      // Fail closed: an unresolved market must not widen to every provider.
-      user: { countryCode: { equals: jobMarket.countryCode, mode: 'insensitive' } },
+      // Use registered company market, not the historical creator's country.
+      countryCode: { equals: jobMarket.countryCode, mode: 'insensitive' },
     },
     select: { id: true },
   })

@@ -95,11 +95,11 @@ describe('Phase 03 — all provider eligibility helpers derive job market from a
     }))
   })
 
-  it('scopes company candidate query and eligibility to Vancouver rather than stored LK', async () => {
+  it('scopes company candidate query by registered Vancouver market, not its original owner country', async () => {
     expect(await getEligibleCompanies(db, 'job')).toHaveLength(1)
     expect(mock.companies).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        user: { countryCode: { equals: 'CA', mode: 'insensitive' } },
+        countryCode: { equals: 'CA', mode: 'insensitive' },
       }),
     }))
     expect(mock.evaluate).toHaveBeenCalledWith(expect.objectContaining({
@@ -123,7 +123,7 @@ describe('Phase 03 — all provider eligibility helpers derive job market from a
     expect(await getEligibleCompanies(db, 'job')).toHaveLength(1)
     expect(mock.companies).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        user: { countryCode: { equals: 'LK', mode: 'insensitive' } },
+        countryCode: { equals: 'LK', mode: 'insensitive' },
       }),
     }))
   })

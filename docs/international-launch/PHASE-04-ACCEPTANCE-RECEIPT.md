@@ -49,9 +49,10 @@ must not be described as locally executed.
    historical creator. `checkCompanyEligibility` now verifies current active
    owner memberships rather than this historical link, with regressions for
    suspended successor owners. Canonical matching eligibility also derives
-   owner authority from these current memberships, but candidate pre-filtering
-   and other owner-linked account/UI paths still need full review. Continue
-   auditing other owner-linked access
+   owner authority from these current memberships, and canonical discovery
+   filters on the registered company market rather than the historical
+   founder's country/account restrictions. Continue auditing remaining
+   owner-linked account/UI paths before declaring full ownership acceptance
    and UI paths before transferred-company onboarding is accepted; do not
    blindly rewrite historical owner data.
 4. **Cross-market live acceptance.** Exercise real test fixtures for LK
