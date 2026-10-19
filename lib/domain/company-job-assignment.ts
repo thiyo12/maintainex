@@ -487,7 +487,18 @@ export async function workerAcceptAssignment(
   }
 
   const claimed = await prisma.companyJobAssignment.updateMany({
-    where: { id: assignmentId, workerUserId, status: 'ASSIGNED' },
+    where: {
+      id: assignmentId,
+      workerUserId,
+      status: 'ASSIGNED',
+      // An assignment created for a quote-accepted booking must not be
+      // accepted after cancellation, replacement or worker reassignment.
+      // The parent condition is checked atomically with the state change.
+      job: {
+        status: 'QUOTE_ACCEPTED',
+        targetTaskerId: workerUserId,
+      },
+    },
     data: { status: 'ACCEPTED', acceptedAt: new Date() },
   })
   if (claimed.count !== 1) {

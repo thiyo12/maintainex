@@ -211,6 +211,36 @@ export async function PATCH(request: NextRequest) {
         }
 
         await prisma.$transaction(async tx => {
+          // The global account and membership may change after the HTTP
+          // preflight. Lock them in dispatch order (User -> TeamMember) and
+          // revalidate before restoring a worker's privileges.
+          const accounts = await tx.$queryRaw<Array<{
+            isActive: boolean; isSuspended: boolean; isBanned: boolean
+          }>>`
+            SELECT "isActive", "isSuspended", "isBanned"
+            FROM "User" WHERE id = ${memberUserId} FOR UPDATE
+          `
+          const account = accounts[0]
+          if (!account || !account.isActive || account.isSuspended || account.isBanned) {
+            throw new Error('MEMBER_REACTIVATION_BLOCKED')
+          }
+
+          await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "TeamMember" WHERE id = ${member.id} FOR UPDATE
+          `
+          const lockedMember = await tx.teamMember.findUnique({
+            where: { id: member.id },
+            select: { role: true, status: true },
+          })
+          if (
+            !lockedMember ||
+            lockedMember.role !== member.role ||
+            lockedMember.status !== member.status ||
+            lockedMember.status === 'REMOVED'
+          ) {
+            throw new Error('MEMBER_STATUS_CHANGED')
+          }
+
           await tx.teamMember.update({
             where: { id: member.id },
             data: { status: 'ACTIVE' },
@@ -244,6 +274,11 @@ export async function PATCH(request: NextRequest) {
           { error: 'Reassign or finish the worker\'s active jobs before changing their role.' },
           { status: 409 }
         )
+      }
+      if (err.message === 'MEMBER_REACTIVATION_BLOCKED') {
+        return NextResponse.json({
+          error: 'Cannot reactivate membership while the user account is inactive, suspended, or banned',
+        }, { status: 409 })
       }
       if (err.message === 'MEMBER_STATUS_CHANGED') {
         return NextResponse.json(
