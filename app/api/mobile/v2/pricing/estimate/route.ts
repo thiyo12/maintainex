@@ -11,6 +11,15 @@ function parsePositiveNumber(value: unknown): number | undefined | null {
   return parsed
 }
 
+// Quantities multiply minor-unit BigInts in the canonical engine. Fractions
+// otherwise throw RangeError (HTTP 500), and unsafe integers lose precision.
+function parsePositiveQuantity(value: unknown): number | undefined | null {
+  if (value === undefined || value === null || value === '') return undefined
+  if (typeof value !== 'number' && typeof value !== 'string') return null
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
@@ -79,10 +88,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid urgency' }, { status: 400 })
     }
 
-    const quantity = parsePositiveNumber(body.quantity)
+    const quantity = parsePositiveQuantity(body.quantity)
     const durationMinutes = parsePositiveNumber(body.durationMinutes)
     if (quantity === null || durationMinutes === null) {
-      return NextResponse.json({ error: 'quantity and durationMinutes must be positive finite numbers' }, { status: 400 })
+      return NextResponse.json({ error: 'quantity must be a positive safe integer and durationMinutes must be a positive finite number' }, { status: 400 })
     }
 
     const estimate = await calculatePrice(prisma, {
