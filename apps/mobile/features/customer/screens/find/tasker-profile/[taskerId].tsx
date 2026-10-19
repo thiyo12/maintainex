@@ -9,6 +9,8 @@ import { taskers } from '@/api/taskers'
 import { templateJobs } from '@/api/jobs'
 import { v3 } from '@/theme/v3/tokens'
 import AvatarCircle from '@/components/ui/AvatarCircle'
+import { useCountry } from '@/lib/country'
+import { providerPriceGuide } from '@/lib/provider-discovery-display'
 
 const formatPercent = (value: unknown) => {
   const n = Number(value)
@@ -16,13 +18,9 @@ const formatPercent = (value: unknown) => {
   return `${n > 1 ? n.toFixed(1) : (n * 100).toFixed(1)}%`
 }
 
-const money = (value: unknown) => {
-  const n = Number(value)
-  return Number.isFinite(n) && n > 0 ? `LKR ${n.toLocaleString()}` : null
-}
-
 export default function ProviderProfile() {
   const router = useRouter()
+  const { selectedCountry } = useCountry()
   const { taskerId, jobId } = useLocalSearchParams<{ taskerId: string; jobId?: string }>()
   const [tasker, setTasker] = useState<any>(null)
   const [job, setJob] = useState<any>(null)
@@ -62,14 +60,10 @@ export default function ProviderProfile() {
   const rating = Number(tasker?.rating || 0)
   const jobs = Number(tasker?.completedJobs || tasker?.jobsCompleted || 0)
 
-  const price = useMemo(() => {
-    const providerPrice = Number(tasker?.startingPrice || tasker?.hourlyRate || 0)
-    if (providerPrice > 0) return money(providerPrice)
-    const min = Number(job?.priceMin || 0)
-    const max = Number(job?.priceMax || 0)
-    if (min > 0 && max > 0) return money(Math.round((min + max) / 2))
-    return 'Quote required'
-  }, [tasker, job])
+  const price = useMemo(
+    () => providerPriceGuide(tasker, job, selectedCountry?.code),
+    [tasker, job, selectedCountry?.code],
+  )
 
   const message = async (quoteRequest = false) => {
     const participantId = tasker?.userId || tasker?.user?.id
@@ -185,7 +179,7 @@ export default function ProviderProfile() {
             <Text style={styles.quoteService} numberOfLines={1}>{job?.name || 'Selected service'}</Text>
             <Text style={styles.quotePrice}>{price}</Text>
           </View>
-          <Text style={styles.arrival}>{tasker.distanceMinutes ? `Arrival ${tasker.distanceMinutes} min` : tasker.isOnline ? 'Available now' : 'Request availability'}</Text>
+          <Text style={styles.arrival}>{tasker.isOnline ? 'Online · time unconfirmed' : 'Request availability'}</Text>
         </View>
 
         <TouchableOpacity style={styles.messageRow} onPress={() => message(false)} disabled={startingChat} activeOpacity={0.72}>

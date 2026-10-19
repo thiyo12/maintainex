@@ -673,7 +673,7 @@ export default function CreateJobScreen() {
                       value={budget}
                       onChangeText={setBudget}
                       keyboardType="numeric"
-                      placeholder="LKR amount"
+                      placeholder={countryCode === 'CA' ? 'CAD amount' : 'LKR amount'}
                       placeholderTextColor={v3.colors.textPlaceholder}
                       style={styles.budgetInput}
                     />

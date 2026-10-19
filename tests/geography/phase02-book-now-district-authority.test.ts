@@ -47,6 +47,14 @@ describe('Phase 02 — direct booking district must match verified address marke
       countryCode: 'CA', district: 'Vancouver',
     }))
   })
+  it('creates a pending request without claiming the provider accepted the appointment', async () => {
+    const response = await book()
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({
+      message: 'Service request sent. The provider must confirm the quote and appointment before it is booked.',
+    })
+  })
+
   it('accepts Vancouver spelled in lowercase but stores the canonical label', async () => {
     expect((await book({ district: 'vancouver' })).status).toBe(201)
     expect(mock.book).toHaveBeenCalledWith(expect.objectContaining({ district: 'Vancouver' }))
