@@ -156,6 +156,22 @@ describe('Phase 04 — company worker assignment respects exact service selectio
     expect(result.reasons).toContain('Job requires a multi-worker crew; one worker is insufficient')
   })
 
+  it('considers all in-progress worker jobs busy even when the booking is on a different day', async () => {
+    db.job.mockResolvedValue({
+      ...validJob, preferredDate: new Date('2026-11-02T09:00:00.000Z'),
+    })
+    db.conflicts.mockResolvedValue([{ id: 'active-on-prior-date' }])
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain(
+      'Worker has a scheduling conflict with another assignment on the same date/time',
+    )
+    const query = db.conflicts.mock.calls[0][0].where
+    expect(query.OR[0]).toEqual({ status: 'IN_PROGRESS' })
+    expect(query.OR[0]).not.toHaveProperty('job')
+    expect(query.OR[1].status).toEqual({ in: ['ASSIGNED', 'ACCEPTED'] })
+  })
+
   it('blocks undated dispatch when the worker already has an active assignment', async () => {
     db.busy.mockResolvedValue({ id: 'existing' })
     // Another assignment blocks capacity even when neither job has a date.

@@ -118,13 +118,18 @@ export async function lockAndAssertWorkerScheduleAvailable(
     where: {
       workerUserId,
       jobId: { not: jobId },
-      status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
-      job: {
-        OR: [
-          { preferredDate: null },
-          { preferredDate: { gte: dayStart, lt: dayEnd }, ...slotFilter },
-        ],
-      },
+      OR: [
+        { status: 'IN_PROGRESS' },
+        {
+          status: { in: ['ASSIGNED', 'ACCEPTED'] },
+          job: {
+            OR: [
+              { preferredDate: null },
+              { preferredDate: { gte: dayStart, lt: dayEnd }, ...slotFilter },
+            ],
+          },
+        },
+      ],
     },
     select: { id: true, jobId: true },
   })

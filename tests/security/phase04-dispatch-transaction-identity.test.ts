@@ -104,12 +104,26 @@ describe('Phase 04 — dispatch transaction locks and rechecks worker identity a
     expect(mocks.busy).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          job: expect.objectContaining({
-            OR: expect.arrayContaining([{ preferredDate: null }]),
-          }),
+          OR: expect.arrayContaining([
+            { status: 'IN_PROGRESS' },
+            expect.objectContaining({
+              status: { in: ['ASSIGNED', 'ACCEPTED'] },
+              job: expect.objectContaining({
+                OR: expect.arrayContaining([{ preferredDate: null }]),
+              }),
+            }),
+          ]),
         }),
       }),
     )
+  })
+
+  it('never applies calendar-date filters to an already IN_PROGRESS worker job', async () => {
+    await expect(check(new Date('2026-11-02T09:00:00.000Z'))).resolves.toBeUndefined()
+    const query = mocks.busy.mock.calls[0][0].where
+    expect(query.OR[0]).toEqual({ status: 'IN_PROGRESS' })
+    expect(query.OR[0]).not.toHaveProperty('job')
+    expect(query.OR[1].job.OR).toEqual(expect.arrayContaining([{ preferredDate: null }]))
   })
 
   it('rejects conflicts discovered only after the initial preflight', async () => {

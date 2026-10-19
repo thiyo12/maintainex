@@ -302,14 +302,21 @@ export async function checkWorkerEligibility(
         const conflictingAssignments = await prisma.companyJobAssignment.findMany({
           where: {
             workerUserId: userId,
-            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
             jobId: { not: requiredJobId },
-            job: {
-              OR: [
-                { preferredDate: null },
-                { preferredDate: { gte: dayStart, lt: dayEnd }, ...slotFilter },
-              ],
-            },
+            OR: [
+              // An unfinished job blocks additional dispatch regardless of
+              // its original appointment date: it is active real-world work.
+              { status: 'IN_PROGRESS' },
+              {
+                status: { in: ['ASSIGNED', 'ACCEPTED'] },
+                job: {
+                  OR: [
+                    { preferredDate: null },
+                    { preferredDate: { gte: dayStart, lt: dayEnd }, ...slotFilter },
+                  ],
+                },
+              },
+            ],
           },
           select: { id: true, jobId: true },
         })
