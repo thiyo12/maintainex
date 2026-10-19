@@ -58,14 +58,19 @@ describe('Phase 04 — company workforce suspension serializes with live dispatc
       role: 'WORKER', status: 'ACTIVE', name: 'Worker',
     })
     db.memberLocked.mockResolvedValue({ role: 'WORKER', status: 'ACTIVE' })
-    db.lock.mockResolvedValue([{ id: 'membership' }])
+    db.lock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const sql = strings.join(' ')
+      if (sql.includes('FROM "User"')) return [{ isActive: true, isSuspended: false, isBanned: false }]
+      if (sql.includes('AND "userId"')) return [{ role: 'COMPANY_OWNER', status: 'ACTIVE' }]
+      return [{ id: 'membership' }]
+    })
     db.assignments.mockResolvedValue([])
   })
 
   it('locks the membership row before querying active assignments', async () => {
     const { status } = await suspend()
     expect(status).toBe(200)
-    expect(db.lock).toHaveBeenCalledTimes(2)
+    expect(db.lock).toHaveBeenCalledTimes(4)
     expect(db.memberLocked).toHaveBeenCalledWith({
       where: { id: 'membership' }, select: { role: true, status: true },
     })

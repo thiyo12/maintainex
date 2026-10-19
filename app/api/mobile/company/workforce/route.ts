@@ -2,9 +2,36 @@ import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
-import { prisma } from '@/lib/prisma'
-import { canAssignRole, canManageMember, isValidCompanyRole } from '@/lib/phase6/rbac'
+import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
+import { canAssignRole, canManageMember, hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
+
+/** Recheck the actor's live account and role under the same transaction that
+ * modifies workforce. Caller holds the company row lock before invoking. */
+export async function assertCurrentWorkforceManager(
+  tx: PrismaClientOrTx, companyId: string, actorUserId: string, actorRole: string,
+): Promise<void> {
+  const accounts = await tx.$queryRaw<Array<{
+    isActive: boolean; isSuspended: boolean; isBanned: boolean
+  }>>`
+    SELECT "isActive", "isSuspended", "isBanned"
+    FROM "User" WHERE id = ${actorUserId} FOR UPDATE
+  `
+  if (accounts.length !== 1 || !accounts[0].isActive ||
+      accounts[0].isSuspended || accounts[0].isBanned) {
+    throw new Error('WORKFORCE_ACTOR_NO_LONGER_AUTHORIZED')
+  }
+  const members = await tx.$queryRaw<Array<{ role: string; status: string }>>`
+    SELECT role, status FROM "TeamMember"
+    WHERE "companyId" = ${companyId} AND "userId" = ${actorUserId}
+    FOR UPDATE
+  `
+  if (members.length !== 1 || members[0].status !== 'ACTIVE' ||
+      members[0].role !== actorRole || !isValidCompanyRole(members[0].role) ||
+      !hasCompanyPermission(members[0].role, 'members:manage')) {
+    throw new Error('WORKFORCE_ACTOR_NO_LONGER_AUTHORIZED')
+  }
+}
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -52,6 +79,8 @@ export async function PATCH(request: NextRequest) {
             WHERE id = ${companyId}
             FOR UPDATE
           `
+
+          await assertCurrentWorkforceManager(tx, companyId, user.id, context!.role)
 
           // Serialize role transitions with dispatch, which locks the same
           // membership row before writing a worker assignment. Otherwise a
@@ -116,6 +145,8 @@ export async function PATCH(request: NextRequest) {
             WHERE id = ${companyId}
             FOR UPDATE
           `
+
+          await assertCurrentWorkforceManager(tx, companyId, user.id, context!.role)
 
           // Dispatch locks this same TeamMember row before writing an
           // assignment. Hold it until the assignment lookup and revocation
@@ -211,6 +242,11 @@ export async function PATCH(request: NextRequest) {
         }
 
         await prisma.$transaction(async tx => {
+          await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "CompanyProfile" WHERE id = ${companyId} FOR UPDATE
+          `
+          await assertCurrentWorkforceManager(tx, companyId, user.id, context!.role)
+
           // The global account and membership may change after the HTTP
           // preflight. Lock them in dispatch order (User -> TeamMember) and
           // revalidate before restoring a worker's privileges.
@@ -266,6 +302,9 @@ export async function PATCH(request: NextRequest) {
     }
   } catch (err) {
     if (err instanceof Error) {
+      if (err.message === 'WORKFORCE_ACTOR_NO_LONGER_AUTHORIZED') {
+        return NextResponse.json({ error: 'Workforce manager is no longer authorized' }, { status: 403 })
+      }
       if (err.message === 'LAST_COMPANY_OWNER') {
         return NextResponse.json({ error: 'Cannot remove or demote the last active company owner' }, { status: 409 })
       }

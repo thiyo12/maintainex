@@ -84,6 +84,16 @@ Follow-up work (requires exact commit CI):
 - Regression tests run in the launch fast gates. These code gates do not
   certify crew coverage, device flows or operational readiness.
 
+## Phase 04 — workforce actor authority at commit
+
+All three workforce actions now revalidate the acting manager's unrestricted
+global account and active persisted role **under transaction row locks** before
+editing a target. A demoted, removed, suspended or banned manager cannot reuse
+a stale authorization context to change a role, deactivate staff or reactivate
+a suspended team membership. The company row and actor locks are acquired
+before the target membership. Dedicated regressions cover all actions;
+exact-head CI and physical acceptance are still required.
+
 ## Remaining blockers — cannot mark Phase 04 accepted
 
 1. **Multi-worker crew support.** The job has a `workersCount` requirement,

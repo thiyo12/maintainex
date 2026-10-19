@@ -58,7 +58,12 @@ describe('Phase 04 — changing a company worker role never strands an active as
     mock.memberLocked.mockResolvedValue({ role: 'WORKER', status: 'ACTIVE' })
     mock.memberUpdate.mockResolvedValue({ role: 'FINANCE' })
     mock.countAssignments.mockResolvedValue(0)
-    mock.lock.mockResolvedValue([{ id: 'member' }])
+    mock.lock.mockImplementation(async (strings: TemplateStringsArray) => {
+      const sql = strings.join(' ')
+      if (sql.includes('FROM "User"')) return [{ isActive: true, isSuspended: false, isBanned: false }]
+      if (sql.includes('AND "userId"')) return [{ role: 'COMPANY_OWNER', status: 'ACTIVE' }]
+      return [{ id: 'member' }]
+    })
   })
 
   it.each([1, 2])('rejects changing worker to finance while %i active assignments exist', async n => {
@@ -87,7 +92,7 @@ describe('Phase 04 — changing a company worker role never strands an active as
   it('checks the row after taking a membership lock', async () => {
     const response = await changeRole()
     expect(response.status).toBe(200)
-    expect(mock.lock).toHaveBeenCalledTimes(2)
+    expect(mock.lock).toHaveBeenCalledTimes(4)
     expect(mock.memberLocked).toHaveBeenCalledWith({
       where: { id: 'member' },
       select: { role: true, status: true },
