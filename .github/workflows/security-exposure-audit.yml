@@ -10,6 +10,7 @@ on:
   pull_request:
     branches:
       - main
+      - feature/international-launch-12phase
   workflow_dispatch:
 
 concurrency:

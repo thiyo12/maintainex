@@ -8,14 +8,12 @@ import { taskers } from '@/api/taskers'
 import { templateJobs } from '@/api/jobs'
 import { v3 } from '@/theme/v3/tokens'
 import AvatarCircle from '@/components/ui/AvatarCircle'
-
-const money = (value: unknown) => {
-  const n = Number(value)
-  return Number.isFinite(n) && n > 0 ? `LKR ${n.toLocaleString()}` : null
-}
+import { useCountry } from '@/lib/country'
+import { directRequestPriceGuide } from '@/lib/provider-discovery-display'
 
 export default function DirectTaskerBooking() {
   const router = useRouter()
+  const { selectedCountry } = useCountry()
   const { jobId, taskerId } = useLocalSearchParams<{ jobId: string; taskerId?: string }>()
   const [job, setJob] = useState<any>(null)
   const [tasker, setTasker] = useState<any>(null)
@@ -45,14 +43,10 @@ export default function DirectTaskerBooking() {
 
   const name = tasker?.user?.name || tasker?.name || 'Professional'
   const categoryId = job?.categoryId || job?.category?.id
-  const estimate = useMemo(() => {
-    const providerRate = Number(tasker?.startingPrice || tasker?.hourlyRate || 0)
-    if (providerRate > 0) return money(providerRate)
-    const min = Number(job?.priceMin || 0)
-    const max = Number(job?.priceMax || 0)
-    if (min && max) return `${money(min)}–${max.toLocaleString()}`
-    return 'Calculated before posting'
-  }, [job, tasker])
+  const estimate = useMemo(
+    () => directRequestPriceGuide(tasker, job, selectedCountry?.code),
+    [job, tasker, selectedCountry?.code],
+  )
 
   const continueBooking = () => {
     if (!jobId || !categoryId) {
@@ -83,7 +77,7 @@ export default function DirectTaskerBooking() {
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}><CaretLeft size={20} color={v3.colors.ink} weight="bold" /></TouchableOpacity>
-          <Text style={styles.headerTitle}>Book professional</Text>
+          <Text style={styles.headerTitle}>Request professional</Text>
           <View style={styles.headerButtonRight} />
         </View>
         <View style={styles.errorWrap}>
@@ -99,21 +93,21 @@ export default function DirectTaskerBooking() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerButton} onPress={() => router.back()} hitSlop={10}><CaretLeft size={20} color={v3.colors.ink} weight="bold" /></TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>Book {name.split(' ')[0]}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>Request {name.split(' ')[0]}</Text>
         <View style={styles.headerButtonRight}><DotsThree size={17} color={v3.colors.ink} weight="bold" /></View>
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.eyebrow}>{tasker?.isOnline ? 'AVAILABLE TODAY' : 'DIRECT BOOKING'}</Text>
-        <Text style={styles.title}>Book a trusted professional directly.</Text>
-        <Text style={styles.subtitle}>You already know who you want; MaintainEX still protects the booking.</Text>
+        <Text style={styles.eyebrow}>{tasker?.isOnline ? 'PROVIDER ONLINE' : 'DIRECT REQUEST'}</Text>
+        <Text style={styles.title}>Request a trusted professional directly.</Text>
+        <Text style={styles.subtitle}>Send a request to your chosen professional. No appointment is confirmed until they respond.</Text>
 
         <View style={styles.providerCard}>
           <AvatarCircle uri={tasker?.profileImage || tasker?.avatarUrl || tasker?.user?.profileImage} name={name} size={52} showOnline={!!tasker?.isOnline} />
           <View style={styles.providerCopy}>
             <Text style={styles.providerName}>{name}</Text>
             <Text style={styles.providerMeta}>{tasker?.rating ? `★ ${Number(tasker.rating).toFixed(2)} · ` : ''}{tasker?.isVerified ? 'Verified · ' : ''}{tasker?.completedJobs || 0} jobs</Text>
-            <View style={styles.availabilityPill}><Text style={styles.availabilityText}>{tasker?.distanceMinutes ? `${tasker.distanceMinutes} min away` : tasker?.isOnline ? 'Available now' : 'Availability confirmed next'}</Text></View>
+            <View style={styles.availabilityPill}><Text style={styles.availabilityText}>{tasker?.distanceMinutes ? `${tasker.distanceMinutes} min away` : tasker?.isOnline ? 'Online — appointment unconfirmed' : 'Schedule confirmation needed'}</Text></View>
           </View>
         </View>
 
@@ -125,7 +119,7 @@ export default function DirectTaskerBooking() {
           </View>
           <View style={styles.detailRow}>
             <View style={styles.iconCircle}><CalendarBlank size={15} color={v3.colors.ink} /></View>
-            <View style={styles.rowCopy}><Text style={styles.rowTitle}>When</Text><Text style={styles.rowSub}>Choose date & time in the protected booking flow</Text></View>
+            <View style={styles.rowCopy}><Text style={styles.rowTitle}>When</Text><Text style={styles.rowSub}>Choose a preferred date & time; provider confirmation required</Text></View>
             <CaretRight size={16} color={v3.colors.ink} />
           </View>
           <View style={styles.detailRow}>
@@ -134,8 +128,8 @@ export default function DirectTaskerBooking() {
             <CaretRight size={16} color={v3.colors.ink} />
           </View>
           <View style={styles.detailRow}>
-            <View style={styles.iconCircle}><Text style={styles.priceIcon}>L</Text></View>
-            <View style={styles.rowCopy}><Text style={styles.rowTitle}>Estimated price</Text><Text style={styles.rowSub}>{estimate}</Text></View>
+            <View style={styles.iconCircle}><Text style={styles.priceIcon}>{selectedCountry?.code === 'CA' ? 'CAD' : 'LKR'}</Text></View>
+            <View style={styles.rowCopy}><Text style={styles.rowTitle}>Indicative price guide</Text><Text style={styles.rowSub}>{estimate}</Text></View>
             <CaretRight size={16} color={v3.colors.ink} />
           </View>
         </View>
@@ -143,9 +137,9 @@ export default function DirectTaskerBooking() {
 
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.primaryButton} onPress={continueBooking} activeOpacity={0.82}>
-          <Text style={styles.primaryButtonText}>Continue booking request</Text>
+          <Text style={styles.primaryButtonText}>Continue service request</Text>
         </TouchableOpacity>
-        <Text style={styles.protectionNote}>Final schedule, address, budget and payment choice are confirmed before the job is posted.</Text>
+        <Text style={styles.protectionNote}>Confirm service details and estimated budget before submitting. Provider acceptance and payment happen later.</Text>
       </View>
     </SafeAreaView>
   )

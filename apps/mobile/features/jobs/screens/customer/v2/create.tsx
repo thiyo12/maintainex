@@ -24,6 +24,7 @@ import type { JobCategory } from '@/lib/types'
 import { v3 } from '@/theme/v3/tokens'
 import V3CustomerBottomNav from '@/components/v3/V3CustomerBottomNav'
 import JobLocationPicker, { type JobLocationValue } from '@/components/location/JobLocationPicker'
+import { verifiedLocalPriceRange } from '@/lib/provider-discovery-display'
 
 type SearchCategory = {
   id: string
@@ -196,29 +197,10 @@ export default function CreateJobScreen() {
     return categories.slice(0, 4)
   }, [categories, searchResults])
 
-  const localRange = useMemo(() => {
-    if (estimate?.priceRange?.min != null && estimate?.priceRange?.max != null) {
-      return {
-        min: Number(estimate.priceRange.min),
-        max: Number(estimate.priceRange.max),
-        currency: estimate.currency || 'LKR',
-      }
-    }
-
-    const jobs = (selectedCategory as any)?.jobs
-    if (Array.isArray(jobs) && jobs.length) {
-      const mins = jobs.map((item: any) => Number(item.priceMin)).filter(Number.isFinite)
-      const maxs = jobs.map((item: any) => Number(item.priceMax)).filter(Number.isFinite)
-      if (mins.length && maxs.length) {
-        return {
-          min: Math.min(...mins),
-          max: Math.max(...maxs),
-          currency: jobs[0]?.currency || 'LKR',
-        }
-      }
-    }
-    return null
-  }, [estimate, selectedCategory])
+  const localRange = useMemo(
+    () => verifiedLocalPriceRange(estimate, (selectedCategory as any)?.jobs, countryCode),
+    [estimate, selectedCategory, countryCode],
+  )
 
   const canContinue = description.trim().length >= 3 && !!selectedCategory
 
@@ -673,7 +655,7 @@ export default function CreateJobScreen() {
                       value={budget}
                       onChangeText={setBudget}
                       keyboardType="numeric"
-                      placeholder="LKR amount"
+                      placeholder={countryCode === 'CA' ? 'CAD amount' : 'LKR amount'}
                       placeholderTextColor={v3.colors.textPlaceholder}
                       style={styles.budgetInput}
                     />
@@ -693,17 +675,19 @@ export default function CreateJobScreen() {
 
             <View style={styles.rangeCard}>
               <View>
-                <Text style={styles.rangeLabel}>Estimated local range</Text>
+                <Text style={styles.rangeLabel}>Indicative service price range</Text>
                 <Text style={styles.rangeValue}>
                   {localRange
-                    ? `${localRange.currency} ${Math.round(localRange.min).toLocaleString()} – ${Math.round(localRange.max).toLocaleString()}`
-                    : 'Taskers will quote after you post'}
+                    ? `${localRange.currency} ${Math.round(localRange.min).toLocaleString()} – ${Math.round(localRange.max).toLocaleString()} · confirm quote`
+                    : 'Quote required — no verified local range'}
                 </Text>
               </View>
-              <View style={styles.aiBadge}>
-                <Sparkle size={13} color={v3.colors.amberDark} weight="fill" />
-                <Text style={styles.aiText}>AI</Text>
-              </View>
+              {localRange?.source === 'ENGINE' ? (
+                <View style={styles.aiBadge}>
+                  <Sparkle size={13} color={v3.colors.amberDark} weight="fill" />
+                  <Text style={styles.aiText}>AI</Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.summaryCard}>

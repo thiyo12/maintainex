@@ -466,7 +466,7 @@ export async function createBookNowJob(input: BookNowInput) {
         currency: pricing.currency,
         totalCents: pricing.providerGross,
         estimatedCompletionTime: '1-2 hours',
-        message: input.notes || 'BOOK_NOW instant booking',
+        message: input.notes || 'Direct service request awaiting provider confirmation',
         attachments: '[]',
         status: 'PENDING',
       },
@@ -477,8 +477,8 @@ export async function createBookNowJob(input: BookNowInput) {
 
   await createNotification({
     userId: resolvedNotificationUserId,
-    title: 'New direct booking',
-    body: `${result.job.title} has been booked with you.`,
+    title: 'New direct service request',
+    body: `${result.job.title}: a customer has requested your service. Review and respond before confirming the appointment.`,
     referenceType: 'JOB_MATCH',
     referenceId: result.job.id,
   })
