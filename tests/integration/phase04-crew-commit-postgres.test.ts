@@ -154,12 +154,12 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         data: { companyId, jobId, requiredWorkersCount: 2, status: 'FORMING', version: 1 },
       })),
     )
-    const successful = attempts.filter(
-      (result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof db.companyCrewDispatch.create>>> =>
-        result.status === 'fulfilled',
-    )
+    const successful = attempts.filter(result => result.status === 'fulfilled')
     expect(successful).toHaveLength(1)
-    crewId = successful[0].value.id
+    const onlyCrew = await db!.companyCrewDispatch.findUniqueOrThrow({
+      where: { jobId }, select: { id: true },
+    })
+    crewId = onlyCrew.id
     expect(await db!.companyCrewDispatch.count({ where: { jobId } })).toBe(1)
     // This is only a data model race test, NOT enabled crew dispatch.
   })

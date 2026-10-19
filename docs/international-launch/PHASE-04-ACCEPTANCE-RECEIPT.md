@@ -256,3 +256,13 @@ uniqueness, with dependent-row cleanup. The suite is wired into blocking
 release checks. This is not an implemented crew roster reservation,
 all-worker acceptance, crew PIN/work-start authorization or operational
 approval. No production migration is applied by these development commits.
+
+## Phase 04 — transaction lifetime boundary correction
+
+The read-only `checkCrewRosterAtCommit` wrapper holds locks only for its own
+SERIALIZABLE transaction, then returns `dispatchEnabled: false`. Its result
+is **not** a capacity hold and cannot authorize writes in another transaction.
+The separately exported `assertCrewRosterReadyInsideTransaction(tx, input)`
+allows a future writer to reuse the exact guard **within the same still-open
+SERIALIZABLE reservation transaction** before staging all slots atomically.
+No writer, crew acceptance or PIN route is enabled here.

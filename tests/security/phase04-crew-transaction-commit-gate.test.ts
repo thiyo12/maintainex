@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Prisma } from '@prisma/client'
-import { checkCrewRosterAtCommit } from '@/lib/domain/company-crew-commit-gate'
+import { checkCrewRosterAtCommit, assertCrewRosterReadyInsideTransaction } from '@/lib/domain/company-crew-commit-gate'
 
 const mock = vi.hoisted(() => ({
   txWork: vi.fn(),
@@ -136,6 +136,13 @@ describe('Phase 04 — future crew reservation commit gate is locked and non-mut
     }))
     await expect(checkCrewRosterAtCommit(input)).rejects.toThrow('no longer satisfies')
     expect(mock.workerEligible).toHaveBeenCalledTimes(2)
+  })
+
+  it('lets a future writer reuse the guard inside its OWN transaction without committing locks first', async () => {
+    const result = await assertCrewRosterReadyInsideTransaction(tx as any, input)
+    expect(result.dispatchEnabled).toBe(false)
+    expect(mock.txWork).not.toHaveBeenCalled()
+    expect(mock.schedule.mock.calls.map(call => call[1])).toEqual(['a-worker', 'z-worker'])
   })
 
   it('does not expose a persistence or dispatch endpoint', async () => {

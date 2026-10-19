@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 import { requireJobMarket } from '@/lib/geography/market-engine'
 import { checkCompanyEligibility, checkCrewCandidateEligibility } from '@/lib/phase6/provider-eligibility'
 import { lockAndAssertAssignmentActorAuthorized, lockAndAssertWorkerScheduleAvailable } from '@/lib/domain/company-job-assignment'
@@ -20,23 +20,16 @@ export interface CrewCommitGateInput {
   workerUserIds: string[]
 }
 
-/**
- * Internal commit-time gate for the FUTURE crew reservation transaction.
- *
- * Does not create a dispatch, assignment, PIN, workspace, or notification.
- * No HTTP route invokes this helper. The serializable transaction prevents
- * a caller from treating a stale preflight as proof of available capacity.
- * Work-start and single-worker guards remain unchanged.
- */
-export async function checkCrewRosterAtCommit(input: CrewCommitGateInput): Promise<{
+export interface CrewCommitGateResult {
   companyId: string
   jobId: string
   requiredWorkersCount: number
   workerUserIds: string[]
   readyForFutureReservation: true
   dispatchEnabled: false
-}> {
-  const { companyId, jobId, actorUserId, actorRole, workerUserIds } = input
+}
+
+function validateRoster(workerUserIds: string[]): string[] {
   if (!Array.isArray(workerUserIds) || workerUserIds.length < 2 ||
     workerUserIds.length > MAX_CREW_PREVIEW_WORKERS ||
     workerUserIds.some(id => typeof id !== 'string' || !id.trim() ||
@@ -44,11 +37,40 @@ export async function checkCrewRosterAtCommit(input: CrewCommitGateInput): Promi
     new Set(workerUserIds).size !== workerUserIds.length) {
     throw new CrewCommitGateError('Crew requires 2–12 distinct valid worker IDs', 400)
   }
+  return [...workerUserIds].sort()
+}
 
-  // Stable row-lock ordering prevents concurrent A→B and B→A crew requests
-  // from locking the same worker identities in opposite order.
-  const sortedWorkers = [...workerUserIds].sort()
-  return prisma.$transaction(async tx => {
+/**
+ * Read-only, point-in-time diagnostic. Its transaction COMMITS before it
+ * returns; a success must NEVER be used to authorize a subsequent write.
+ * There is no HTTP route and no crew dispatch activation.
+ */
+export async function checkCrewRosterAtCommit(
+  input: CrewCommitGateInput,
+): Promise<CrewCommitGateResult> {
+  validateRoster(input.workerUserIds)
+  return prisma.$transaction(
+    tx => assertCrewRosterReadyInsideTransaction(tx, input),
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  )
+}
+
+/**
+ * Commit-time gate for the eventual atomic reservation writer.
+ * Its caller MUST hold one SERIALIZABLE transaction open while writing
+ * every reserved worker slot, and retry or fail closed on serialization
+ * errors. Do not call this as a separate preflight transaction.
+ * This helper itself makes no writes, creates no assignments or PINs,
+ * and does not enable crew dispatch.
+ */
+export async function assertCrewRosterReadyInsideTransaction(
+  tx: Prisma.TransactionClient,
+  input: CrewCommitGateInput,
+): Promise<CrewCommitGateResult> {
+  const { companyId, jobId, actorUserId, actorRole } = input
+  // Shared across read-only and future writer paths; lock all workers in
+  // deterministic order to avoid A→B vs B→A deadlocks.
+  const sortedWorkers = validateRoster(input.workerUserIds)
     await lockAndAssertAssignmentActorAuthorized(
       tx, companyId, actorUserId, actorRole,
     )
@@ -151,5 +173,4 @@ export async function checkCrewRosterAtCommit(input: CrewCommitGateInput): Promi
       readyForFutureReservation: true as const,
       dispatchEnabled: false as const,
     }
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 }
