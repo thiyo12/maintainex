@@ -25,6 +25,7 @@ export type CompanyAuditAction =
   | 'DOCUMENT_VERIFY'
   | 'QUOTE_SUBMIT'
   | 'CREW_ROSTER_STAGE'
+  | 'CREW_MEMBER_ACCEPT'
   | 'WORKER_ASSIGN'
   | 'WORKER_REASSIGN'
   | 'WORKER_REVOKE'
