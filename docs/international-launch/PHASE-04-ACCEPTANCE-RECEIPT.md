@@ -237,3 +237,22 @@ slow preview responses once the selected job, roster or team changes. These
 are engineering prerequisites only, **not Phase 04 approval**. Latest-commit
 CI and isolated PostgreSQL migration verification are still required; LK and
 Vancouver physical-device and operational acceptance remain outstanding.
+
+## Phase 04 — transaction-scoped all-worker commit gate
+
+The internal `checkCrewRosterAtCommit` helper now runs on a SERIALIZABLE
+PostgreSQL transaction. Before any future reservation can be written it
+locks the acting dispatcher, accepted quote, booking, company and each
+proposed worker in sorted order; it requires an unchanged 2–12-worker job,
+current company/owner/market authorization, zero prior arrivals/safety
+mismatches, exact worker service/market eligibility, photos and capacity.
+All eligibility queries share the transaction client; earlier preview
+results do not grant authorization. The helper returns
+`dispatchEnabled: false`, makes **no writes** and has no public route.
+
+A dedicated PostgreSQL CI suite uses owned test fixtures only to exercise
+the commit gate, account/skill revocation and competing crew-record
+uniqueness, with dependent-row cleanup. The suite is wired into blocking
+release checks. This is not an implemented crew roster reservation,
+all-worker acceptance, crew PIN/work-start authorization or operational
+approval. No production migration is applied by these development commits.
