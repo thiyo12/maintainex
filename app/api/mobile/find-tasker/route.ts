@@ -6,6 +6,7 @@ import { isBookNowCatalogueAvailableInMarket } from '@/lib/domain/catalog-market
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { matchTaskerCandidates, resolveJobCategoryKeys } from '@/lib/job-matching'
 import { getSetting } from '@/lib/settings'
+import { findCompanyCandidatesForTemplate } from '@/lib/domain/company-provider-discovery'
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest) {
     // Browsing without GPS is a discovery hint, not permission to book.
     // When coordinates are provided they MUST resolve inside the requested
     // launch market (the municipal polygon is authoritative for Vancouver).
+    let serviceDistrict: string | null = null
     if (lat !== null && lng !== null) {
       const location = resolveMarketFromServiceAddress({
         latitude: lat, longitude: lng, claimedCountryCode: requestedCountry,
@@ -77,6 +79,7 @@ export async function GET(request: NextRequest) {
           candidates: [],
         }, { status: 400 })
       }
+      serviceDistrict = location.district || null
     }
 
     // TemplateJob IDs are not sufficient market authorization. Inactive,
@@ -100,8 +103,22 @@ export async function GET(request: NextRequest) {
       countryCode: requestedCountry,
     })
 
-    return NextResponse.json(
-      candidates.map((c) => ({
+    // Same catalogue+market controls as individual browse. Company discovery
+    // additionally checks active ownership, credentials and service-area
+    // capability through the canonical eligibility engine. A preview is
+    // non-binding: V2 job creation enforces the final service-address checks.
+    const companies = await findCompanyCandidatesForTemplate({
+      templateJobId: templateJob.id,
+      categoryId: templateJob.category.id,
+      countryCode: requestedCountry as 'LK' | 'CA',
+      latitude: lat,
+      longitude: lng,
+      district: serviceDistrict,
+      radiusKm,
+    })
+
+    return NextResponse.json([
+      ...candidates.map((c) => ({
         id: c.profile.id,
         userId: c.profile.userId,
         name: c.profile.user.name,
@@ -121,8 +138,9 @@ export async function GET(request: NextRequest) {
         hourlyRate: c.profile.hourlyRate,
         fixedRate: 0,
         experienceYears: 0,
-      }))
-    )
+      })),
+      ...companies,
+    ])
   } catch (error) {
     secureConsole.error('Find tasker error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
