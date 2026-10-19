@@ -166,6 +166,10 @@ export async function findCandidates(
 
   const jobReqs = await resolveJobRequirements(client, job.categoryId, job.serviceTemplateId, job.templateJobId)
   if (!jobReqs) return emptyResult(input.jobId, config.matchingVersion)
+  // A ServiceTemplate can carry the canonical TemplateJob even when the job
+  // does not have a separate direct templateJobId. Eligibility must see the
+  // resolved exact service or a sibling category selection could slip through.
+  canonicalInput.templateJobId = jobReqs.templateJobIds[0]
 
   // =============================================
   // Phase 1: Collect eligible providers (eligibility evaluation)
@@ -401,6 +405,19 @@ export async function findCandidates(
 // NEW CANONICAL API (Phase 10.2)
 // =============================================
 
+function unsupportedJobCapability(): EligibilityResult {
+  return {
+    eligible: false,
+    gates: [{ gate: 'JOB_CAPABILITY', passed: false, reason: 'Booking catalogue service is inconsistent or missing' }],
+    matchedProfessionId: null,
+    matchedSkills: [],
+    preferredSkillsMatched: [],
+    jurisdictionPassed: false,
+    serviceAreaPassed: false,
+    availabilityPassed: false,
+  }
+}
+
 /**
  * Evaluate a single provider's eligibility for a job.
  */
@@ -431,6 +448,11 @@ export async function evaluateTaskerEligibility(
     }
   }
 
+  const reqs = await resolveJobRequirements(
+    client, job.categoryId, job.serviceTemplateId, job.templateJobId,
+  )
+  if (!reqs) return unsupportedJobCapability()
+
   return evaluateEligibility({
     providerType: 'INDIVIDUAL',
     providerId: taskerId,
@@ -438,6 +460,7 @@ export async function evaluateTaskerEligibility(
       jobId,
       categoryId: job.categoryId,
       serviceTemplateId: job.serviceTemplateId || undefined,
+      templateJobId: reqs.templateJobIds[0],
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
       countryCode: jobMarket.countryCode,
@@ -477,6 +500,11 @@ export async function evaluateCompanyEligibility(
     }
   }
 
+  const reqs = await resolveJobRequirements(
+    client, job.categoryId, job.serviceTemplateId, job.templateJobId,
+  )
+  if (!reqs) return unsupportedJobCapability()
+
   return evaluateEligibility({
     providerType: 'COMPANY',
     providerId: companyId,
@@ -484,6 +512,7 @@ export async function evaluateCompanyEligibility(
       jobId,
       categoryId: job.categoryId,
       serviceTemplateId: job.serviceTemplateId || undefined,
+      templateJobId: reqs.templateJobIds[0],
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
       countryCode: jobMarket.countryCode,
@@ -502,11 +531,15 @@ export async function getEligibleTaskers(
 ): Promise<Array<{ providerId: string; eligibility: EligibilityResult }>> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, countryCode: true, latitude: true, longitude: true, preferredDate: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true, latitude: true, longitude: true, preferredDate: true },
   })
   if (!job) return []
   const jobMarket = requireJobMarket(job)
   if (!jobMarket.ok) return []
+  const reqs = await resolveJobRequirements(
+    client, job.categoryId, job.serviceTemplateId, job.templateJobId,
+  )
+  if (!reqs) return []
 
   const profiles = await client.taskerProfile.findMany({
     where: {
@@ -527,6 +560,7 @@ export async function getEligibleTaskers(
         jobId,
         categoryId: job.categoryId,
         serviceTemplateId: job.serviceTemplateId || undefined,
+        templateJobId: reqs.templateJobIds[0],
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
         countryCode: jobMarket.countryCode,
@@ -550,11 +584,15 @@ export async function getEligibleCompanies(
 ): Promise<Array<{ companyId: string; eligibility: EligibilityResult }>> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, countryCode: true, latitude: true, longitude: true, preferredDate: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true, latitude: true, longitude: true, preferredDate: true },
   })
   if (!job) return []
   const jobMarket = requireJobMarket(job)
   if (!jobMarket.ok) return []
+  const reqs = await resolveJobRequirements(
+    client, job.categoryId, job.serviceTemplateId, job.templateJobId,
+  )
+  if (!reqs) return []
 
   const companies = await client.companyProfile.findMany({
     where: {
@@ -575,6 +613,7 @@ export async function getEligibleCompanies(
         jobId,
         categoryId: job.categoryId,
         serviceTemplateId: job.serviceTemplateId || undefined,
+        templateJobId: reqs.templateJobIds[0],
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
         countryCode: jobMarket.countryCode,
