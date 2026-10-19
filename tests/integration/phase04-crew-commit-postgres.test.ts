@@ -217,7 +217,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
   it('enforces distinct crew slots while retaining the original single-worker index', async () => {
     expect(crewId).toBeTruthy()
     expect(await db!.companyJobAssignment.count({
-      where: { jobId, status: 'CREW_RESERVED' },
+      where: { jobId, status: 'CREW_ACCEPTED' },
     })).toBe(2)
     await expect(db!.companyJobAssignment.create({
       data: {
