@@ -47,6 +47,7 @@ export default function ProviderResults() {
   const [providers, setProviders] = useState<any[]>([])
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
+  const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -136,8 +137,28 @@ export default function ProviderResults() {
     } as any)
   }
 
+  const postCompanyJob = (provider: any) => {
+    if (!jobId || !provider?.id || !categoryId || provider.providerType !== 'COMPANY') return
+    // The V2 job POST validates the company ID, market, account eligibility
+    // and exact service capability again. Do not treat a browse result as
+    // booking authorization or send the customer to a generic job broadcast.
+    router.push({
+      pathname: '/(customer)/jobs/v2/create',
+      params: {
+        title: serviceTitle,
+        categoryId,
+        templateJobId: jobId,
+        taskerId: provider.id,
+        taskerName: providerName(provider),
+      },
+    } as any)
+  }
+
   const openProvider = (provider: any) => {
-    if (provider.providerType === 'COMPANY') return
+    if (provider.providerType === 'COMPANY') {
+      setExpandedCompanyId(current => current === provider.id ? null : provider.id)
+      return
+    }
     router.push(`/(customer)/find/tasker-profile/${provider.id}?jobId=${jobId}` as any)
   }
 
@@ -215,7 +236,7 @@ export default function ProviderResults() {
               return (
                 <TouchableOpacity
                   key={`${item.providerType || 'INDIVIDUAL'}-${item.id}`}
-                  activeOpacity={isCompany ? 1 : 0.76}
+                  activeOpacity={0.76}
                   onPress={() => openProvider(item)}
                   style={styles.providerCard}
                 >
@@ -231,7 +252,7 @@ export default function ProviderResults() {
                         <Text style={styles.name} numberOfLines={1}>{name}</Text>
                         {item.isVerified ? <SealCheck size={15} color={v3.colors.success} weight="fill" /> : null}
                       </View>
-                      <Text style={styles.typeLabel}>{item.isCertificationTest ? 'Certification test tasker' : isCompany ? 'Verified company team' : 'Independent tasker'}</Text>
+                      <Text style={styles.typeLabel}>{item.isCertificationTest ? 'Certification test tasker' : isCompany ? item.isVerified ? 'Verified company' : 'Service company' : 'Independent tasker'}</Text>
                     </View>
 
                     <View style={[styles.liveBadge, !online && styles.liveBadgeMuted]}>
@@ -267,11 +288,34 @@ export default function ProviderResults() {
                     </View>
                   ) : null}
 
+                  {isCompany && expandedCompanyId === item.id ? (
+                    <View style={styles.companyDetail}>
+                      <Text style={styles.companyDetailTitle}>Company request details</Text>
+                      <Text style={styles.companyDetailText}>
+                        {name} · {serviceTitle}
+                      </Text>
+                      <Text style={styles.companyDetailText}>
+                        {item.isVerified ? 'Company verification approved' : 'Verification not confirmed'} · {teamSize || 'Unlisted'} team members
+                      </Text>
+                      <Text style={styles.companyDetailNote}>
+                        Submit a request for this specific company. Its service eligibility,
+                        appointment availability and final quote must be confirmed before work starts.
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {isCompany ? (
+                    <View style={styles.companyViewHint}>
+                      <Text style={styles.companyViewHintText}>
+                        {expandedCompanyId === item.id ? 'Hide company details' : 'Tap card to view company details'}
+                      </Text>
+                    </View>
+                  ) : null}
                   <View style={styles.providerBottom}>
                     <Text style={styles.price}>{priceFrom(item, job)}</Text>
                     {isCompany ? (
-                      <TouchableOpacity activeOpacity={0.8} style={styles.requestButton} onPress={postJob}>
-                        <Text style={styles.requestButtonText}>Request company quote</Text>
+                      <TouchableOpacity activeOpacity={0.8} style={styles.requestButton} onPress={() => postCompanyJob(item)}>
+                        <Text style={styles.requestButtonText}>Request this company</Text>
                         <CaretRight size={13} color={v3.colors.paper} weight="bold" />
                       </TouchableOpacity>
                     ) : (
@@ -361,6 +405,12 @@ const styles = StyleSheet.create({
   metricLabel: { marginTop: 2, fontFamily: 'Outfit_500Medium', fontSize: 8.5, color: v3.colors.textMuted },
   companyLine: { marginTop: 10, minHeight: 36, borderRadius: 12, backgroundColor: v3.colors.infoSoft, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 7 },
   companyLineText: { flex: 1, fontFamily: 'Outfit_600SemiBold', fontSize: 10.5, color: v3.colors.textSecondary },
+  companyDetail: { marginTop: 12, borderRadius: 12, backgroundColor: v3.colors.infoSoft, padding: 12, gap: 5 },
+  companyDetailTitle: { fontSize: 12, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  companyDetailText: { fontSize: 10.5, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  companyDetailNote: { marginTop: 4, fontSize: 10, lineHeight: 15, fontFamily: 'Outfit_500Medium', color: v3.colors.textSecondary },
+  companyViewHint: { marginTop: 8 },
+  companyViewHintText: { fontSize: 9.5, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
   providerBottom: { marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   price: { flex: 1, fontFamily: 'Outfit_700Bold', fontSize: 10.5, color: v3.colors.textSecondary },
   viewProfile: { flexDirection: 'row', alignItems: 'center', gap: 3 },
