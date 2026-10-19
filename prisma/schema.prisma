@@ -1800,6 +1800,7 @@ model CompanyProfile {
   subscriptions      CompanySubscription[]
   auditLogs          CompanyAuditLog[]
   jobAssignments     CompanyJobAssignment[]
+  crewDispatches     CompanyCrewDispatch[]
 
   @@index([isVerified])
   @@index([rating])
@@ -2209,6 +2210,7 @@ model MarketplaceJob {
   riskEvents        MarketplaceRiskEvent[]
   verificationPins  JobVerificationPin[]
   assignments       CompanyJobAssignment[]
+  crewDispatch      CompanyCrewDispatch?
   lifecycleEvents   JobLifecycleEvent[]
   marketplaceDisputes MarketplaceDispute[]
 
@@ -3534,6 +3536,24 @@ model JobVerificationPin {
 }
 
 // Phase 10.7 — Company Workforce: formal job assignment tracking
+// Phase 04: additive crew lifecycle scaffold. No crew writes/dispatch are enabled.
+model CompanyCrewDispatch {
+  id                   String   @id @default(cuid())
+  jobId                String   @unique
+  job                  MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  companyId            String
+  company              CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  requiredWorkersCount Int
+  status               String   @default("FORMING") // FORMING, READY, IN_PROGRESS, COMPLETED, BLOCKED, CANCELLED
+  leadWorkerUserId     String?
+  version              Int      @default(1)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  assignments          CompanyJobAssignment[]
+
+  @@index([companyId, status])
+}
+
 model CompanyJobAssignment {
   id            String   @id @default(cuid())
   companyId     String
@@ -3542,6 +3562,12 @@ model CompanyJobAssignment {
   job           MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
   workerUserId  String
   worker        User     @relation(fields: [workerUserId], references: [id], onDelete: Cascade)
+  crewDispatchId String?
+  crewDispatch   CompanyCrewDispatch? @relation(fields: [crewDispatchId], references: [id], onDelete: SetNull)
+  crewSlot       Int?
+  crewRole       String? // LEAD, MEMBER; null for legacy single-worker assignments
+  crewArrivedAt  DateTime?
+  crewIdentityConfirmedAt DateTime?
   assignedBy    String   // userId of actor who made the assignment
   status        String   @default("ASSIGNED") // ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED, REJECTED, REVOKED
   assignedAt    DateTime @default(now())
@@ -3557,6 +3583,8 @@ model CompanyJobAssignment {
   updatedAt DateTime @updatedAt
 
   @@unique([jobId, workerUserId])
+  @@unique([crewDispatchId, crewSlot])
+  @@index([crewDispatchId])
   @@index([companyId])
   @@index([workerUserId])
   @@index([jobId])
