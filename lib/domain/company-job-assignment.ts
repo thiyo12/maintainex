@@ -138,6 +138,41 @@ export async function lockAndAssertWorkerScheduleAvailable(
   }
 }
 
+/** Recheck dispatcher authorization while holding the same membership
+ * lock as workforce role/suspension edits, before the assignment is written. */
+export async function lockAndAssertAssignmentActorAuthorized(
+  tx: PrismaClientOrTx,
+  companyId: string,
+  actorUserId: string,
+  actorRole: string,
+): Promise<void> {
+  const actors = await tx.$queryRaw<Array<{
+    isActive: boolean; isSuspended: boolean; isBanned: boolean
+  }>>`
+    SELECT "isActive", "isSuspended", "isBanned"
+    FROM "User" WHERE id = ${actorUserId} FOR UPDATE
+  `
+  const actor = actors[0]
+  if (!actor || !actor.isActive || actor.isSuspended || actor.isBanned) {
+    throw new Error('Assigning actor is no longer authorized')
+  }
+  const memberships = await tx.$queryRaw<Array<{ role: string; status: string }>>`
+    SELECT role, status
+    FROM "TeamMember"
+    WHERE "companyId" = ${companyId} AND "userId" = ${actorUserId}
+    FOR UPDATE
+  `
+  if (
+    memberships.length !== 1 ||
+    memberships[0].status !== 'ACTIVE' ||
+    memberships[0].role !== actorRole ||
+    !isValidCompanyRole(memberships[0].role) ||
+    !hasCompanyPermission(memberships[0].role, 'workers:assign')
+  ) {
+    throw new Error('Assigning actor is no longer authorized')
+  }
+}
+
 export async function createAssignment(params: AssignmentCreateParams): Promise<AssignmentResult> {
   const { companyId, jobId, workerUserId, assignedByUserId, actorRole } = params
 
@@ -203,6 +238,7 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
         companyId,
         job.workerIdentityCheckRequired,
       )
+      await lockAndAssertAssignmentActorAuthorized(tx, companyId, assignedByUserId, actorRole)
 
       const claimed = await tx.marketplaceJob.updateMany({
       where: {
@@ -272,7 +308,8 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
         error.message === 'Worker account not found' ||
         error.message.includes('Worker identity or account status changed') ||
         error.message.includes('Worker membership or role changed') ||
-        error.message.includes('Worker verified photo is no longer approved')
+        error.message.includes('Worker verified photo is no longer approved') ||
+        error.message.includes('Assigning actor is no longer authorized')
       )
     ) {
       return { success: false, error: error.message }
@@ -370,6 +407,7 @@ export async function reassignWorker(
         companyId,
         job.workerIdentityCheckRequired,
       )
+      await lockAndAssertAssignmentActorAuthorized(tx, companyId, actorUserId, actorRole)
 
       const claimed = await tx.marketplaceJob.updateMany({
         where: {
@@ -455,7 +493,8 @@ export async function reassignWorker(
         error.message === 'Worker account not found' ||
         error.message.includes('Worker identity or account status changed') ||
         error.message.includes('Worker membership or role changed') ||
-        error.message.includes('Worker verified photo is no longer approved')
+        error.message.includes('Worker verified photo is no longer approved') ||
+        error.message.includes('Assigning actor is no longer authorized')
       )
     ) {
       return { success: false, error: error.message }
