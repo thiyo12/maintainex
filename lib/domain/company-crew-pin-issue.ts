@@ -54,7 +54,8 @@ export async function issueStagedCrewArrivalPinsInsideTransaction(
     SELECT id, "isActive", "isSuspended", "isBanned"
     FROM "User" WHERE id = ${input.authenticatedCustomerUserId} FOR UPDATE
   `
-  if (customers.length !== 1 || !customers[0].isActive ||
+  if (customers.length !== 1 || customers[0].id !== input.authenticatedCustomerUserId ||
+      !customers[0].isActive ||
       customers[0].isSuspended || customers[0].isBanned) {
     throw new CrewCommitGateError('Customer is not authorized to issue crew PINs', 403)
   }
