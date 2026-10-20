@@ -1152,6 +1152,20 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       await expect(db!.companyCrewPresenceWitness.create({
         data: { ...data, crewVersion: 0 },
       })).rejects.toThrow()
+      // Real parallel inserts cannot create two separate acknowledgements
+      // for the same member/epoch, even from racing device submissions.
+      const racing = await Promise.allSettled([
+        db!.companyCrewPresenceWitness.create({
+          data: { ...data, crewVersion: 44 },
+        }),
+        db!.companyCrewPresenceWitness.create({
+          data: { ...data, crewVersion: 44, customerAttestedAt: new Date() },
+        }),
+      ])
+      expect(racing.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+      expect(await db!.companyCrewPresenceWitness.count({
+        where: { crewDispatchId: crewId, crewVersion: 44 },
+      })).toBe(1)
       expect(await db!.companyCrewPresenceWitness.count({
         where: { crewDispatchId: crewId, crewVersion: 42 },
       })).toBe(1)
@@ -1163,7 +1177,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       })
     } finally {
       await db!.companyCrewPresenceWitness.deleteMany({
-        where: { crewDispatchId: crewId, crewVersion: { in: [0, 42, 43] } },
+        where: { crewDispatchId: crewId, crewVersion: { in: [0, 42, 43, 44] } },
       })
     }
   })
