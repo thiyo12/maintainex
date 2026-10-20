@@ -11,6 +11,7 @@ import { consumeStagedCrewMemberPinInsideTransaction } from '@/lib/domain/compan
 import { issueStagedCrewArrivalPinsInsideTransaction } from '@/lib/domain/company-crew-pin-issue'
 import { assertAllCrewPinClaimsInsideTransaction } from '@/lib/domain/company-crew-pin-claims'
 import { recordCrewPresenceWitnessInsideTransaction } from '@/lib/domain/company-crew-presence-record'
+import { assertCrewDualWitnessInventoryInsideTransaction } from '@/lib/domain/company-crew-presence-witness'
 import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -1305,9 +1306,52 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         where: { crewDispatchId: staged.crewDispatchId, assignmentId: base.assignmentId },
       })).workerAttestedAt!.getTime()).toBe(firstWorkerStamp)
 
+      // Competing customer and worker submissions target ONE other slot.
+      // PostgreSQL SERIALIZABLE may reject one participant, but never
+      // duplicates a witness or acknowledges on behalf of the loser.
+      const second = { ...base, assignmentId: assignments[1].id }
+      const racing = await Promise.allSettled([
+        db!.$transaction(tx => recordCrewPresenceWitnessInsideTransaction(tx, {
+          ...second, authenticatedUserId: workerIds[1], participant: 'WORKER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 10000, timeout: 10000 }),
+        db!.$transaction(tx => recordCrewPresenceWitnessInsideTransaction(tx, {
+          ...second, authenticatedUserId: ownerId, participant: 'CUSTOMER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 10000, timeout: 10000 }),
+      ])
+      expect(racing.filter(x => x.status === 'fulfilled').length).toBeGreaterThanOrEqual(1)
+      expect(await db!.companyCrewPresenceWitness.count({
+        where: { crewDispatchId: staged.crewDispatchId, assignmentId: second.assignmentId },
+      })).toBe(1)
+      const raceRow = await db!.companyCrewPresenceWitness.findFirstOrThrow({
+        where: { crewDispatchId: staged.crewDispatchId, assignmentId: second.assignmentId },
+      })
+      // Only the successful authenticated actor can set their own column.
+      expect(raceRow.workerAttestedAt !== null).toBe(racing[0].status === 'fulfilled')
+      expect(raceRow.customerAttestedAt !== null).toBe(racing[1].status === 'fulfilled')
+      if (racing[0].status === 'rejected') {
+        await db!.$transaction(tx => recordCrewPresenceWitnessInsideTransaction(tx, {
+          ...second, authenticatedUserId: workerIds[1], participant: 'WORKER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      }
+      if (racing[1].status === 'rejected') {
+        await db!.$transaction(tx => recordCrewPresenceWitnessInsideTransaction(tx, {
+          ...second, authenticatedUserId: ownerId, participant: 'CUSTOMER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      }
       expect(await db!.companyCrewPresenceWitness.count({
         where: { crewDispatchId: staged.crewDispatchId },
-      })).toBe(1)
+      })).toBe(2)
+      const group = await db!.$transaction(tx => assertCrewDualWitnessInventoryInsideTransaction(tx, {
+        crewDispatchId: staged.crewDispatchId, expectedVersion: 1,
+        actorUserId: ownerId, actorRole: 'COMPANY_OWNER',
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      expect(group).toEqual({
+        crewDispatchId: staged.crewDispatchId, crewVersion: 1,
+        membersWithDualWitnesses: 2, dualAttestationsCollected: true,
+        physicalPresenceVerified: false, arrivalEnabled: false, workStartEnabled: false,
+      })
       expect((await db!.companyCrewDispatch.findUniqueOrThrow({
         where: { id: staged.crewDispatchId },
       })).status).toBe('FORMING')
