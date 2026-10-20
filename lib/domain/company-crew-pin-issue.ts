@@ -134,6 +134,9 @@ export async function issueStagedCrewArrivalPinsInsideTransaction(
       crewSlot: true, crewRole: true, crewArrivedAt: true, startedAt: true,
     },
   })
+  if (slots.some(s => s.workerUserId === job.customerId)) {
+    throw new CrewCommitGateError('Booking customer cannot issue PINs to their own crew account')
+  }
   if (slots.length !== crew.requiredWorkersCount ||
       new Set(slots.map(s => s.workerUserId)).size !== slots.length ||
       new Set(slots.map(s => s.crewSlot)).size !== slots.length ||
