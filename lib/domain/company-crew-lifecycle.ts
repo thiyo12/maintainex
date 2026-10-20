@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { requireJobMarket } from '@/lib/geography/market-engine'
 import { checkCompanyEligibility, checkCrewCandidateEligibility } from '@/lib/phase6/provider-eligibility'
-import { lockAndAssertWorkerScheduleAvailable } from '@/lib/domain/company-job-assignment'
+import { lockAndAssertAssignmentActorAuthorized, lockAndAssertWorkerScheduleAvailable } from '@/lib/domain/company-job-assignment'
 import { CrewCommitGateError } from '@/lib/domain/company-crew-commit-gate'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 
@@ -275,6 +275,132 @@ export async function rejectStagedCrewMemberInsideTransaction(
     status: 'BLOCKED',
     version: crew.version + 1,
     releasedWorkersCount: slots.length,
+    dispatchEnabled: false,
+  }
+}
+
+// A manager may safely abandon a still-FORMING roster. Cancellation is a
+// terminal epoch: the unique jobId crew row is retained for traceability, so
+// refilling requires a separate, audited versioned roster protocol.
+export async function cancelStagedCrewInsideTransaction(
+  tx: Prisma.TransactionClient,
+  input: {
+    crewDispatchId: string
+    companyId: string // company context authorized by the route
+    actorUserId: string // authenticated actor, NEVER copied from the request body
+    actorRole: string
+    expectedVersion: number
+    reason?: string
+  },
+): Promise<{
+  crewDispatchId: string
+  status: 'CANCELLED'
+  version: number
+  releasedWorkersCount: number
+  dispatchEnabled: false
+}> {
+  if (!input.crewDispatchId || input.crewDispatchId.length > 128 ||
+      !input.companyId || input.companyId.length > 128 ||
+      !input.actorUserId || input.actorUserId.length > 128 ||
+      !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1 ||
+      (input.reason !== undefined &&
+        (typeof input.reason !== 'string' || input.reason.length > 250))) {
+    throw new CrewCommitGateError('Invalid crew cancellation request', 400)
+  }
+
+  // Resolve only the crew's company/job keys before authorizing the actor.
+  // Do not reveal customer or worker details until the current company role
+  // has been locked and checked under the same SERIALIZABLE transaction.
+  const key = await tx.companyCrewDispatch.findUnique({
+    where: { id: input.crewDispatchId },
+    select: { companyId: true, jobId: true },
+  })
+  if (!key || key.companyId !== input.companyId) {
+    throw new CrewCommitGateError('Crew roster not found', 404)
+  }
+  await lockAndAssertAssignmentActorAuthorized(
+    tx, key.companyId, input.actorUserId, input.actorRole,
+  )
+
+  const jobs = await tx.$queryRaw<Array<{ id: string; status: string; workersCount: number }>>`
+    SELECT id, status, "workersCount"
+    FROM "MarketplaceJob" WHERE id = ${key.jobId} FOR UPDATE
+  `
+  const crews = await tx.$queryRaw<LockedCrew[]>`
+    SELECT id, "companyId", "jobId", "requiredWorkersCount",
+      "leadWorkerUserId", status, version
+    FROM "CompanyCrewDispatch" WHERE id = ${input.crewDispatchId} FOR UPDATE
+  `
+  const crew = crews[0]
+  if (!crew || crew.companyId !== key.companyId || crew.jobId !== key.jobId ||
+      crew.version !== input.expectedVersion || crew.status !== 'FORMING' ||
+      jobs[0]?.status !== 'QUOTE_ACCEPTED' ||
+      jobs[0]?.workersCount !== crew.requiredWorkersCount) {
+    throw new CrewCommitGateError('Crew or booking changed; cannot cancel stale roster')
+  }
+  // Neither identity confirmations nor arrival evidence may be erased. A
+  // prior arrival is a safety event, even if crew statuses still say FORMING.
+  const priorArrival = await tx.jobVerificationPin.findFirst({
+    where: { jobId: crew.jobId, arrivalVerifiedAt: { not: null } },
+    select: { id: true },
+  })
+  const activePin = await tx.jobVerificationPin.findFirst({
+    where: { jobId: crew.jobId, status: 'ACTIVE' },
+    select: { id: true },
+  })
+  if (priorArrival || activePin) {
+    throw new CrewCommitGateError('PIN or arrival evidence blocks silent crew cancellation')
+  }
+  const slots = await tx.companyJobAssignment.findMany({
+    where: { crewDispatchId: crew.id },
+    select: {
+      id: true, companyId: true, jobId: true, status: true,
+      workerUserId: true, crewSlot: true, crewRole: true,
+      startedAt: true, crewArrivedAt: true,
+    },
+  })
+  if (slots.length !== crew.requiredWorkersCount ||
+      slots.some(slot => slot.companyId !== crew.companyId ||
+        slot.jobId !== crew.jobId ||
+        !['CREW_RESERVED', 'CREW_ACCEPTED'].includes(slot.status) ||
+        slot.startedAt !== null || slot.crewArrivedAt !== null) ||
+      new Set(slots.map(slot => slot.workerUserId)).size !== slots.length ||
+      new Set(slots.map(slot => slot.crewSlot)).size !== slots.length ||
+      slots.filter(slot => slot.crewRole === 'LEAD').length !== 1 ||
+      slots.find(slot => slot.crewRole === 'LEAD')?.workerUserId !== crew.leadWorkerUserId) {
+    throw new CrewCommitGateError('Crew roster is not safe to cancel')
+  }
+
+  const now = new Date()
+  const released = await tx.companyJobAssignment.updateMany({
+    where: { crewDispatchId: crew.id, status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] } },
+    data: {
+      status: 'REVOKED', revokedAt: now,
+      revokedReason: input.reason?.trim() || 'Crew roster cancelled by dispatcher',
+    },
+  })
+  if (released.count !== slots.length) {
+    throw new CrewCommitGateError('Crew roster changed during cancellation')
+  }
+  const updated = await tx.companyCrewDispatch.updateMany({
+    where: { id: crew.id, status: 'FORMING', version: crew.version },
+    data: { status: 'CANCELLED', version: { increment: 1 } },
+  })
+  if (updated.count !== 1) throw new CrewCommitGateError('Crew version changed during cancellation')
+  await writeCompanyAuditLog({
+    companyId: crew.companyId,
+    actorId: input.actorUserId,
+    actorRole: input.actorRole,
+    action: 'CREW_ROSTER_CANCEL',
+    targetType: 'CompanyCrewDispatch',
+    targetId: crew.id,
+    description: 'Dispatcher cancelled staged crew; all capacity released, no work authorized',
+    metadata: { jobId: crew.jobId, oldCrewVersion: crew.version, releasedWorkersCount: released.count },
+  }, tx)
+  return {
+    crewDispatchId: crew.id, status: 'CANCELLED',
+    version: crew.version + 1,
+    releasedWorkersCount: released.count,
     dispatchEnabled: false,
   }
 }
