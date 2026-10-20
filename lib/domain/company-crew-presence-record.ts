@@ -161,6 +161,12 @@ export async function recordCrewPresenceWitnessInsideTransaction(
         s.crewArrivedAt !== null || s.startedAt !== null)) {
     throw new CrewCommitGateError('Complete accepted crew and safety evidence required')
   }
+  // Independent attestations require independent PEOPLE/accounts. Even if
+  // the HTTP layer rejects a dual-role actor, future internal callers must
+  // not let the booking customer attest as any member of this same crew.
+  if (slots.some(slot => slot.workerUserId === job.customerId)) {
+    throw new CrewCommitGateError('Customer cannot witness their own crew assignment')
+  }
   const selected = slots.find(s => s.id === input.assignmentId)
   if (!selected || (input.participant === 'WORKER' &&
       selected.workerUserId !== input.authenticatedUserId)) {

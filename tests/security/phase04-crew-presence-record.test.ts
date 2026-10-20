@@ -179,6 +179,21 @@ describe('Phase04 individual witness recording: mutually independent actors, no 
     expect(m.create).not.toHaveBeenCalled()
   })
 
+  it('forbids one account acting as the booking customer and any crew worker, even a different slot',async()=>{
+    const original = m.sql.getMockImplementation()!
+    m.sql.mockImplementation(async (strings:TemplateStringsArray,...args:unknown[])=>{
+      if(strings.join(' ').includes('FROM "MarketplaceJob"')) {
+        return [{...job,customerId:'worker-b'}]
+      }
+      return original(strings,...args)
+    })
+    await expect(record({authenticatedUserId:'worker-a'}))
+      .rejects.toThrow('Customer cannot witness their own crew assignment')
+    expect(m.create).not.toHaveBeenCalled()
+    expect(m.update).not.toHaveBeenCalled()
+    expect(m.audit).not.toHaveBeenCalled()
+  })
+
   it('fails closed for restricted session, obsolete epoch, legacy arrival or safety hold',async()=>{
     m.sql.mockImplementationOnce(async()=>[{id:'quote'}])
       .mockImplementationOnce(async()=>[job])
