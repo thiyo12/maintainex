@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Briefcase, Plus, UserCircle } from 'phosphor-react-native'
@@ -15,9 +15,28 @@ type Assignment = {
   worker: { id: string; name: string; email: string }
 }
 
+type CrewRoster = {
+  id: string
+  status: 'FORMING'
+  version: number
+  requiredWorkersCount: number
+  dispatchEnabled: false
+  job: { id: string; title: string; countryCode: string }
+  assignments: {
+    id: string
+    status: string
+    crewSlot: number
+    crewRole: string
+    worker: { id: string; name: string }
+  }[]
+}
+
 export default function CompanyDispatch() {
   const router = useRouter()
   const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [formingCrews, setFormingCrews] = useState<CrewRoster[]>([])
+  const [cancellingCrewId, setCancellingCrewId] = useState<string | null>(null)
+  const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null)
   const [filter, setFilter] = useState<'active' | 'in_progress' | 'completed'>('active')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -27,16 +46,26 @@ export default function CompanyDispatch() {
       const companyId = await getActiveCompanyId()
       if (!companyId) {
         setAssignments([])
+        setFormingCrews([])
+        setActiveCompanyId(null)
         return
       }
+      setActiveCompanyId(companyId)
       const params = new URLSearchParams({ companyId })
       if (filter === 'in_progress') params.set('status', 'IN_PROGRESS')
       if (filter === 'completed') params.set('status', 'COMPLETED')
-      const data = await v2Request<{ assignments: Assignment[] }>(`/api/mobile/company/assignments?${params.toString()}`)
+      const [data, crewData] = await Promise.all([
+        v2Request<{ assignments: Assignment[] }>(`/api/mobile/company/assignments?${params.toString()}`),
+        v2Request<{ crews: CrewRoster[] }>(
+          `/api/mobile/company/crew/roster?companyId=${encodeURIComponent(companyId)}`,
+        ).catch(() => ({ crews: [] as CrewRoster[] })),
+      ])
+      setFormingCrews(crewData.crews || [])
       const rows = data.assignments || []
       setAssignments(filter === 'active' ? rows.filter((row) => !['COMPLETED', 'REJECTED', 'REVOKED'].includes(row.status)) : rows)
     } catch {
       setAssignments([])
+      setFormingCrews([])
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -44,6 +73,38 @@ export default function CompanyDispatch() {
   }, [filter])
 
   useEffect(() => { setLoading(true); load() }, [load])
+
+  const cancelCrew = async (crew: CrewRoster) => {
+    if (!activeCompanyId || cancellingCrewId) return
+    setCancellingCrewId(crew.id)
+    try {
+      await v2Request('/api/mobile/company/crew/roster', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          companyId: activeCompanyId,
+          crewDispatchId: crew.id,
+          expectedVersion: crew.version,
+          reason: 'Cancelled by company dispatcher',
+        }),
+      })
+      await load()
+      Alert.alert('Crew reservation cancelled', 'All staged worker capacity was released. Customer booking remains pending.')
+    } catch (error: any) {
+      Alert.alert('Unable to cancel crew', error?.message || 'Refresh the roster and try again.')
+      await load()
+    } finally {
+      setCancellingCrewId(null)
+    }
+  }
+
+  const confirmCancelCrew = (crew: CrewRoster) => Alert.alert(
+    'Cancel this unstarted crew?',
+    'All worker reservations will be released together. An accepted customer booking is not cancelled.',
+    [
+      { text: 'Keep crew', style: 'cancel' },
+      { text: 'Release crew', style: 'destructive', onPress: () => { void cancelCrew(crew) } },
+    ],
+  )
 
   if (loading) return <SafeAreaView style={styles.safe}><View style={styles.loading}><ActivityIndicator color={v3.colors.ink} /></View></SafeAreaView>
 
@@ -71,6 +132,35 @@ export default function CompanyDispatch() {
           ))}
         </View>
 
+        {formingCrews.length > 0 && filter === 'active' ? (
+          <View style={styles.crewSection}>
+            <Text style={styles.crewHeading}>Pending multi-worker rosters</Text>
+            <Text style={styles.crewNote}>
+              These are internal capacity reservations. They do not authorize arrival,
+              customer PIN verification, job start or payouts.
+            </Text>
+            {formingCrews.map(crew => (
+              <View key={crew.id} style={styles.crewCard}>
+                <Text style={styles.jobTitle}>{crew.job.title}</Text>
+                <Text style={styles.crewNote}>
+                  {crew.assignments.filter(row => row.status === 'CREW_ACCEPTED').length}
+                  {' / '}{crew.requiredWorkersCount} workers accepted · FORMING
+                </Text>
+                {crew.assignments.map(row => (
+                  <Text key={row.id} style={styles.crewWorker}>
+                    {row.crewRole === 'LEAD' ? 'Lead: ' : 'Member: '}
+                    {row.worker.name} — {row.status === 'CREW_ACCEPTED' ? 'Accepted' : 'Pending response'}
+                  </Text>
+                ))}
+                <TouchableOpacity style={styles.crewCancel} disabled={!!cancellingCrewId}
+                  onPress={() => confirmCancelCrew(crew)}>
+                  <Text style={styles.crewCancelText}>Release staged crew</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {assignments.length ? assignments.map((assignment) => (
           <TouchableOpacity key={assignment.id} style={styles.card} activeOpacity={0.72} onPress={() => router.push(`/(company)/workforce/assignment/${assignment.id}` as any)}>
             <View style={styles.cardHeader}>
@@ -97,6 +187,13 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: v3.colors.canvas },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: 18, paddingBottom: 34 },
+  crewSection: { gap: 8, marginBottom: 16 },
+  crewHeading: { ...v3.typography.bodyLarge, color: v3.colors.ink },
+  crewNote: { ...v3.typography.small, color: v3.colors.textMuted, marginTop: 5, lineHeight: 17 },
+  crewCard: { backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, borderRadius: 16, padding: 14, gap: 5 },
+  crewWorker: { ...v3.typography.caption, color: v3.colors.textSecondary },
+  crewCancel: { borderRadius: 12, borderWidth: 1, borderColor: v3.colors.amberDark, padding: 11, alignItems: 'center', marginTop: 9 },
+  crewCancelText: { ...v3.typography.captionBold, color: v3.colors.amberDark },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, paddingBottom: 14 },
   eyebrow: { ...v3.typography.label, color: v3.colors.amberDark, letterSpacing: 1 },
   title: { ...v3.typography.h4, color: v3.colors.ink, marginTop: 2 },

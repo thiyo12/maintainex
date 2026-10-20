@@ -118,6 +118,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       longitude: true,
       status: true,
       title: true,
+      workersCount: true,
     },
   })
   if (!previewJob) {
@@ -125,6 +126,9 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
   }
   if (previewJob.customerId !== customerId) {
     return { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }
+  }
+  if ((previewJob.workersCount ?? 1) !== 1) {
+    return { success: false, error: 'Crew payment activation is not available', code: 'CREW_PAYMENT_NOT_ENABLED' }
   }
 
   // Phase 02/03: a new payment intent must be authorised by the authoritative
@@ -190,12 +194,13 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         customerId: string
         status: string
         title: string
+        workersCount: number
         countryCode: string
         latitude: number | null
         longitude: number | null
       }[]
     >`
-      SELECT id, "customerId", status, title, "countryCode", "latitude", "longitude"
+      SELECT id, "customerId", status, title, "workersCount", "countryCode", "latitude", "longitude"
       FROM "MarketplaceJob"
       WHERE id = ${jobId}
       FOR UPDATE
@@ -220,6 +225,17 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         intent: null,
         jobTitle: job.title,
         failure: { success: false, error: 'Job is not payable', code: 'JOB_NOT_PAYABLE' },
+      }
+    }
+    if ((job.workersCount ?? 1) !== 1) {
+      return {
+        intent: null,
+        jobTitle: job.title,
+        failure: {
+          success: false,
+          error: 'Crew payment activation is not available',
+          code: 'CREW_PAYMENT_NOT_ENABLED',
+        },
       }
     }
     // Revalidate the authoritative market on the locked row: the job may have
