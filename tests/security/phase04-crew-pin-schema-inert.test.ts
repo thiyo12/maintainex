@@ -26,6 +26,27 @@ describe('Phase 04 — versioned crew challenge persistence is additive and neve
     expect(migration).toContain('ON DELETE RESTRICT')
   })
 
+  it('restores raw challenge constraints in the isolated CI baseline before database tests', () => {
+    const workflow = read('.github/workflows/phase0-7-validation.yml')
+    expect(workflow).toContain('psql "$DATABASE_URL" -v ON_ERROR_STOP=1')
+    expect(workflow).toContain('CompanyCrewPinChallenge_group_epoch_key')
+    expect(workflow).toContain('CompanyCrewPinChallenge_worker_epoch_key')
+    for (const constraint of [
+      'CompanyCrewPinChallenge_version_check',
+      'CompanyCrewPinChallenge_shape_check',
+      'CompanyCrewPinChallenge_status_check',
+      'CompanyCrewPinChallenge_attempts_check',
+      'CompanyCrewPinChallenge_window_check',
+      'CompanyCrewPinChallenge_consumed_check',
+      'CompanyCrewPinChallenge_revoked_check',
+    ]) {
+      expect(migration).toContain(constraint)
+      expect(workflow).toContain(constraint)
+    }
+    expect(workflow).toContain('WHERE "assignmentId" IS NULL')
+    expect(workflow).toContain("INTERVAL '10 minutes'")
+  })
+
   it('preserves all legacy data, indexes and existing crew start/pin denials', () => {
     expect(migration).toContain('CREATE TABLE "CompanyCrewPinChallenge"')
     expect(migration).not.toMatch(/\bDROP\s+(?:TABLE|INDEX|COLUMN|CONSTRAINT)\b/i)
