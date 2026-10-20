@@ -103,6 +103,9 @@ export async function consumeStagedCrewMemberPinInsideTransaction(
   })
   const own = slots.find(slot => slot.workerUserId === input.authenticatedWorkerUserId)
   if (!own) throw new CrewCommitGateError('Crew invitation not found', 404)
+  if (slots.some(s => s.workerUserId === job.customerId)) {
+    throw new CrewCommitGateError('Booking customer cannot verify a crew PIN as a worker')
+  }
   if (slots.length !== crew.requiredWorkersCount ||
       new Set(slots.map(s => s.workerUserId)).size !== slots.length ||
       new Set(slots.map(s => s.crewSlot)).size !== slots.length ||
