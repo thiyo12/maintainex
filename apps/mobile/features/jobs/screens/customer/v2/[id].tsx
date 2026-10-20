@@ -507,7 +507,9 @@ export default function V2JobDetailScreen() {
         ) : null}
 
         {/* ─── Action Cards ─── */}
-        {(job.status === 'QUOTE_ACCEPTED' && escrow?.status === 'PENDING_PAYMENT') || (job.status === 'IN_PROGRESS' && !escrow) ? (
+        {(job.workersCount ?? 1) === 1 &&
+          ((job.status === 'QUOTE_ACCEPTED' && escrow?.status === 'PENDING_PAYMENT') ||
+           (job.status === 'IN_PROGRESS' && !escrow)) ? (
           <View style={styles.actionCard}>
             <View style={styles.actionIconCircle}>
               <Lock size={28} color={colors.ink} weight="fill" />
