@@ -140,6 +140,7 @@ jobs:
             tests/security/phase04-crew-financial-activation-boundary.test.ts \
             tests/security/phase04-crew-pin-epoch.test.ts \
             tests/security/phase04-crew-pin-consume.test.ts \
+            tests/security/phase04-crew-pin-issue.test.ts \
             tests/security/phase04-crew-pin-challenge-schema.test.ts \
             tests/security/phase04-crew-arrival-inventory.test.ts \
             tests/security/phase04-crew-lifecycle-routes.test.ts \
