@@ -75,10 +75,26 @@ describe('Phase 04 — changing a company worker role never strands an active as
     expect(mock.countAssignments).toHaveBeenCalledWith({
       where: {
         companyId: 'company', workerUserId: 'worker',
-        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
       },
     })
   })
+
+  it.each(['CREW_RESERVED', 'CREW_ACCEPTED'])(
+    'blocks role removal while a %s crew reservation occupies the worker', async status => {
+      mock.countAssignments.mockResolvedValue(1)
+      const response = await changeRole()
+      expect(response.status).toBe(409)
+      expect(mock.countAssignments).toHaveBeenCalledWith({
+        where: {
+          companyId: 'company',
+          workerUserId: 'worker',
+          status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
+        },
+      })
+      expect(mock.memberUpdate).not.toHaveBeenCalled()
+    },
+  )
 
   it('allows a completed and unassigned worker to change roles', async () => {
     const response = await changeRole()

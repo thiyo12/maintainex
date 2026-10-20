@@ -112,13 +112,13 @@ export async function DELETE(
         }
       }
 
-      // Never orphan a worker's accepted or in-progress booking. Operators
+      // Never orphan a worker's accepted, in-progress or staged crew booking. Operators
       // must deactivate/reassign pre-start work or complete active work first.
       const assignments = await tx.companyJobAssignment.count({
         where: {
           companyId: context!.companyId,
           workerUserId: target.userId,
-          status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+          status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
         },
       })
       if (assignments > 0) {

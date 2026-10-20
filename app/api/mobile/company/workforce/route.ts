@@ -101,7 +101,7 @@ export async function PATCH(request: NextRequest) {
               where: {
                 companyId,
                 workerUserId: memberUserId,
-                status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+                status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
               },
             })
             if (activeAssignments > 0) throw new Error('WORKER_HAS_ACTIVE_ASSIGNMENT')
@@ -177,13 +177,21 @@ export async function PATCH(request: NextRequest) {
             where: {
               workerUserId: memberUserId,
               companyId,
-              status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+              status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
             },
             select: { id: true, jobId: true, status: true },
           })
 
           if (activeAssignments.some(assignment => assignment.status === 'IN_PROGRESS')) {
             throw new Error('WORKER_HAS_IN_PROGRESS_JOB')
+          }
+          // A forming crew is an indivisible capacity reservation. Revoking
+          // just this worker would leave the other reservations stranded while
+          // the crew still appears FORMING. Cancel the whole crew through the
+          // versioned, audited roster transaction before changing membership.
+          if (activeAssignments.some(assignment =>
+            assignment.status === 'CREW_RESERVED' || assignment.status === 'CREW_ACCEPTED')) {
+            throw new Error('WORKER_HAS_STAGED_CREW')
           }
 
           await tx.teamMember.update({
@@ -327,6 +335,12 @@ export async function PATCH(request: NextRequest) {
       }
       if (err.message === 'MEMBER_ROLE_CHANGED') {
         return NextResponse.json({ error: 'Member role changed concurrently; retry the request' }, { status: 409 })
+      }
+      if (err.message === 'WORKER_HAS_STAGED_CREW') {
+        return NextResponse.json(
+          { error: 'Cancel the whole forming crew before deactivating its worker.' },
+          { status: 409 },
+        )
       }
       if (err.message === 'WORKER_HAS_IN_PROGRESS_JOB') {
         return NextResponse.json(
