@@ -47,7 +47,8 @@ describe('Phase04 manager safety containment after consumed crew PIN',()=>{
   beforeEach(()=>{
     vi.resetAllMocks()
     m.key.mockResolvedValue({companyId:'company',jobId:'job'})
-    m.sql.mockResolvedValueOnce([job]).mockResolvedValueOnce([crew])
+    m.sql.mockImplementation(async (strings:TemplateStringsArray) =>
+      strings.join(' ').includes('MarketplaceJob') ? [job] : [crew])
     m.slots.mockResolvedValue(members)
     m.legacy.mockResolvedValue(null)
     m.workspace.mockResolvedValue(null)
