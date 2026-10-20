@@ -145,6 +145,7 @@ jobs:
             tests/security/phase04-crew-all-member-identity-barrier.test.ts \
             tests/security/phase04-crew-evidence-route.test.ts \
             tests/security/phase04-company-crew-evidence-mobile.test.ts \
+            tests/security/phase04-dev-only-crew-staging-mobile.test.ts \
             tests/security/phase04-customer-crew-photo-mobile.test.ts \
             tests/security/phase04-crew-schema-foundation.test.ts \
             tests/security/phase04-crew-readiness-mobile-freshness.test.ts \
