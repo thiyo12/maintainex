@@ -70,6 +70,7 @@ export async function POST(
     if (message.includes('Only the customer')) return NextResponse.json({ error: message }, { status: 403 })
     if (message.includes('not found')) return NextResponse.json({ error: message }, { status: 404 })
     if (
+      message.includes('CREW_PAYMENT_NOT_ENABLED') ||
       message.includes('already active') ||
       message.includes('state changed') ||
       message.includes('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
