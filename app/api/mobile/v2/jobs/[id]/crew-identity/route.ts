@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
+import { CrewCommitGateError } from '@/lib/domain/company-crew-commit-gate'
+import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { secureConsole } from '@/lib/shared/observability/secure-console'
@@ -169,5 +172,62 @@ export async function GET(
   } catch (error) {
     secureConsole.error('Customer crew identity preview failed:', error)
     return NextResponse.json({ error: 'Unable to load crew identity preview' }, { status: 500 })
+  }
+}
+
+/**
+ * Per-member MATCH or safety MISMATCH is submitted by the booking customer
+ * only. Version and slot checks are repeated under SERIALIZABLE job/crew
+ * locks. Even the final successful MATCH never grants dispatch or work-start.
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const user = await authenticateMarketplaceUser(request)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
+    const { id: jobId } = await params
+    const body: unknown = await request.json().catch(() => null)
+    if (!body || typeof body !== 'object' || Array.isArray(body) ||
+        !jobId || jobId.length > 128) {
+      return NextResponse.json({ error: 'Invalid crew identity decision' }, { status: 400 })
+    }
+    const input = body as Record<string, unknown>
+    if (typeof input.crewDispatchId !== 'string' ||
+        !input.crewDispatchId.trim() || input.crewDispatchId.length > 128 ||
+        typeof input.assignmentId !== 'string' ||
+        !input.assignmentId.trim() || input.assignmentId.length > 128 ||
+        !Number.isSafeInteger(input.expectedVersion) ||
+        (input.expectedVersion as number) < 1 ||
+        !['MATCH', 'MISMATCH'].includes(String(input.decision)) ||
+        (input.reason !== undefined &&
+          (typeof input.reason !== 'string' || input.reason.length > 250)) ||
+        'customerUserId' in input || 'actorUserId' in input) {
+      return NextResponse.json({ error: 'Invalid crew identity decision' }, { status: 400 })
+    }
+    const result = await prisma.$transaction(tx => decideCrewWorkerIdentityInsideTransaction(tx, {
+      jobId,
+      crewDispatchId: input.crewDispatchId as string,
+      assignmentId: input.assignmentId as string,
+      expectedVersion: input.expectedVersion as number,
+      customerUserId: user.id,
+      decision: input.decision as 'MATCH' | 'MISMATCH',
+      reason: input.reason as string | undefined,
+    }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    return NextResponse.json({
+      ...result, workStartEnabled: false, arrivalPinEnabled: false,
+    }, { headers: { 'Cache-Control': 'private, no-store' } })
+  } catch (error) {
+    if (error instanceof CrewCommitGateError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+      return NextResponse.json({ error: 'Crew membership changed; refresh and retry' }, { status: 409 })
+    }
+    secureConsole.error('Customer crew photo decision failed:', error)
+    return NextResponse.json({ error: 'Unable to record crew photo decision' }, { status: 500 })
   }
 }
