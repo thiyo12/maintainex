@@ -28,7 +28,17 @@ export async function POST(
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE })
     const blocked = assertNotSuspended(user)
-    if (blocked) return blocked
+    if (blocked) {
+      blocked.headers.set('Cache-Control', 'private, no-store')
+      return blocked
+    }
+    // Bearer authentication prevents ambient cookie invocation. Still reject
+    // simple-form and plain-text submissions at the API boundary.
+    const contentType = request.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase()
+    if (contentType !== 'application/json') {
+      return NextResponse.json({ error: 'JSON request required' },
+        { status: 415, headers: NO_STORE })
+    }
 
     const { id: jobId } = await params
     const lengthHeader = request.headers.get('content-length')
