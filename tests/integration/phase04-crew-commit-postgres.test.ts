@@ -12,6 +12,7 @@ import { issueStagedCrewArrivalPinsInsideTransaction } from '@/lib/domain/compan
 import { assertAllCrewPinClaimsInsideTransaction } from '@/lib/domain/company-crew-pin-claims'
 import { recordCrewPresenceWitnessInsideTransaction } from '@/lib/domain/company-crew-presence-record'
 import { assertCrewDualWitnessInventoryInsideTransaction } from '@/lib/domain/company-crew-presence-witness'
+import { assertCrewPrestartFinancialEvidenceInsideTransaction } from '@/lib/domain/company-crew-prestart-finance'
 import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -1362,8 +1363,70 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         where: { crewDispatchId: staged.crewDispatchId },
       })).every(row => row.startedAt === null && row.crewArrivedAt === null)).toBe(true)
       expect(await db!.jobVerificationPin.count({ where: { jobId: booking.id } })).toBe(0)
+      // Every PIN and both independent actor acknowledgements can be
+      // complete, but there is NO protected crew payment. The new read-only
+      // finance gate must refuse to authorize any work or manufacture funding.
+      expect(await db!.jobEscrow.count({ where: { jobId: booking.id } })).toBe(0)
+      await expect(db!.$transaction(tx =>
+        assertCrewPrestartFinancialEvidenceInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, expectedVersion: 1,
+          actorUserId: ownerId, actorRole: 'COMPANY_OWNER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('incomplete or conflicting finance/workspace state')
+      expect(await db!.paymentIntent.count({ where: { jobId: booking.id } })).toBe(0)
       expect(await db!.jobWorkspace.count({ where: { jobId: booking.id } })).toBe(0)
+
+      // Positive SQL proof uses isolated rows only. Nothing is charged,
+      // authorized, notified, or released by a processor: protected funding
+      // here is a synthetic local fixture, NOT payment onboarding approval.
+      const quoteForFixture = await db!.jobQuote.findFirstOrThrow({
+        where: { jobId: booking.id, status: 'ACCEPTED' },
+      })
+      const paidAt = new Date(Date.now() - 120000)
+      const protectedAt = new Date(Date.now() - 60000)
+      const testEscrow = await db!.jobEscrow.create({
+        data: {
+          jobId: booking.id, quoteId: quoteForFixture.id,
+          customerId: ownerId, providerId: companyId,
+          paymentMethod: 'CARD', currency: quoteForFixture.currency,
+          amount: quoteForFixture.price, serviceFee: 1000n,
+          totalAmount: quoteForFixture.price + 1000n,
+          status: 'PROTECTED', heldAt: protectedAt,
+        },
+      })
+      await db!.paymentIntent.create({
+        data: {
+          jobId: booking.id, customerId: ownerId, escrowId: testEscrow.id,
+          merchantOrderId: 'phase04-ci-fake-' + randomUUID(),
+          gateway: 'CI_ONLY_NO_GATEWAY', amount: testEscrow.totalAmount,
+          currency: testEscrow.currency, status: 'SUCCESS', paidAt,
+        },
+      })
+      const diag = await db!.$transaction(tx =>
+        assertCrewPrestartFinancialEvidenceInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, expectedVersion: 1,
+          actorUserId: ownerId, actorRole: 'COMPANY_OWNER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(diag).toMatchObject({
+        financialEvidenceComplete: true,
+        workersCount: 2, independentPhysicalPresenceVerified: false,
+        groupArrivalEnabled: false, workStartEnabled: false,
+        paymentExecutionEnabled: false,
+      })
+      expect((await db!.marketplaceJob.findUniqueOrThrow({
+        where: { id: booking.id },
+      })).status).toBe('QUOTE_ACCEPTED')
+      expect((await db!.companyCrewDispatch.findUniqueOrThrow({
+        where: { id: staged.crewDispatchId },
+      })).status).toBe('FORMING')
+      expect((await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })).every(row => row.startedAt === null && row.crewArrivedAt === null)).toBe(true)
+
     } finally {
+      await db!.paymentIntent.deleteMany({ where: { jobId: booking.id } })
+      await db!.jobEscrow.deleteMany({ where: { jobId: booking.id } })
       await db!.companyCrewPresenceWitness.deleteMany({
         where: { jobId: booking.id },
       })
