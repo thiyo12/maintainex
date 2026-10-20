@@ -168,6 +168,15 @@ describe('Phase04 customer-bound two-worker PIN issuance: no arrival/work author
     expect(m.audit).not.toHaveBeenCalled()
   })
 
+  it('forbids the booking customer also being ANY crew member before issuing codes', async () => {
+    m.slots.mockResolvedValue([
+      workers[0], { ...workers[1], workerUserId: customerId },
+    ])
+    await expect(issue()).rejects.toThrow('cannot issue PINs to their own crew account')
+    expect(m.createMany).not.toHaveBeenCalled()
+    expect(m.audit).not.toHaveBeenCalled()
+  })
+
   it('does not enable production issuance or expose customer codes through any route', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     try {

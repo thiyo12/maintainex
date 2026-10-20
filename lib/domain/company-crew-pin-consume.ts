@@ -32,6 +32,11 @@ export async function consumeStagedCrewMemberPinInsideTransaction(
   arrivalEnabled: false
   workStartEnabled: false
 }> {
+  // Defense in depth: even an accidentally introduced direct server caller
+  // may not consume crew challenges in a production process.
+  if (process.env.NODE_ENV === 'production') {
+    throw new CrewCommitGateError('Crew arrival PIN consumption is not enabled')
+  }
   if (typeof input.crewDispatchId !== 'string' ||
       !input.crewDispatchId.trim() || input.crewDispatchId.length > 128 ||
       typeof input.authenticatedWorkerUserId !== 'string' ||
@@ -98,6 +103,9 @@ export async function consumeStagedCrewMemberPinInsideTransaction(
   })
   const own = slots.find(slot => slot.workerUserId === input.authenticatedWorkerUserId)
   if (!own) throw new CrewCommitGateError('Crew invitation not found', 404)
+  if (slots.some(s => s.workerUserId === job.customerId)) {
+    throw new CrewCommitGateError('Booking customer cannot verify a crew PIN as a worker')
+  }
   if (slots.length !== crew.requiredWorkersCount ||
       new Set(slots.map(s => s.workerUserId)).size !== slots.length ||
       new Set(slots.map(s => s.crewSlot)).size !== slots.length ||
