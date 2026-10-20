@@ -55,7 +55,7 @@ export async function consumeStagedCrewMemberPinInsideTransaction(
   })
   if (!key) throw new CrewCommitGateError('Crew invitation not found', 404)
   const quotes = await tx.$queryRaw<Array<{ id: string }>>`
-    SELECT id FROM "Job`uote"
+    SELECT id FROM "JobQuote"
     WHERE "jobId" = ${key.jobId} AND "providerId" = ${key.companyId}
       AND "providerType" = 'COMPANY' AND status = 'ACCEPTED'
     FOR SHARE
@@ -80,7 +80,7 @@ export async function consumeStagedCrewMemberPinInsideTransaction(
   if (!crew || !job || crew.companyId !== key.companyId ||
       crew.jobId !== key.jobId || crew.status !== 'FORMING' ||
       crew.version !== input.expectedVersion ||
-      job.status !== '`UOTE_ACCEPTED' ||
+      job.status !== 'QUOTE_ACCEPTED' ||
       job.workersCount !== crew.requiredWorkersCount ||
       crew.requiredWorkersCount < 2 || crew.requiredWorkersCount > 12) {
     throw new CrewCommitGateError('Crew or booking epoch has changed')
@@ -106,7 +106,7 @@ export async function consumeStagedCrewMemberPinInsideTransaction(
   const mismatch = await tx.jobWorkerIdentityCheck.findFirst({
     where: {
       jobId: job.id,
-      status: { in: ['MISMATCH_REPORTED', 'REVIEW_RE`UIRED'] },
+      status: { in: ['MISMATCH_REPORTED', 'REVIEW_REQUIRED'] },
     },
     select: { id: true },
   })
