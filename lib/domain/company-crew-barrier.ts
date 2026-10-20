@@ -17,12 +17,21 @@ import { CrewCommitGateError } from '@/lib/domain/company-crew-commit-gate'
  */
 export async function assertStagedCrewIdentityEvidenceInsideTransaction(
   tx: Prisma.TransactionClient,
-  input: {
-    crewDispatchId: string
-    expectedVersion: number
-    actorUserId: string // must be the authenticated company dispatcher
-    actorRole: string // must originate from active company membership
-  },
+  input:
+    | {
+        crewDispatchId: string
+        expectedVersion: number
+        actorUserId: string // authenticated company dispatcher
+        actorRole: string // active company role
+        customerUserId?: never
+      }
+    | {
+        crewDispatchId: string
+        expectedVersion: number
+        customerUserId: string // authenticated booking customer ONLY
+        actorUserId?: never
+        actorRole?: never
+      },
 ): Promise<{
   crewDispatchId: string
   version: number
@@ -33,8 +42,11 @@ export async function assertStagedCrewIdentityEvidenceInsideTransaction(
   workStartEnabled: false
 }> {
   if (!input.crewDispatchId || input.crewDispatchId.length > 128 ||
-      !input.actorUserId || input.actorUserId.length > 128 ||
-      !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1) {
+      !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1 ||
+      ('customerUserId' in input
+        ? (!input.customerUserId || input.customerUserId.length > 128)
+        : (!input.actorUserId || input.actorUserId.length > 128 ||
+          !input.actorRole || input.actorRole.length > 128))) {
     throw new CrewCommitGateError('Invalid crew evidence request', 400)
   }
 
@@ -43,11 +55,25 @@ export async function assertStagedCrewIdentityEvidenceInsideTransaction(
     select: { companyId: true, jobId: true },
   })
   if (!key) throw new CrewCommitGateError('Crew booking not found', 404)
-  // Do not reveal booking metadata until the actor's membership and account
-  // are checked under the same row locks used for workforce role changes.
-  await lockAndAssertAssignmentActorAuthorized(
-    tx, key.companyId, input.actorUserId, input.actorRole,
-  )
+  if (input.customerUserId) {
+    // A customer can only review evidence for their OWN booking. The customer
+    // never gains dispatcher permissions, and neither caller can select a
+    // different user through request body parameters.
+    const ownership = await tx.marketplaceJob.findUnique({
+      where: { id: key.jobId },
+      select: { customerId: true },
+    })
+    if (!ownership || ownership.customerId !== input.customerUserId) {
+      throw new CrewCommitGateError('Crew booking not found', 404)
+    }
+  } else {
+    // Managers recheck current global account and membership under the same
+    // locks used by workforce role changes. Customer authorization is never
+    // inferred from the manager's role (or the historical founder ID).
+    await lockAndAssertAssignmentActorAuthorized(
+      tx, key.companyId, input.actorUserId!, input.actorRole!,
+    )
+  }
 
   const quotes = await tx.$queryRaw<Array<{ id: string }>>`
     SELECT id FROM "JobQuote"
