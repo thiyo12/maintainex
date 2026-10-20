@@ -1121,4 +1121,51 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
     }
   })
 
+
+  it('isolated PostgreSQL keeps per-epoch witness uniqueness and rejects empty or invalid witnesses', async () => {
+    const slot = await db!.companyJobAssignment.findFirstOrThrow({
+      where: { crewDispatchId: crewId },
+      select: { id: true, workerUserId: true },
+    })
+    const data = {
+      crewDispatchId: crewId, assignmentId: slot.id,
+      jobId, crewVersion: 42, workerUserId: slot.workerUserId,
+      customerUserId: ownerId,
+      workerAttestedAt: new Date(), customerAttestedAt: null,
+    }
+    try {
+      const witness = await db!.companyCrewPresenceWitness.create({ data })
+      expect(witness.workerAttestedAt).not.toBeNull()
+      expect(witness.customerAttestedAt).toBeNull()
+      // The same worker cannot provide duplicate records for one crew epoch.
+      await expect(db!.companyCrewPresenceWitness.create({
+        data: { ...data, customerAttestedAt: new Date() },
+      })).rejects.toThrow()
+      // The raw migration CHECKs must be restored in Prisma-generated CI
+      // bootstrap too. No blank or zero-epoch witness is accepted.
+      await expect(db!.companyCrewPresenceWitness.create({
+        data: {
+          ...data, crewVersion: 43,
+          workerAttestedAt: null, customerAttestedAt: null,
+        },
+      })).rejects.toThrow()
+      await expect(db!.companyCrewPresenceWitness.create({
+        data: { ...data, crewVersion: 0 },
+      })).rejects.toThrow()
+      expect(await db!.companyCrewPresenceWitness.count({
+        where: { crewDispatchId: crewId, crewVersion: 42 },
+      })).toBe(1)
+      expect(await db!.companyCrewPresenceWitness.findUnique({
+        where: { id: witness.id },
+      })).toMatchObject({
+        assignmentId: slot.id, workerUserId: slot.workerUserId,
+        customerUserId: ownerId, crewVersion: 42,
+      })
+    } finally {
+      await db!.companyCrewPresenceWitness.deleteMany({
+        where: { crewDispatchId: crewId, crewVersion: { in: [0, 42, 43] } },
+      })
+    }
+  })
+
 })
