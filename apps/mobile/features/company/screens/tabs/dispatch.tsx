@@ -97,6 +97,41 @@ export default function CompanyDispatch() {
     }
   }
 
+  const [reviewingCrewId, setReviewingCrewId] = useState<string | null>(null)
+
+  const reviewCrewEvidence = async (crew: CrewRoster) => {
+    if (!activeCompanyId || reviewingCrewId) return
+    setReviewingCrewId(crew.id)
+    try {
+      const evidence = await v2Request<{
+        memberEvidenceComplete: true
+        dispatchEnabled: false
+        arrivalEnabled: false
+        workStartEnabled: false
+      }>('/api/mobile/company/crew/evidence', {
+        method: 'POST',
+        body: JSON.stringify({
+          companyId: activeCompanyId,
+          crewDispatchId: crew.id,
+          expectedVersion: crew.version,
+        }),
+      })
+      Alert.alert(
+        'Crew identities checked',
+        evidence.memberEvidenceComplete
+          ? 'All workers have current customer-confirmed photos. Crew dispatch, arrival and Start Work remain disabled.'
+          : 'Crew identity verification is not yet complete.',
+      )
+    } catch (error: any) {
+      Alert.alert(
+        'Crew identity checks are incomplete',
+        error?.message || 'Every worker must accept and have a current customer-confirmed photo.',
+      )
+    } finally {
+      setReviewingCrewId(null)
+    }
+  }
+
   const confirmCancelCrew = (crew: CrewRoster) => Alert.alert(
     'Cancel this unstarted crew?',
     'All worker reservations will be released together. An accepted customer booking is not cancelled.',
@@ -152,6 +187,11 @@ export default function CompanyDispatch() {
                     {row.worker.name} — {row.status === 'CREW_ACCEPTED' ? 'Accepted' : 'Pending response'}
                   </Text>
                 ))}
+                <TouchableOpacity style={styles.crewReview}
+                  disabled={!!reviewingCrewId || !!cancellingCrewId}
+                  onPress={() => { void reviewCrewEvidence(crew) }}>
+                  <Text style={styles.crewReviewText}>Check all worker identities</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.crewCancel} disabled={!!cancellingCrewId}
                   onPress={() => confirmCancelCrew(crew)}>
                   <Text style={styles.crewCancelText}>Release staged crew</Text>
@@ -192,6 +232,8 @@ const styles = StyleSheet.create({
   crewNote: { ...v3.typography.small, color: v3.colors.textMuted, marginTop: 5, lineHeight: 17 },
   crewCard: { backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, borderRadius: 16, padding: 14, gap: 5 },
   crewWorker: { ...v3.typography.caption, color: v3.colors.textSecondary },
+  crewReview: { borderRadius: 12, backgroundColor: v3.colors.ink, padding: 11, alignItems: 'center', marginTop: 9 },
+  crewReviewText: { ...v3.typography.captionBold, color: v3.colors.paper },
   crewCancel: { borderRadius: 12, borderWidth: 1, borderColor: v3.colors.amberDark, padding: 11, alignItems: 'center', marginTop: 9 },
   crewCancelText: { ...v3.typography.captionBold, color: v3.colors.amberDark },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, paddingBottom: 14 },
