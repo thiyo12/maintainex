@@ -139,6 +139,7 @@ jobs:
             tests/security/phase04-crew-lifecycle-routes.test.ts \
             tests/security/phase04-worker-crew-mobile-invitations.test.ts \
             tests/security/phase04-company-crew-roster-mobile.test.ts \
+            tests/security/phase04-customer-crew-identity-preview.test.ts \
             tests/security/phase04-crew-schema-foundation.test.ts \
             tests/security/phase04-crew-readiness-mobile-freshness.test.ts \
             tests/security/phase04-crew-readiness-route.test.ts \
