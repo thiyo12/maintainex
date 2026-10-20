@@ -198,6 +198,14 @@ describe('Phase04 internal PIN consumption is exact-member scoped and never auth
     } finally { vi.unstubAllEnvs() }
   })
 
+  it('rejects a booking customer occupying another worker slot even for a valid worker PIN', async () => {
+    m.slots.mockResolvedValue([
+      slots[0], { ...slots[1], workerUserId: 'customer' },
+    ])
+    await expect(verify()).rejects.toThrow('cannot verify a crew PIN')
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
   it('existing live routes still provide no crew arrival or work start', () => {
     for (const path of [
       'app/api/mobile/worker/crew/route.ts',
