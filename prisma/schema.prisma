@@ -3595,11 +3595,8 @@ model CompanyJobAssignment {
 }
 
 
-/**
- * Phase 04 inert challenge storage for an eventual per-member, per-purpose
- * epoch-bound crew PIN protocol. No application issuer/verifier is wired.
- * A challenge is NOT proof of attendance, acceptance or work authority.
- */
+/// Phase 04 inert member/epoch/purpose crew PIN challenge storage.
+/// No application issuer or verifier; challenge does not authorize work.
 model CompanyCrewPinChallenge {
   id                     String   @id @default(cuid())
   crewDispatchId         String
