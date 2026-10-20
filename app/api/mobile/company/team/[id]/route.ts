@@ -7,6 +7,8 @@ import { safeParseJsonArr } from '@/lib/db-utils'
 import { hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { Prisma } from '@prisma/client'
+import { blockWorkerFormingCrewsInsideTransaction } from '@/lib/domain/company-crew-workforce'
 
 export async function DELETE(
   request: NextRequest,
@@ -125,6 +127,13 @@ export async function DELETE(
         return { status: 409, error: 'Member has an active job. Complete or reassign it before removal.' }
       }
 
+      // Stage-only holds do not justify leaving coworkers orphaned. Revoke
+      // the entire FORMING roster in this same transaction as removal.
+      const crewInvalidation = await blockWorkerFormingCrewsInsideTransaction(tx, {
+        companyId: context!.companyId, workerUserId: target.userId,
+        actorUserId: user.id, actorRole: actorMembership.role, reason: 'REMOVED',
+      })
+
       const removed = await tx.teamMember.updateMany({
         where: {
           id, companyId: context!.companyId,
@@ -146,11 +155,15 @@ export async function DELETE(
         targetType: 'TeamMember',
         targetId: id,
         description: `Removed ${target.name} (${target.role}) from company`,
-        metadata: { removedUserId: target.userId, removedRole: target.role },
+        metadata: {
+          removedUserId: target.userId, removedRole: target.role,
+          blockedCrews: crewInvalidation.blockedCrewsCount,
+          revokedCrewSlots: crewInvalidation.revokedCrewSlotsCount,
+        },
       }, tx)
 
       return { success: true } as const
-    })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
     if ('error' in result) {
       return NextResponse.json({ error: result.error }, { status: result.status })
@@ -158,6 +171,10 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error instanceof Error && (error.message === 'CREW_WORKFORCE_STATE_CONFLICT' ||
+        (error as Error & { code?: string }).code === 'P2034')) {
+      return NextResponse.json({ error: 'Crew changed concurrently or has arrival/work evidence; retry or resolve roster first' }, { status: 409 })
+    }
     secureConsole.error('Team member delete error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }

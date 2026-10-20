@@ -3550,6 +3550,7 @@ model CompanyCrewDispatch {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   assignments          CompanyJobAssignment[]
+  crewPinChallenges    CompanyCrewPinChallenge[]
 
   @@index([companyId, status])
 }
@@ -3582,6 +3583,8 @@ model CompanyJobAssignment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  crewPinChallenges CompanyCrewPinChallenge[]
+
   @@unique([jobId, workerUserId])
   @@unique([crewDispatchId, crewSlot])
   @@index([crewDispatchId])
@@ -3589,6 +3592,34 @@ model CompanyJobAssignment {
   @@index([workerUserId])
   @@index([jobId])
   @@index([status])
+}
+
+
+/// Phase 04 inert member/epoch/purpose crew PIN challenge storage.
+/// No application issuer or verifier; challenge does not authorize work.
+model CompanyCrewPinChallenge {
+  id                     String   @id @default(cuid())
+  crewDispatchId         String
+  crewDispatch           CompanyCrewDispatch @relation(fields: [crewDispatchId], references: [id], onDelete: Restrict)
+  assignmentId           String
+  assignment             CompanyJobAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  jobId                  String
+  crewVersion            Int
+  purpose                String   // ARRIVAL or WORK_START (DB check)
+  challengeVersion       Int      @default(1)
+  pinDigest              String   // scoped HMAC; NEVER plaintext
+  issuedByCustomerUserId String
+  expiresAt              DateTime
+  failedAttempts         Int      @default(0)
+  lockedUntil            DateTime?
+  consumedAt             DateTime?
+  revokedAt              DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([crewDispatchId, crewVersion, assignmentId, purpose, challengeVersion], map: "CrewPinChallenge_scope_version_key")
+  @@index([crewDispatchId, crewVersion, purpose], map: "CrewPinChallenge_crew_purpose_idx")
+  @@index([assignmentId, purpose, expiresAt], map: "CrewPinChallenge_assignment_expiry_idx")
 }
 
 model PaymentProviderConfig {
