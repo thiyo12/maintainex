@@ -3620,9 +3620,9 @@ model CompanyCrewPinChallenge {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
-  @@unique([crewDispatchId, crewVersion, assignmentId, purpose, challengeVersion])
-  @@index([crewDispatchId, crewVersion, purpose])
-  @@index([assignmentId, purpose, expiresAt])
+  @@unique([crewDispatchId, crewVersion, assignmentId, purpose, challengeVersion], map: "CrewPinChallenge_scope_version_key")
+  @@index([crewDispatchId, crewVersion, purpose], map: "CrewPinChallenge_crew_purpose_idx")
+  @@index([assignmentId, purpose, expiresAt], map: "CrewPinChallenge_assignment_expiry_idx")
 }
 
 model PaymentProviderConfig {
