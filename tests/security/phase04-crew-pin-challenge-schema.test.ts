@@ -25,7 +25,7 @@ describe('Phase04 crew member challenge persistence remains inert and scoped', (
 
   it('only adds a constrained table without weakening old unique assignment/PIN guards', () => {
     expect(migration).toContain('CREATE TABLE "CompanyCrewPinChallenge"')
-    expect(migration).not.toMatch(/\b(DROP|DELETE|TRUNCATE)\b/i)
+    expect(migration).not.toMatch(/\b(?:DROP\s+(?:TABLE|INDEX|COLUMN|CONSTRAINT)|DELETE\s+FROM|TRUNCATE\s+TABLE)\b/i)
     expect(migration).not.toMatch(/\bUPDATE\s+"MarketplaceJob"\b/i)
     expect(migration).toContain('ON DELETE RESTRICT')
     const legacy = source('lib/domain/job-pin.ts')
