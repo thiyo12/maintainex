@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
+import { revokeCrewPinChallengesInsideTransaction } from '@/lib/domain/company-crew-pin-revocation'
 
 // Must be called under the SAME SERIALIZABLE transaction and current membership
 // locks as the worker role/status write. Terminal: never enables PIN or work.
@@ -86,6 +87,16 @@ export async function blockWorkerFormingCrewsInsideTransaction(
           slot.jobId !== crew.jobId || !slot.crewSlot ||
           slot.crewArrivedAt !== null || slot.startedAt !== null ||
           !['CREW_RESERVED', 'CREW_ACCEPTED'].includes(slot.status))) {
+      throw new Error('CREW_WORKFORCE_STATE_CONFLICT')
+    }
+
+    // Under the same job/crew lock, withdraw all unconsumed member codes.
+    // Consumed proof is a support-only state and stops this membership write.
+    try {
+      await revokeCrewPinChallengesInsideTransaction(tx, {
+        crewDispatchId: crew.id, crewVersion: crew.version,
+      })
+    } catch {
       throw new Error('CREW_WORKFORCE_STATE_CONFLICT')
     }
 
