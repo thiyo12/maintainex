@@ -4,6 +4,7 @@ import { checkCompanyEligibility, checkCrewCandidateEligibility } from '@/lib/ph
 import { lockAndAssertAssignmentActorAuthorized, lockAndAssertWorkerScheduleAvailable } from '@/lib/domain/company-job-assignment'
 import { CrewCommitGateError } from '@/lib/domain/company-crew-commit-gate'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
+import { revokeCrewPinChallengesInsideTransaction } from '@/lib/domain/company-crew-pin-revocation'
 
 export interface CrewWorkerDecision {
   crewDispatchId: string
@@ -224,6 +225,11 @@ export async function rejectStagedCrewMemberInsideTransaction(
   `
   if (accounts.length !== 1) throw new CrewCommitGateError('Worker account no longer exists')
 
+  // No individual decline may abandon coworkers' still-usable PINs.
+  // A consumed claim requires safety/support review before ordinary refusal.
+  await revokeCrewPinChallengesInsideTransaction(tx, {
+    crewDispatchId: crew.id, crewVersion: crew.version,
+  })
   const now = new Date()
   const rejected = await tx.companyJobAssignment.updateMany({
     where: {
@@ -371,6 +377,11 @@ export async function cancelStagedCrewInsideTransaction(
     throw new CrewCommitGateError('Crew roster is not safe to cancel')
   }
 
+  // Revoke every unused member PIN together with the roster. Never erase or
+  // silently cancel a crew once even one member has consumed an arrival PIN.
+  await revokeCrewPinChallengesInsideTransaction(tx, {
+    crewDispatchId: crew.id, crewVersion: crew.version,
+  })
   const now = new Date()
   const released = await tx.companyJobAssignment.updateMany({
     where: { crewDispatchId: crew.id, status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] } },
