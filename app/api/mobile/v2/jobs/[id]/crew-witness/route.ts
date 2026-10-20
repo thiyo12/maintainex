@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { recordCrewPresenceWitnessInsideTransaction } from '@/lib/domain/company-crew-presence-record'
 import { CrewCommitGateError } from '@/lib/domain/company-crew-commit-gate'
+import { isPhase04CrewWitnessIsolatedTestEnvironment } from '@/lib/domain/company-crew-witness-isolated-db'
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' }
@@ -19,8 +20,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (process.env.NODE_ENV === 'production' ||
-      process.env.MAINTAINEX_PHASE04_CREW_WITNESS_TEST_ENABLED !== 'true') {
+  if (!isPhase04CrewWitnessIsolatedTestEnvironment()) {
     return NextResponse.json({ error: 'Crew witness recording is not enabled' },
       { status: 409, headers: NO_STORE })
   }
