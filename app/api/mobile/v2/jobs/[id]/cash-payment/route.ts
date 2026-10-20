@@ -72,6 +72,12 @@ export async function POST(
     logger.error('Cash payment selection failed unexpectedly', { err: error, route: '/api/mobile/v2/jobs/[id]/cash-payment', method: 'POST' })
     const message = error instanceof Error ? error.message : 'Cash payment selection failed'
 
+    if (message === 'CREW_PAYMENT_NOT_ENABLED') {
+      return NextResponse.json(
+        { error: 'Crew payment activation is not available', code: message },
+        { status: 409 },
+      )
+    }
     if (message === 'CASH_PAYMENT_NOT_AVAILABLE_FOR_MARKET') {
       return NextResponse.json(
         {
