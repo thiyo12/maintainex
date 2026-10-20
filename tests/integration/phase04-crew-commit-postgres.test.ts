@@ -257,6 +257,16 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
           issuedByCustomerUserId: ownerId, expiresAt,
         },
       })).rejects.toThrow()
+      // A different version still cannot create two simultaneously live
+      // challenges for the same worker/purpose in a crew epoch.
+      await expect(db!.companyCrewPinChallenge.create({
+        data: {
+          crewDispatchId: crewId, assignmentId: slots[0].id, jobId,
+          crewVersion: 1, purpose: 'ARRIVAL', challengeVersion: 2,
+          pinDigest: persisted[0].pinDigest,
+          issuedByCustomerUserId: ownerId, expiresAt,
+        },
+      })).rejects.toThrow()
       await expect(db!.companyCrewPinChallenge.create({
         data: {
           crewDispatchId: crewId, assignmentId: slots[0].id, jobId,
