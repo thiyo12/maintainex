@@ -90,6 +90,21 @@ describe('Phase04 opt-in development witness actor-bound route (never arrival)',
       expect(m.record).not.toHaveBeenCalled()
     }
   })
+  it('rejects cross-site simple content types and requires an explicit JSON body', async () => {
+    const { POST } = await import('@/app/api/mobile/v2/jobs/[id]/crew-witness/route')
+    for (const type of ['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data', '']) {
+      const response = await POST(new NextRequest(
+        'http://localhost/api/mobile/v2/jobs/job-1/crew-witness', {
+          method: 'POST', body: JSON.stringify(valid),
+          headers: type ? { 'content-type': type } : {},
+        },
+      ), { params: Promise.resolve({ id: 'job-1' }) })
+      expect(response.status).toBe(415)
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    }
+    expect(m.transaction).not.toHaveBeenCalled()
+    expect(m.record).not.toHaveBeenCalled()
+  })
   it('binds the authenticated customer and exact URL booking in SERIALIZABLE transaction', async () => {
     const response = await post()
     expect(response.status).toBe(200)
@@ -139,7 +154,9 @@ describe('Phase04 opt-in development witness actor-bound route (never arrival)',
     expect((await post()).status).toBe(401)
     m.actor = 'worker-2'
     m.suspended = true
-    expect((await post()).status).toBe(403)
+    const suspended = await post()
+    expect(suspended.status).toBe(403)
+    expect(suspended.headers.get('Cache-Control')).toBe('private, no-store')
     m.suspended = false
     m.customer.mockResolvedValue(null)
     m.worker.mockResolvedValue(null)
