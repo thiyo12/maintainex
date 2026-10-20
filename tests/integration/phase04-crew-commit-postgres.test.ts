@@ -458,7 +458,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       const result = await db!.$transaction(async tx => {
         await tx.$queryRaw`
           SELECT id FROM "TeamMember"
-          WHERE "companyId" = ${{companyId} AND "userId" = ${{workerIds[0]} FOR UPDATE
+          WHERE "companyId" = ${companyId} AND "userId" = ${workerIds[0]} FOR UPDATE
         `
         const invalidated = await blockWorkerFormingCrewsInsideTransaction(tx, {
           companyId, workerUserId: workerIds[0], actorUserId: ownerId,
