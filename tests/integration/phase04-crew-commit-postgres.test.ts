@@ -6,6 +6,7 @@ import { acceptStagedCrewMemberInsideTransaction, rejectStagedCrewMemberInsideTr
 import { lockAndAssertWorkerScheduleAvailable } from '@/lib/domain/company-job-assignment'
 import { assertStagedCrewIdentityEvidenceInsideTransaction } from '@/lib/domain/company-crew-barrier'
 import { blockWorkerFormingCrewsInsideTransaction } from '@/lib/domain/company-crew-workforce'
+import { deriveCrewPinDigest } from '@/lib/domain/company-crew-pin-epoch'
 import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -215,6 +216,62 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
     expect(await db!.jobVerificationPin.count({ where: { jobId } })).toBe(0)
     expect((await db!.marketplaceJob.findUniqueOrThrow({ where: { id: jobId } })).status)
       .toBe('QUOTE_ACCEPTED')
+  })
+
+
+  it('isolated PostgreSQL PIN ledger separates crew members and rejects duplicate epochs without enabling work', async () => {
+    const slots = await db!.companyJobAssignment.findMany({
+      where: { crewDispatchId: crewId },
+      orderBy: { crewSlot: 'asc' },
+    })
+    expect(slots).toHaveLength(2)
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
+    const secret = Buffer.alloc(32, 0x41) // Deterministic test-only HMAC key
+    try {
+      const created = await db!.companyCrewPinChallenge.createMany({
+        data: slots.map(slot => ({
+          crewDispatchId: crewId, assignmentId: slot.id, jobId,
+          crewVersion: 1, purpose: 'ARRIVAL', challengeVersion: 1,
+          pinDigest: deriveCrewPinDigest('123456', {
+            crewDispatchId: crewId, assignmentId: slot.id,
+            jobId, crewVersion: 1,
+            workerUserId: slot.workerUserId, purpose: 'ARRIVAL',
+          }, secret),
+          issuedByCustomerUserId: ownerId, expiresAt,
+        })),
+      })
+      expect(created.count).toBe(2)
+      const persisted = await db!.companyCrewPinChallenge.findMany({
+        where: { crewDispatchId: crewId },
+      })
+      expect(persisted).toHaveLength(2)
+      expect(persisted[0].pinDigest).not.toBe(persisted[1].pinDigest)
+      expect(persisted.every(row => row.consumedAt === null &&
+        row.failedAttempts === 0 && row.revokedAt === null)).toBe(true)
+
+      await expect(db!.companyCrewPinChallenge.create({
+        data: {
+          crewDispatchId: crewId, assignmentId: slots[0].id, jobId,
+          crewVersion: 1, purpose: 'ARRIVAL', challengeVersion: 1,
+          pinDigest: persisted[0].pinDigest,
+          issuedByCustomerUserId: ownerId, expiresAt,
+        },
+      })).rejects.toThrow()
+      await expect(db!.companyCrewPinChallenge.create({
+        data: {
+          crewDispatchId: crewId, assignmentId: slots[0].id, jobId,
+          crewVersion: 1, purpose: 'INVALID', challengeVersion: 2,
+          pinDigest: persisted[0].pinDigest,
+          issuedByCustomerUserId: ownerId, expiresAt,
+        },
+      })).rejects.toThrow()
+      expect((await db!.companyCrewDispatch.findUniqueOrThrow({ where: { id: crewId } })).status)
+        .toBe('FORMING')
+      expect(await db!.jobVerificationPin.count({ where: { jobId } })).toBe(0)
+      expect(slots.every(slot => slot.crewArrivedAt === null && slot.startedAt === null)).toBe(true)
+    } finally {
+      await db!.companyCrewPinChallenge.deleteMany({ where: { crewDispatchId: crewId } })
+    }
   })
 
   it('requires all-worker fresh verified photo evidence in isolated PostgreSQL', async () => {
