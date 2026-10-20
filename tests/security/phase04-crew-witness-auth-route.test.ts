@@ -80,6 +80,8 @@ describe('Phase04 opt-in development witness actor-bound route (never arrival)',
       'postgresql://user:pass@localhost:5432/maintainex_test_phase07_ci?host=remote-server',
       'postgresql://user:pass@localhost:5432/maintainex_test_phase07_ci?schema=public&schema=public',
       'postgresql://user:pass@localhost:5432/maintainex_test_phase07_ci?service=some-service',
+      'postgresql://user:pass@localhost:5500/maintainex_test_phase07_ci',
+      'postgresql://user@localhost:5432/maintainex_test_phase07_ci',
       'file:./dev.db', 'not-a-url', '',
     ]) {
       vi.stubEnv('DATABASE_URL', url)
