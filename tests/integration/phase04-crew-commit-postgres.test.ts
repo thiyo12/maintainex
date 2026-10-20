@@ -12,6 +12,7 @@ import { issueStagedCrewArrivalPinsInsideTransaction } from '@/lib/domain/compan
 import { assertAllCrewPinClaimsInsideTransaction } from '@/lib/domain/company-crew-pin-claims'
 import { recordCrewPresenceWitnessInsideTransaction } from '@/lib/domain/company-crew-presence-record'
 import { assertCrewDualWitnessInventoryInsideTransaction } from '@/lib/domain/company-crew-presence-witness'
+import { assertCrewPrestartFinancialEvidenceInsideTransaction } from '@/lib/domain/company-crew-prestart-finance'
 import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -1362,6 +1363,17 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         where: { crewDispatchId: staged.crewDispatchId },
       })).every(row => row.startedAt === null && row.crewArrivedAt === null)).toBe(true)
       expect(await db!.jobVerificationPin.count({ where: { jobId: booking.id } })).toBe(0)
+      // Every PIN and both independent actor acknowledgements can be
+      // complete, but there is NO protected crew payment. The new read-only
+      // finance gate must refuse to authorize any work or manufacture funding.
+      expect(await db!.jobEscrow.count({ where: { jobId: booking.id } })).toBe(0)
+      await expect(db!.$transaction(tx =>
+        assertCrewPrestartFinancialEvidenceInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, expectedVersion: 1,
+          actorUserId: ownerId, actorRole: 'COMPANY_OWNER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('incomplete or conflicting finance/workspace state')
+      expect(await db!.paymentIntent.count({ where: { jobId: booking.id } })).toBe(0)
       expect(await db!.jobWorkspace.count({ where: { jobId: booking.id } })).toBe(0)
     } finally {
       await db!.companyCrewPresenceWitness.deleteMany({
