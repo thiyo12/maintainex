@@ -5,6 +5,7 @@ import { checkCrewRosterAtCommit, stageCrewReservationInsideTransaction } from '
 import { acceptStagedCrewMemberInsideTransaction, rejectStagedCrewMemberInsideTransaction, cancelStagedCrewInsideTransaction } from '@/lib/domain/company-crew-lifecycle'
 import { lockAndAssertWorkerScheduleAvailable } from '@/lib/domain/company-job-assignment'
 import { assertStagedCrewIdentityEvidenceInsideTransaction } from '@/lib/domain/company-crew-barrier'
+import { blockWorkerFormingCrewsInsideTransaction } from '@/lib/domain/company-crew-workforce'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
 // All generated IDs are scoped to this suite and deleted in dependency order.
@@ -425,6 +426,79 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       await db!.companyCrewDispatch.deleteMany({ where: { jobId: cancellationJob.id } })
       await db!.jobQuote.deleteMany({ where: { jobId: cancellationJob.id } })
       await db!.marketplaceJob.delete({ where: { id: cancellationJob.id } })
+    }
+  })
+
+
+  it('atomically invalidates a two-member accepted crew on a suspended workforce member', async () => {
+    const booking = await db!.marketplaceJob.create({
+      data: {
+        customerId: ownerId, title: 'Crew workforce suspension fixture',
+        description: 'Phase 04 role/status mutation must revoke all staged holds',
+        categoryId, photos: '[]', budgetType: 'FIXED',
+        countryCode: 'LK', workersCount: 2, status: 'QUOTE_ACCEPTED',
+      },
+    })
+    try {
+      await db!.jobQuote.create({
+        data: {
+          jobId: booking.id, providerId: companyId, providerType: 'COMPANY',
+          price: 10000n, estimatedCompletionTime: '2 hours',
+          attachments: '[]', status: 'ACCEPTED',
+        },
+      })
+      const staged = await db!.$transaction(tx => stageCrewReservationInsideTransaction(tx, {
+        ...input(), jobId: booking.id, leadWorkerUserId: workerIds[0],
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      await db!.$transaction(tx => acceptStagedCrewMemberInsideTransaction(tx, {
+        crewDispatchId: staged.crewDispatchId,
+        workerUserId: workerIds[1], expectedVersion: 1,
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+
+      const result = await db!.$transaction(async tx => {
+        await tx.$queryRaw`
+          SELECT id FROM "TeamMember"
+          WHERE "companyId" = ${{companyId} AND "userId" = ${{workerIds[0]} FOR UPDATE
+        `
+        const invalidated = await blockWorkerFormingCrewsInsideTransaction(tx, {
+          companyId, workerUserId: workerIds[0], actorUserId: ownerId,
+          actorRole: 'COMPANY_OWNER', reason: 'SUSPENDED',
+        })
+        await tx.teamMember.update({
+          where: { companyId_userId: { companyId, userId: workerIds[0] } },
+          data: { status: 'SUSPENDED' },
+        })
+        return invalidated
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      expect(result).toEqual({ blockedCrewsCount: 1, revokedCrewSlotsCount: 2 })
+      const crew = await db!.companyCrewDispatch.findUniqueOrThrow({
+        where: { id: staged.crewDispatchId },
+      })
+      expect(crew.status).toBe('BLOCKED')
+      expect(crew.version).toBe(2)
+      const slots = await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })
+      expect(slots).toHaveLength(2)
+      expect(slots.every(slot => slot.status === 'REVOKED' &&
+        slot.revokedAt !== null && slot.startedAt === null)).toBe(true)
+      expect(await db!.jobVerificationPin.count({ where: { jobId: booking.id } })).toBe(0)
+      await expect(db!.$transaction(tx => acceptStagedCrewMemberInsideTransaction(tx, {
+        crewDispatchId: staged.crewDispatchId,
+        workerUserId: workerIds[0], expectedVersion: 1,
+      }))).rejects.toThrow('Crew version')
+      await expect(db!.$transaction(tx => stageCrewReservationInsideTransaction(tx, {
+        ...input(), jobId: booking.id, leadWorkerUserId: workerIds[0],
+      }))).rejects.toThrow('existing dispatch')
+    } finally {
+      await db!.teamMember.update({
+        where: { companyId_userId: { companyId, userId: workerIds[0] } },
+        data: { status: 'ACTIVE' },
+      })
+      await db!.companyJobAssignment.deleteMany({ where: { jobId: booking.id } })
+      await db!.companyCrewDispatch.deleteMany({ where: { jobId: booking.id } })
+      await db!.jobQuote.deleteMany({ where: { jobId: booking.id } })
+      await db!.marketplaceJob.delete({ where: { id: booking.id } })
     }
   })
 
