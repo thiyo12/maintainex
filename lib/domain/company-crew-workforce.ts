@@ -38,7 +38,7 @@ export async function blockWorkerFormingCrewsInsideTransaction(
       id: string; status: string; workersCount: number
     }>>`
       SELECT id, status, "workersCount"
-      FROM "MarketplaceJob" WHERE id = ${{key.jobId} FOR UPDATE
+      FROM "MarketplaceJob" WHERE id = ${key.jobId} FOR UPDATE
     `
     const crews = await tx.$queryRaw<Array<{
       id: string; companyId: string; jobId: string; status: string
@@ -47,7 +47,7 @@ export async function blockWorkerFormingCrewsInsideTransaction(
     }>>`
       SELECT id, "companyId", "jobId", status, version,
         "requiredWorkersCount", "leadWorkerUserId"
-      FROM "CompanyCrewDispatch" WHERE id = ${{crewId} FOR UPDATE
+      FROM "CompanyCrewDispatch" WHERE id = ${crewId} FOR UPDATE
     `
     const crew = crews[0]
     if (!crew || crew.companyId !== input.companyId ||
