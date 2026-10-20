@@ -9,6 +9,7 @@ import { blockWorkerFormingCrewsInsideTransaction } from '@/lib/domain/company-c
 import { deriveCrewPinDigest } from '@/lib/domain/company-crew-pin-epoch'
 import { consumeStagedCrewMemberPinInsideTransaction } from '@/lib/domain/company-crew-pin-consume'
 import { issueStagedCrewArrivalPinsInsideTransaction } from '@/lib/domain/company-crew-pin-issue'
+import { assertAllCrewPinClaimsInsideTransaction } from '@/lib/domain/company-crew-pin-claims'
 import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -451,6 +452,88 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       expect(await db!.jobVerificationPin.count({ where: { jobId } })).toBe(0)
       const slots = await db!.companyJobAssignment.findMany({ where: { crewDispatchId: crewId } })
       expect(slots.every(row => row.crewArrivedAt === null && row.startedAt === null)).toBe(true)
+    } finally {
+      await db!.companyCrewPinChallenge.deleteMany({ where: { crewDispatchId: crewId } })
+      await db!.jobWorkerIdentityCheck.deleteMany({ where: { jobId } })
+      await db!.companyJobAssignment.updateMany({
+        where: { crewDispatchId: crewId }, data: { crewIdentityConfirmedAt: null },
+      })
+    }
+  })
+
+  it('isolated PostgreSQL: two consumed worker claims never grant physical arrival or work authority', async () => {
+    const photos = await db!.providerIdentity.findMany({
+      where: {
+        currentUserId: { in: workerIds }, identityType: 'COMPANY_WORKER',
+        kycStatus: 'VERIFIED', verifiedPhotoUrl: { not: null },
+      },
+      select: { id: true, currentUserId: true, verifiedPhotoUrl: true },
+    })
+    expect(photos).toHaveLength(2)
+    const matchedAt = new Date()
+    try {
+      for (const photo of photos) {
+        await db!.jobWorkerIdentityCheck.create({
+          data: {
+            jobId, customerId: ownerId, providerIdentityId: photo.id,
+            assignedWorkerUserId: photo.currentUserId,
+            displayNameSnapshot: 'CI worker', photoSnapshotUrl: photo.verifiedPhotoUrl,
+            status: 'MATCHED', confirmedAt: matchedAt,
+          },
+        })
+      }
+      await db!.companyJobAssignment.updateMany({
+        where: { crewDispatchId: crewId, status: 'CREW_ACCEPTED' },
+        data: { crewIdentityConfirmedAt: matchedAt },
+      })
+      const assignments = await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: crewId },
+      })
+      expect(assignments).toHaveLength(2)
+      const consumedAt = new Date()
+      await db!.companyCrewPinChallenge.createMany({
+        data: assignments.map(assignment => ({
+          crewDispatchId: crewId, jobId, crewVersion: 1,
+          assignmentId: assignment.id, purpose: 'ARRIVAL',
+          challengeVersion: 1, issuedByCustomerUserId: ownerId,
+          pinDigest: deriveCrewPinDigest('123456', {
+            crewDispatchId: crewId, jobId, crewVersion: 1,
+            assignmentId: assignment.id, workerUserId: assignment.workerUserId,
+            purpose: 'ARRIVAL',
+          }, Buffer.alloc(32, 0x29)),
+          createdAt: new Date(consumedAt.getTime() - 2000),
+          consumedAt,
+          expiresAt: new Date(consumedAt.getTime() + 300000),
+        })),
+      })
+      const request = {
+        crewDispatchId: crewId, expectedVersion: 1,
+        actorUserId: ownerId, actorRole: 'COMPANY_OWNER',
+      }
+      const complete = await db!.$transaction(
+        tx => assertAllCrewPinClaimsInsideTransaction(tx, request),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(complete).toEqual({
+        crewDispatchId: crewId, crewVersion: 1,
+        memberClaimsComplete: true, physicalPresenceVerified: false,
+        arrivalEnabled: false, workStartEnabled: false,
+      })
+      expect((await db!.companyCrewDispatch.findUniqueOrThrow({ where: { id: crewId } })).status)
+        .toBe('FORMING')
+      expect(await db!.jobVerificationPin.count({ where: { jobId } })).toBe(0)
+      expect((await db!.marketplaceJob.findUniqueOrThrow({ where: { id: jobId } })).status)
+        .toBe('QUOTE_ACCEPTED')
+      expect((await db!.companyJobAssignment.findMany({ where: { crewDispatchId: crewId } }))
+        .every(row => row.crewArrivedAt === null && row.startedAt === null)).toBe(true)
+      await db!.companyCrewPinChallenge.updateMany({
+        where: { crewDispatchId: crewId, assignmentId: assignments[1].id },
+        data: { revokedAt: new Date(), consumedAt: null },
+      })
+      await expect(db!.$transaction(
+        tx => assertAllCrewPinClaimsInsideTransaction(tx, request),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('independently consumed')
     } finally {
       await db!.companyCrewPinChallenge.deleteMany({ where: { crewDispatchId: crewId } })
       await db!.jobWorkerIdentityCheck.deleteMany({ where: { jobId } })
