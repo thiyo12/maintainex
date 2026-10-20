@@ -3550,6 +3550,7 @@ model CompanyCrewDispatch {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   assignments          CompanyJobAssignment[]
+  pinChallenges        CompanyCrewPinChallenge[]
 
   @@index([companyId, status])
 }
@@ -3564,6 +3565,7 @@ model CompanyJobAssignment {
   worker        User     @relation(fields: [workerUserId], references: [id], onDelete: Cascade)
   crewDispatchId String?
   crewDispatch   CompanyCrewDispatch? @relation(fields: [crewDispatchId], references: [id], onDelete: Restrict)
+  crewPinChallenges CompanyCrewPinChallenge[]
   crewSlot       Int?
   crewRole       String? // LEAD, MEMBER; null for legacy single-worker assignments
   crewArrivedAt  DateTime?
@@ -3589,6 +3591,34 @@ model CompanyJobAssignment {
   @@index([workerUserId])
   @@index([jobId])
   @@index([status])
+}
+
+// Additive/INERT Phase 04 challenge storage. No HTTP handlers mint or redeem
+// these credentials, and legacy JobVerificationPin explicitly rejects crews.
+// The migration adds partial unique indexes because nullable assignment IDs
+// must never permit more than one group START challenge in an epoch.
+model CompanyCrewPinChallenge {
+  id               String   @id @default(cuid())
+  crewDispatchId   String
+  crewDispatch     CompanyCrewDispatch @relation(fields: [crewDispatchId], references: [id], onDelete: Restrict)
+  assignmentId     String?
+  assignment       CompanyJobAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  crewVersion      Int
+  purpose          String   // ARRIVAL requires a slot; WORK_START requires a null slot
+  pinHash          String   // never a plaintext PIN
+  issuedByCustomerId String
+  status           String   @default("ACTIVE") // ACTIVE, CONSUMED, REVOKED, EXPIRED
+  failedAttempts   Int      @default(0)
+  lockedUntil      DateTime?
+  expiresAt        DateTime
+  consumedAt       DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([crewDispatchId, crewVersion])
+  @@index([assignmentId])
+  @@index([expiresAt, status])
 }
 
 model PaymentProviderConfig {

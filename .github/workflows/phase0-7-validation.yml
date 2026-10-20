@@ -13,6 +13,7 @@ on:
   pull_request:
     branches:
       - main
+      - feature/international-launch-12phase
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -111,7 +112,7 @@ jobs:
 
       - name: Restore raw production invariants omitted by Prisma schema baseline
         run: |
-          psql "$DATABASE_URL" <<'SQL'
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           ALTER TABLE "ProviderOpportunity"
             DROP CONSTRAINT IF EXISTS "ProviderOpportunity_xor_provider";
           ALTER TABLE "ProviderOpportunity"
@@ -155,6 +156,40 @@ jobs:
           CREATE UNIQUE INDEX IF NOT EXISTS "PaymentIntent_one_active_per_job"
             ON "PaymentIntent"("jobId")
             WHERE status IN ('CREATED', 'PENDING');
+
+          -- Prisma's schema-to-empty baseline omits raw migration CHECKs
+          -- and partial UNIQUE indexes. Restore the exact Phase04 crew
+          -- challenge protections into this *isolated CI database* before
+          -- exercising PostgreSQL challenge races. This does not affect
+          -- production and does not mint or activate crew PINs.
+          ALTER TABLE "CompanyCrewPinChallenge"
+            ADD CONSTRAINT "CompanyCrewPinChallenge_version_check"
+              CHECK ("crewVersion" >= 1),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_shape_check"
+              CHECK (
+                ("purpose" = 'ARRIVAL' AND "assignmentId" IS NOT NULL)
+                OR ("purpose" = 'WORK_START' AND "assignmentId" IS NULL)
+              ),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_status_check"
+              CHECK ("status" IN ('ACTIVE', 'CONSUMED', 'REVOKED', 'EXPIRED')),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_attempts_check"
+              CHECK ("failedAttempts" BETWEEN 0 AND 5),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_window_check"
+              CHECK (
+                "expiresAt" > "createdAt"
+                AND "expiresAt" <= "createdAt" + INTERVAL '10 minutes'
+              ),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_consumed_check"
+              CHECK ("status" <> 'CONSUMED' OR "consumedAt" IS NOT NULL),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_revoked_check"
+              CHECK ("status" <> 'REVOKED' OR "revokedAt" IS NOT NULL);
+
+          CREATE UNIQUE INDEX IF NOT EXISTS "CompanyCrewPinChallenge_worker_epoch_key"
+            ON "CompanyCrewPinChallenge"("crewDispatchId", "crewVersion", "assignmentId", "purpose")
+            WHERE "assignmentId" IS NOT NULL;
+          CREATE UNIQUE INDEX IF NOT EXISTS "CompanyCrewPinChallenge_group_epoch_key"
+            ON "CompanyCrewPinChallenge"("crewDispatchId", "crewVersion", "purpose")
+            WHERE "assignmentId" IS NULL;
           SQL
 
       - name: Verify migration deploy is no-op
