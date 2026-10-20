@@ -13,6 +13,7 @@ import { assertAllCrewPinClaimsInsideTransaction } from '@/lib/domain/company-cr
 import { recordCrewPresenceWitnessInsideTransaction } from '@/lib/domain/company-crew-presence-record'
 import { assertCrewDualWitnessInventoryInsideTransaction } from '@/lib/domain/company-crew-presence-witness'
 import { assertCrewPrestartFinancialEvidenceInsideTransaction } from '@/lib/domain/company-crew-prestart-finance'
+import { holdCrewAfterPinClaimInsideTransaction } from '@/lib/domain/company-crew-pin-safety-hold'
 import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -1423,6 +1424,48 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       expect((await db!.companyJobAssignment.findMany({
         where: { crewDispatchId: staged.crewDispatchId },
       })).every(row => row.startedAt === null && row.crewArrivedAt === null)).toBe(true)
+      // Real PostgreSQL safety containment: after two consumed arrival PINs
+      // and two dual acknowledgements, an authenticated dispatcher can freeze
+      // the whole FORMING epoch without erasing any evidence or releasing held
+      // worker capacity. The old epoch must become unusable.
+      const held = await db!.$transaction(tx =>
+        holdCrewAfterPinClaimInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          expectedVersion: 1, actorUserId: ownerId,
+          actorRole: 'COMPANY_OWNER', reason: 'CI-only safety review',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(held).toMatchObject({
+        crewVersion: 2, status: 'BLOCKED', capacityHeldWorkerCount: 2,
+        preservedConsumedPinClaims: 2, revokedUnusedPinChallenges: 0,
+        supportReviewRequired: true, physicalPresenceVerified: false,
+        arrivalEnabled: false, workStartEnabled: false, paymentsEnabled: false,
+      })
+      expect((await db!.companyCrewDispatch.findUniqueOrThrow({
+        where: { id: staged.crewDispatchId },
+      })).version).toBe(2)
+      expect((await db!.companyCrewPresenceWitness.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })).length).toBe(2)
+      expect((await db!.companyCrewPinChallenge.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })).every(pin => pin.consumedAt !== null && pin.revokedAt === null)).toBe(true)
+      expect((await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })).every(row => row.status === 'CREW_ACCEPTED' &&
+        row.startedAt === null && row.crewArrivedAt === null)).toBe(true)
+      expect((await db!.marketplaceJob.findUniqueOrThrow({
+        where: { id: booking.id },
+      })).status).toBe('QUOTE_ACCEPTED')
+      expect(await db!.jobWorkspace.count({ where: { jobId: booking.id } })).toBe(0)
+      // An old manager request cannot undo a completed safety hold.
+      await expect(db!.$transaction(tx =>
+        holdCrewAfterPinClaimInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          expectedVersion: 1, actorUserId: ownerId,
+          actorRole: 'COMPANY_OWNER', reason: 'Stale repeated request',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('epoch or booking changed')
 
     } finally {
       await db!.paymentIntent.deleteMany({ where: { jobId: booking.id } })
