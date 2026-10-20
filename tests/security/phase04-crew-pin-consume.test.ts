@@ -141,6 +141,16 @@ describe('Phase04 internal PIN consumption is exact-member scoped and never auth
     m.match.mockResolvedValue({ status: 'MISMATCH_REPORTED' })
     await expect(verify()).rejects.toThrow('photo confirmation')
     expect(m.update).not.toHaveBeenCalled()
+    // Restore the transaction snapshot for the second independent request:
+    // the first negative assertion consumed the one-shot SQL mock queue.
+    m.sql.mockReset().mockResolvedValueOnce([{ id: 'quote' }])
+      .mockResolvedValueOnce([{ id: 'job', status: 'QUOTE_ACCEPTED',
+        workersCount: 2, customerId: 'customer', preferredDate: null,
+        preferredTimeSlot: null }])
+      .mockResolvedValueOnce([{ id: 'crew', companyId: 'company', jobId: 'job',
+        version: 4, requiredWorkersCount: 2, status: 'FORMING',
+        leadWorkerUserId: 'worker-a' }])
+      .mockResolvedValueOnce([challenge()])
     m.match.mockClear()
     m.schedule.mockRejectedValue(new Error('Worker membership or role changed'))
     await expect(verify()).rejects.toThrow('Worker membership')
