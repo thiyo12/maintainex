@@ -4,7 +4,7 @@ import { holdCrewAfterPinClaimInsideTransaction } from '@/lib/domain/company-cre
 const m=vi.hoisted(()=>({
   key:vi.fn(), sql:vi.fn(), lock:vi.fn(), slots:vi.fn(),
   legacy:vi.fn(), workspace:vi.fn(), claims:vi.fn(),
-  revoke:vi.fn(), update:vi.fn(), audit:vi.fn(),
+  revoke:vi.fn(), update:vi.fn(), audit:vi.fn(), risk:vi.fn(),
 }))
 vi.mock('@/lib/domain/company-job-assignment',()=>({
   lockAndAssertAssignmentActorAuthorized:m.lock,
@@ -34,6 +34,7 @@ const tx={
   jobVerificationPin:{findFirst:m.legacy},
   jobWorkspace:{findUnique:m.workspace},
   companyCrewPinChallenge:{findMany:m.claims},
+  marketplaceRiskEvent:{create:m.risk},
   $queryRaw:m.sql,
 }
 const input={
@@ -73,6 +74,17 @@ describe('Phase04 manager safety containment after consumed crew PIN',()=>{
       where:{id:'crew',status:'FORMING',version:4},
       data:{status:'BLOCKED',version:{increment:1}},
     })
+    expect(m.risk).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        jobId: 'job', actorUserId: 'dispatcher',
+        eventType: 'CREW_CONSUMED_PIN_SAFETY_HOLD', severity: 'HIGH',
+        metadata: expect.any(String),
+      }),
+    })
+    expect(JSON.parse(m.risk.mock.calls[0][0].data.metadata)).toMatchObject({
+      crewDispatchId: 'crew', previousVersion: 4, blockedVersion: 5,
+      consumedPinsPreserved: 1, unusedPinsRevoked: 1, capacityHeld: 2,
+    })
     expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({
       companyId:'company',actorId:'dispatcher',
       action:'CREW_PIN_SAFETY_HOLD',
@@ -82,6 +94,15 @@ describe('Phase04 manager safety containment after consumed crew PIN',()=>{
     }),tx)
     expect(tx.companyJobAssignment).not.toHaveProperty('updateMany')
     expect(tx.companyCrewPinChallenge).not.toHaveProperty('deleteMany')
+  })
+
+  it('rolls back the safety hold when queueing the required HIGH risk event fails', async()=>{
+    m.risk.mockRejectedValue(new Error('Safety queue is unavailable'))
+    await expect(hold()).rejects.toThrow('Safety queue is unavailable')
+    expect(m.update).toHaveBeenCalledOnce()
+    expect(m.audit).not.toHaveBeenCalled()
+    // A real caller-owned SERIALIZABLE transaction rolls back revocations
+    // and the crew version because an unreviewed hold cannot be acknowledged.
   })
 
   it('denies a removed or unauthenticated manager before any booking lock',async()=>{
