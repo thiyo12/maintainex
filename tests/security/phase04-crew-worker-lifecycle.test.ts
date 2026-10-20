@@ -257,6 +257,7 @@ describe('Phase 04 — dispatcher terminal crew cancellation', () => {
     await expect(cancel()).rejects.toThrow('not safe to cancel')
     expect(mocks.update).not.toHaveBeenCalled()
     mocks.slots.mockResolvedValue(slots.map(s => ({ ...s, startedAt: null, crewArrivedAt: null })))
+    mocks.sql.mockReset().mockResolvedValueOnce([job]).mockResolvedValueOnce([crew])
     mocks.update.mockResolvedValue({ count: 1 })
     await expect(cancel()).rejects.toThrow('changed during cancellation')
     expect(mocks.blockCrew).not.toHaveBeenCalled()
