@@ -502,4 +502,84 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
     }
   })
 
+
+  it('isolated PostgreSQL race: acceptance versus member suspension never strands a partial crew', async () => {
+    const booking = await db!.marketplaceJob.create({
+      data: {
+        customerId: ownerId, title: 'Concurrent crew workforce fixture',
+        description: 'Phase 04 worker acceptance versus workforce suspension',
+        categoryId, photos: '[]', budgetType: 'FIXED',
+        countryCode: 'LK', workersCount: 2, status: 'QUOTE_ACCEPTED',
+      },
+    })
+    try {
+      await db!.jobQuote.create({
+        data: {
+          jobId: booking.id, providerId: companyId, providerType: 'COMPANY',
+          price: 10000n, estimatedCompletionTime: '2 hours',
+          attachments: '[]', status: 'ACCEPTED',
+        },
+      })
+      const staged = await db!.$transaction(tx => stageCrewReservationInsideTransaction(tx, {
+        ...input(), jobId: booking.id, leadWorkerUserId: workerIds[0],
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      const attempts = await Promise.allSettled([
+        db!.$transaction(tx => acceptStagedCrewMemberInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId,
+          workerUserId: workerIds[1], expectedVersion: 1,
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 10000, timeout: 10000 }),
+        db!.$transaction(async tx => {
+          await tx.$queryRaw`
+            SELECT id FROM "TeamMember"
+            WHERE "companyId" = ${companyId} AND "userId" = ${workerIds[0]} FOR UPDATE
+          `
+          await blockWorkerFormingCrewsInsideTransaction(tx, {
+            companyId, workerUserId: workerIds[0], actorUserId: ownerId,
+            actorRole: 'COMPANY_OWNER', reason: 'SUSPENDED',
+          })
+          await tx.teamMember.update({
+            where: { companyId_userId: { companyId, userId: workerIds[0] } },
+            data: { status: 'SUSPENDED' },
+          })
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 10000, timeout: 10000 }),
+      ])
+      const member = await db!.teamMember.findUniqueOrThrow({
+        where: { companyId_userId: { companyId, userId: workerIds[0] } },
+      })
+      const crew = await db!.companyCrewDispatch.findUniqueOrThrow({
+        where: { id: staged.crewDispatchId },
+      })
+      const slots = await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })
+      expect(slots).toHaveLength(2)
+      if (member.status === 'SUSPENDED') {
+        expect(attempts[1].status).toBe('fulfilled')
+        expect(crew.status).toBe('BLOCKED')
+        expect(crew.version).toBe(2)
+        expect(slots.every(slot => slot.status === 'REVOKED')).toBe(true)
+      } else {
+        // Serializable lock/deadlock loser rolls back its entire transaction.
+        expect(member.status).toBe('ACTIVE')
+        expect(attempts[1].status).toBe('rejected')
+        expect(crew.status).toBe('FORMING')
+        expect(crew.version).toBe(1)
+        expect(slots.every(slot =>
+          ['CREW_RESERVED', 'CREW_ACCEPTED'].includes(slot.status))).toBe(true)
+      }
+      expect(await db!.jobVerificationPin.count({ where: { jobId: booking.id } })).toBe(0)
+    } finally {
+      await db!.teamMember.update({
+        where: { companyId_userId: { companyId, userId: workerIds[0] } },
+        data: { status: 'ACTIVE' },
+      })
+      await db!.companyJobAssignment.deleteMany({ where: { jobId: booking.id } })
+      await db!.companyCrewDispatch.deleteMany({ where: { jobId: booking.id } })
+      await db!.jobQuote.deleteMany({ where: { jobId: booking.id } })
+      await db!.marketplaceJob.delete({ where: { id: booking.id } })
+    }
+  })
+
 })
