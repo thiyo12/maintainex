@@ -3550,6 +3550,7 @@ model CompanyCrewDispatch {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   assignments          CompanyJobAssignment[]
+  crewPinChallenges    CompanyCrewPinChallenge[]
 
   @@index([companyId, status])
 }
@@ -3582,6 +3583,8 @@ model CompanyJobAssignment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  crewPinChallenges CompanyCrewPinChallenge[]
+
   @@unique([jobId, workerUserId])
   @@unique([crewDispatchId, crewSlot])
   @@index([crewDispatchId])
@@ -3589,6 +3592,37 @@ model CompanyJobAssignment {
   @@index([workerUserId])
   @@index([jobId])
   @@index([status])
+}
+
+
+/**
+ * Phase 04 inert challenge storage for an eventual per-member, per-purpose
+ * epoch-bound crew PIN protocol. No application issuer/verifier is wired.
+ * A challenge is NOT proof of attendance, acceptance or work authority.
+ */
+model CompanyCrewPinChallenge {
+  id                     String   @id @default(cuid())
+  crewDispatchId         String
+  crewDispatch           CompanyCrewDispatch @relation(fields: [crewDispatchId], references: [id], onDelete: Restrict)
+  assignmentId           String
+  assignment             CompanyJobAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  jobId                  String
+  crewVersion            Int
+  purpose                String   // ARRIVAL or WORK_START (DB check)
+  challengeVersion       Int      @default(1)
+  pinDigest              String   // scoped HMAC; NEVER plaintext
+  issuedByCustomerUserId String
+  expiresAt              DateTime
+  failedAttempts         Int      @default(0)
+  lockedUntil            DateTime?
+  consumedAt             DateTime?
+  revokedAt              DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([crewDispatchId, crewVersion, assignmentId, purpose, challengeVersion])
+  @@index([crewDispatchId, crewVersion, purpose])
+  @@index([assignmentId, purpose, expiresAt])
 }
 
 model PaymentProviderConfig {
