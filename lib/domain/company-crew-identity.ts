@@ -160,6 +160,12 @@ export async function decideCrewWorkerIdentityInsideTransaction(
     where: {
       currentUserId: slot.workerUserId,
       identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
+      // MATCH uses the same verified-photo selection policy as the customer
+      // preview; otherwise an unrelated newer unverified record can block
+      // confirmation of the photo the customer actually saw.
+      ...(input.decision === 'MATCH'
+        ? { kycStatus: 'VERIFIED', verifiedPhotoUrl: { not: null } }
+        : {}),
     },
     orderBy: { updatedAt: 'desc' },
     select: {

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { checkCrewRosterAtCommit, stageCrewReservationInsideTransaction } from '@/lib/domain/company-crew-commit-gate'
 import { acceptStagedCrewMemberInsideTransaction, rejectStagedCrewMemberInsideTransaction, cancelStagedCrewInsideTransaction } from '@/lib/domain/company-crew-lifecycle'
 import { lockAndAssertWorkerScheduleAvailable } from '@/lib/domain/company-job-assignment'
+import { assertStagedCrewIdentityEvidenceInsideTransaction } from '@/lib/domain/company-crew-barrier'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
 // All generated IDs are scoped to this suite and deleted in dependency order.
@@ -212,6 +213,86 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
     expect(await db!.jobVerificationPin.count({ where: { jobId } })).toBe(0)
     expect((await db!.marketplaceJob.findUniqueOrThrow({ where: { id: jobId } })).status)
       .toBe('QUOTE_ACCEPTED')
+  })
+
+  it('requires all-worker fresh verified photo evidence in isolated PostgreSQL', async () => {
+    const photoRows = await db!.providerIdentity.findMany({
+      where: {
+        currentUserId: { in: workerIds },
+        identityType: 'COMPANY_WORKER',
+        kycStatus: 'VERIFIED',
+        verifiedPhotoUrl: { not: null },
+      },
+      select: { id: true, currentUserId: true, verifiedPhotoUrl: true },
+    })
+    expect(photoRows).toHaveLength(2)
+    const version = 1
+    const request = {
+      crewDispatchId: crewId, expectedVersion: version,
+      actorUserId: ownerId, actorRole: 'COMPANY_OWNER',
+    }
+    // A worker who has merely accepted has NOT been approved by the customer.
+    await expect(db!.$transaction(
+      tx => assertStagedCrewIdentityEvidenceInsideTransaction(tx, request),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    )).rejects.toThrow('current photo confirmation')
+
+    const confirmedAt = new Date()
+    try {
+      for (const profile of photoRows) {
+        await db!.jobWorkerIdentityCheck.create({
+          data: {
+            jobId, customerId: ownerId,
+            providerIdentityId: profile.id,
+            assignedWorkerUserId: profile.currentUserId,
+            displayNameSnapshot: 'Isolated worker',
+            photoSnapshotUrl: profile.verifiedPhotoUrl,
+            status: 'MATCHED', confirmedAt,
+          },
+        })
+      }
+      await db!.companyJobAssignment.updateMany({
+        where: { crewDispatchId: crewId, status: 'CREW_ACCEPTED' },
+        data: { crewIdentityConfirmedAt: confirmedAt },
+      })
+      const ready = await db!.$transaction(
+        tx => assertStagedCrewIdentityEvidenceInsideTransaction(tx, request),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(ready.memberEvidenceComplete).toBe(true)
+      expect(ready.dispatchEnabled).toBe(false)
+      expect(ready.arrivalEnabled).toBe(false)
+      expect(ready.workStartEnabled).toBe(false)
+      expect((await db!.companyCrewDispatch.findUniqueOrThrow({ where: { id: crewId } })).status)
+        .toBe('FORMING')
+      expect(await db!.jobVerificationPin.count({ where: { jobId } })).toBe(0)
+
+      // Photo changed after customer approval => prior confirmation must fail.
+      await db!.providerIdentity.update({
+        where: { id: photoRows[0].id },
+        data: { verifiedPhotoUrl: '/ci/new-photo-that-customer-did-not-confirm' },
+      })
+      await expect(db!.$transaction(
+        tx => assertStagedCrewIdentityEvidenceInsideTransaction(tx, request),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('missing or stale')
+      await db!.providerIdentity.update({
+        where: { id: photoRows[0].id },
+        data: { verifiedPhotoUrl: photoRows[0].verifiedPhotoUrl },
+      })
+    } finally {
+      await db!.jobWorkerIdentityCheck.deleteMany({
+        where: { jobId, providerIdentityId: { in: photoRows.map(p => p.id) } },
+      })
+      await db!.companyJobAssignment.updateMany({
+        where: { crewDispatchId: crewId },
+        data: { crewIdentityConfirmedAt: null },
+      })
+      await db!.providerIdentity.update({
+        where: { id: photoRows[0].id },
+        data: { verifiedPhotoUrl: photoRows[0].verifiedPhotoUrl },
+      })
+    }
   })
 
   it('enforces distinct crew slots while retaining the original single-worker index', async () => {

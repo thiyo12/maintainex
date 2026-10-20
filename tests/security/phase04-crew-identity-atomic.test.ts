@@ -103,6 +103,31 @@ describe('Phase04 customer photo decisions cannot grant crew work', () => {
     expect(m.slotUpdate).not.toHaveBeenCalled()
   })
 
+  it('MATCH uses the same latest verified personal photo source as the customer preview', async () => {
+    await decide()
+    expect(m.photo).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        currentUserId: 'a',
+        identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
+        kycStatus: 'VERIFIED',
+        verifiedPhotoUrl: { not: null },
+      },
+      orderBy: { updatedAt: 'desc' },
+    }))
+  })
+
+  it('still accepts identity mismatch reports when an employee photo is revoked', async () => {
+    m.photo.mockResolvedValue(null)
+    m.slotUpdate.mockResolvedValue({ count: 2 })
+    await decide({ decision: 'MISMATCH', reason: 'Photo removed' })
+    expect(m.photo).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        currentUserId: 'a',
+        identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
+      },
+    }))
+  })
+
   it('safety mismatch releases all holds, increments crew epoch and preserves signals', async () => {
     m.slotUpdate.mockResolvedValue({ count: 2 })
     expect(await decide({ decision: 'MISMATCH', reason: 'Not that worker' })).toMatchObject({
