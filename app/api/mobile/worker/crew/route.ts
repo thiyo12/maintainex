@@ -85,14 +85,16 @@ export async function POST(request: NextRequest) {
       expectedVersion: input.expectedVersion as number,
       workerUserId: user.id,
     }
-    const result = await prisma.$transaction(
-      tx => input.action === 'accept'
-        ? acceptStagedCrewMemberInsideTransaction(tx, decision)
-        : rejectStagedCrewMemberInsideTransaction(tx, {
-          ...decision, reason: input.reason as string | undefined,
-        }),
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    )
+    const result = await prisma.$transaction(async tx => {
+      // Explicit async result union, not Promise<Accept> | Promise<Reject>.
+      // Prisma interactive transactions require a single resolved result type.
+      if (input.action === 'accept') {
+        return await acceptStagedCrewMemberInsideTransaction(tx, decision)
+      }
+      return await rejectStagedCrewMemberInsideTransaction(tx, {
+        ...decision, reason: input.reason as string | undefined,
+      })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
     return NextResponse.json({ ...result, dispatchEnabled: false }, {
       headers: { 'Cache-Control': 'private, no-store' },
     })

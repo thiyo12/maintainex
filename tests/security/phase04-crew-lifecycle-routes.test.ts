@@ -46,18 +46,23 @@ vi.mock('@/lib/shared/observability/secure-console', () => ({
 }))
 
 async function call(path: 'worker/crew' | 'company/crew/roster', method: 'POST' | 'PATCH' | 'GET', body?: unknown) {
-  const route = path === 'worker/crew'
-    ? await import('@/app/api/mobile/worker/crew/route')
-    : await import('@/app/api/mobile/company/crew/roster/route')
-  const handler = method === 'GET' ? route.GET : method === 'PATCH' ? route.PATCH : route.POST
-  if (!handler) throw new Error('Unsupported mocked test method')
-  return handler(new NextRequest(`http://localhost/api/mobile/${path}`, {
+  const request = new NextRequest(`http://localhost/api/mobile/${path}`, {
     method,
     ...(method !== 'GET' ? {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     } : {}),
-  }))
+  })
+  if (path === 'worker/crew') {
+    const workerRoute = await import('@/app/api/mobile/worker/crew/route')
+    if (method === 'GET') return workerRoute.GET(request)
+    if (method === 'POST') return workerRoute.POST(request)
+    throw new Error('Worker crew route does not support PATCH')
+  }
+  const managerRoute = await import('@/app/api/mobile/company/crew/roster/route')
+  if (method === 'GET') return managerRoute.GET(request)
+  if (method === 'PATCH') return managerRoute.PATCH(request)
+  return managerRoute.POST(request)
 }
 
 describe('Phase04 crew decision routes: authenticated identity and fail-closed scope', () => {
@@ -197,7 +202,6 @@ describe('Phase04 crew decision routes: authenticated identity and fail-closed s
 
   it('keeps roster staging disabled by default and permanently disabled on production', async () => {
     const oldFlag = process.env.MAINTAINEX_PHASE04_CREW_STAGING_ENABLED
-    const oldNodeEnv = process.env.NODE_ENV
     try {
       delete process.env.MAINTAINEX_PHASE04_CREW_STAGING_ENABLED
       const response = await call('company/crew/roster', 'POST', {
@@ -209,7 +213,6 @@ describe('Phase04 crew decision routes: authenticated identity and fail-closed s
     } finally {
       if (oldFlag === undefined) delete process.env.MAINTAINEX_PHASE04_CREW_STAGING_ENABLED
       else process.env.MAINTAINEX_PHASE04_CREW_STAGING_ENABLED = oldFlag
-      process.env.NODE_ENV = oldNodeEnv
     }
   })
 })
