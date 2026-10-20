@@ -8,6 +8,7 @@ const db = vi.hoisted(() => ({
   memberLocked: vi.fn(),
   memberUpdate: vi.fn(),
   assignments: vi.fn(),
+  crewHeld: vi.fn(),
   revoke: vi.fn(),
   retarget: vi.fn(),
   ownerCount: vi.fn(),
@@ -32,7 +33,11 @@ vi.mock('@/lib/prisma', () => ({
       teamMember: {
         findUnique: db.memberLocked, update: db.memberUpdate, count: db.ownerCount,
       },
-      companyJobAssignment: { findMany: db.assignments, updateMany: db.revoke },
+      companyJobAssignment: {
+        findMany: (args: any) => args.where.status?.in?.includes('CREW_RESERVED')
+          ? db.crewHeld(args) : db.assignments(args),
+        updateMany: db.revoke,
+      },
       marketplaceJob: { updateMany: db.retarget },
     }),
   },
@@ -65,6 +70,7 @@ describe('Phase 04 — company workforce suspension serializes with live dispatc
       return [{ id: 'membership' }]
     })
     db.assignments.mockResolvedValue([])
+    db.crewHeld.mockResolvedValue([])
   })
 
   it('locks the membership row before querying active assignments', async () => {
@@ -76,6 +82,10 @@ describe('Phase 04 — company workforce suspension serializes with live dispatc
     })
     expect(db.memberLocked.mock.invocationCallOrder[0])
       .toBeLessThan(db.assignments.mock.invocationCallOrder[0])
+    expect(db.crewHeld).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ workerUserId: 'worker',
+        status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] } }),
+    }))
     expect(db.memberUpdate).toHaveBeenCalledWith({
       where: { id: 'membership' }, data: { status: 'SUSPENDED' },
     })
