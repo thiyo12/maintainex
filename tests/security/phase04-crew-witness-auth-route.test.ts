@@ -44,6 +44,7 @@ describe('Phase04 opt-in development witness actor-bound route (never arrival)',
     m.suspended = false
     vi.stubEnv('NODE_ENV', 'test')
     vi.stubEnv('MAINTAINEX_PHASE04_CREW_WITNESS_TEST_ENABLED', 'true')
+    vi.stubEnv('DATABASE_URL', 'postgresql://phase04_fixture:isolated_secret@127.0.0.1:5432/maintainex_test_phase07_ci')
     m.crew.mockResolvedValue({ id: 'crew' })
     m.customer.mockResolvedValue({ id: 'job-1' })
     m.worker.mockResolvedValue(null)
@@ -69,6 +70,25 @@ describe('Phase04 opt-in development witness actor-bound route (never arrival)',
     vi.stubEnv('MAINTAINEX_PHASE04_CREW_WITNESS_TEST_ENABLED', 'false')
     expect((await post()).status).toBe(409)
     expect(m.transaction).not.toHaveBeenCalled()
+  })
+  it('denies production-like, remote, unnamed, socket or overridden databases before authentication', async () => {
+    for (const url of [
+      'postgresql://user:pass@db.internal:5432/maintainex_test_phase07_ci',
+      'postgresql://user:pass@127.0.0.1:5432/maintainex',
+      'postgresql://user:pass@localhost:5432/maintainex_production',
+      'postgresql://user:pass@localhost:5432/maintainex_test_phase07_ci?schema=private',
+      'postgresql://user:pass@localhost:5432/maintainex_test_phase07_ci?host=remote-server',
+      'postgresql://user:pass@localhost:5432/maintainex_test_phase07_ci?schema=public&schema=public',
+      'postgresql://user:pass@localhost:5432/maintainex_test_phase07_ci?service=some-service',
+      'file:./dev.db', 'not-a-url', '',
+    ]) {
+      vi.stubEnv('DATABASE_URL', url)
+      const response = await post()
+      expect(response.status).toBe(409)
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+      expect(m.transaction).not.toHaveBeenCalled()
+      expect(m.record).not.toHaveBeenCalled()
+    }
   })
   it('binds the authenticated customer and exact URL booking in SERIALIZABLE transaction', async () => {
     const response = await post()
