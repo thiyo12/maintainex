@@ -92,6 +92,10 @@ describe('Phase04 crew decision routes: authenticated identity and fail-closed s
       where: expect.objectContaining({
         workerUserId: 'worker-a',
         status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] },
+        crewDispatch: { status: 'FORMING' },
+        company: { teamMembers: { some: {
+          userId: 'worker-a', status: 'ACTIVE', role: 'WORKER',
+        } } },
       }),
       take: 50,
     }))

@@ -22,6 +22,12 @@ export async function GET(request: NextRequest) {
         workerUserId: user.id,
         crewDispatchId: { not: null },
         status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] },
+        crewDispatch: { status: 'FORMING' },
+        company: {
+          teamMembers: {
+            some: { userId: user.id, status: 'ACTIVE', role: 'WORKER' },
+          },
+        },
       },
       select: {
         id: true, status: true, acceptedAt: true,
