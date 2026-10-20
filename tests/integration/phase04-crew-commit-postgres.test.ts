@@ -708,6 +708,20 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         }),
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       )
+      // A previously issued but unconsumed per-worker challenge is revoked
+      // in the SAME transaction as the whole-crew cancellation.
+      const stagedSlots = await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })
+      await db!.companyCrewPinChallenge.createMany({
+        data: stagedSlots.map(slot => ({
+          crewDispatchId: staged.crewDispatchId, assignmentId: slot.id,
+          jobId: cancellationJob.id, crewVersion: 1, purpose: 'ARRIVAL',
+          challengeVersion: 1, pinDigest: 'a'.repeat(64),
+          issuedByCustomerUserId: ownerId,
+          expiresAt: new Date(Date.now() + 300000),
+        })),
+      })
       const result = await db!.$transaction(
         tx => cancelStagedCrewInsideTransaction(tx, {
           companyId, crewDispatchId: staged.crewDispatchId,
@@ -725,6 +739,12 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       })
       expect(saved.status).toBe('CANCELLED')
       expect(saved.version).toBe(2)
+      const withdrawnCodes = await db!.companyCrewPinChallenge.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })
+      expect(withdrawnCodes).toHaveLength(2)
+      expect(withdrawnCodes.every(pin => pin.revokedAt !== null && pin.consumedAt === null))
+        .toBe(true)
       const cancelledSlots = await db!.companyJobAssignment.findMany({
         where: { crewDispatchId: staged.crewDispatchId },
       })
@@ -749,6 +769,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         workerUserIds: [...workerIds], leadWorkerUserId: workerIds[0],
       }))).rejects.toThrow('existing dispatch')
     } finally {
+      await db!.companyCrewPinChallenge.deleteMany({ where: { jobId: cancellationJob.id } })
       await db!.companyJobAssignment.deleteMany({ where: { jobId: cancellationJob.id } })
       await db!.companyCrewDispatch.deleteMany({ where: { jobId: cancellationJob.id } })
       await db!.jobQuote.deleteMany({ where: { jobId: cancellationJob.id } })
