@@ -171,6 +171,14 @@ jobs:
               ("crewDispatchId", "crewVersion", "assignmentId", "purpose")
             WHERE "consumedAt" IS NULL AND "revokedAt" IS NULL;
 
+          -- CI bootstraps a Prisma-generated schema rather than replaying raw
+          -- migrations. Restore the two additive witness CHECK invariants.
+          ALTER TABLE "CompanyCrewPresenceWitness"
+            ADD CONSTRAINT "CrewPresenceWitness_positive_epoch_check"
+              CHECK ("crewVersion" >= 1),
+            ADD CONSTRAINT "CrewPresenceWitness_nonempty_check"
+              CHECK ("workerAttestedAt" IS NOT NULL OR "customerAttestedAt" IS NOT NULL);
+
           CREATE UNIQUE INDEX IF NOT EXISTS "JobQuote_one_pending_per_provider_job"
             ON "JobQuote"("jobId", "providerId")
             WHERE status = 'PENDING';

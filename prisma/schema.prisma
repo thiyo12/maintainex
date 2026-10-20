@@ -3551,6 +3551,7 @@ model CompanyCrewDispatch {
   updatedAt            DateTime @updatedAt
   assignments          CompanyJobAssignment[]
   crewPinChallenges    CompanyCrewPinChallenge[]
+  crewPresenceWitnesses CompanyCrewPresenceWitness[]
 
   @@index([companyId, status])
 }
@@ -3584,6 +3585,7 @@ model CompanyJobAssignment {
   updatedAt DateTime @updatedAt
 
   crewPinChallenges CompanyCrewPinChallenge[]
+  crewPresenceWitnesses CompanyCrewPresenceWitness[]
 
   @@unique([jobId, workerUserId])
   @@unique([crewDispatchId, crewSlot])
@@ -3620,6 +3622,28 @@ model CompanyCrewPinChallenge {
   @@unique([crewDispatchId, crewVersion, assignmentId, purpose, challengeVersion], map: "CrewPinChallenge_scope_version_key")
   @@index([crewDispatchId, crewVersion, purpose], map: "CrewPinChallenge_crew_purpose_idx")
   @@index([assignmentId, purpose, expiresAt], map: "CrewPinChallenge_assignment_expiry_idx")
+}
+
+/// Inert Phase 04 evidence scaffold: per-worker independently collected
+/// customer and worker acknowledgements. This does NOT establish actual
+/// physical co-presence or grant arrival/work-start authorization.
+model CompanyCrewPresenceWitness {
+  id                  String   @id @default(cuid())
+  crewDispatchId      String
+  crewDispatch        CompanyCrewDispatch @relation(fields: [crewDispatchId], references: [id], onDelete: Restrict)
+  assignmentId        String
+  assignment          CompanyJobAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  jobId               String
+  crewVersion         Int
+  workerUserId        String
+  customerUserId      String
+  workerAttestedAt    DateTime?
+  customerAttestedAt  DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([crewDispatchId, crewVersion, assignmentId], map: "CrewPresenceWitness_scope_key")
+  @@index([jobId, crewVersion], map: "CrewPresenceWitness_job_epoch_idx")
 }
 
 model PaymentProviderConfig {

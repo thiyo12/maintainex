@@ -142,6 +142,8 @@ jobs:
             tests/security/phase04-crew-pin-consume.test.ts \
             tests/security/phase04-crew-pin-issue.test.ts \
             tests/security/phase04-crew-pin-claims.test.ts \
+            tests/security/phase04-crew-presence-witness.test.ts \
+            tests/security/phase04-crew-presence-schema.test.ts \
             tests/security/phase04-crew-pin-revocation.test.ts \
             tests/security/phase04-crew-pin-challenge-schema.test.ts \
             tests/security/phase04-crew-arrival-inventory.test.ts \
