@@ -5,9 +5,12 @@ import { blockWorkerFormingCrewsInsideTransaction } from '@/lib/domain/company-c
 
 const m = vi.hoisted(() => ({
   held: vi.fn(), roster: vi.fn(), crew: vi.fn(), sql: vi.fn(),
-  arrival: vi.fn(), pin: vi.fn(), release: vi.fn(), block: vi.fn(), audit: vi.fn(),
+  arrival: vi.fn(), pin: vi.fn(), release: vi.fn(), block: vi.fn(), audit: vi.fn(), pinRevoke: vi.fn(),
 }))
 vi.mock('@/lib/phase6/audit', () => ({ writeCompanyAuditLog: m.audit }))
+vi.mock('@/lib/domain/company-crew-pin-revocation', () => ({
+  revokeCrewPinChallengesInsideTransaction: m.pinRevoke,
+}))
 
 const slot = (id: string, worker: string, status: string, crewRole: string, crewSlot: number) => ({
   id, workerUserId: worker, companyId: 'company', jobId: 'job', status,

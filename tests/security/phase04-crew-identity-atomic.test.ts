@@ -5,9 +5,12 @@ const m = vi.hoisted(() => ({
   lookup: vi.fn(), key: vi.fn(), sql: vi.fn(), slots: vi.fn(),
   unsafe: vi.fn(), pin: vi.fn(), photo: vi.fn(), check: vi.fn(),
   upsert: vi.fn(), slotUpdate: vi.fn(), block: vi.fn(),
-  signal: vi.fn(), risk: vi.fn(), audit: vi.fn(),
+  signal: vi.fn(), risk: vi.fn(), audit: vi.fn(), pinRevoke: vi.fn(),
 }))
 vi.mock('@/lib/phase6/audit', () => ({ writeCompanyAuditLog: m.audit }))
+vi.mock('@/lib/domain/company-crew-pin-revocation', () => ({
+  revokeCrewPinChallengesInsideTransaction: m.pinRevoke,
+}))
 vi.mock('@/lib/prisma', () => ({ prisma: {} }))
 const crew = {
   id: 'crew', companyId: 'company', jobId: 'booking', status: 'FORMING',
