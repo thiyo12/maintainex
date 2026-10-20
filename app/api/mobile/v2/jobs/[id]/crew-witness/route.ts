@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { recordCrewPresenceWitnessInsideTransaction } from '@/lib/domain/company-crew-presence-record'
 import { CrewCommitGateError } from '@/lib/domain/company-crew-commit-gate'
+import { isPhase04CrewWitnessIsolatedTestEnvironment } from '@/lib/domain/company-crew-witness-isolated-db'
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' }
@@ -19,8 +20,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (process.env.NODE_ENV === 'production' ||
-      process.env.MAINTAINEX_PHASE04_CREW_WITNESS_TEST_ENABLED !== 'true') {
+  if (!isPhase04CrewWitnessIsolatedTestEnvironment()) {
     return NextResponse.json({ error: 'Crew witness recording is not enabled' },
       { status: 409, headers: NO_STORE })
   }
@@ -28,7 +28,17 @@ export async function POST(
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE })
     const blocked = assertNotSuspended(user)
-    if (blocked) return blocked
+    if (blocked) {
+      blocked.headers.set('Cache-Control', 'private, no-store')
+      return blocked
+    }
+    // Bearer authentication prevents ambient cookie invocation. Still reject
+    // simple-form and plain-text submissions at the API boundary.
+    const contentType = request.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase()
+    if (contentType !== 'application/json') {
+      return NextResponse.json({ error: 'JSON request required' },
+        { status: 415, headers: NO_STORE })
+    }
 
     const { id: jobId } = await params
     const lengthHeader = request.headers.get('content-length')
