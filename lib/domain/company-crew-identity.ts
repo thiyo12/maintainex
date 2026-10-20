@@ -254,24 +254,30 @@ export async function decideCrewWorkerIdentityInsideTransaction(
   // Safety escalation must proceed even if an earlier code was consumed.
   // Preserve consumed claims as immutable evidence; atomically revoke other
   // unconsumed workers' codes before blocking the full crew.
-  await revokeCrewPinChallengesInsideTransaction(tx, {
+  const revokedPins = await revokeCrewPinChallengesInsideTransaction(tx, {
     crewDispatchId: crew.id, crewVersion: crew.version,
     allowConsumedEvidence: true,
   })
-  // The safety signal and capacity release MUST commit together, even if
-  // the worker lost their verified photo or active membership while pending.
-  const released = await tx.companyJobAssignment.updateMany({
-    where: {
-      crewDispatchId: crew.id,
-      status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] },
-    },
-    data: {
-      status: 'REVOKED', revokedAt: now,
-      revokedReason: 'Customer reported a crew worker identity mismatch',
-    },
-  })
-  if (released.count !== slots.length) {
-    throw new CrewCommitGateError('Crew roster changed during safety hold')
+  // Once ANY member consumed an arrival claim, that is a potential on-site
+  // safety event. Blocking the crew must preserve consumed PIN/witness proof
+  // AND hold EVERY worker's scheduling capacity for human support review.
+  // Only a mismatch with ZERO consumed claims may safely release the roster.
+  let releasedWorkersCount = 0
+  if (revokedPins.consumedClaimsPreserved === 0) {
+    const released = await tx.companyJobAssignment.updateMany({
+      where: {
+        crewDispatchId: crew.id,
+        status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] },
+      },
+      data: {
+        status: 'REVOKED', revokedAt: now,
+        revokedReason: 'Customer reported a crew worker identity mismatch',
+      },
+    })
+    if (released.count !== slots.length) {
+      throw new CrewCommitGateError('Crew roster changed during safety hold')
+    }
+    releasedWorkersCount = released.count
   }
   const blocked = await tx.companyCrewDispatch.updateMany({
     where: { id: crew.id, status: 'FORMING', version: crew.version },
@@ -308,8 +314,16 @@ export async function decideCrewWorkerIdentityInsideTransaction(
     actorId: input.customerUserId, actorRole: 'CUSTOMER',
     action: 'CREW_IDENTITY_MISMATCH',
     targetType: 'CompanyCrewDispatch', targetId: crew.id,
-    description: 'Crew blocked and all capacity released after customer safety report',
-    metadata: { jobId: input.jobId, oldCrewVersion: crew.version },
+    description: revokedPins.consumedClaimsPreserved > 0
+      ? 'Crew blocked after customer safety report; consumed arrival evidence and all capacity held for review'
+      : 'Crew blocked after customer safety report; all capacity released before PIN consumption',
+    metadata: {
+      jobId: input.jobId, oldCrewVersion: crew.version,
+      consumedPinsPreserved: revokedPins.consumedClaimsPreserved,
+      unusedPinsRevoked: revokedPins.revokedPinChallenges,
+      capacityHeldForReview: revokedPins.consumedClaimsPreserved > 0 ? slots.length : 0,
+      releasedWorkersCount,
+    },
   }, tx)
   return {
     status: 'BLOCKED', version: crew.version + 1,
