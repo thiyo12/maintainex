@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { randomUUID } from 'node:crypto'
 import { checkCrewRosterAtCommit, stageCrewReservationInsideTransaction } from '@/lib/domain/company-crew-commit-gate'
-import { acceptStagedCrewMemberInsideTransaction, rejectStagedCrewMemberInsideTransaction } from '@/lib/domain/company-crew-lifecycle'
+import { acceptStagedCrewMemberInsideTransaction, rejectStagedCrewMemberInsideTransaction, cancelStagedCrewInsideTransaction } from '@/lib/domain/company-crew-lifecycle'
 import { lockAndAssertWorkerScheduleAvailable } from '@/lib/domain/company-job-assignment'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -266,4 +266,85 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       ))).resolves.toBeUndefined()
     }
   })
+
+  it('cancels an accepted two-worker roster atomically and preserves the terminal epoch', async () => {
+    const cancellationJob = await db!.marketplaceJob.create({
+      data: {
+        customerId: ownerId, title: 'Isolated cancellation booking',
+        description: 'Phase 04 cancel regression only',
+        categoryId, photos: '[]', budgetType: 'FIXED',
+        countryCode: 'LK', workersCount: 2, status: 'QUOTE_ACCEPTED',
+      },
+    })
+    try {
+      await db!.jobQuote.create({
+        data: {
+          jobId: cancellationJob.id, providerId: companyId, providerType: 'COMPANY',
+          price: 10000n, estimatedCompletionTime: '3 hours',
+          attachments: '[]', status: 'ACCEPTED',
+        },
+      })
+      const staged = await db!.$transaction(
+        tx => stageCrewReservationInsideTransaction(tx, {
+          companyId, jobId: cancellationJob.id,
+          actorUserId: ownerId, actorRole: 'COMPANY_OWNER',
+          workerUserIds: [...workerIds], leadWorkerUserId: workerIds[0],
+        }),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      await db!.$transaction(
+        tx => acceptStagedCrewMemberInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId,
+          workerUserId: workerIds[0], expectedVersion: 1,
+        }),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      const result = await db!.$transaction(
+        tx => cancelStagedCrewInsideTransaction(tx, {
+          companyId, crewDispatchId: staged.crewDispatchId,
+          actorUserId: ownerId, actorRole: 'COMPANY_OWNER', expectedVersion: 1,
+          reason: 'Full roster cancelled in isolated test',
+        }),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(result).toMatchObject({
+        crewDispatchId: staged.crewDispatchId, status: 'CANCELLED',
+        version: 2, releasedWorkersCount: 2, dispatchEnabled: false,
+      })
+      const saved = await db!.companyCrewDispatch.findUniqueOrThrow({
+        where: { id: staged.crewDispatchId },
+      })
+      expect(saved.status).toBe('CANCELLED')
+      expect(saved.version).toBe(2)
+      const cancelledSlots = await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })
+      expect(cancelledSlots).toHaveLength(2)
+      expect(cancelledSlots.every(slot =>
+        slot.status === 'REVOKED' && slot.revokedAt !== null &&
+        slot.startedAt === null)).toBe(true)
+      expect(await db!.jobVerificationPin.count({ where: { jobId: cancellationJob.id } })).toBe(0)
+      await expect(db!.$transaction(tx => acceptStagedCrewMemberInsideTransaction(tx, {
+        crewDispatchId: staged.crewDispatchId,
+        workerUserId: workerIds[1], expectedVersion: 1,
+      }))).rejects.toThrow('Crew version')
+      for (const workerUserId of workerIds) {
+        await expect(db!.$transaction(tx => lockAndAssertWorkerScheduleAvailable(
+          tx, workerUserId, 'other-booking', null, null, companyId, false,
+        ))).resolves.toBeUndefined()
+      }
+      // Historical crew record remains to prevent an unaudited re-stage.
+      await expect(db!.$transaction(tx => stageCrewReservationInsideTransaction(tx, {
+        companyId, jobId: cancellationJob.id,
+        actorUserId: ownerId, actorRole: 'COMPANY_OWNER',
+        workerUserIds: [...workerIds], leadWorkerUserId: workerIds[0],
+      }))).rejects.toThrow('existing dispatch')
+    } finally {
+      await db!.companyJobAssignment.deleteMany({ where: { jobId: cancellationJob.id } })
+      await db!.companyCrewDispatch.deleteMany({ where: { jobId: cancellationJob.id } })
+      await db!.jobQuote.deleteMany({ where: { jobId: cancellationJob.id } })
+      await db!.marketplaceJob.delete({ where: { id: cancellationJob.id } })
+    }
+  })
+
 })
