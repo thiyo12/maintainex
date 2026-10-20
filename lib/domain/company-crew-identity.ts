@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { CrewCommitGateError } from '@/lib/domain/company-crew-commit-gate'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
+import { revokeCrewPinChallengesInsideTransaction } from '@/lib/domain/company-crew-pin-revocation'
 
 export interface CrewCustomerIdentityDecision {
   jobId: string
@@ -250,6 +251,13 @@ export async function decideCrewWorkerIdentityInsideTransaction(
     }
   }
 
+  // Safety escalation must proceed even if an earlier code was consumed.
+  // Preserve consumed claims as immutable evidence; atomically revoke other
+  // unconsumed workers' codes before blocking the full crew.
+  await revokeCrewPinChallengesInsideTransaction(tx, {
+    crewDispatchId: crew.id, crewVersion: crew.version,
+    allowConsumedEvidence: true,
+  })
   // The safety signal and capacity release MUST commit together, even if
   // the worker lost their verified photo or active membership while pending.
   const released = await tx.companyJobAssignment.updateMany({
