@@ -1458,6 +1458,19 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         where: { id: booking.id },
       })).status).toBe('QUOTE_ACCEPTED')
       expect(await db!.jobWorkspace.count({ where: { jobId: booking.id } })).toBe(0)
+      // Support hold retains scheduling capacity AND never captures,
+      // releases or refunds even the synthetic CI-only payment record.
+      expect((await db!.jobEscrow.findFirstOrThrow({
+        where: { jobId: booking.id },
+      })).status).toBe('PROTECTED')
+      expect((await db!.paymentIntent.findFirstOrThrow({
+        where: { jobId: booking.id },
+      })).status).toBe('SUCCESS')
+      await expect(db!.$transaction(tx =>
+        lockAndAssertWorkerScheduleAvailable(
+          tx, workerIds[0], 'different-booking', null, null, companyId, false,
+        ), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('scheduling conflict')
       // An old manager request cannot undo a completed safety hold.
       await expect(db!.$transaction(tx =>
         holdCrewAfterPinClaimInsideTransaction(tx, {
