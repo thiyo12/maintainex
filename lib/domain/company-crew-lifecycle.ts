@@ -286,6 +286,7 @@ export async function cancelStagedCrewInsideTransaction(
   tx: Prisma.TransactionClient,
   input: {
     crewDispatchId: string
+    companyId: string // company context authorized by the route
     actorUserId: string // authenticated actor, NEVER copied from the request body
     actorRole: string
     expectedVersion: number
@@ -299,6 +300,7 @@ export async function cancelStagedCrewInsideTransaction(
   dispatchEnabled: false
 }> {
   if (!input.crewDispatchId || input.crewDispatchId.length > 128 ||
+      !input.companyId || input.companyId.length > 128 ||
       !input.actorUserId || input.actorUserId.length > 128 ||
       !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1 ||
       (input.reason !== undefined &&
@@ -313,7 +315,9 @@ export async function cancelStagedCrewInsideTransaction(
     where: { id: input.crewDispatchId },
     select: { companyId: true, jobId: true },
   })
-  if (!key) throw new CrewCommitGateError('Crew roster not found', 404)
+  if (!key || key.companyId !== input.companyId) {
+    throw new CrewCommitGateError('Crew roster not found', 404)
+  }
   await lockAndAssertAssignmentActorAuthorized(
     tx, key.companyId, input.actorUserId, input.actorRole,
   )

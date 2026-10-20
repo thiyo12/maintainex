@@ -201,7 +201,7 @@ describe('Phase 04 — dispatcher terminal crew cancellation', () => {
     mocks.arrival.mockResolvedValue(null)
   })
   const cancel = (patch = {}) => cancelStagedCrewInsideTransaction(tx as any, {
-    crewDispatchId: 'crew', actorUserId: 'manager', actorRole: 'DISPATCHER',
+    crewDispatchId: 'crew', companyId: 'company', actorUserId: 'manager', actorRole: 'DISPATCHER',
     expectedVersion: 1, reason: 'Worker schedules changed', ...patch,
   })
 
