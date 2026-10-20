@@ -146,6 +146,7 @@ jobs:
             tests/security/phase04-crew-presence-record.test.ts \
             tests/security/phase04-crew-witness-auth-route.test.ts \
             tests/security/phase04-crew-witness-isolated-db.test.ts \
+            tests/security/phase04-crew-prestart-finance.test.ts \
             tests/security/phase04-crew-presence-schema.test.ts \
             tests/security/phase04-crew-pin-revocation.test.ts \
             tests/security/phase04-crew-pin-challenge-schema.test.ts \
