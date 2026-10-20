@@ -142,6 +142,7 @@ jobs:
             tests/security/phase04-customer-crew-identity-preview.test.ts \
             tests/security/phase04-crew-identity-decision-route.test.ts \
             tests/security/phase04-crew-identity-atomic.test.ts \
+            tests/security/phase04-crew-all-member-identity-barrier.test.ts \
             tests/security/phase04-customer-crew-photo-mobile.test.ts \
             tests/security/phase04-crew-schema-foundation.test.ts \
             tests/security/phase04-crew-readiness-mobile-freshness.test.ts \
