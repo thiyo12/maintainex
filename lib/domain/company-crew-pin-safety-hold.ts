@@ -153,6 +153,27 @@ export async function holdCrewAfterPinClaimInsideTransaction(
   if (changed.count !== 1) {
     throw new CrewCommitGateError('Crew epoch changed during safety hold')
   }
+  // A company audit log alone is not an actionable Trust & Safety queue.
+  // Create a HIGH severity job-linked, unreviewed event in the SAME
+  // transaction as the whole-crew epoch block and PIN revocation. If this
+  // write fails, roll everything back rather than claim support was notified.
+  await tx.marketplaceRiskEvent.create({
+    data: {
+      jobId: job.id,
+      actorUserId: input.actorUserId,
+      eventType: 'CREW_CONSUMED_PIN_SAFETY_HOLD',
+      severity: 'HIGH',
+      metadata: JSON.stringify({
+        companyId: crew.companyId, crewDispatchId: crew.id,
+        previousVersion: crew.version, blockedVersion: crew.version + 1,
+        triggeringWorkerUserId: null,
+        reason: input.reason.trim(),
+        consumedPinsPreserved: revoked.consumedClaimsPreserved,
+        unusedPinsRevoked: revoked.revokedPinChallenges,
+        capacityHeld: slots.length,
+      }),
+    },
+  })
   await writeCompanyAuditLog({
     companyId: crew.companyId,
     actorId: input.actorUserId, actorRole: input.actorRole,
