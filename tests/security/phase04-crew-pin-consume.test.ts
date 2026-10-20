@@ -188,7 +188,17 @@ describe('Phase04 internal PIN consumption is exact-member scoped and never auth
     expect(m.update).toHaveBeenCalledOnce()
   })
 
-  it('stays internal; no route offers crew arrival or work start', () => {
+  it('cannot consume a crew PIN in production through any future direct internal caller', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    try {
+      await expect(verify()).rejects.toThrow('not enabled')
+      expect(m.key).not.toHaveBeenCalled()
+      expect(m.sql).not.toHaveBeenCalled()
+      expect(m.update).not.toHaveBeenCalled()
+    } finally { vi.unstubAllEnvs() }
+  })
+
+  it('existing live routes still provide no crew arrival or work start', () => {
     for (const path of [
       'app/api/mobile/worker/crew/route.ts',
       'app/api/mobile/company/crew/roster/route.ts',
