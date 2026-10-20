@@ -62,6 +62,7 @@ describe('Phase04 customer photo decisions cannot grant crew work', () => {
     m.check.mockResolvedValue(null)
     m.slotUpdate.mockResolvedValue({ count: 1 })
     m.block.mockResolvedValue({ count: 1 })
+    m.pinRevoke.mockResolvedValue({ revokedPinChallenges: 0, consumedClaimsPreserved: 0 })
   })
 
   it('valid customer MATCH records one slot without turning FORMING into work authority', async () => {
@@ -149,6 +150,52 @@ describe('Phase04 customer photo decisions cannot grant crew work', () => {
     expect(m.audit).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'CREW_IDENTITY_MISMATCH' }), tx,
     )
+  })
+
+  it('customer MISMATCH AFTER any consumed PIN blocks crew but preserves all worker capacity for human safety review', async () => {
+    m.slots.mockResolvedValue([slot('a', 'CREW_ACCEPTED'), slot('b', 'CREW_ACCEPTED')])
+    m.pinRevoke.mockResolvedValue({
+      revokedPinChallenges: 1, consumedClaimsPreserved: 1,
+    })
+    const result = await decide({ decision: 'MISMATCH', reason: 'Wrong worker at site' })
+    expect(result).toMatchObject({
+      status: 'BLOCKED', version: 2, customerConfirmed: false,
+      safetyReviewRequired: true, dispatchEnabled: false,
+    })
+    expect(m.pinRevoke).toHaveBeenCalledWith(tx, {
+      crewDispatchId: 'crew', crewVersion: 1, allowConsumedEvidence: true,
+    })
+    expect(m.slotUpdate).not.toHaveBeenCalled()
+    expect(m.block).toHaveBeenCalledWith({
+      where: { id: 'crew', status: 'FORMING', version: 1 },
+      data: { status: 'BLOCKED', version: { increment: 1 } },
+    })
+    expect(m.signal).toHaveBeenCalledOnce()
+    expect(m.risk).toHaveBeenCalledOnce()
+    expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'CREW_IDENTITY_MISMATCH',
+      metadata: expect.objectContaining({
+        consumedPinsPreserved: 1,
+        unusedPinsRevoked: 1,
+        capacityHeldForReview: 2,
+        releasedWorkersCount: 0,
+      }),
+    }), tx)
+  })
+
+  it('no consumed PIN permits ordinary all-worker release after a mismatch', async () => {
+    m.pinRevoke.mockResolvedValue({
+      revokedPinChallenges: 2, consumedClaimsPreserved: 0,
+    })
+    m.slotUpdate.mockResolvedValue({ count: 2 })
+    await decide({ decision: 'MISMATCH' })
+    expect(m.slotUpdate).toHaveBeenCalledOnce()
+    expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: expect.objectContaining({
+        capacityHeldForReview: 0,
+        releasedWorkersCount: 2,
+      }),
+    }), tx)
   })
 
   it('mismatch still blocks the entire crew if the verified worker photo vanished', async () => {

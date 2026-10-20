@@ -13,6 +13,7 @@ import { assertAllCrewPinClaimsInsideTransaction } from '@/lib/domain/company-cr
 import { recordCrewPresenceWitnessInsideTransaction } from '@/lib/domain/company-crew-presence-record'
 import { assertCrewDualWitnessInventoryInsideTransaction } from '@/lib/domain/company-crew-presence-witness'
 import { assertCrewPrestartFinancialEvidenceInsideTransaction } from '@/lib/domain/company-crew-prestart-finance'
+import { holdCrewAfterPinClaimInsideTransaction } from '@/lib/domain/company-crew-pin-safety-hold'
 import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -1125,6 +1126,117 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
   })
 
 
+  it('isolated PostgreSQL customer mismatch AFTER a consumed PIN preserves both workers and evidence', async () => {
+    const booking = await db!.marketplaceJob.create({
+      data: {
+        customerId: ownerId, title: 'Crew consumed PIN mismatch fixture',
+        description: 'Customer safety hold after worker PIN use, CI only',
+        categoryId, photos: '[]', budgetType: 'FIXED', countryCode: 'LK',
+        workersCount: 2, status: 'QUOTE_ACCEPTED',
+      },
+    })
+    try {
+      await db!.jobQuote.create({
+        data: {
+          jobId: booking.id, providerId: companyId,
+          providerType: 'COMPANY', price: 10000n,
+          estimatedCompletionTime: '2 hours',
+          attachments: '[]', status: 'ACCEPTED',
+        },
+      })
+      const staged = await db!.$transaction(tx =>
+        stageCrewReservationInsideTransaction(tx, {
+          companyId, jobId: booking.id,
+          actorUserId: ownerId, actorRole: 'COMPANY_OWNER',
+          workerUserIds: [...workerIds], leadWorkerUserId: workerIds[0],
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      for (const workerUserId of workerIds) {
+        await db!.$transaction(tx => acceptStagedCrewMemberInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, workerUserId, expectedVersion: 1,
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      }
+      const assigned = await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+        orderBy: { crewSlot: 'asc' },
+      })
+      expect(assigned).toHaveLength(2)
+      for (const slot of assigned) {
+        await db!.$transaction(tx => decideCrewWorkerIdentityInsideTransaction(tx, {
+          jobId: booking.id, crewDispatchId: staged.crewDispatchId,
+          assignmentId: slot.id, customerUserId: ownerId,
+          expectedVersion: 1, decision: 'MATCH',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      }
+      const now = new Date()
+      await db!.companyCrewPinChallenge.createMany({
+        data: assigned.map((slot, index) => ({
+          crewDispatchId: staged.crewDispatchId,
+          assignmentId: slot.id, jobId: booking.id, crewVersion: 1,
+          purpose: 'ARRIVAL', challengeVersion: 1,
+          issuedByCustomerUserId: ownerId,
+          pinDigest: deriveCrewPinDigest('012345', {
+            crewDispatchId: staged.crewDispatchId,
+            jobId: booking.id, crewVersion: 1,
+            assignmentId: slot.id, workerUserId: slot.workerUserId,
+            purpose: 'ARRIVAL',
+          }, Buffer.alloc(32, 0x6b)),
+          expiresAt: new Date(now.getTime() + 300000),
+          consumedAt: index === 0 ? now : null,
+        })),
+      })
+      const result = await db!.$transaction(tx => decideCrewWorkerIdentityInsideTransaction(tx, {
+        jobId: booking.id, crewDispatchId: staged.crewDispatchId,
+        assignmentId: assigned[0].id,
+        customerUserId: ownerId, expectedVersion: 1,
+        decision: 'MISMATCH', reason: 'Wrong worker after PIN consumption',
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      expect(result).toMatchObject({
+        status: 'BLOCKED', version: 2,
+        safetyReviewRequired: true, dispatchEnabled: false,
+      })
+      expect((await db!.companyCrewDispatch.findUniqueOrThrow({
+        where: { id: staged.crewDispatchId },
+      })).version).toBe(2)
+      expect(await db!.companyJobAssignment.count({
+        where: { crewDispatchId: staged.crewDispatchId, status: 'CREW_ACCEPTED' },
+      })).toBe(2)
+      const preserved = await db!.companyCrewPinChallenge.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+        orderBy: { assignmentId: 'asc' },
+      })
+      expect(preserved).toHaveLength(2)
+      expect(preserved.filter(p => p.consumedAt !== null && p.revokedAt === null))
+        .toHaveLength(1)
+      expect(preserved.filter(p => p.consumedAt === null && p.revokedAt !== null))
+        .toHaveLength(1)
+      for (const workerUserId of workerIds) {
+        await expect(db!.$transaction(tx => lockAndAssertWorkerScheduleAvailable(
+          tx, workerUserId, 'other-booking', null, null, companyId, false,
+        ))).rejects.toThrow('scheduling conflict')
+      }
+      expect(await db!.providerIntegritySignal.count({
+        where: { jobId: booking.id, severity: 'HIGH', status: 'OPEN' },
+      })).toBe(1)
+      expect(await db!.marketplaceRiskEvent.count({
+        where: { jobId: booking.id, severity: 'HIGH' },
+      })).toBe(1)
+      expect(await db!.jobWorkspace.count({ where: { jobId: booking.id } })).toBe(0)
+      expect((await db!.marketplaceJob.findUniqueOrThrow({
+        where: { id: booking.id },
+      })).status).toBe('QUOTE_ACCEPTED')
+    } finally {
+      await db!.companyCrewPinChallenge.deleteMany({ where: { jobId: booking.id } })
+      await db!.marketplaceRiskEvent.deleteMany({ where: { jobId: booking.id } })
+      await db!.providerIntegritySignal.deleteMany({ where: { jobId: booking.id } })
+      await db!.jobWorkerIdentityCheck.deleteMany({ where: { jobId: booking.id } })
+      await db!.companyJobAssignment.deleteMany({ where: { jobId: booking.id } })
+      await db!.companyCrewDispatch.deleteMany({ where: { jobId: booking.id } })
+      await db!.jobQuote.deleteMany({ where: { jobId: booking.id } })
+      await db!.marketplaceJob.delete({ where: { id: booking.id } })
+    }
+  })
+
   it('isolated PostgreSQL keeps per-epoch witness uniqueness and rejects empty or invalid witnesses', async () => {
     const slot = await db!.companyJobAssignment.findFirstOrThrow({
       where: { crewDispatchId: crewId },
@@ -1423,6 +1535,61 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       expect((await db!.companyJobAssignment.findMany({
         where: { crewDispatchId: staged.crewDispatchId },
       })).every(row => row.startedAt === null && row.crewArrivedAt === null)).toBe(true)
+      // Real PostgreSQL safety containment: after two consumed arrival PINs
+      // and two dual acknowledgements, an authenticated dispatcher can freeze
+      // the whole FORMING epoch without erasing any evidence or releasing held
+      // worker capacity. The old epoch must become unusable.
+      const held = await db!.$transaction(tx =>
+        holdCrewAfterPinClaimInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          expectedVersion: 1, actorUserId: ownerId,
+          actorRole: 'COMPANY_OWNER', reason: 'CI-only safety review',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(held).toMatchObject({
+        crewVersion: 2, status: 'BLOCKED', capacityHeldWorkerCount: 2,
+        preservedConsumedPinClaims: 2, revokedUnusedPinChallenges: 0,
+        supportReviewRequired: true, physicalPresenceVerified: false,
+        arrivalEnabled: false, workStartEnabled: false, paymentsEnabled: false,
+      })
+      expect((await db!.companyCrewDispatch.findUniqueOrThrow({
+        where: { id: staged.crewDispatchId },
+      })).version).toBe(2)
+      expect((await db!.companyCrewPresenceWitness.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })).length).toBe(2)
+      expect((await db!.companyCrewPinChallenge.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })).every(pin => pin.consumedAt !== null && pin.revokedAt === null)).toBe(true)
+      expect((await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })).every(row => row.status === 'CREW_ACCEPTED' &&
+        row.startedAt === null && row.crewArrivedAt === null)).toBe(true)
+      expect((await db!.marketplaceJob.findUniqueOrThrow({
+        where: { id: booking.id },
+      })).status).toBe('QUOTE_ACCEPTED')
+      expect(await db!.jobWorkspace.count({ where: { jobId: booking.id } })).toBe(0)
+      // Support hold retains scheduling capacity AND never captures,
+      // releases or refunds even the synthetic CI-only payment record.
+      expect((await db!.jobEscrow.findFirstOrThrow({
+        where: { jobId: booking.id },
+      })).status).toBe('PROTECTED')
+      expect((await db!.paymentIntent.findFirstOrThrow({
+        where: { jobId: booking.id },
+      })).status).toBe('SUCCESS')
+      await expect(db!.$transaction(tx =>
+        lockAndAssertWorkerScheduleAvailable(
+          tx, workerIds[0], 'different-booking', null, null, companyId, false,
+        ), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('scheduling conflict')
+      // An old manager request cannot undo a completed safety hold.
+      await expect(db!.$transaction(tx =>
+        holdCrewAfterPinClaimInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          expectedVersion: 1, actorUserId: ownerId,
+          actorRole: 'COMPANY_OWNER', reason: 'Stale repeated request',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('epoch or booking changed')
 
     } finally {
       await db!.paymentIntent.deleteMany({ where: { jobId: booking.id } })
