@@ -68,19 +68,19 @@ export async function holdCrewAfterPinClaimInsideTransaction(
   )
   const jobs = await tx.$queryRaw<Array<{
     id: string; status: string; workersCount: number
-  }>>\`
+  }>>`
     SELECT id, status, "workersCount" FROM "MarketplaceJob"
-    WHERE id = \${key.jobId} FOR UPDATE
-  \`
+    WHERE id = ${key.jobId} FOR UPDATE
+  `
   const crews = await tx.$queryRaw<Array<{
     id: string; companyId: string; jobId: string
     version: number; status: string; requiredWorkersCount: number
     leadWorkerUserId: string | null
-  }>>\`
+  }>>`
     SELECT id, "companyId", "jobId", version, status,
       "requiredWorkersCount", "leadWorkerUserId"
-    FROM "CompanyCrewDispatch" WHERE id = \${input.crewDispatchId} FOR UPDATE
-  \`
+    FROM "CompanyCrewDispatch" WHERE id = ${input.crewDispatchId} FOR UPDATE
+  `
   const crew = crews[0], job = jobs[0]
   if (!crew || !job || crew.companyId !== key.companyId ||
       crew.jobId !== key.jobId ||
