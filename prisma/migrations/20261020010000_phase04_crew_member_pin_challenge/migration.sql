@@ -28,6 +28,11 @@ CREATE TABLE "CompanyCrewPinChallenge" (
 );
 CREATE UNIQUE INDEX "CrewPinChallenge_scope_version_key" ON "CompanyCrewPinChallenge"
   ("crewDispatchId", "crewVersion", "assignmentId", "purpose", "challengeVersion");
+-- Keep at most one unconsumed/unrevoked challenge per person and purpose.
+-- Rotation must revoke the previous challenge before writing a successor.
+CREATE UNIQUE INDEX "CrewPinChallenge_one_live_idx" ON "CompanyCrewPinChallenge"
+  ("crewDispatchId", "crewVersion", "assignmentId", "purpose")
+  WHERE "consumedAt" IS NULL AND "revokedAt" IS NULL;
 CREATE INDEX "CrewPinChallenge_crew_purpose_idx" ON "CompanyCrewPinChallenge"
   ("crewDispatchId", "crewVersion", "purpose");
 CREATE INDEX "CrewPinChallenge_assignment_expiry_idx" ON "CompanyCrewPinChallenge"
