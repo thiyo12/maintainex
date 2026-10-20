@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   sql: vi.fn(), crewLookup: vi.fn(), company: vi.fn(), slots: vi.fn(),
   update: vi.fn(), blockCrew: vi.fn(), schedule: vi.fn(), eligibility: vi.fn(),
   companyEligibility: vi.fn(), market: vi.fn(), arrival: vi.fn(),
-  mismatch: vi.fn(), audit: vi.fn(), actor: vi.fn(),
+  mismatch: vi.fn(), audit: vi.fn(), actor: vi.fn(), pinRevoke: vi.fn(),
 }))
 vi.mock('@/lib/geography/market-engine', () => ({ requireJobMarket: mocks.market }))
 vi.mock('@/lib/phase6/provider-eligibility', () => ({
@@ -17,6 +17,9 @@ vi.mock('@/lib/domain/company-job-assignment', () => ({
   lockAndAssertAssignmentActorAuthorized: mocks.actor,
 }))
 vi.mock('@/lib/phase6/audit', () => ({ writeCompanyAuditLog: mocks.audit }))
+vi.mock('@/lib/domain/company-crew-pin-revocation', () => ({
+  revokeCrewPinChallengesInsideTransaction: mocks.pinRevoke,
+}))
 vi.mock('@/lib/prisma', () => ({ prisma: {} }))
 
 const tx = {
