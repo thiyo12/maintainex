@@ -149,6 +149,28 @@ jobs:
             ON "CompanyJobAssignment"("jobId")
             WHERE "status" IN ('ASSIGNED', 'ACCEPTED', 'IN_PROGRESS');
 
+          -- The Prisma-generated CI baseline omits custom SQL CHECK constraints
+          -- and partial indexes. Mirror only the additive Phase04 challenge
+          -- invariants so isolated CI matches the actual migration.
+          ALTER TABLE "CompanyCrewPinChallenge"
+            ADD CONSTRAINT "CompanyCrewPinChallenge_epoch_check"
+              CHECK ("crewVersion" >= 1 AND "challengeVersion" >= 1),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_purpose_check"
+              CHECK ("purpose" IN ('ARRIVAL', 'WORK_START')),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_attempt_check"
+              CHECK ("failedAttempts" BETWEEN 0 AND 5),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_digest_check"
+              CHECK ("pinDigest" ~ '^[a-f0-9]{64}$'),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_expiry_check"
+              CHECK ("expiresAt" > "createdAt"),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_terminal_check"
+              CHECK ("consumedAt" IS NULL OR "revokedAt" IS NULL);
+
+          CREATE UNIQUE INDEX IF NOT EXISTS "CrewPinChallenge_one_live_idx"
+            ON "CompanyCrewPinChallenge"
+              ("crewDispatchId", "crewVersion", "assignmentId", "purpose")
+            WHERE "consumedAt" IS NULL AND "revokedAt" IS NULL;
+
           CREATE UNIQUE INDEX IF NOT EXISTS "JobQuote_one_pending_per_provider_job"
             ON "JobQuote"("jobId", "providerId")
             WHERE status = 'PENDING';
