@@ -333,13 +333,27 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         authenticatedWorkerUserId: own.workerUserId, purpose: 'ARRIVAL' as const,
         pin, signingKey,
       }
-      const result = await db!.$transaction(
-        tx => consumeStagedCrewMemberPinInsideTransaction(tx, req),
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-      )
-      expect(result).toEqual({
-        pinVerified: true, attemptsRemaining: 0,
-        arrivalEnabled: false, workStartEnabled: false,
+      // Two workers/requests may race to use the same digest. Exactly one
+      // SERIALIZABLE transaction is allowed to consume it, never both.
+      const attempts = await Promise.allSettled([
+        db!.$transaction(
+          tx => consumeStagedCrewMemberPinInsideTransaction(tx, req),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            timeout: 15000, maxWait: 15000 },
+        ),
+        db!.$transaction(
+          tx => consumeStagedCrewMemberPinInsideTransaction(tx, req),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            timeout: 15000, maxWait: 15000 },
+        ),
+      ])
+      expect(attempts.filter(r => r.status === 'fulfilled')).toHaveLength(1)
+      expect(attempts.filter(r => r.status === 'rejected')).toHaveLength(1)
+      expect(attempts.find(r => r.status === 'fulfilled')).toMatchObject({
+        value: {
+          pinVerified: true, attemptsRemaining: 0,
+          arrivalEnabled: false, workStartEnabled: false,
+        },
       })
       const consumed = await db!.companyCrewPinChallenge.findMany({
         where: { crewDispatchId: crewId },
