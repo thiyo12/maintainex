@@ -10,6 +10,7 @@ import { deriveCrewPinDigest } from '@/lib/domain/company-crew-pin-epoch'
 import { consumeStagedCrewMemberPinInsideTransaction } from '@/lib/domain/company-crew-pin-consume'
 import { issueStagedCrewArrivalPinsInsideTransaction } from '@/lib/domain/company-crew-pin-issue'
 import { assertAllCrewPinClaimsInsideTransaction } from '@/lib/domain/company-crew-pin-claims'
+import { recordCrewPresenceWitnessInsideTransaction } from '@/lib/domain/company-crew-presence-record'
 import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -1179,6 +1180,155 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       await db!.companyCrewPresenceWitness.deleteMany({
         where: { crewDispatchId: crewId, crewVersion: { in: [0, 42, 43, 44] } },
       })
+    }
+  })
+
+
+  it('isolated PostgreSQL: distinct authenticated actors write individual witnesses, never crew arrival', async () => {
+    const booking = await db!.marketplaceJob.create({
+      data: {
+        customerId: ownerId, title: 'Per-actor crew witness CI fixture',
+        description: 'Three-party receipt ownership and concurrency, no work authority',
+        categoryId, photos: '[]', budgetType: 'FIXED',
+        countryCode: 'LK', workersCount: 2, status: 'QUOTE_ACCEPTED',
+      },
+    })
+    try {
+      await db!.jobQuote.create({
+        data: {
+          jobId: booking.id, providerId: companyId, providerType: 'COMPANY',
+          price: 10000n, estimatedCompletionTime: '2 hours',
+          attachments: '[]', status: 'ACCEPTED',
+        },
+      })
+      const staged = await db!.$transaction(tx => stageCrewReservationInsideTransaction(tx, {
+        ...input(), jobId: booking.id, leadWorkerUserId: workerIds[0],
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      for (const workerUserId of workerIds) {
+        await db!.$transaction(tx => acceptStagedCrewMemberInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, workerUserId, expectedVersion: 1,
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      }
+      const assignments = await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+        orderBy: { crewSlot: 'asc' },
+      })
+      const photos = await db!.providerIdentity.findMany({
+        where: {
+          currentUserId: { in: workerIds }, identityType: 'COMPANY_WORKER',
+          kycStatus: 'VERIFIED', verifiedPhotoUrl: { not: null },
+        },
+        select: { id: true, currentUserId: true, verifiedPhotoUrl: true },
+      })
+      expect(photos).toHaveLength(2)
+      const approvedAt = new Date()
+      for (const photo of photos) {
+        await db!.jobWorkerIdentityCheck.create({
+          data: {
+            jobId: booking.id, customerId: ownerId,
+            providerIdentityId: photo.id, assignedWorkerUserId: photo.currentUserId,
+            displayNameSnapshot: 'CI worker', photoSnapshotUrl: photo.verifiedPhotoUrl,
+            status: 'MATCHED', confirmedAt: approvedAt,
+          },
+        })
+      }
+      await db!.companyJobAssignment.updateMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+        data: { crewIdentityConfirmedAt: approvedAt },
+      })
+      const now = new Date()
+      await db!.companyCrewPinChallenge.createMany({
+        data: assignments.map(assignment => ({
+          crewDispatchId: staged.crewDispatchId, jobId: booking.id, crewVersion: 1,
+          assignmentId: assignment.id, purpose: 'ARRIVAL',
+          challengeVersion: 1, issuedByCustomerUserId: ownerId,
+          pinDigest: deriveCrewPinDigest('345678', {
+            crewDispatchId: staged.crewDispatchId, jobId: booking.id, crewVersion: 1,
+            assignmentId: assignment.id, workerUserId: assignment.workerUserId,
+            purpose: 'ARRIVAL',
+          }, Buffer.alloc(32, 0x32)),
+          createdAt: new Date(now.getTime()-20000),
+          consumedAt: new Date(now.getTime()-10000),
+          expiresAt: new Date(now.getTime()+300000),
+        })),
+      })
+      const base = {
+        crewDispatchId: staged.crewDispatchId,
+        expectedVersion: 1, assignmentId: assignments[0].id,
+      }
+      await expect(db!.$transaction(
+        tx => recordCrewPresenceWitnessInsideTransaction(tx, {
+          ...base, authenticatedUserId: workerIds[1], participant: 'WORKER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('assignment not found')
+      await expect(db!.$transaction(
+        tx => recordCrewPresenceWitnessInsideTransaction(tx, {
+          ...base, authenticatedUserId: workerIds[0], participant: 'CUSTOMER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('not found')
+
+      const worker = await db!.$transaction(
+        tx => recordCrewPresenceWitnessInsideTransaction(tx, {
+          ...base, authenticatedUserId: workerIds[0], participant: 'WORKER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(worker).toMatchObject({
+        participantRecorded: 'WORKER', physicalPresenceVerified: false,
+        arrivalEnabled: false, workStartEnabled: false,
+      })
+      let witnessed = await db!.companyCrewPresenceWitness.findFirstOrThrow({
+        where: { crewDispatchId: staged.crewDispatchId, assignmentId: base.assignmentId },
+      })
+      expect(witnessed.workerAttestedAt).not.toBeNull()
+      expect(witnessed.customerAttestedAt).toBeNull()
+
+      const customer = await db!.$transaction(
+        tx => recordCrewPresenceWitnessInsideTransaction(tx, {
+          ...base, authenticatedUserId: ownerId, participant: 'CUSTOMER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(customer).toMatchObject({
+        participantRecorded: 'CUSTOMER', physicalPresenceVerified: false,
+        arrivalEnabled: false, workStartEnabled: false,
+      })
+      witnessed = await db!.companyCrewPresenceWitness.findFirstOrThrow({
+        where: { crewDispatchId: staged.crewDispatchId, assignmentId: base.assignmentId },
+      })
+      expect(witnessed.customerAttestedAt).not.toBeNull()
+      const firstWorkerStamp = witnessed.workerAttestedAt!.getTime()
+      await expect(db!.$transaction(
+        tx => recordCrewPresenceWitnessInsideTransaction(tx, {
+          ...base, authenticatedUserId: workerIds[0], participant: 'WORKER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('already recorded')
+      expect((await db!.companyCrewPresenceWitness.findFirstOrThrow({
+        where: { crewDispatchId: staged.crewDispatchId, assignmentId: base.assignmentId },
+      })).workerAttestedAt!.getTime()).toBe(firstWorkerStamp)
+
+      expect(await db!.companyCrewPresenceWitness.count({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })).toBe(1)
+      expect((await db!.companyCrewDispatch.findUniqueOrThrow({
+        where: { id: staged.crewDispatchId },
+      })).status).toBe('FORMING')
+      expect((await db!.marketplaceJob.findUniqueOrThrow({
+        where: { id: booking.id },
+      })).status).toBe('QUOTE_ACCEPTED')
+      expect((await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })).every(row => row.startedAt === null && row.crewArrivedAt === null)).toBe(true)
+      expect(await db!.jobVerificationPin.count({ where: { jobId: booking.id } })).toBe(0)
+      expect(await db!.jobWorkspace.count({ where: { jobId: booking.id } })).toBe(0)
+    } finally {
+      await db!.companyCrewPresenceWitness.deleteMany({
+        where: { jobId: booking.id },
+      })
+      await db!.companyCrewPinChallenge.deleteMany({ where: { jobId: booking.id } })
+      await db!.jobWorkerIdentityCheck.deleteMany({ where: { jobId: booking.id } })
+      await db!.companyJobAssignment.deleteMany({ where: { jobId: booking.id } })
+      await db!.companyCrewDispatch.deleteMany({ where: { jobId: booking.id } })
+      await db!.jobQuote.deleteMany({ where: { jobId: booking.id } })
+      await db!.marketplaceJob.delete({ where: { id: booking.id } })
     }
   })
 
