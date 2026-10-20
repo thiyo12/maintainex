@@ -21,6 +21,58 @@ async function authorizedCompany(request: NextRequest, input: Record<string, unk
   return { actorId: user.id, companyId: result.context.companyId, role: result.context.role }
 }
 
+
+/**
+ * Authorized dispatcher read model. No customer contact or location data,
+ * competing quotes, raw photo IDs, identity documents or PINs are exposed.
+ * A FORMING roster is an internal hold, not active crew dispatch.
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const companyId = searchParams.get('companyId')
+    if (!companyId) {
+      return NextResponse.json({ error: 'companyId is required' }, { status: 400 })
+    }
+    const user = await authenticateMarketplaceUser(request)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
+    if (!companyId.trim() || companyId.length > 128) {
+      return NextResponse.json({ error: 'Invalid company' }, { status: 400 })
+    }
+    const result = await resolveCompanyContext(user.id, companyId, 'workers:read')
+    if (result.error) return result.error
+    if (!result.context) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const rows = await prisma.companyCrewDispatch.findMany({
+      where: { companyId: result.context.companyId, status: 'FORMING' },
+      select: {
+        id: true, status: true, version: true,
+        requiredWorkersCount: true, leadWorkerUserId: true,
+        job: { select: { id: true, title: true, countryCode: true } },
+        assignments: {
+          select: {
+            id: true, status: true, crewSlot: true, crewRole: true,
+            worker: { select: { id: true, name: true } },
+          },
+          orderBy: { crewSlot: 'asc' },
+        },
+      },
+      take: 50,
+      orderBy: { createdAt: 'desc' },
+    })
+    return NextResponse.json({
+      crews: rows.map(row => ({
+        ...row, dispatchEnabled: false,
+      })),
+    }, { headers: { 'Cache-Control': 'private, no-store' } })
+  } catch (error) {
+    secureConsole.error('Crew roster listing failed:', error)
+    return NextResponse.json({ error: 'Unable to load crew rosters' }, { status: 500 })
+  }
+}
+
 /**
  * Staging is deliberately unavailable on production and opt-in in test/dev.
  * It reserves capacity but never sends invitations, grants PINs, changes

@@ -11,12 +11,13 @@ const state = vi.hoisted(() => ({
   stage: vi.fn(),
   cancel: vi.fn(),
   transaction: vi.fn(),
-  invitations: vi.fn(),
+  invitations: vi.fn(), crews: vi.fn(),
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     $transaction: state.transaction,
     companyJobAssignment: { findMany: state.invitations },
+    companyCrewDispatch: { findMany: state.crews },
   },
 }))
 vi.mock('@/lib/auth/marketplace-auth', () => ({
@@ -72,6 +73,7 @@ describe('Phase04 crew decision routes: authenticated identity and fail-closed s
     state.stage.mockResolvedValue({ status: 'FORMING', dispatchEnabled: false })
     state.cancel.mockResolvedValue({ status: 'CANCELLED', dispatchEnabled: false })
     state.invitations.mockResolvedValue([])
+    state.crews.mockResolvedValue([])
   })
 
   it('does not let an unauthenticated visitor read or answer crew invitations', async () => {
@@ -141,6 +143,28 @@ describe('Phase04 crew decision routes: authenticated identity and fail-closed s
     expect((await call('worker/crew', 'POST', { crewDispatchId: 'crew',
       expectedVersion: 1, action: 'accept' })).status).toBe(403)
     expect(state.transaction).not.toHaveBeenCalled()
+  })
+
+  it('lists only forming crews belonging to an active authorized company', async () => {
+    state.actor = 'manager'
+    const { GET } = await import('@/app/api/mobile/company/crew/roster/route')
+    const response = await GET(new NextRequest('http://localhost/api/mobile/company/crew/roster?companyId=company'))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(state.crews).toHaveBeenCalledWith(expect.objectContaining({
+      where: { companyId: 'company', status: 'FORMING' },
+      take: 50,
+    }))
+    expect((await response.json()).crews).toEqual([])
+    state.allow = false
+    expect((await GET(new NextRequest('http://localhost/api/mobile/company/crew/roster?companyId=company'))).status).toBe(403)
+  })
+
+  it('does not let a worker read another company\'s manager roster', async () => {
+    state.actor = null
+    const { GET } = await import('@/app/api/mobile/company/crew/roster/route')
+    expect((await GET(new NextRequest('http://localhost/api/mobile/company/crew/roster?companyId=company'))).status).toBe(401)
+    expect(state.crews).not.toHaveBeenCalled()
   })
 
   it('allows current dispatcher cancellation while staging is disabled', async () => {
