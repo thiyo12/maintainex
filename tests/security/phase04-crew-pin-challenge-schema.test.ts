@@ -27,6 +27,21 @@ describe('Phase04 crew member challenge persistence remains inert and scoped', (
     expect(migration).toContain('"purpose" IN (\'ARRIVAL\', \'WORK_START\')')
     expect(migration).toContain('"pinDigest" ~ \'^[a-f0-9]{64}$\'')
     expect(migration).toContain('"failedAttempts" BETWEEN 0 AND 5')
+    // Prisma's baseline cannot express CHECK constraints. A green baseline
+    // must enforce every raw migration check as well as the partial index.
+    const pinChecks = [
+      ['CompanyCrewPinChallenge_epoch_check', '"crewVersion" >= 1 AND "challengeVersion" >= 1'],
+      ['CompanyCrewPinChallenge_purpose_check', '"purpose" IN (\'ARRIVAL\', \'WORK_START\')'],
+      ['CompanyCrewPinChallenge_attempt_check', '"failedAttempts" BETWEEN 0 AND 5'],
+      ['CompanyCrewPinChallenge_digest_check', '"pinDigest" ~ \'^[a-f0-9]{64}$\''],
+      ['CompanyCrewPinChallenge_expiry_check', '"expiresAt" > "createdAt"'],
+      ['CompanyCrewPinChallenge_terminal_check', '"consumedAt" IS NULL OR "revokedAt" IS NULL'],
+    ] as const
+    for (const [name, expression] of pinChecks) {
+      expect(migration).toContain('"' + name + '"')
+      expect(fullCi).toContain('"' + name + '"')
+      expect(fullCi).toContain('CHECK (' + expression + ')')
+    }
   })
 
   it('only adds a constrained table without weakening old unique assignment/PIN guards', () => {
