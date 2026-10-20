@@ -79,6 +79,7 @@ export interface V2Job {
   description: string
   categoryId: string
   countryCode: string
+  workersCount?: number
   photos: string[]
   budgetType: string
   budgetAmount: number | null
