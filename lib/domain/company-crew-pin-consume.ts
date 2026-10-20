@@ -32,6 +32,11 @@ export async function consumeStagedCrewMemberPinInsideTransaction(
   arrivalEnabled: false
   workStartEnabled: false
 }> {
+  // Defense in depth: even an accidentally introduced direct server caller
+  // may not consume crew challenges in a production process.
+  if (process.env.NODE_ENV === 'production') {
+    throw new CrewCommitGateError('Crew arrival PIN consumption is not enabled')
+  }
   if (typeof input.crewDispatchId !== 'string' ||
       !input.crewDispatchId.trim() || input.crewDispatchId.length > 128 ||
       typeof input.authenticatedWorkerUserId !== 'string' ||
