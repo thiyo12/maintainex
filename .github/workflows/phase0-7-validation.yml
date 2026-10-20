@@ -149,11 +149,9 @@ jobs:
             ON "CompanyJobAssignment"("jobId")
             WHERE "status" IN ('ASSIGNED', 'ACCEPTED', 'IN_PROGRESS');
 
-          -- Prisma's generated baseline omits custom partial indexes AND
-          -- CHECK constraints. Restore the exact additive Phase04 PIN
-          -- migration invariants in this isolated test database. Without
-          -- these, passing Prisma schema checks would falsely certify
-          -- invalid challenge purposes, digests and terminal states.
+          -- Prisma baseline does not include raw SQL CHECK constraints or
+          -- partial indexes. Preserve the Phase04 additive migration's
+          -- safety invariants in the isolated CI database.
           ALTER TABLE "CompanyCrewPinChallenge"
             ADD CONSTRAINT "CompanyCrewPinChallenge_epoch_check"
               CHECK ("crewVersion" >= 1 AND "challengeVersion" >= 1),
@@ -162,7 +160,13 @@ jobs:
             ADD CONSTRAINT "CompanyCrewPinChallenge_attempt_check"
               CHECK ("failedAttempts" BETWEEN 0 AND 5),
             ADD CONSTRAINT "CompanyCrewPinChallenge_digest_check"
-              CHECK ("pinDigest" ~ '^[a-f0-9]{64}
+              CHECK ("pinDigest" ~ '^[a-f0-9]{64}$'),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_expiry_check"
+              CHECK ("expiresAt" > "createdAt"),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_terminal_check"
+              CHECK ("consumedAt" IS NULL OR "revokedAt" IS NULL);
+
+          CREATE UNIQUE INDEX IF NOT EXISTS "CrewPinChallenge_one_live_idx"
             ON "CompanyCrewPinChallenge"
               ("crewDispatchId", "crewVersion", "assignmentId", "purpose")
             WHERE "consumedAt" IS NULL AND "revokedAt" IS NULL;
