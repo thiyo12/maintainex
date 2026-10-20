@@ -676,6 +676,97 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
     }
   })
 
+  it('isolated PostgreSQL: a consumed worker PIN prevents silent cancellation and workforce removal', async () => {
+    const job = await db!.marketplaceJob.create({
+      data: {
+        customerId: ownerId, title: 'Crew consumed claim cancellation fixture',
+        description: 'Phase04 crew claim must survive attempted workforce changes',
+        categoryId, photos: '[]', budgetType: 'FIXED',
+        countryCode: 'LK', workersCount: 2, status: 'QUOTE_ACCEPTED',
+      },
+    })
+    try {
+      await db!.jobQuote.create({
+        data: {
+          jobId: job.id, providerId: companyId, providerType: 'COMPANY',
+          price: 10000n, estimatedCompletionTime: '2 hours',
+          attachments: '[]', status: 'ACCEPTED',
+        },
+      })
+      const staged = await db!.$transaction(
+        tx => stageCrewReservationInsideTransaction(tx, {
+          ...input(), jobId: job.id, leadWorkerUserId: workerIds[0],
+        }),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      for (const workerUserId of workerIds) {
+        await db!.$transaction(
+          tx => acceptStagedCrewMemberInsideTransaction(tx, {
+            crewDispatchId: staged.crewDispatchId, workerUserId, expectedVersion: 1,
+          }),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        )
+      }
+      const slots = await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })
+      const consumed = new Date()
+      await db!.companyCrewPinChallenge.create({
+        data: {
+          crewDispatchId: staged.crewDispatchId, jobId: job.id,
+          assignmentId: slots[0].id, crewVersion: 1, purpose: 'ARRIVAL',
+          challengeVersion: 1, pinDigest: 'a'.repeat(64),
+          issuedByCustomerUserId: ownerId,
+          createdAt: new Date(consumed.getTime() - 1000),
+          consumedAt: consumed,
+          expiresAt: new Date(consumed.getTime() + 300000),
+        },
+      })
+      await expect(db!.$transaction(
+        tx => cancelStagedCrewInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          actorUserId: ownerId, actorRole: 'COMPANY_OWNER',
+          expectedVersion: 1, reason: 'Try cancelling after PIN was consumed',
+        }),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('support review')
+      await expect(db!.$transaction(async tx => {
+        await tx.$queryRaw`
+          SELECT id FROM "TeamMember"
+          WHERE "companyId" = ${companyId} AND "userId" = ${workerIds[0]} FOR UPDATE
+        `
+        await blockWorkerFormingCrewsInsideTransaction(tx, {
+          companyId, workerUserId: workerIds[0],
+          actorUserId: ownerId, actorRole: 'COMPANY_OWNER', reason: 'REMOVED',
+        })
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
+        .rejects.toThrow('CREW_WORKFORCE_STATE_CONFLICT')
+      const persisted = await db!.companyCrewPinChallenge.findFirstOrThrow({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })
+      expect(persisted.consumedAt).not.toBeNull()
+      expect(persisted.revokedAt).toBeNull()
+      const crew = await db!.companyCrewDispatch.findUniqueOrThrow({
+        where: { id: staged.crewDispatchId },
+      })
+      expect(crew.status).toBe('FORMING')
+      expect(crew.version).toBe(1)
+      const unchanged = await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })
+      expect(unchanged).toHaveLength(2)
+      expect(unchanged.every(s => s.status === 'CREW_ACCEPTED' && s.revokedAt === null))
+        .toBe(true)
+      expect(await db!.jobVerificationPin.count({ where: { jobId: job.id } })).toBe(0)
+    } finally {
+      await db!.companyCrewPinChallenge.deleteMany({ where: { jobId: job.id } })
+      await db!.companyJobAssignment.deleteMany({ where: { jobId: job.id } })
+      await db!.companyCrewDispatch.deleteMany({ where: { jobId: job.id } })
+      await db!.jobQuote.deleteMany({ where: { jobId: job.id } })
+      await db!.marketplaceJob.delete({ where: { id: job.id } })
+    }
+  })
+
   it('cancels an accepted two-worker roster atomically and preserves the terminal epoch', async () => {
     const cancellationJob = await db!.marketplaceJob.create({
       data: {
