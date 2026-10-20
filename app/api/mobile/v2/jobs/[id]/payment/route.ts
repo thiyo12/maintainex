@@ -107,6 +107,7 @@ export async function GET(
         countryCode: true,
         latitude: true,
         longitude: true,
+        workersCount: true,
       },
     })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
@@ -126,6 +127,17 @@ export async function GET(
         select: { providerId: true, providerType: true },
       }),
     ])
+
+    // Preserve existing financial history while withholding all new checkout
+    // options on not-yet-supported crew bookings. This is a read-only gate.
+    if ((job.workersCount ?? 1) !== 1) {
+      return NextResponse.json({
+        payment,
+        options: null,
+        market: { valid: false, code: 'CREW_PAYMENT_NOT_ENABLED',
+          error: 'Crew payment activation is not available' },
+      })
+    }
 
     // Phase 02/03: payment display uses the SAME resolver as payment intent
     // creation, so GET and POST can never disagree about whether a job's market
