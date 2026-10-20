@@ -58,7 +58,7 @@ describe('NEGATIVE: payment creation enforces the authoritative market', () => {
 
   it('the locked job revalidation selects coordinates', () => {
     // Before the fix the FOR UPDATE query selected only stored countryCode.
-    expect(paymentService).toMatch(/SELECT id, "customerId", status, title, "countryCode", "latitude", "longitude"/)
+    expect(paymentService).toMatch(/SELECT id, "customerId", status, title, "workersCount", "countryCode", "latitude", "longitude"/)
   })
 
   it('exposes a single market resolver used by payment intent creation', () => {
@@ -137,7 +137,7 @@ describe('HISTORICAL PATHS: refunds and committed accounting stay unchanged', ()
     expect(confirmCashPaymentSource).not.toMatch(/countryCode: job\.countryCode \|\| 'LK'/)
     expect(confirmCashPaymentSource).not.toContain("job.countryCode || 'LK'")
     // The locked row must carry the market columns it is validated from.
-    expect(escrowService).toContain('SELECT id, "customerId", status, "countryCode", latitude, longitude')
+    expect(escrowService).toContain('SELECT id, "customerId", status, "workersCount", "countryCode", latitude, longitude')
     // Both the cash gate and the provider financial check use the same validated
     // market, not the pre-lock preview.
     expect(escrowService).toContain('isCashPaymentAvailableForMarket(authoritativeCountryCode, escrow.currency)')
