@@ -96,6 +96,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
     if (!db) return
     try {
       if (jobId) {
+        await db.companyCrewPinChallenge.deleteMany({ where: { crewDispatch: { jobId } } })
         await db.companyJobAssignment.deleteMany({ where: { jobId } })
         await db.companyCrewDispatch.deleteMany({ where: { jobId } })
         await db.jobQuote.deleteMany({ where: { jobId } })
@@ -182,6 +183,63 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
     // No target worker rewrite, work-start, PIN or customer notification.
     expect((await db!.marketplaceJob.findUniqueOrThrow({ where: { id: jobId } })).status)
       .toBe('QUOTE_ACCEPTED')
+  })
+
+  it('enforces worker/crew epoch PIN shape, expiry and uniqueness without issuing real codes', async () => {
+    const assignment = await db!.companyJobAssignment.findFirstOrThrow({
+      where: { crewDispatchId: crewId },
+      select: { id: true },
+    })
+    const base = {
+      crewDispatchId: crewId,
+      crewVersion: 1,
+      issuedByCustomerId: ownerId,
+      pinHash: 'test-only-hashed-placeholder',
+      expiresAt: new Date(Date.now() + 5 * 60_000),
+    }
+    try {
+      await db!.companyCrewPinChallenge.create({
+        data: { ...base, assignmentId: assignment.id, purpose: 'ARRIVAL' },
+      })
+      await db!.companyCrewPinChallenge.create({
+        data: { ...base, assignmentId: null, purpose: 'WORK_START' },
+      })
+      await expect(db!.companyCrewPinChallenge.create({
+        data: { ...base, assignmentId: null, purpose: 'WORK_START' },
+      })).rejects.toThrow()
+      await expect(db!.companyCrewPinChallenge.create({
+        data: { ...base, assignmentId: assignment.id, purpose: 'ARRIVAL' },
+      })).rejects.toThrow()
+      await expect(db!.companyCrewPinChallenge.create({
+        data: {
+          ...base, assignmentId: assignment.id,
+          purpose: 'WORK_START',
+        },
+      })).rejects.toThrow()
+      await expect(db!.companyCrewPinChallenge.create({
+        data: {
+          ...base, assignmentId: null,
+          purpose: 'ARRIVAL',
+        },
+      })).rejects.toThrow()
+      await expect(db!.companyCrewPinChallenge.create({
+        data: {
+          ...base, assignmentId: assignment.id,
+          purpose: 'ARRIVAL', crewVersion: 2,
+          expiresAt: new Date(Date.now() + 60 * 60_000),
+        },
+      })).rejects.toThrow()
+      expect(await db!.companyCrewPinChallenge.count({
+        where: { crewDispatchId: crewId },
+      })).toBe(2)
+      expect(await db!.jobVerificationPin.count({ where: { jobId } })).toBe(0)
+      expect((await db!.marketplaceJob.findUniqueOrThrow({ where: { id: jobId } })).status)
+        .toBe('QUOTE_ACCEPTED')
+    } finally {
+      await db!.companyCrewPinChallenge.deleteMany({
+        where: { crewDispatchId: crewId },
+      })
+    }
   })
 
   it('makes staged crew capacity block subsequent single-worker allocations on other jobs', async () => {
