@@ -20,7 +20,8 @@ export function isPhase04CrewWitnessIsolatedTestEnvironment(): boolean {
     if (!['postgresql:', 'postgres:'].includes(parsed.protocol) ||
         !['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname) ||
         parsed.pathname !== '/maintainex_test_phase07_ci' ||
-        !parsed.username || !parsed.password) {
+        (parsed.port !== '' && parsed.port !== '5432') ||
+        parsed.hash !== '' || !parsed.username || !parsed.password) {
       return false
     }
     // Host, schema and service overrides can redirect a PostgreSQL URI
