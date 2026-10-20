@@ -72,8 +72,10 @@ export async function consumeStagedCrewMemberPinInsideTransaction(
   const crews = await tx.$queryRaw<Array<{
     id: string; companyId: string; jobId: string
     status: string; version: number; requiredWorkersCount: number
+    leadWorkerUserId: string | null
   }>>`
-    SELECT id, "companyId", "jobId", status, version, "requiredWorkersCount"
+    SELECT id, "companyId", "jobId", status, version,
+      "requiredWorkersCount", "leadWorkerUserId"
     FROM "CompanyCrewDispatch" WHERE id = ${input.crewDispatchId} FOR UPDATE
   `
   const crew = crews[0], job = jobs[0]
@@ -91,12 +93,16 @@ export async function consumeStagedCrewMemberPinInsideTransaction(
       id: true, jobId: true, companyId: true, workerUserId: true,
       status: true, crewArrivedAt: true, startedAt: true,
       acceptedAt: true, crewIdentityConfirmedAt: true,
+      crewSlot: true, crewRole: true,
     },
   })
   const own = slots.find(slot => slot.workerUserId === input.authenticatedWorkerUserId)
   if (!own) throw new CrewCommitGateError('Crew invitation not found', 404)
   if (slots.length !== crew.requiredWorkersCount ||
       new Set(slots.map(s => s.workerUserId)).size !== slots.length ||
+      new Set(slots.map(s => s.crewSlot)).size !== slots.length ||
+      slots.filter(s => s.crewRole === 'LEAD').length !== 1 ||
+      slots.find(s => s.crewRole === 'LEAD')?.workerUserId !== crew.leadWorkerUserId ||
       slots.some(s => s.jobId !== job.id || s.companyId !== key.companyId ||
         s.status !== 'CREW_ACCEPTED' || !s.acceptedAt ||
         !s.crewIdentityConfirmedAt || s.crewIdentityConfirmedAt < s.acceptedAt ||
@@ -121,43 +127,46 @@ export async function consumeStagedCrewMemberPinInsideTransaction(
     throw new CrewCommitGateError('Crew has unresolved safety or old arrival evidence')
   }
 
-  // Authenticate the CURRENT worker account and photo under the same User /
-  // TeamMember locks as suspension and dispatch before touching PIN state.
-  await lockAndAssertWorkerScheduleAvailable(
-    tx, input.authenticatedWorkerUserId, job.id,
-    job.preferredDate, job.preferredTimeSlot, key.companyId, true,
-  )
-  const eligibility = await checkCrewCandidateEligibility(
-    key.companyId, input.authenticatedWorkerUserId, job.id, tx,
-  )
-  if (!eligibility.eligible) throw new CrewCommitGateError('Worker eligibility changed')
-
-  const photo = await tx.providerIdentity.findFirst({
-    where: {
-      currentUserId: input.authenticatedWorkerUserId,
-      identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
-      kycStatus: 'VERIFIED', verifiedPhotoUrl: { not: null },
-    },
-    orderBy: { updatedAt: 'desc' },
-    select: { id: true, verifiedPhotoUrl: true },
-  })
-  if (!photo?.verifiedPhotoUrl) throw new CrewCommitGateError('Worker photo no longer verified')
-  const confirmation = await tx.jobWorkerIdentityCheck.findUnique({
-    where: { jobId_providerIdentityId: {
-      jobId: job.id, providerIdentityId: photo.id,
-    } },
-    select: {
-      status: true, assignedWorkerUserId: true, confirmedAt: true,
-      photoSnapshotUrl: true,
-    },
-  })
-  if (!confirmation || confirmation.status !== 'MATCHED' ||
-      confirmation.assignedWorkerUserId !== own.workerUserId ||
-      confirmation.photoSnapshotUrl !== photo.verifiedPhotoUrl ||
-      !confirmation.confirmedAt ||
-      confirmation.confirmedAt < own.acceptedAt! ||
-      confirmation.confirmedAt > own.crewIdentityConfirmedAt!) {
-    throw new CrewCommitGateError('Worker photo confirmation changed')
+  // Authorize every CURRENT worker in stable ID order: each account,
+  // membership, verified photo and customer snapshot can change after the
+  // customer pressed Match. A verified PIN does not bypass group safety.
+  for (const slot of [...slots].sort((a, b) =>
+    a.workerUserId.localeCompare(b.workerUserId))) {
+    await lockAndAssertWorkerScheduleAvailable(
+      tx, slot.workerUserId, job.id,
+      job.preferredDate, job.preferredTimeSlot, key.companyId, true,
+    )
+    const eligibility = await checkCrewCandidateEligibility(
+      key.companyId, slot.workerUserId, job.id, tx,
+    )
+    if (!eligibility.eligible) throw new CrewCommitGateError('Crew worker eligibility changed')
+    const photo = await tx.providerIdentity.findFirst({
+      where: {
+        currentUserId: slot.workerUserId,
+        identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
+        kycStatus: 'VERIFIED', verifiedPhotoUrl: { not: null },
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: { id: true, verifiedPhotoUrl: true },
+    })
+    if (!photo?.verifiedPhotoUrl) throw new CrewCommitGateError('Crew worker photo is no longer verified')
+    const confirmed = await tx.jobWorkerIdentityCheck.findUnique({
+      where: { jobId_providerIdentityId: {
+        jobId: job.id, providerIdentityId: photo.id,
+      } },
+      select: {
+        status: true, assignedWorkerUserId: true, confirmedAt: true,
+        photoSnapshotUrl: true,
+      },
+    })
+    if (!confirmed || confirmed.status !== 'MATCHED' ||
+        confirmed.assignedWorkerUserId !== slot.workerUserId ||
+        confirmed.photoSnapshotUrl !== photo.verifiedPhotoUrl ||
+        !confirmed.confirmedAt ||
+        confirmed.confirmedAt < slot.acceptedAt! ||
+        confirmed.confirmedAt > slot.crewIdentityConfirmedAt!) {
+      throw new CrewCommitGateError('Crew worker photo confirmation changed')
+    }
   }
 
   // Guard against cross-job/worker challenge reuse and consume exactly once.
