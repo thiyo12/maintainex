@@ -5,7 +5,7 @@ import { blockWorkerFormingCrewsInsideTransaction } from '@/lib/domain/company-c
 
 const m = vi.hoisted(() => ({
   held: vi.fn(), roster: vi.fn(), crew: vi.fn(), sql: vi.fn(),
-  arrival: vi.fn(), pin: vi.fn(), release: vi.fn(), block: vi.fn(), audit: vi.fn(), pinRevoke: vi.fn(),
+  arrival: vi.fn(), pin: vi.fn(), release: vi.fn(), block: vi.fn(), audit: vi.fn(), pinRevoke: vi.fn(), risk: vi.fn(), priorClaim: vi.fn(),
 }))
 vi.mock('@/lib/phase6/audit', () => ({ writeCompanyAuditLog: m.audit }))
 vi.mock('@/lib/domain/company-crew-pin-revocation', () => ({
@@ -25,6 +25,8 @@ const tx = {
     updateMany: m.release,
   },
   companyCrewDispatch: { findUnique: m.crew, updateMany: m.block },
+  companyCrewPinChallenge: { findFirst: m.priorClaim },
+  marketplaceRiskEvent: { create: m.risk },
   jobVerificationPin: { findFirst: vi.fn(async (args: any) =>
     args.where.status === 'ACTIVE' ? m.pin() : m.arrival()) },
   $queryRaw: m.sql,
@@ -51,6 +53,8 @@ describe('Phase04 crew workforce invalidation: fail closed and whole-roster atom
     m.pin.mockResolvedValue(null)
     m.release.mockResolvedValue({ count: 2 })
     m.block.mockResolvedValue({ count: 1 })
+    m.pinRevoke.mockResolvedValue({revokedPinChallenges: 0, consumedClaimsPreserved: 0})
+    m.priorClaim.mockResolvedValue({id:'prior-pin'})
   })
 
   it('revokes every reserved/accepted coworker, blocks epoch and audits trigger', async () => {
@@ -73,6 +77,89 @@ describe('Phase04 crew workforce invalidation: fail closed and whole-roster atom
       }),
     }), tx)
     expect(tx).not.toHaveProperty('jobWorkspace')
+  })
+
+  it('allows a real workforce SUSPENSION with consumed crew PIN: hold all capacity and queue HIGH safety review',async()=>{
+    m.roster.mockResolvedValue([
+      {...roster[0],status:'CREW_ACCEPTED'},
+      roster[1],
+    ])
+    m.pinRevoke.mockResolvedValue({revokedPinChallenges:1,consumedClaimsPreserved:1})
+    expect(await invalidate()).toEqual({blockedCrewsCount:1,revokedCrewSlotsCount:0})
+    expect(m.release).not.toHaveBeenCalled()
+    expect(m.block).toHaveBeenCalledWith({
+      where:{id:'crew',version:4,status:'FORMING'},
+      data:{status:'BLOCKED',version:{increment:1}},
+    })
+    expect(m.pinRevoke).toHaveBeenCalledWith(tx,{
+      crewDispatchId:'crew',crewVersion:4,allowConsumedEvidence:true,
+    })
+    expect(m.risk).toHaveBeenCalledWith({
+      data:expect.objectContaining({
+        jobId:'job',actorUserId:'manager',
+        eventType:'CREW_WORKFORCE_PIN_SAFETY_HOLD',severity:'HIGH',
+      }),
+    })
+    expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action:'CREW_WORKFORCE_INVALIDATED',
+      metadata:expect.objectContaining({
+        revokedCrewSlots:0,consumedPinsPreserved:1,unusedPinsRevoked:1,
+        capacityHeldForReview:2,
+      }),
+    }),tx)
+  })
+
+  it('allows later role/remove/suspend on already safety-BLOCKED crew without touching capacity or old proof',async()=>{
+    m.roster.mockResolvedValue([
+      {...roster[0],status:'CREW_ACCEPTED'},roster[1],
+    ])
+    m.sql.mockReset().mockResolvedValueOnce([{id:'job',status:'QUOTE_ACCEPTED',workersCount:2}])
+      .mockResolvedValueOnce([{
+        id:'crew',companyId:'company',jobId:'job',status:'BLOCKED',
+        version:5,requiredWorkersCount:2,leadWorkerUserId:'worker',
+      }])
+    expect(await invalidate()).toEqual({blockedCrewsCount:1,revokedCrewSlotsCount:0})
+    expect(m.priorClaim).toHaveBeenCalledWith({
+      where:{crewDispatchId:'crew',consumedAt:{not:null},purpose:'ARRIVAL'},
+      select:{id:true},
+    })
+    expect(m.pinRevoke).not.toHaveBeenCalled()
+    expect(m.release).not.toHaveBeenCalled()
+    expect(m.block).not.toHaveBeenCalled()
+    expect(m.risk).not.toHaveBeenCalled()
+    expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({
+      metadata:expect.objectContaining({
+        alreadyBlocked:true,revokedCrewSlots:0,capacityHeldForReview:2,
+      }),
+    }),tx)
+  })
+
+  it('fails closed when a BLOCKED crew has no consumed arrival evidence',async()=>{
+    m.roster.mockResolvedValue([
+      {...roster[0],status:'CREW_ACCEPTED'},roster[1],
+    ])
+    m.sql.mockReset().mockResolvedValueOnce([{id:'job',status:'QUOTE_ACCEPTED',workersCount:2}])
+      .mockResolvedValueOnce([{
+        id:'crew',companyId:'company',jobId:'job',status:'BLOCKED',
+        version:5,requiredWorkersCount:2,leadWorkerUserId:'worker',
+      }])
+    m.priorClaim.mockResolvedValue(null)
+    await expect(invalidate()).rejects.toThrow('CREW_WORKFORCE_STATE_CONFLICT')
+    expect(m.block).not.toHaveBeenCalled()
+    expect(m.release).not.toHaveBeenCalled()
+  })
+
+  it('aborts a consumed-PIN workforce transition if the HIGH safety-review event cannot be recorded',async()=>{
+    m.roster.mockResolvedValue([
+      {...roster[0],status:'CREW_ACCEPTED'},roster[1],
+    ])
+    m.pinRevoke.mockResolvedValue({revokedPinChallenges:0,consumedClaimsPreserved:1})
+    m.risk.mockRejectedValue(new Error('risk queue unavailable'))
+    await expect(invalidate()).rejects.toThrow('risk queue unavailable')
+    expect(m.block).toHaveBeenCalledOnce()
+    expect(m.release).not.toHaveBeenCalled()
+    expect(m.audit).not.toHaveBeenCalled()
+    // Real caller SERIALIZABLE transaction rolls back the epoch/write on error.
   })
 
   it('does not mutate when worker has no staged crew', async () => {
