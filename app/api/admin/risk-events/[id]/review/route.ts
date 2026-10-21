@@ -2,7 +2,7 @@ import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
-import { reviewRiskEvent, type RiskEventResolution } from '@/lib/domain/admin-risk-event'
+import { CrewSafetyCaseRequiresDedicatedResolutionError, reviewRiskEvent, type RiskEventResolution } from '@/lib/domain/admin-risk-event'
 import type { AdminSession } from '@/lib/admin-types'
 
 const VALID_RESOLUTIONS: RiskEventResolution[] = ['CONFIRMED', 'DISMISSED', 'ESCALATED', 'NO_ACTION']
@@ -75,6 +75,12 @@ export async function PATCH(
       resolution: result.resolution,
     })
   } catch (error) {
+    if (error instanceof CrewSafetyCaseRequiresDedicatedResolutionError) {
+      return NextResponse.json(
+        { error: 'Crew safety case requires separate authorized support resolution' },
+        { status: 409, headers: { 'Cache-Control': 'private, no-store' } },
+      )
+    }
     const message = error instanceof Error ? error.message : 'Server error'
     if (message.includes('already reviewed') || message.includes('Concurrent')) {
       return NextResponse.json({ error: message }, { status: 409 })
