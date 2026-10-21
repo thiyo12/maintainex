@@ -1198,19 +1198,6 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       expect((await db!.companyCrewDispatch.findUniqueOrThrow({
         where: { id: staged.crewDispatchId },
       })).version).toBe(2)
-      const queued = await db!.marketplaceRiskEvent.findMany({
-        where: { jobId: booking.id, eventType: 'CREW_CONSUMED_PIN_SAFETY_HOLD' },
-      })
-      expect(queued).toHaveLength(1)
-      expect(queued[0]).toMatchObject({
-        actorUserId: ownerId, severity: 'HIGH', reviewedAt: null,
-      })
-      expect(JSON.parse(queued[0].metadata || '{}')).toMatchObject({
-        companyId, crewDispatchId: staged.crewDispatchId,
-        previousVersion: 1, blockedVersion: 2,
-        consumedPinsPreserved: 2, capacityHeld: 2,
-      })
-
       expect(await db!.companyJobAssignment.count({
         where: { crewDispatchId: staged.crewDispatchId, status: 'CREW_ACCEPTED' },
       })).toBe(2)
@@ -1568,6 +1555,19 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       expect((await db!.companyCrewDispatch.findUniqueOrThrow({
         where: { id: staged.crewDispatchId },
       })).version).toBe(2)
+      const queued = await db!.marketplaceRiskEvent.findMany({
+        where: { jobId: booking.id, eventType: 'CREW_CONSUMED_PIN_SAFETY_HOLD' },
+      })
+      expect(queued).toHaveLength(1)
+      expect(queued[0]).toMatchObject({
+        actorUserId: ownerId, severity: 'HIGH', reviewedAt: null,
+      })
+      expect(JSON.parse(queued[0].metadata || '{}')).toMatchObject({
+        companyId, crewDispatchId: staged.crewDispatchId,
+        previousVersion: 1, blockedVersion: 2,
+        consumedPinsPreserved: 2, capacityHeld: 2,
+      })
+
       expect((await db!.companyCrewPresenceWitness.findMany({
         where: { crewDispatchId: staged.crewDispatchId },
       })).length).toBe(2)
