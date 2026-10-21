@@ -14,7 +14,10 @@ import { recordCrewPresenceWitnessInsideTransaction } from '@/lib/domain/company
 import { assertCrewDualWitnessInventoryInsideTransaction } from '@/lib/domain/company-crew-presence-witness'
 import { assertCrewPrestartFinancialEvidenceInsideTransaction } from '@/lib/domain/company-crew-prestart-finance'
 import { holdCrewAfterPinClaimInsideTransaction } from '@/lib/domain/company-crew-pin-safety-hold'
-import { inspectBlockedCrewSafetyEvidenceInsideTransaction } from '@/lib/domain/company-crew-safety-review-inventory'
+import {
+  inspectBlockedCrewSafetyEvidenceInsideTransaction,
+  inspectBlockedCrewSafetyEvidenceForCrmInsideTransaction,
+} from '@/lib/domain/company-crew-safety-review-inventory'
 import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -1365,6 +1368,36 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         capacityReleaseEnabled: false, crewArrivalEnabled: false,
         workStartEnabled: false, paymentsEnabled: false,
       })
+      // CRM staff can read this exact HIGH event only within the locked LK
+      // market; the result never grants safety resolution or worker release.
+      const crmInventory = await db!.$transaction(tx =>
+        inspectBlockedCrewSafetyEvidenceForCrmInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          expectedVersion: 2, riskEventId: risk.id,
+          allowedCountries: ['LK'],
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(crmInventory).toMatchObject({
+        heldWorkerCount: 2, consumedPinClaimsPreserved: 1,
+        unreviewedHighRiskEvents: 1,
+        manualSafetyReviewRequired: true,
+        capacityReleaseEnabled: false, crewArrivalEnabled: false,
+        workStartEnabled: false, paymentsEnabled: false,
+      })
+      await expect(db!.$transaction(tx =>
+        inspectBlockedCrewSafetyEvidenceForCrmInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          expectedVersion: 2, riskEventId: risk.id,
+          allowedCountries: ['CA'],
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toMatchObject({ status: 404 })
+      await expect(db!.$transaction(tx =>
+        inspectBlockedCrewSafetyEvidenceForCrmInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          expectedVersion: 2, riskEventId: 'different-high-case',
+          allowedCountries: ['LK'],
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('Unreviewed HIGH')
       // A stale HIGH event with a matching job and crew must NOT become
       // a valid reason to resolve/release a new crew epoch.
       await db!.marketplaceRiskEvent.update({
