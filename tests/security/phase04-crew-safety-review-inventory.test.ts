@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { inspectBlockedCrewSafetyEvidenceInsideTransaction } from '@/lib/domain/company-crew-safety-review-inventory'
+import {
+  inspectBlockedCrewSafetyEvidenceInsideTransaction,
+  inspectBlockedCrewSafetyEvidenceForCrmInsideTransaction,
+} from '@/lib/domain/company-crew-safety-review-inventory'
 
 const m = vi.hoisted(() => ({
   key: vi.fn(), authorize: vi.fn(), sql: vi.fn(), roster: vi.fn(),
@@ -57,7 +60,7 @@ describe('Phase04 blocked crew review is read-only and never unlocks capacity', 
     vi.resetAllMocks()
     m.key.mockResolvedValue({ jobId: 'job', companyId: 'company' })
     m.sql.mockResolvedValueOnce([{
-      id: 'job', status: 'QUOTE_ACCEPTED', workersCount: 2,
+      id: 'job', status: 'QUOTE_ACCEPTED', workersCount: 2, countryCode: 'LK',
     }]).mockResolvedValueOnce([{
       id: 'crew', companyId: 'company', jobId: 'job',
       status: 'BLOCKED', version: 2, requiredWorkersCount: 2,
@@ -74,6 +77,40 @@ describe('Phase04 blocked crew review is read-only and never unlocks capacity', 
     m.risk.mockResolvedValue([safetyEvent()])
     m.workspace.mockResolvedValue(null)
     m.legacyArrival.mockResolvedValue(null)
+  })
+
+  it('permits preauthorized CRM triage only for the exact locked market and event id', async () => {
+    const result = await inspectBlockedCrewSafetyEvidenceForCrmInsideTransaction(
+      tx as any, {
+        crewDispatchId: 'crew', companyId: 'company', expectedVersion: 2,
+        riskEventId: 'risk1', allowedCountries: ['LK'],
+      },
+    )
+    expect(result).toMatchObject({
+      manualSafetyReviewRequired: true, capacityReleaseEnabled: false,
+      crewArrivalEnabled: false, workStartEnabled: false, paymentsEnabled: false,
+    })
+    expect(m.authorize).not.toHaveBeenCalled()
+    expect(m.sql).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects CRM access when the locked market differs from the staff assignment', async () => {
+    await expect(inspectBlockedCrewSafetyEvidenceForCrmInsideTransaction(
+      tx as any, {
+        crewDispatchId: 'crew', companyId: 'company', expectedVersion: 2,
+        riskEventId: 'risk1', allowedCountries: ['CA'],
+      },
+    )).rejects.toMatchObject({ status: 404 })
+    expect(m.pins).not.toHaveBeenCalled()
+  })
+
+  it('cannot substitute another HIGH case from the same booking during CRM triage', async () => {
+    await expect(inspectBlockedCrewSafetyEvidenceForCrmInsideTransaction(
+      tx as any, {
+        crewDispatchId: 'crew', companyId: 'company', expectedVersion: 2,
+        riskEventId: 'different-risk', allowedCountries: ['LK'],
+      },
+    )).rejects.toThrow('Unreviewed HIGH')
   })
 
   it('requires actor authorization and returns bounded non-authorizing counts only', async () => {
@@ -121,7 +158,7 @@ describe('Phase04 blocked crew review is read-only and never unlocks capacity', 
   it('refuses stale versions and any crew that is not already BLOCKED', async () => {
     await expect(inspect({ expectedVersion: 3 })).rejects.toThrow('epoch changed')
     m.sql.mockReset().mockResolvedValueOnce([{
-      id: 'job', status: 'QUOTE_ACCEPTED', workersCount: 2,
+      id: 'job', status: 'QUOTE_ACCEPTED', workersCount: 2, countryCode: 'LK',
     }]).mockResolvedValueOnce([{
       id: 'crew', companyId: 'company', jobId: 'job',
       status: 'FORMING', version: 2, requiredWorkersCount: 2,
