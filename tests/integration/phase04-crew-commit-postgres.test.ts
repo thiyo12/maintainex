@@ -896,6 +896,106 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
   })
 
 
+  it('isolated PostgreSQL: stale-epoch consumed PIN prevents capacity release after an epoch bump', async () => {
+    const job = await db!.marketplaceJob.create({
+      data: {
+        customerId: ownerId, title: 'Crew older-epoch PIN safety fixture',
+        description: 'Prior consumed PIN still requires human review after stale crew epoch',
+        categoryId, photos: '[]', budgetType: 'FIXED',
+        countryCode: 'LK', workersCount: 2, status: 'QUOTE_ACCEPTED',
+      },
+    })
+    try {
+      await db!.jobQuote.create({
+        data: {
+          jobId: job.id, providerId: companyId, providerType: 'COMPANY',
+          price: 10000n, estimatedCompletionTime: '2 hours',
+          attachments: '[]', status: 'ACCEPTED',
+        },
+      })
+      const staged = await db!.$transaction(
+        tx => stageCrewReservationInsideTransaction(tx, {
+          ...input(), jobId: job.id, leadWorkerUserId: workerIds[0],
+        }),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      for (const workerUserId of workerIds) {
+        await db!.$transaction(
+          tx => acceptStagedCrewMemberInsideTransaction(tx, {
+            crewDispatchId: staged.crewDispatchId, workerUserId, expectedVersion: 1,
+          }),
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        )
+      }
+      const slots = await db!.companyJobAssignment.findMany({
+        where: { crewDispatchId: staged.crewDispatchId },
+      })
+      const now = new Date()
+      const proof = await db!.companyCrewPinChallenge.create({
+        data: {
+          crewDispatchId: staged.crewDispatchId, jobId: job.id,
+          assignmentId: slots[0].id, crewVersion: 1, purpose: 'ARRIVAL',
+          challengeVersion: 1, pinDigest: 'b'.repeat(64),
+          issuedByCustomerUserId: ownerId,
+          createdAt: new Date(now.getTime() - 1000),
+          consumedAt: now, expiresAt: new Date(now.getTime() + 300000),
+        },
+      })
+      // Simulate a stale/incorrect version advance: no earlier PIN claim may
+      // be silently treated as absent merely because a new epoch is current.
+      await db!.companyCrewDispatch.update({
+        where: { id: staged.crewDispatchId }, data: { version: 2 },
+      })
+      await expect(db!.$transaction(
+        tx => cancelStagedCrewInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          actorUserId: ownerId, actorRole: 'COMPANY_OWNER',
+          expectedVersion: 2, reason: 'Do not release prior consumed PIN evidence',
+        }),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('support review')
+      expect(await db!.companyJobAssignment.count({
+        where: { crewDispatchId: staged.crewDispatchId, status: 'CREW_ACCEPTED' },
+      })).toBe(2)
+      const held = await db!.$transaction(async tx => {
+        await tx.$queryRaw`
+          SELECT id FROM "TeamMember"
+          WHERE "companyId" = ${companyId} AND "userId" = ${workerIds[0]} FOR UPDATE
+        `
+        return blockWorkerFormingCrewsInsideTransaction(tx, {
+          companyId, workerUserId: workerIds[0],
+          actorUserId: ownerId, actorRole: 'COMPANY_OWNER', reason: 'SUSPENDED',
+        })
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      expect(held).toEqual({ blockedCrewsCount: 1, revokedCrewSlotsCount: 0 })
+      expect(await db!.companyCrewDispatch.findUniqueOrThrow({
+        where: { id: staged.crewDispatchId },
+      })).toMatchObject({ status: 'BLOCKED', version: 3 })
+      expect(await db!.companyCrewPinChallenge.findUniqueOrThrow({
+        where: { id: proof.id },
+      })).toMatchObject({ consumedAt: now, revokedAt: null })
+      expect(await db!.companyJobAssignment.count({
+        where: { crewDispatchId: staged.crewDispatchId, status: 'CREW_ACCEPTED' },
+      })).toBe(2)
+      const risk = await db!.marketplaceRiskEvent.findMany({
+        where: { jobId: job.id, eventType: 'CREW_WORKFORCE_PIN_SAFETY_HOLD' },
+      })
+      expect(risk).toHaveLength(1)
+      expect(risk[0]).toMatchObject({ severity: 'HIGH', reviewedAt: null })
+      expect(JSON.parse(risk[0].metadata || '{}')).toMatchObject({
+        consumedPinsPreserved: 1, capacityHeldForReview: 2,
+      })
+      expect(await db!.jobWorkspace.count({ where: { jobId: job.id } })).toBe(0)
+    } finally {
+      await db!.marketplaceRiskEvent.deleteMany({ where: { jobId: job.id } })
+      await db!.companyCrewPinChallenge.deleteMany({ where: { jobId: job.id } })
+      await db!.companyJobAssignment.deleteMany({ where: { jobId: job.id } })
+      await db!.companyCrewDispatch.deleteMany({ where: { jobId: job.id } })
+      await db!.jobQuote.deleteMany({ where: { jobId: job.id } })
+      await db!.marketplaceJob.delete({ where: { id: job.id } })
+    }
+  })
+
   it('atomically invalidates a two-member accepted crew on a suspended workforce member', async () => {
     const booking = await db!.marketplaceJob.create({
       data: {
