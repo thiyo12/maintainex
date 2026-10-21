@@ -80,8 +80,8 @@ export async function GET(
         crewDispatchId.length > 128 ||
         typeof companyId !== 'string' || !companyId.trim() ||
         companyId.length > 128 ||
-        !Number.isSafeInteger(expectedVersion) ||
-        typeof expectedVersion !== 'number' || expectedVersion < 1) {
+        typeof expectedVersion !== 'number' ||
+        !Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
       return deny('Crew safety evidence scope is invalid', 409)
     }
 
