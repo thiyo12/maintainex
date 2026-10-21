@@ -172,6 +172,18 @@ describe('Phase04 customer photo decisions cannot grant crew work', () => {
     })
     expect(m.signal).toHaveBeenCalledOnce()
     expect(m.risk).toHaveBeenCalledOnce()
+    expect(m.risk).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        jobId: 'booking', actorUserId: 'customer',
+        eventType: 'WORKER_IDENTITY_MISMATCH', severity: 'HIGH',
+      }),
+    })
+    expect(JSON.parse(m.risk.mock.calls[0][0].data.metadata)).toMatchObject({
+      companyId: 'company', crewId: 'crew',
+      assignmentId: 'slot-a', workerUserId: 'a',
+      previousVersion: 1, blockedVersion: 2,
+      consumedPinsPreserved: 1, capacityHeldForReview: 2,
+    })
     expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({
       action: 'CREW_IDENTITY_MISMATCH',
       metadata: expect.objectContaining({
