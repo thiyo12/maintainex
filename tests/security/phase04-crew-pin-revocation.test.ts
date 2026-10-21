@@ -14,7 +14,7 @@ const input = { crewDispatchId: 'crew', crewVersion: 3 }
 const run = (extra: Record<string, unknown> = {}) =>
   revokeCrewPinChallengesInsideTransaction(tx as any, { ...input, ...extra })
 const entry = (id: string, patch: Record<string, unknown> = {}) => ({
-  id, consumedAt: null, revokedAt: null, ...patch,
+  id, crewVersion: 3, consumedAt: null, revokedAt: null, ...patch,
 })
 
 describe('Phase04 crew cancellation/role change PIN ledger safety', () => {
@@ -29,8 +29,8 @@ describe('Phase04 crew cancellation/role change PIN ledger safety', () => {
       revokedPinChallenges: 3, consumedClaimsPreserved: 0,
     })
     expect(m.scan).toHaveBeenCalledWith({
-      where: { crewDispatchId: 'crew', crewVersion: 3 },
-      select: { id: true, consumedAt: true, revokedAt: true },
+      where: { crewDispatchId: 'crew' },
+      select: { id: true, crewVersion: true, consumedAt: true, revokedAt: true },
     })
     expect(m.update).toHaveBeenCalledWith({
       where: {
@@ -62,6 +62,35 @@ describe('Phase04 crew cancellation/role change PIN ledger safety', () => {
     expect(m.update).toHaveBeenCalledWith({
       where: {
         id: { in: ['b'] }, crewDispatchId: 'crew',
+        crewVersion: 3, consumedAt: null, revokedAt: null,
+      },
+      data: { revokedAt: expect.any(Date) },
+    })
+  })
+
+  it('refuses ordinary cancellation when consumed evidence survives an older crew epoch', async () => {
+    m.scan.mockResolvedValue([
+      entry('prior-claim', { crewVersion: 2, consumedAt: new Date() }),
+      entry('current-live', { crewVersion: 3 }),
+    ])
+    await expect(run()).rejects.toThrow('requires support review')
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
+  it('holds all historical consumed evidence but only revokes unused current-epoch challenges', async () => {
+    m.scan.mockResolvedValue([
+      entry('prior-claim-1', { crewVersion: 1, consumedAt: new Date() }),
+      entry('prior-claim-2', { crewVersion: 2, consumedAt: new Date() }),
+      entry('old-live', { crewVersion: 2 }),
+      entry('current-live', { crewVersion: 3 }),
+    ])
+    m.update.mockResolvedValue({ count: 1 })
+    expect(await run({ allowConsumedEvidence: true })).toEqual({
+      revokedPinChallenges: 1, consumedClaimsPreserved: 2,
+    })
+    expect(m.update).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['current-live'] }, crewDispatchId: 'crew',
         crewVersion: 3, consumedAt: null, revokedAt: null,
       },
       data: { revokedAt: expect.any(Date) },

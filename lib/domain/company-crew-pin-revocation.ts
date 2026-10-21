@@ -24,15 +24,22 @@ export async function revokeCrewPinChallengesInsideTransaction(
       !Number.isSafeInteger(input.crewVersion) || input.crewVersion < 1) {
     throw new CrewCommitGateError('Invalid crew PIN revocation scope', 400)
   }
+  // Read the entire crew's PIN history, not just the current epoch.
+  // A stale consumed claim must never be overlooked if a later epoch was
+  // formed incorrectly: ordinary cancellation would otherwise free capacity
+  // while prior arrival evidence still needs human safety review.
   const rows = await tx.companyCrewPinChallenge.findMany({
-    where: { crewDispatchId: input.crewDispatchId, crewVersion: input.crewVersion },
-    select: { id: true, consumedAt: true, revokedAt: true },
+    where: { crewDispatchId: input.crewDispatchId },
+    select: { id: true, crewVersion: true, consumedAt: true, revokedAt: true },
   })
   const consumed = rows.filter(row => row.consumedAt !== null)
   if (consumed.length && !input.allowConsumedEvidence) {
     throw new CrewCommitGateError('Crew worker PIN claim requires support review before roster change')
   }
-  const live = rows.filter(row => row.consumedAt === null && row.revokedAt === null)
+  // Revoke only UNUSED challenges from the caller-locked current epoch.
+  // Historical unconsumed challenges are never rewritten by a later epoch.
+  const live = rows.filter(row => row.crewVersion === input.crewVersion &&
+    row.consumedAt === null && row.revokedAt === null)
   if (live.length) {
     const written = await tx.companyCrewPinChallenge.updateMany({
       where: {
