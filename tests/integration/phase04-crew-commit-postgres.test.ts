@@ -680,7 +680,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
     }
   })
 
-  it('isolated PostgreSQL: a consumed worker PIN prevents silent cancellation and workforce removal', async () => {
+  it('isolated PostgreSQL: a consumed worker PIN blocks silent cancellation but permits safety-held workforce removal', async () => {
     const job = await db!.marketplaceJob.create({
       data: {
         customerId: ownerId, title: 'Crew consumed claim cancellation fixture',
@@ -734,17 +734,17 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         }),
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       )).rejects.toThrow('support review')
-      await expect(db!.$transaction(async tx => {
+      const revoked = await db!.$transaction(async tx => {
         await tx.$queryRaw`
           SELECT id FROM "TeamMember"
           WHERE "companyId" = ${companyId} AND "userId" = ${workerIds[0]} FOR UPDATE
         `
-        await blockWorkerFormingCrewsInsideTransaction(tx, {
+        return blockWorkerFormingCrewsInsideTransaction(tx, {
           companyId, workerUserId: workerIds[0],
           actorUserId: ownerId, actorRole: 'COMPANY_OWNER', reason: 'REMOVED',
         })
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
-        .rejects.toThrow('CREW_WORKFORCE_STATE_CONFLICT')
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      expect(revoked).toEqual({ blockedCrewsCount: 1, revokedCrewSlotsCount: 0 })
       const persisted = await db!.companyCrewPinChallenge.findFirstOrThrow({
         where: { crewDispatchId: staged.crewDispatchId },
       })
@@ -753,16 +753,39 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       const crew = await db!.companyCrewDispatch.findUniqueOrThrow({
         where: { id: staged.crewDispatchId },
       })
-      expect(crew.status).toBe('FORMING')
-      expect(crew.version).toBe(1)
+      expect(crew.status).toBe('BLOCKED')
+      expect(crew.version).toBe(2)
       const unchanged = await db!.companyJobAssignment.findMany({
         where: { crewDispatchId: staged.crewDispatchId },
       })
       expect(unchanged).toHaveLength(2)
       expect(unchanged.every(s => s.status === 'CREW_ACCEPTED' && s.revokedAt === null))
         .toBe(true)
+      const risk = await db!.marketplaceRiskEvent.findMany({
+        where: { jobId: job.id, eventType: 'CREW_WORKFORCE_PIN_SAFETY_HOLD' },
+      })
+      expect(risk).toHaveLength(1)
+      expect(risk[0]).toMatchObject({ actorUserId: ownerId, severity: 'HIGH', reviewedAt: null })
+      expect(JSON.parse(risk[0].metadata || '{}')).toMatchObject({
+        companyId, crewDispatchId: staged.crewDispatchId,
+        trigger: 'REMOVED', capacityHeldForReview: 2, consumedPinsPreserved: 1,
+      })
+      // Later member transitions on already held crew must never drop its capacity.
+      const next = await db!.$transaction(tx =>
+        blockWorkerFormingCrewsInsideTransaction(tx, {
+          companyId, workerUserId: workerIds[1],
+          actorUserId: ownerId, actorRole: 'COMPANY_OWNER', reason: 'SUSPENDED',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      expect(next).toEqual({blockedCrewsCount:1,revokedCrewSlotsCount:0})
+      expect(await db!.marketplaceRiskEvent.count({
+        where: { jobId: job.id, eventType: 'CREW_WORKFORCE_PIN_SAFETY_HOLD' },
+      })).toBe(1)
+      expect(await db!.companyJobAssignment.count({
+        where: { crewDispatchId: staged.crewDispatchId, status: 'CREW_ACCEPTED' },
+      })).toBe(2)
       expect(await db!.jobVerificationPin.count({ where: { jobId: job.id } })).toBe(0)
     } finally {
+      await db!.marketplaceRiskEvent.deleteMany({ where: { jobId: job.id } })
       await db!.companyCrewPinChallenge.deleteMany({ where: { jobId: job.id } })
       await db!.companyJobAssignment.deleteMany({ where: { jobId: job.id } })
       await db!.companyCrewDispatch.deleteMany({ where: { jobId: job.id } })
