@@ -52,7 +52,8 @@ export async function blockWorkerFormingCrewsInsideTransaction(
     `
     const crew = crews[0]
     if (!crew || crew.companyId !== input.companyId ||
-        crew.jobId !== key.jobId || crew.status !== 'FORMING' ||
+        crew.jobId !== key.jobId ||
+        !['FORMING', 'BLOCKED'].includes(crew.status) ||
         jobs[0]?.status !== 'QUOTE_ACCEPTED' ||
         jobs[0]?.workersCount !== crew.requiredWorkersCount ||
         crew.requiredWorkersCount < 2 || crew.requiredWorkersCount > 12) {
@@ -90,43 +91,112 @@ export async function blockWorkerFormingCrewsInsideTransaction(
       throw new Error('CREW_WORKFORCE_STATE_CONFLICT')
     }
 
-    // Under the same job/crew lock, withdraw all unconsumed member codes.
-    // Consumed proof is a support-only state and stops this membership write.
+    // A worker must be suspendable/removable even if a consumed arrival PIN
+    // is under safety investigation. In that case do NOT release any held
+    // accepted workforce slot or delete proof. Stop further crew work by
+    // blocking the old epoch; the membership write is committed alongside it.
+    //
+    // A crew BLOCKED by an earlier consumed-PIN safety event is intentionally
+    // still held: subsequent workforce actions cannot re-release its members.
+    if (crew.status === 'BLOCKED') {
+      const consumed = await tx.companyCrewPinChallenge.findFirst({
+        where: {
+          crewDispatchId: crew.id, consumedAt: { not: null },
+          purpose: 'ARRIVAL',
+        },
+        select: { id: true },
+      })
+      if (!consumed || slots.some(s => s.status !== 'CREW_ACCEPTED')) {
+        throw new Error('CREW_WORKFORCE_STATE_CONFLICT')
+      }
+      await writeCompanyAuditLog({
+        companyId: input.companyId,
+        actorId: input.actorUserId, actorRole: input.actorRole,
+        action: 'CREW_WORKFORCE_INVALIDATED',
+        targetType: 'CompanyCrewDispatch', targetId: crew.id,
+        description: 'Membership changed on already safety-blocked crew; capacity and evidence preserved',
+        metadata: {
+          jobId: crew.jobId, previousVersion: crew.version,
+          trigger: input.reason, affectedWorkerUserId: input.workerUserId,
+          revokedCrewSlots: 0, capacityHeldForReview: slots.length,
+          alreadyBlocked: true,
+        },
+      }, tx)
+      continue
+    }
+
+    // Only unused challenges may be revoked. Once one member consumed a
+    // code, preserve every accepted coworker reservation for support rather
+    // than falsely treating an alleged arrival as an ordinary cancellation.
+    let withdrawn: { revokedPinChallenges: number; consumedClaimsPreserved: number }
     try {
-      await revokeCrewPinChallengesInsideTransaction(tx, {
+      withdrawn = await revokeCrewPinChallengesInsideTransaction(tx, {
         crewDispatchId: crew.id, crewVersion: crew.version,
+        allowConsumedEvidence: true,
       })
     } catch {
       throw new Error('CREW_WORKFORCE_STATE_CONFLICT')
     }
 
-    const now = new Date()
-    const released = await tx.companyJobAssignment.updateMany({
-      where: { crewDispatchId: crew.id, status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] } },
-      data: {
-        status: 'REVOKED', revokedAt: now,
-        revokedReason: 'Crew blocked by workforce ' + input.reason.toLowerCase(),
-      },
-    })
-    if (released.count !== slots.length) throw new Error('CREW_WORKFORCE_STATE_CONFLICT')
+    const safetyHeld = withdrawn.consumedClaimsPreserved > 0
+    if (safetyHeld && slots.some(s => s.status !== 'CREW_ACCEPTED')) {
+      throw new Error('CREW_WORKFORCE_STATE_CONFLICT')
+    }
+    let releasedCount = 0
+    if (!safetyHeld) {
+      const released = await tx.companyJobAssignment.updateMany({
+        where: { crewDispatchId: crew.id, status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] } },
+        data: {
+          status: 'REVOKED', revokedAt: new Date(),
+          revokedReason: 'Crew blocked by workforce ' + input.reason.toLowerCase(),
+        },
+      })
+      if (released.count !== slots.length) throw new Error('CREW_WORKFORCE_STATE_CONFLICT')
+      releasedCount = released.count
+    }
+
     const blocked = await tx.companyCrewDispatch.updateMany({
       where: { id: crew.id, version: crew.version, status: 'FORMING' },
       data: { status: 'BLOCKED', version: { increment: 1 } },
     })
     if (blocked.count !== 1) throw new Error('CREW_WORKFORCE_STATE_CONFLICT')
 
+    if (safetyHeld) {
+      // An audit entry alone does not create a support queue item. Failure
+      // to queue this HIGH safety event aborts the entire membership write.
+      await tx.marketplaceRiskEvent.create({
+        data: {
+          jobId: crew.jobId, actorUserId: input.actorUserId,
+          eventType: 'CREW_WORKFORCE_PIN_SAFETY_HOLD',
+          severity: 'HIGH',
+          metadata: JSON.stringify({
+            companyId: input.companyId, crewDispatchId: crew.id,
+            previousVersion: crew.version, blockedVersion: crew.version + 1,
+            trigger: input.reason, affectedWorkerUserId: input.workerUserId,
+            consumedPinsPreserved: withdrawn.consumedClaimsPreserved,
+            unusedPinsRevoked: withdrawn.revokedPinChallenges,
+            capacityHeldForReview: slots.length,
+          }),
+        },
+      })
+    }
     await writeCompanyAuditLog({
       companyId: input.companyId, actorId: input.actorUserId,
       actorRole: input.actorRole, action: 'CREW_WORKFORCE_INVALIDATED',
       targetType: 'CompanyCrewDispatch', targetId: crew.id,
-      description: 'Whole staged crew blocked following workforce transition; no work authorized',
+      description: safetyHeld
+        ? 'Crew safety blocked after member transition; consumed PIN evidence and all capacity held for support'
+        : 'Whole staged crew blocked following workforce transition; no work authorized',
       metadata: {
         jobId: crew.jobId, previousVersion: crew.version,
         trigger: input.reason, affectedWorkerUserId: input.workerUserId,
-        revokedCrewSlots: released.count,
+        revokedCrewSlots: releasedCount,
+        consumedPinsPreserved: withdrawn.consumedClaimsPreserved,
+        unusedPinsRevoked: withdrawn.revokedPinChallenges,
+        capacityHeldForReview: safetyHeld ? slots.length : 0,
       },
     }, tx)
-    revokedCrewSlotsCount += released.count
+    revokedCrewSlotsCount += releasedCount
   }
   return { blockedCrewsCount: crewIds.length, revokedCrewSlotsCount }
 }
