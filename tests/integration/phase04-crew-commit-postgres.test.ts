@@ -14,6 +14,7 @@ import { recordCrewPresenceWitnessInsideTransaction } from '@/lib/domain/company
 import { assertCrewDualWitnessInventoryInsideTransaction } from '@/lib/domain/company-crew-presence-witness'
 import { assertCrewPrestartFinancialEvidenceInsideTransaction } from '@/lib/domain/company-crew-prestart-finance'
 import { holdCrewAfterPinClaimInsideTransaction } from '@/lib/domain/company-crew-pin-safety-hold'
+import { inspectBlockedCrewSafetyEvidenceInsideTransaction } from '@/lib/domain/company-crew-safety-review-inventory'
 import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
@@ -1689,6 +1690,42 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         companyId, crewDispatchId: staged.crewDispatchId,
         previousVersion: 1, blockedVersion: 2,
         consumedPinsPreserved: 2, capacityHeld: 2,
+      })
+
+      // Support evidence inventory is READ ONLY: it checks actual PostgreSQL
+      // held slots, consumed PINs, witness records and an unreviewed HIGH risk
+      // event, without authorizing physical presence, release or work.
+      const review = await db!.$transaction(tx =>
+        inspectBlockedCrewSafetyEvidenceInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          expectedVersion: 2, actorUserId: ownerId,
+          actorRole: 'COMPANY_OWNER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(review).toMatchObject({
+        heldWorkerCount: 2, consumedPinClaimsPreserved: 2,
+        witnessRecordsPreserved: 2, unreviewedHighRiskEvents: 1,
+        manualSafetyReviewRequired: true,
+        independentPhysicalPresenceVerified: false,
+        capacityReleaseEnabled: false, crewArrivalEnabled: false,
+        workStartEnabled: false, paymentsEnabled: false,
+      })
+      // A risk event is not safely resolved just because somebody marks it
+      // reviewed. There is no automatic capacity-release or work action.
+      await db!.marketplaceRiskEvent.update({
+        where: { id: queued[0].id },
+        data: { reviewedAt: new Date(), reviewedBy: ownerId },
+      })
+      await expect(db!.$transaction(tx =>
+        inspectBlockedCrewSafetyEvidenceInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          expectedVersion: 2, actorUserId: ownerId,
+          actorRole: 'COMPANY_OWNER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('Unreviewed HIGH')
+      await db!.marketplaceRiskEvent.update({
+        where: { id: queued[0].id },
+        data: { reviewedAt: null, reviewedBy: null },
       })
 
       expect((await db!.companyCrewPresenceWitness.findMany({
