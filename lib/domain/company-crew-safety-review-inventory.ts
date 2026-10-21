@@ -19,15 +19,19 @@ const SAFETY_EVENT_TYPES = [
  *
  * Not wired to HTTP and deliberately has no mutation or approval operation.
  */
-export async function inspectBlockedCrewSafetyEvidenceInsideTransaction(
+type CrewSafetyReviewScope = {
+  crewDispatchId: string
+  companyId: string
+  expectedVersion: number
+}
+type CrewSafetyReviewer =
+  | { kind: 'company'; actorUserId: string; actorRole: string }
+  | { kind: 'crm'; riskEventId: string; allowedCountries: string[] | null }
+
+async function inspectCore(
   tx: Prisma.TransactionClient,
-  input: {
-    crewDispatchId: string
-    companyId: string
-    expectedVersion: number
-    actorUserId: string
-    actorRole: string
-  },
+  input: CrewSafetyReviewScope,
+  reviewer: CrewSafetyReviewer,
 ): Promise<{
   crewDispatchId: string
   crewVersion: number
@@ -46,10 +50,21 @@ export async function inspectBlockedCrewSafetyEvidenceInsideTransaction(
       !input.crewDispatchId.trim() || input.crewDispatchId.length > 128 ||
       typeof input.companyId !== 'string' || !input.companyId.trim() ||
       input.companyId.length > 128 ||
-      typeof input.actorUserId !== 'string' || !input.actorUserId.trim() ||
-      input.actorUserId.length > 128 ||
-      typeof input.actorRole !== 'string' || !input.actorRole.trim() ||
-      !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1) {
+      !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1 ||
+      (reviewer.kind === 'company' && (
+        typeof reviewer.actorUserId !== 'string' || !reviewer.actorUserId.trim() ||
+        reviewer.actorUserId.length > 128 ||
+        typeof reviewer.actorRole !== 'string' || !reviewer.actorRole.trim()
+      )) ||
+      (reviewer.kind === 'crm' && (
+        typeof reviewer.riskEventId !== 'string' ||
+        !reviewer.riskEventId.trim() || reviewer.riskEventId.length > 128 ||
+        (reviewer.allowedCountries !== null && (
+          !Array.isArray(reviewer.allowedCountries) ||
+          reviewer.allowedCountries.some(country =>
+            typeof country !== 'string' || !/^[A-Z]{2}$/.test(country))
+        ))
+      ))) {
     throw new CrewCommitGateError('Invalid crew safety inventory request', 400)
   }
 
@@ -60,15 +75,21 @@ export async function inspectBlockedCrewSafetyEvidenceInsideTransaction(
   if (!key || key.companyId !== input.companyId) {
     throw new CrewCommitGateError('Crew safety inventory not found', 404)
   }
-  await lockAndAssertAssignmentActorAuthorized(
-    tx, input.companyId, input.actorUserId, input.actorRole,
-  )
+  if (reviewer.kind === 'company') {
+    await lockAndAssertAssignmentActorAuthorized(
+      tx, input.companyId, reviewer.actorUserId, reviewer.actorRole,
+    )
+  }
+  // CRM access is authenticated with guardCrmRequest(risk_events:read)
+  // BEFORE the caller enters this transaction. Unlike company managers, CRM
+  // reviewers must also pass the LIVE, country-scoped job check below.
+  // This function itself never authenticates a network request.
 
   // Same job -> crew lock order as cancellation and safety containment.
   const jobs = await tx.$queryRaw<Array<{
-    id: string; status: string; workersCount: number
+    id: string; status: string; workersCount: number; countryCode: string
   }>>`
-    SELECT id, status, "workersCount" FROM "MarketplaceJob"
+    SELECT id, status, "workersCount", "countryCode" FROM "MarketplaceJob"
     WHERE id = ${key.jobId} FOR UPDATE
   `
   const crews = await tx.$queryRaw<Array<{
@@ -81,6 +102,13 @@ export async function inspectBlockedCrewSafetyEvidenceInsideTransaction(
     WHERE id = ${input.crewDispatchId} FOR UPDATE
   `
   const job = jobs[0], crew = crews[0]
+  // Do not accept a stale/out-of-market preflight: validate the locked
+  // authoritative job country again within the serializable transaction.
+  if (reviewer.kind === 'crm' && (!job?.countryCode ||
+      (reviewer.allowedCountries !== null &&
+        !reviewer.allowedCountries.includes(job.countryCode.toUpperCase())))) {
+    throw new CrewCommitGateError('Crew safety inventory not found', 404)
+  }
   if (!job || !crew || crew.id !== input.crewDispatchId ||
       crew.companyId !== input.companyId || crew.jobId !== job.id ||
       crew.status !== 'BLOCKED' || crew.version !== input.expectedVersion ||
@@ -168,6 +196,9 @@ export async function inspectBlockedCrewSafetyEvidenceInsideTransaction(
   // Company/customer risk events use different scoped metadata keys.
   // Never expose metadata, actor identities or old PIN content in receipt.
   const linkedEvents = events.filter(event => {
+    // A CRM review opens ONE exact HIGH risk case. Do not substitute another
+    // event in the same job even if that event has a valid crew metadata scope.
+    if (reviewer.kind === 'crm' && event.id !== reviewer.riskEventId) return false
     if (!event.metadata) return false
     try {
       const metadata: unknown = JSON.parse(event.metadata)
@@ -222,4 +253,36 @@ export async function inspectBlockedCrewSafetyEvidenceInsideTransaction(
     workStartEnabled: false,
     paymentsEnabled: false,
   }
+}
+
+/**
+ * Company-owner/dispatcher read-only support inventory. Manager authority
+ * revalidated under transaction locks; never grants operational authority.
+ */
+export async function inspectBlockedCrewSafetyEvidenceInsideTransaction(
+  tx: Prisma.TransactionClient,
+  input: CrewSafetyReviewScope & { actorUserId: string; actorRole: string },
+) {
+  return inspectCore(tx, input, {
+    kind: 'company', actorUserId: input.actorUserId, actorRole: input.actorRole,
+  })
+}
+
+/**
+ * CRM STAFF ONLY: call only after guardCrmRequest with risk_events:read,
+ * live session verification and a country-scoped event check. The fresh
+ * locked job country and EXACT event id are rechecked here to deny races.
+ * No CRM or company actor gains a crew RELEASE or work-start capability.
+ */
+export async function inspectBlockedCrewSafetyEvidenceForCrmInsideTransaction(
+  tx: Prisma.TransactionClient,
+  input: CrewSafetyReviewScope & {
+    riskEventId: string
+    allowedCountries: string[] | null
+  },
+) {
+  return inspectCore(tx, input, {
+    kind: 'crm', riskEventId: input.riskEventId,
+    allowedCountries: input.allowedCountries,
+  })
 }
