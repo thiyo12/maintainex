@@ -173,9 +173,33 @@ export async function inspectBlockedCrewSafetyEvidenceInsideTransaction(
       const metadata: unknown = JSON.parse(event.metadata)
       if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false
       const m = metadata as Record<string, unknown>
-      return m.companyId === crew.companyId &&
-        (m.crewDispatchId === crew.id || m.crewId === crew.id) &&
-        (m.blockedVersion === undefined || m.blockedVersion === crew.version)
+      // Never let a generic or stale job-level HIGH event stand in for this
+      // crew's exact blocked epoch. All three canonical paths now record the
+      // originating version, resulting version and held consumed-PIN evidence.
+      if (m.companyId !== crew.companyId ||
+          m.previousVersion !== crew.version - 1 ||
+          m.blockedVersion !== crew.version ||
+          !Number.isSafeInteger(m.consumedPinsPreserved) ||
+          m.consumedPinsPreserved !== consumed.length) {
+        return false
+      }
+      if (event.eventType === 'CREW_CONSUMED_PIN_SAFETY_HOLD') {
+        return m.crewDispatchId === crew.id &&
+          m.capacityHeld === slots.length
+      }
+      if (event.eventType === 'CREW_WORKFORCE_PIN_SAFETY_HOLD') {
+        return m.crewDispatchId === crew.id &&
+          m.capacityHeldForReview === slots.length &&
+          ['ROLE_CHANGED', 'SUSPENDED', 'REMOVED'].includes(String(m.trigger)) &&
+          slots.some(s => s.workerUserId === m.affectedWorkerUserId)
+      }
+      if (event.eventType === 'WORKER_IDENTITY_MISMATCH') {
+        return m.crewId === crew.id &&
+          m.capacityHeldForReview === slots.length &&
+          typeof m.assignmentId === 'string' &&
+          byAssignment.get(m.assignmentId)?.workerUserId === m.workerUserId
+      }
+      return false
     } catch {
       return false
     }

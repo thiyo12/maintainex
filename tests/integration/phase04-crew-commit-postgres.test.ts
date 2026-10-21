@@ -1342,9 +1342,44 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       expect(await db!.providerIntegritySignal.count({
         where: { jobId: booking.id, severity: 'HIGH', status: 'OPEN' },
       })).toBe(1)
-      expect(await db!.marketplaceRiskEvent.count({
-        where: { jobId: booking.id, severity: 'HIGH' },
-      })).toBe(1)
+      const risk = await db!.marketplaceRiskEvent.findFirstOrThrow({
+        where: { jobId: booking.id, eventType: 'WORKER_IDENTITY_MISMATCH' },
+      })
+      expect(risk).toMatchObject({ severity: 'HIGH', reviewedAt: null })
+      expect(JSON.parse(risk.metadata || '{}')).toMatchObject({
+        companyId, crewId: staged.crewDispatchId,
+        assignmentId: assigned[0].id, workerUserId: assigned[0].workerUserId,
+        previousVersion: 1, blockedVersion: 2,
+        consumedPinsPreserved: 1, capacityHeldForReview: 2,
+      })
+      const review = await db!.$transaction(tx =>
+        inspectBlockedCrewSafetyEvidenceInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          expectedVersion: 2, actorUserId: ownerId,
+          actorRole: 'COMPANY_OWNER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      expect(review).toMatchObject({
+        heldWorkerCount: 2, consumedPinClaimsPreserved: 1,
+        unreviewedHighRiskEvents: 1, manualSafetyReviewRequired: true,
+        capacityReleaseEnabled: false, crewArrivalEnabled: false,
+        workStartEnabled: false, paymentsEnabled: false,
+      })
+      // A stale HIGH event with a matching job and crew must NOT become
+      // a valid reason to resolve/release a new crew epoch.
+      await db!.marketplaceRiskEvent.update({
+        where: { id: risk.id },
+        data: { metadata: JSON.stringify({
+          ...JSON.parse(risk.metadata || '{}'), blockedVersion: 1,
+        }) },
+      })
+      await expect(db!.$transaction(tx =>
+        inspectBlockedCrewSafetyEvidenceInsideTransaction(tx, {
+          crewDispatchId: staged.crewDispatchId, companyId,
+          expectedVersion: 2, actorUserId: ownerId,
+          actorRole: 'COMPANY_OWNER',
+        }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )).rejects.toThrow('Unreviewed HIGH')
       expect(await db!.jobWorkspace.count({ where: { jobId: booking.id } })).toBe(0)
       expect((await db!.marketplaceJob.findUniqueOrThrow({
         where: { id: booking.id },

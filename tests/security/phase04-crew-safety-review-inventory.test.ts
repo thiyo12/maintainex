@@ -34,6 +34,7 @@ const safetyEvent = (changes: Record<string, unknown> = {}) => ({
   metadata: JSON.stringify({
     companyId: 'company', crewDispatchId: 'crew',
     previousVersion: 1, blockedVersion: 2,
+    consumedPinsPreserved: 1, capacityHeld: 2,
   }), ...changes,
 })
 const tx = {
@@ -166,7 +167,60 @@ describe('Phase04 blocked crew review is read-only and never unlocks capacity', 
   it('accepts a customer mismatch HIGH event scoped by crewId, still with all authority false', async () => {
     m.risk.mockResolvedValue([safetyEvent({
       eventType: 'WORKER_IDENTITY_MISMATCH',
-      metadata: JSON.stringify({ companyId: 'company', crewId: 'crew' }),
+      metadata: JSON.stringify({
+        companyId: 'company', crewId: 'crew',
+        previousVersion: 1, blockedVersion: 2,
+        consumedPinsPreserved: 1, capacityHeldForReview: 2,
+        assignmentId: 'slot1', workerUserId: 'worker1',
+      }),
+    })])
+    expect((await inspect()).capacityReleaseEnabled).toBe(false)
+  })
+
+  it('rejects a HIGH event tied to a previous crew epoch even when the crew id matches', async () => {
+    m.risk.mockResolvedValue([safetyEvent({
+      metadata: JSON.stringify({
+        companyId: 'company', crewDispatchId: 'crew',
+        previousVersion: 0, blockedVersion: 1,
+        consumedPinsPreserved: 1, capacityHeld: 2,
+      }),
+    })])
+    await expect(inspect()).rejects.toThrow('Unreviewed HIGH')
+  })
+
+  it('rejects a manager event that reports no consumed PIN or insufficient held capacity', async () => {
+    m.risk.mockResolvedValue([safetyEvent({
+      metadata: JSON.stringify({
+        companyId: 'company', crewDispatchId: 'crew',
+        previousVersion: 1, blockedVersion: 2,
+        consumedPinsPreserved: 0, capacityHeld: 1,
+      }),
+    })])
+    await expect(inspect()).rejects.toThrow('Unreviewed HIGH')
+  })
+
+  it('rejects a spoofed customer photo mismatch linked to the wrong worker', async () => {
+    m.risk.mockResolvedValue([safetyEvent({
+      eventType: 'WORKER_IDENTITY_MISMATCH',
+      metadata: JSON.stringify({
+        companyId: 'company', crewId: 'crew',
+        previousVersion: 1, blockedVersion: 2,
+        consumedPinsPreserved: 1, capacityHeldForReview: 2,
+        assignmentId: 'slot1', workerUserId: 'worker2',
+      }),
+    })])
+    await expect(inspect()).rejects.toThrow('Unreviewed HIGH')
+  })
+
+  it('recognizes a correct workforce suspension hold, but not another crew member', async () => {
+    m.risk.mockResolvedValue([safetyEvent({
+      eventType: 'CREW_WORKFORCE_PIN_SAFETY_HOLD',
+      metadata: JSON.stringify({
+        companyId: 'company', crewDispatchId: 'crew',
+        previousVersion: 1, blockedVersion: 2,
+        consumedPinsPreserved: 1, capacityHeldForReview: 2,
+        affectedWorkerUserId: 'worker2', trigger: 'SUSPENDED',
+      }),
     })])
     expect((await inspect()).capacityReleaseEnabled).toBe(false)
   })

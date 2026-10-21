@@ -305,6 +305,9 @@ export async function decideCrewWorkerIdentityInsideTransaction(
       metadata: JSON.stringify({
         crewId: crew.id, assignmentId: slot.id,
         workerUserId: slot.workerUserId, companyId: crew.companyId,
+        previousVersion: crew.version, blockedVersion: crew.version + 1,
+        consumedPinsPreserved: revokedPins.consumedClaimsPreserved,
+        capacityHeldForReview: revokedPins.consumedClaimsPreserved > 0 ? slots.length : 0,
         reason: input.reason?.trim() || null,
       }),
     },
