@@ -1292,7 +1292,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       })).toMatchObject({ reviewedAt: null, resolution: null })
       await db!.jobVerificationPin.delete({ where: { id: legacyPin.id } })
 
-      // An old unrevoked crew challenge (even expired and not consumed)
+      // An unrevoked crew challenge (not consumed and schema-valid)
       // must also be remediated before an ordinary CRM closeout.
       const orphanPin = await db!.companyCrewPinChallenge.create({
         data: {
@@ -1301,7 +1301,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
           crewVersion: 1, purpose: 'ARRIVAL', challengeVersion: 99,
           pinDigest: '0'.repeat(64), // Valid hex/HMAC shape, not a usable derived PIN
           issuedByCustomerUserId: ownerId,
-          expiresAt: new Date(Date.now() - 60_000),
+          expiresAt: new Date(Date.now() + 15 * 60_000),
         },
       })
       await expect(db!.$transaction(tx => reviewRiskEvent(tx, {
