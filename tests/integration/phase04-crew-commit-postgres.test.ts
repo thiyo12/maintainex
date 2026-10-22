@@ -1299,7 +1299,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
           crewDispatchId: staged.crewDispatchId,
           assignmentId: saved[0].id, jobId: booking.id,
           crewVersion: 1, purpose: 'ARRIVAL', challengeVersion: 99,
-          pinDigest: 'ci-inert-no-usable-digest',
+          pinDigest: '0'.repeat(64), // Valid hex/HMAC shape, not a usable derived PIN
           issuedByCustomerUserId: ownerId,
           expiresAt: new Date(Date.now() - 60_000),
         },
