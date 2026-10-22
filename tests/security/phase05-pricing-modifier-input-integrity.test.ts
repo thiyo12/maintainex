@@ -46,4 +46,16 @@ describe('Phase 05 pricing modifier input integrity', () => {
     })).rejects.toBeInstanceOf(PricingInputError)
     expect(client.templateJob.findMany).not.toHaveBeenCalled()
   })
+
+  it.each([
+    ['urgency', 'IMMEDIATE'], ['urgency', 'urgent'],
+    ['mode', 'INSTANT'], ['mode', 'book_now'],
+  ] as const)('rejects unsupported %s before DB access', async (field, value) => {
+    const client = { marketplaceJob: { findUnique: vi.fn() } }
+    await expect(calculatePrice(client as any, {
+      jobId: 'existing-booking', categoryId: 'category',
+      mode: 'QUOTE', urgency: 'NORMAL', [field]: value,
+    } as any)).rejects.toBeInstanceOf(PricingInputError)
+    expect(client.marketplaceJob.findUnique).not.toHaveBeenCalled()
+  })
 })
