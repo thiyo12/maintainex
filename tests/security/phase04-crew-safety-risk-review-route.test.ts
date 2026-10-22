@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 
 const m = vi.hoisted(() => ({
-  guard: vi.fn(), country: vi.fn(), lookup: vi.fn(), review: vi.fn(), log: vi.fn(),
+  guard: vi.fn(), country: vi.fn(), lookup: vi.fn(), review: vi.fn(), log: vi.fn(), transaction: vi.fn(),
 }))
 vi.mock('@/lib/crm/security', () => ({
   guardCrmRequest: m.guard,
   assertCrmCountryAllowed: m.country,
 }))
 vi.mock('@/lib/prisma', () => ({
-  prisma: { marketplaceRiskEvent: { findUnique: m.lookup } },
+  prisma: { marketplaceRiskEvent: { findUnique: m.lookup }, $transaction: m.transaction },
 }))
 vi.mock('@/lib/domain/admin-risk-event', () => ({
   CrewSafetyCaseRequiresDedicatedResolutionError: class CrewSafetyCaseRequiresDedicatedResolutionError extends Error {
@@ -46,6 +46,7 @@ describe('Phase04 CRM risk event route never hides pending consumed-PIN holds', 
       },
     })
     m.lookup.mockResolvedValue({ id: 'risk', job: { countryCode: 'LK' } })
+    m.transaction.mockImplementation(async callback => callback({ marker: 'tx' }))
   })
   it('maps a dedicated-crew-safety guard to a bounded 409, not review success', async () => {
     const { CrewSafetyCaseRequiresDedicatedResolutionError } =
@@ -60,6 +61,9 @@ describe('Phase04 CRM risk event route never hides pending consumed-PIN holds', 
       })
     }
     expect(m.review).toHaveBeenCalledTimes(4)
+    expect(m.transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'Serializable',
+    })
     expect(m.guard).toHaveBeenCalledWith(expect.any(NextRequest), {
       permission: 'risk_events:resolve', level: 'sensitive', requireCountryScope: true,
     })

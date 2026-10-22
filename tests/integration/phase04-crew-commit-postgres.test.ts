@@ -1372,6 +1372,30 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       expect(await db!.companyJobAssignment.count({
         where: { crewDispatchId: staged.crewDispatchId, status: 'CREW_ACCEPTED' },
       })).toBe(2)
+      // Even a forged "no PIN/no capacity held" JSON assertion cannot
+      // suppress actual consumed arrival evidence or free reservations.
+      await db!.marketplaceRiskEvent.update({
+        where: { id: risk.id },
+        data: { metadata: JSON.stringify({
+          ...JSON.parse(risk.metadata || '{}'),
+          consumedPinsPreserved: 0, capacityHeldForReview: 0,
+        }) },
+      })
+      await expect(db!.$transaction(tx => reviewRiskEvent(tx, {
+        eventId: risk.id, resolution: 'NO_ACTION',
+        session: {
+          id: 'ci-safety-review-only', email: 'ci@example.invalid',
+          role: 'MANAGER', firstName: '', lastName: '',
+          assignedCountries: ['LK'], authType: 'adminUser',
+        }, ipAddress: '127.0.0.1',
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
+        .rejects.toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+      expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
+        where: { id: risk.id },
+      })).toMatchObject({ reviewedAt: null, resolution: null })
+      await db!.marketplaceRiskEvent.update({
+        where: { id: risk.id }, data: { metadata: risk.metadata },
+      })
       const review = await db!.$transaction(tx =>
         inspectBlockedCrewSafetyEvidenceInsideTransaction(tx, {
           crewDispatchId: staged.crewDispatchId, companyId,

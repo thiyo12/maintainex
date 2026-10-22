@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import type { AdminSession, AuditAction } from '../admin-types'
 
 /**
@@ -15,15 +15,84 @@ export class CrewSafetyCaseRequiresDedicatedResolutionError extends Error {
   }
 }
 
+type ZeroHoldMismatchClaim = {
+  companyId: string
+  crewId: string
+  assignmentId: string
+  workerUserId: string
+  previousVersion: number
+  blockedVersion: number
+}
+
+/**
+ * JSON counts are only a REQUEST to use ordinary CRM review, never proof of
+ * safety. Verify the authoritative whole crew, all historical PINs, and
+ * retained work/scheduling evidence before any reviewedAt write. Callers
+ * should use a SERIALIZABLE transaction to prevent concurrent roster changes
+ * between this read and the review update.
+ */
+async function assertPersistedNoHeldCrewEvidence(
+  tx: PrismaClient | Prisma.TransactionClient,
+  jobId: string | null,
+  m: ZeroHoldMismatchClaim,
+) {
+  const deny = () => { throw new CrewSafetyCaseRequiresDedicatedResolutionError() }
+  if (!jobId) return deny()
+  const crew = await tx.companyCrewDispatch.findUnique({
+    where: { id: m.crewId },
+    select: {
+      jobId: true, companyId: true, version: true,
+      status: true, requiredWorkersCount: true,
+    },
+  })
+  if (!crew || crew.jobId !== jobId || crew.companyId !== m.companyId ||
+      crew.status !== 'BLOCKED' || crew.version !== m.blockedVersion ||
+      crew.requiredWorkersCount < 2 || crew.requiredWorkersCount > 12) return deny()
+
+  const [roster, consumed, witnesses, workspace, legacyArrival] = await Promise.all([
+    tx.companyJobAssignment.findMany({
+      where: { crewDispatchId: m.crewId },
+      select: {
+        id: true, jobId: true, companyId: true, workerUserId: true,
+        status: true, startedAt: true, crewArrivedAt: true,
+      },
+    }),
+    tx.companyCrewPinChallenge.findFirst({
+      where: { crewDispatchId: m.crewId, consumedAt: { not: null } },
+      select: { id: true },
+    }),
+    tx.companyCrewPresenceWitness.findFirst({
+      where: { crewDispatchId: m.crewId },
+      select: { id: true },
+    }),
+    tx.jobWorkspace.findUnique({
+      where: { jobId }, select: { id: true },
+    }),
+    tx.jobVerificationPin.findFirst({
+      where: { jobId, arrivalVerifiedAt: { not: null } },
+      select: { id: true },
+    }),
+  ])
+  if (consumed || witnesses || workspace || legacyArrival ||
+      roster.length !== crew.requiredWorkersCount ||
+      new Set(roster.map(s => s.id)).size !== roster.length ||
+      new Set(roster.map(s => s.workerUserId)).size !== roster.length ||
+      !roster.some(s => s.id === m.assignmentId &&
+        s.workerUserId === m.workerUserId) ||
+      roster.some(s => s.jobId !== jobId || s.companyId !== m.companyId ||
+        s.status !== 'REVOKED' || s.startedAt !== null ||
+        s.crewArrivedAt !== null)) return deny()
+}
+
 function assertGenericRiskReviewDoesNotCloseCrewSafetyHold(
   event: { eventType: string; metadata: string | null },
-) {
+): ZeroHoldMismatchClaim | null {
   if (event.eventType === 'CREW_CONSUMED_PIN_SAFETY_HOLD' ||
       event.eventType === 'CREW_WORKFORCE_PIN_SAFETY_HOLD') {
     // These events only originate from evidence-preserving holds.
     throw new CrewSafetyCaseRequiresDedicatedResolutionError()
   }
-  if (event.eventType !== 'WORKER_IDENTITY_MISMATCH') return
+  if (event.eventType !== 'WORKER_IDENTITY_MISMATCH') return null
 
   // Ordinary pre-arrival customer mismatch may release the roster BEFORE
   // any PIN was consumed. Such non-held risk events retain normal review.
@@ -50,6 +119,11 @@ function assertGenericRiskReviewDoesNotCloseCrewSafetyHold(
       m.blockedVersion !== m.previousVersion + 1) {
     throw new CrewSafetyCaseRequiresDedicatedResolutionError()
   }
+  return {
+    companyId: m.companyId, crewId: m.crewId,
+    assignmentId: m.assignmentId, workerUserId: m.workerUserId,
+    previousVersion: m.previousVersion, blockedVersion: m.blockedVersion,
+  } as ZeroHoldMismatchClaim
 }
 
 export type RiskEventResolution = 'CONFIRMED' | 'DISMISSED' | 'ESCALATED' | 'NO_ACTION'
@@ -63,7 +137,7 @@ export interface ReviewRiskEventInput {
 }
 
 export async function reviewRiskEvent(
-  tx: PrismaClient,
+  tx: PrismaClient | Prisma.TransactionClient,
   input: ReviewRiskEventInput
 ) {
   const { eventId, resolution, reason, session, ipAddress } = input
@@ -82,6 +156,7 @@ export async function reviewRiskEvent(
     select: {
       id: true, eventType: true, severity: true,
       resolution: true, reviewedAt: true, actorUserId: true, metadata: true,
+      jobId: true,
     },
   })
 
@@ -94,7 +169,10 @@ export async function reviewRiskEvent(
   // Fail before setting reviewedAt, touching provider standing or writing an
   // audit "resolution". Neither DISMISSED/NO_ACTION nor ESCALATED/CONFIRMED
   // may silently consume a pending held-crew HIGH safety event.
-  assertGenericRiskReviewDoesNotCloseCrewSafetyHold(event)
+  const zeroHold = assertGenericRiskReviewDoesNotCloseCrewSafetyHold(event)
+  if (zeroHold) {
+    await assertPersistedNoHeldCrewEvidence(tx, event.jobId, zeroHold)
+  }
 
   const oldValue = { resolution: event.resolution, reviewedAt: null }
   const newValue = { resolution, reviewedAt: new Date(), reason }

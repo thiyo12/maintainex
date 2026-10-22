@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -61,13 +62,16 @@ export async function PATCH(
       authType: 'adminUser',
     }
 
-    const result = await reviewRiskEvent(prisma, {
+    // The persisted no-hold evidence read and reviewedAt update must share
+    // SERIALIZABLE isolation; otherwise a worker could consume a PIN after
+    // the read but before CRM closes a still safety-held incident.
+    const result = await prisma.$transaction(tx => reviewRiskEvent(tx, {
       eventId: id,
       resolution,
       reason,
       session,
       ipAddress: security.ipAddress,
-    })
+    }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
     return NextResponse.json({
       success: true,
