@@ -88,8 +88,14 @@ async function assertPersistedNoHeldCrewEvidence(
         status: true, startedAt: true, crewArrivedAt: true,
       },
     }),
+    // Any historical consumed claim OR still-unrevoked challenge is
+    // unresolved arrival evidence, even if its expiry passed or a later
+    // crew epoch was started. Ignore risk-event metadata zero counters.
     tx.companyCrewPinChallenge.findFirst({
-      where: { crewDispatchId: m.crewId, consumedAt: { not: null } },
+      where: {
+        crewDispatchId: m.crewId,
+        OR: [{ consumedAt: { not: null } }, { revokedAt: null }],
+      },
       select: { id: true },
     }),
     tx.companyCrewPresenceWitness.findFirst({
@@ -99,8 +105,18 @@ async function assertPersistedNoHeldCrewEvidence(
     tx.jobWorkspace.findUnique({
       where: { jobId }, select: { id: true },
     }),
+    // An old ACTIVE arrival PIN is unsafe even with no verification yet.
+    // Legacy verified work-start/completion timestamps also deny closeout.
     tx.jobVerificationPin.findFirst({
-      where: { jobId, arrivalVerifiedAt: { not: null } },
+      where: {
+        jobId,
+        OR: [
+          { status: 'ACTIVE' },
+          { arrivalVerifiedAt: { not: null } },
+          { workStartVerifiedAt: { not: null } },
+          { completionVerifiedAt: { not: null } },
+        ],
+      },
       select: { id: true },
     }),
   ])
