@@ -223,6 +223,34 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
     expect(m.update).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['duplicate worker identity', [
+      { id: 'slot1', jobId: 'job-1', companyId: 'company', workerUserId: 'worker1', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
+      { id: 'slot2', jobId: 'job-1', companyId: 'company', workerUserId: 'worker1', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
+    ]],
+    ['worker already started', [
+      { id: 'slot1', jobId: 'job-1', companyId: 'company', workerUserId: 'worker1', status: 'REVOKED', startedAt: new Date('2026-10-20T00:00:00Z'), crewArrivedAt: null },
+      { id: 'slot2', jobId: 'job-1', companyId: 'company', workerUserId: 'worker2', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
+    ]],
+    ['worker arrival already recorded', [
+      { id: 'slot1', jobId: 'job-1', companyId: 'company', workerUserId: 'worker1', status: 'REVOKED', startedAt: null, crewArrivedAt: new Date('2026-10-20T00:00:00Z') },
+      { id: 'slot2', jobId: 'job-1', companyId: 'company', workerUserId: 'worker2', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
+    ]],
+    ['wrong booking in revoked roster', [
+      { id: 'slot1', jobId: 'another-job', companyId: 'company', workerUserId: 'worker1', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
+      { id: 'slot2', jobId: 'job-1', companyId: 'company', workerUserId: 'worker2', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
+    ]],
+  ] as const)('refuses CRM closure for %s despite zero-risk counters', async (_reason, roster) => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    m.roster.mockResolvedValue(roster)
+    await expect(call('NO_ACTION')).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.update).not.toHaveBeenCalled()
+    expect(m.audit).not.toHaveBeenCalled()
+    expect(m.signalUpdate).not.toHaveBeenCalled()
+    expect(m.providerUpdate).not.toHaveBeenCalled()
+  })
+
   it('rejects an earlier or re-formed crew epoch and unrelated booking', async () => {
     m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
     m.sql.mockReset().mockResolvedValueOnce([{
