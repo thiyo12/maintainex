@@ -70,18 +70,6 @@ export async function createQuoteRevision(
         return { success: false, error: 'Quote revisions are only allowed while the job is open' }
       }
 
-      const claimed = await tx.jobQuote.updateMany({
-        where: {
-          id: params.originalQuoteId,
-          providerId: params.providerId,
-          status: 'PENDING',
-        },
-        data: { status: 'SUPERSEDED' },
-      })
-      if (claimed.count !== 1) {
-        return { success: false, error: 'Quote changed while revision was being submitted' }
-      }
-
       // Revision totals and line items must agree before a new commercial
       // offer is persisted. Never accept client-supplied minor-unit totals
       // without authoritative recomputation.
@@ -95,6 +83,18 @@ export async function createQuoteRevision(
         if (!totals.valid || totals.serverTotalCents !== params.price) {
           return { success: false, error: 'Quote revision total does not match line items' }
         }
+      }
+
+      const claimed = await tx.jobQuote.updateMany({
+        where: {
+          id: params.originalQuoteId,
+          providerId: params.providerId,
+          status: 'PENDING',
+        },
+        data: { status: 'SUPERSEDED' },
+      })
+      if (claimed.count !== 1) {
+        return { success: false, error: 'Quote changed while revision was being submitted' }
       }
 
       const newQuote = await tx.jobQuote.create({
