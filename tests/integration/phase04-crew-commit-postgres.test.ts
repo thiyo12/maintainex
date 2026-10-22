@@ -1247,7 +1247,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
           id: 'ci-safety-review-only', email: 'ci@example.invalid',
           role: 'MANAGER', firstName: '', lastName: '',
           assignedCountries: ['LK'], authType: 'adminUser',
-        }, ipAddress: '127.0.0.1',
+        }, ipAddress: '127.0.0.1', allowedCountries: ['LK'],
       }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
         .rejects.toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
       expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
@@ -1256,13 +1256,27 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       await db!.marketplaceJob.update({
         where: { id: booking.id }, data: { status: 'QUOTE_ACCEPTED' },
       })
+      // A stale preflight from LK must not permit a CA-scoped reviewer to
+      // close the otherwise valid non-held mismatch while the row remains LK.
+      await expect(db!.$transaction(tx => reviewRiskEvent(tx, {
+        eventId: clearRisk.id, resolution: 'NO_ACTION',
+        session: {
+          id: 'ci-safety-review-only', email: 'ci@example.invalid',
+          role: 'MANAGER', firstName: '', lastName: '',
+          assignedCountries: ['CA'], authType: 'adminUser',
+        }, ipAddress: '127.0.0.1', allowedCountries: ['CA'],
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
+        .rejects.toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+      expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
+        where: { id: clearRisk.id },
+      })).toMatchObject({ reviewedAt: null, resolution: null })
       expect((await db!.$transaction(tx => reviewRiskEvent(tx, {
         eventId: clearRisk.id, resolution: 'NO_ACTION',
         session: {
           id: 'ci-safety-review-only', email: 'ci@example.invalid',
           role: 'MANAGER', firstName: '', lastName: '',
           assignedCountries: ['LK'], authType: 'adminUser',
-        }, ipAddress: '127.0.0.1',
+        }, ipAddress: '127.0.0.1', allowedCountries: ['LK'],
       }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })).success)
         .toBe(true)
       expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
@@ -1403,7 +1417,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
           id: 'ci-safety-review-only', email: 'ci@example.invalid',
           role: 'MANAGER', firstName: '', lastName: '',
           assignedCountries: ['LK'], authType: 'adminUser',
-        }, ipAddress: '127.0.0.1',
+        }, ipAddress: '127.0.0.1', allowedCountries: ['LK'],
       })).rejects.toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
       expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
         where: { id: risk.id },
@@ -1426,7 +1440,7 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
           id: 'ci-safety-review-only', email: 'ci@example.invalid',
           role: 'MANAGER', firstName: '', lastName: '',
           assignedCountries: ['LK'], authType: 'adminUser',
-        }, ipAddress: '127.0.0.1',
+        }, ipAddress: '127.0.0.1', allowedCountries: ['LK'],
       }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
         .rejects.toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
       expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
