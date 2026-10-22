@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 
 const m = vi.hoisted(() => ({
-  guard: vi.fn(), country: vi.fn(), lookup: vi.fn(), review: vi.fn(), log: vi.fn(), transaction: vi.fn(),
+  guard: vi.fn(), country: vi.fn(), countries: vi.fn(), lookup: vi.fn(), review: vi.fn(), log: vi.fn(), transaction: vi.fn(),
 }))
 vi.mock('@/lib/crm/security', () => ({
   guardCrmRequest: m.guard,
   assertCrmCountryAllowed: m.country,
+  getCrmCountryCodes: m.countries,
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: { marketplaceRiskEvent: { findUnique: m.lookup }, $transaction: m.transaction },
@@ -38,6 +39,7 @@ describe('Phase04 CRM risk event route never hides pending consumed-PIN holds', 
   beforeEach(() => {
     vi.resetAllMocks()
     m.country.mockReturnValue(true)
+    m.countries.mockReturnValue(['LK'])
     m.guard.mockResolvedValue({
       ok: true,
       context: {
@@ -64,6 +66,8 @@ describe('Phase04 CRM risk event route never hides pending consumed-PIN holds', 
     expect(m.transaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: 'Serializable',
     })
+    expect(m.review).toHaveBeenCalledWith({ marker: 'tx' },
+      expect.objectContaining({ allowedCountries: ['LK'] }))
     expect(m.guard).toHaveBeenCalledWith(expect.any(NextRequest), {
       permission: 'risk_events:resolve', level: 'sensitive', requireCountryScope: true,
     })
@@ -78,6 +82,31 @@ describe('Phase04 CRM risk event route never hides pending consumed-PIN holds', 
     expect((await patch()).status).toBe(403)
     expect(m.review).not.toHaveBeenCalled()
   })
+  it('binds the actual selected market from the live guard, not request metadata', async () => {
+    m.countries.mockReturnValue(['CA'])
+    m.review.mockResolvedValue({
+      event: { id: 'risk', eventType: 'WORKER_IDENTITY_MISMATCH' },
+      resolution: 'NO_ACTION',
+    })
+    expect((await patch('NO_ACTION')).status).toBe(200)
+    expect(m.review).toHaveBeenCalledWith({ marker: 'tx' },
+      expect.objectContaining({ allowedCountries: ['CA'] }))
+    expect(m.countries).toHaveBeenCalledWith(expect.objectContaining({
+      adminId: 'admin',
+    }))
+  })
+
+  it('propagates explicit null only for live unrestricted CRM scope', async () => {
+    m.countries.mockReturnValue(null)
+    m.review.mockResolvedValue({
+      event: { id: 'risk', eventType: 'SUSPICIOUS_BID_PATTERN' },
+      resolution: 'NO_ACTION',
+    })
+    expect((await patch('NO_ACTION')).status).toBe(200)
+    expect(m.review).toHaveBeenCalledWith({ marker: 'tx' },
+      expect.objectContaining({ allowedCountries: null }))
+  })
+
   it('leaves unrelated already-authorized CRM reviews functioning', async () => {
     m.review.mockResolvedValue({
       event: { id: 'risk', eventType: 'SUSPICIOUS_BID_PATTERN' },
