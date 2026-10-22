@@ -111,6 +111,14 @@ export async function calculatePrice(
       throw new PricingInputError(`${name} must be a positive safe integer`)
     }
   }
+  // Unknown urgency must not silently price as NORMAL; unknown modes
+  // must not appear as validated fixed-price or quote contracts.
+  if (!['NORMAL', 'URGENT', 'EMERGENCY'].includes(input.urgency)) {
+    throw new PricingInputError('Unsupported pricing urgency')
+  }
+  if (!['BOOK_NOW', 'QUOTE', 'PROJECT', 'RECURRING'].includes(input.mode)) {
+    throw new PricingInputError('Unsupported pricing mode')
+  }
   const identifiers = await validatePricingIdentifiers(client, input)
   const config = await resolvePricingConfig(client, identifiers.countryCode || input.countryCode || 'GLOBAL')
 
