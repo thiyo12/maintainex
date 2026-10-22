@@ -80,7 +80,8 @@ export async function createQuoteRevision(
           return { success: false, error: 'Invalid quote revision line items' }
         }
         const totals = calculateQuoteTotal(checked.validatedItems, params.subtotalCents ?? null, params.totalCents ?? null)
-        if (!totals.valid || totals.serverTotalCents !== params.price) {
+        if (!totals.valid || totals.serverTotalCents !== params.price ||
+          (params.taxCents != null && params.taxCents !== totals.serverTaxCents)) {
           return { success: false, error: 'Quote revision total does not match line items' }
         }
       }
@@ -131,7 +132,7 @@ export async function createQuoteRevision(
               quantity: item.quantity,
               unit: item.unit ?? null,
               unitAmountCents: item.unitAmountCents,
-              totalAmountCents: item.totalAmountCents,
+              totalAmountCents: BigInt(item.quantity) * item.unitAmountCents,
               currency: item.currency,
               sortOrder: item.sortOrder,
               metadata: item.metadata ?? null,
