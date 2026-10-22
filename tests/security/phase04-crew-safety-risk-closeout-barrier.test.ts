@@ -8,11 +8,19 @@ import {
 const m = vi.hoisted(() => ({
   find: vi.fn(), update: vi.fn(), audit: vi.fn(),
   signalRead: vi.fn(), signalUpdate: vi.fn(), providerUpdate: vi.fn(),
+  crew: vi.fn(), roster: vi.fn(), pins: vi.fn(), witnesses: vi.fn(),
+  workspace: vi.fn(), legacyArrival: vi.fn(),
 }))
 
 const tx = {
   marketplaceRiskEvent: { findUnique: m.find, updateMany: m.update },
   auditLog: { create: m.audit },
+  companyCrewDispatch: { findUnique: m.crew },
+  companyJobAssignment: { findMany: m.roster },
+  companyCrewPinChallenge: { findFirst: m.pins },
+  companyCrewPresenceWitness: { findFirst: m.witnesses },
+  jobWorkspace: { findUnique: m.workspace },
+  jobVerificationPin: { findFirst: m.legacyArrival },
   providerIntegritySignal: {
     findUnique: m.signalRead, update: m.signalUpdate, count: vi.fn(),
   },
@@ -33,7 +41,7 @@ const call = (resolution: RiskEventResolution) =>
     session: session as any, ipAddress: '127.0.0.1',
   })
 const event = (eventType: string, metadata: unknown, status: Date | null = null) => ({
-  id: 'risk', eventType, severity: 'HIGH', actorUserId: 'customer',
+  id: 'risk', jobId: 'job-1', eventType, severity: 'HIGH', actorUserId: 'customer',
   resolution: null, reviewedAt: status,
   metadata: typeof metadata === 'string' ? metadata : JSON.stringify(metadata),
 })
@@ -43,6 +51,22 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
     vi.resetAllMocks()
     m.update.mockResolvedValue({ count: 1 })
     m.audit.mockResolvedValue({})
+    m.crew.mockResolvedValue({
+      jobId: 'job-1', companyId: 'company',
+      status: 'BLOCKED', version: 2, requiredWorkersCount: 2,
+    })
+    m.roster.mockResolvedValue([
+      { id: 'slot1', jobId: 'job-1', companyId: 'company',
+        workerUserId: 'worker1', status: 'REVOKED',
+        startedAt: null, crewArrivedAt: null },
+      { id: 'slot2', jobId: 'job-1', companyId: 'company',
+        workerUserId: 'worker2', status: 'REVOKED',
+        startedAt: null, crewArrivedAt: null },
+    ])
+    m.pins.mockResolvedValue(null)
+    m.witnesses.mockResolvedValue(null)
+    m.workspace.mockResolvedValue(null)
+    m.legacyArrival.mockResolvedValue(null)
   })
 
   it.each([
@@ -109,6 +133,53 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
       data: expect.objectContaining({ reviewedBy: 'staff', resolution: 'CONFIRMED' }),
     }))
     expect(m.audit).toHaveBeenCalledOnce()
+  })
+
+  it('refuses forged zero-hold metadata when PostgreSQL still has any consumed PIN in old epochs', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    m.pins.mockResolvedValue({ id: 'historically-consumed-pin' })
+    await expect(call('DISMISSED')).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.pins).toHaveBeenCalledWith({
+      where: { crewDispatchId: 'crew', consumedAt: { not: null } },
+      select: { id: true },
+    })
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
+  it('denies an event when crew capacity is actually still accepted', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    m.roster.mockResolvedValue([
+      { id: 'slot1', jobId: 'job-1', companyId: 'company',
+        workerUserId: 'worker1', status: 'CREW_ACCEPTED',
+        startedAt: null, crewArrivedAt: null },
+      { id: 'slot2', jobId: 'job-1', companyId: 'company',
+        workerUserId: 'worker2', status: 'REVOKED',
+        startedAt: null, crewArrivedAt: null },
+    ])
+    await expect(call('NO_ACTION')).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
+  it('rejects an earlier or re-formed crew epoch and unrelated booking', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    m.crew.mockResolvedValue({
+      jobId: 'another-job', companyId: 'company',
+      status: 'BLOCKED', version: 3, requiredWorkersCount: 2,
+    })
+    await expect(call('CONFIRMED')).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.roster).not.toHaveBeenCalled()
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
+  it('rejects preserved witness or workspace evidence even with zero JSON counters', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    m.witnesses.mockResolvedValue({ id: 'witness' })
+    await expect(call('ESCALATED')).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.update).not.toHaveBeenCalled()
   })
 
   it('does not affect non-crew risk events or provider workflows', async () => {
