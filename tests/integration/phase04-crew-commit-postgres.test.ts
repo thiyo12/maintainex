@@ -1232,6 +1232,45 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       expect(await db!.marketplaceRiskEvent.count({
         where: { jobId: booking.id, severity: 'HIGH' },
       })).toBe(1)
+      // Ordinary no-consumed-PIN mismatch: both worker slots are already
+      // revoked. The generic risk review is permitted ONLY while a locked
+      // QUOTE_ACCEPTED job agrees with the BLOCKED crew and roster epoch.
+      const clearRisk = await db!.marketplaceRiskEvent.findFirstOrThrow({
+        where: { jobId: booking.id, eventType: 'WORKER_IDENTITY_MISMATCH' },
+      })
+      await db!.marketplaceJob.update({
+        where: { id: booking.id }, data: { status: 'CANCELLED' },
+      })
+      await expect(db!.$transaction(tx => reviewRiskEvent(tx, {
+        eventId: clearRisk.id, resolution: 'NO_ACTION',
+        session: {
+          id: 'ci-safety-review-only', email: 'ci@example.invalid',
+          role: 'MANAGER', firstName: '', lastName: '',
+          assignedCountries: ['LK'], authType: 'adminUser',
+        }, ipAddress: '127.0.0.1',
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
+        .rejects.toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+      expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
+        where: { id: clearRisk.id },
+      })).toMatchObject({ reviewedAt: null, resolution: null })
+      await db!.marketplaceJob.update({
+        where: { id: booking.id }, data: { status: 'QUOTE_ACCEPTED' },
+      })
+      expect((await db!.$transaction(tx => reviewRiskEvent(tx, {
+        eventId: clearRisk.id, resolution: 'NO_ACTION',
+        session: {
+          id: 'ci-safety-review-only', email: 'ci@example.invalid',
+          role: 'MANAGER', firstName: '', lastName: '',
+          assignedCountries: ['LK'], authType: 'adminUser',
+        }, ipAddress: '127.0.0.1',
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })).success)
+        .toBe(true)
+      expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
+        where: { id: clearRisk.id },
+      })).toMatchObject({ reviewedBy: 'ci-safety-review-only', resolution: 'NO_ACTION' })
+      expect(await db!.companyJobAssignment.count({
+        where: { crewDispatchId: staged.crewDispatchId, status: 'REVOKED' },
+      })).toBe(2)
       await expect(db!.$transaction(tx => decideCrewWorkerIdentityInsideTransaction(tx, {
         jobId: booking.id, crewDispatchId: staged.crewDispatchId,
         assignmentId: saved[1].id, customerUserId: ownerId,
