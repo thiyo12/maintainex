@@ -114,6 +114,14 @@ export async function calculatePrice(
   const identifiers = await validatePricingIdentifiers(client, input)
   const config = await resolvePricingConfig(client, identifiers.countryCode || input.countryCode || 'GLOBAL')
 
+  // An absent/stale market config may fall back to GLOBAL/LKR. Never
+  // publish a Canadian amount under an LKR configuration (or vice versa).
+  const marketCurrency = identifiers.countryCode === 'CA' ? 'CAD'
+    : identifiers.countryCode === 'LK' ? 'LKR' : null
+  if (marketCurrency && config.defaultCurrency !== marketCurrency) {
+    throw new PricingInputError('Pricing configuration currency does not match job market')
+  }
+
   const baseAmount = await resolveBaseAmount(client, {
     ...input,
     categoryId: identifiers.categoryId,
