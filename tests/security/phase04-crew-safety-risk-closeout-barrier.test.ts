@@ -138,10 +138,12 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
     expect(m.sql).toHaveBeenCalledTimes(2)
     // The raw queries are in canonical MarketplaceJob -> CrewDispatch order
     // and keep exclusive row locks until the CRM transaction completes.
-    expect(m.sql.mock.calls[0][0].strings.join(' ')).toContain('"MarketplaceJob"')
-    expect(m.sql.mock.calls[0][0].strings.join(' ')).toContain('FOR UPDATE')
-    expect(m.sql.mock.calls[1][0].strings.join(' ')).toContain('"CompanyCrewDispatch"')
-    expect(m.sql.mock.calls[1][0].strings.join(' ')).toContain('FOR UPDATE')
+    // Prisma's tagged $queryRaw passes a TemplateStringsArray as the
+    // first argument (the mock does not receive a Prisma.Sql object).
+    expect(m.sql.mock.calls[0][0].join(' ')).toContain('"MarketplaceJob"')
+    expect(m.sql.mock.calls[0][0].join(' ')).toContain('FOR UPDATE')
+    expect(m.sql.mock.calls[1][0].join(' ')).toContain('"CompanyCrewDispatch"')
+    expect(m.sql.mock.calls[1][0].join(' ')).toContain('FOR UPDATE')
   })
 
   it('refuses forged zero-hold metadata when PostgreSQL still has any consumed PIN in old epochs', async () => {
