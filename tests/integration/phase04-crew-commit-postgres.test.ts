@@ -19,6 +19,7 @@ import {
   inspectBlockedCrewSafetyEvidenceForCrmInsideTransaction,
 } from '@/lib/domain/company-crew-safety-review-inventory'
 import { decideCrewWorkerIdentityInsideTransaction } from '@/lib/domain/company-crew-identity'
+import { reviewRiskEvent, CrewSafetyCaseRequiresDedicatedResolutionError } from '@/lib/domain/admin-risk-event'
 
 // Absolutely no fixture creation outside the dedicated CI/test database.
 // All generated IDs are scoped to this suite and deleted in dependency order.
@@ -1355,6 +1356,22 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
         previousVersion: 1, blockedVersion: 2,
         consumedPinsPreserved: 1, capacityHeldForReview: 2,
       })
+      // A real post-consumption safety hold must NOT disappear when CRM
+      // attempts a generic NO_ACTION review. The crew must remain held.
+      await expect(reviewRiskEvent(db!, {
+        eventId: risk.id, resolution: 'NO_ACTION',
+        session: {
+          id: 'ci-safety-review-only', email: 'ci@example.invalid',
+          role: 'MANAGER', firstName: '', lastName: '',
+          assignedCountries: ['LK'], authType: 'adminUser',
+        }, ipAddress: '127.0.0.1',
+      })).rejects.toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+      expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
+        where: { id: risk.id },
+      })).toMatchObject({ reviewedAt: null, resolution: null })
+      expect(await db!.companyJobAssignment.count({
+        where: { crewDispatchId: staged.crewDispatchId, status: 'CREW_ACCEPTED' },
+      })).toBe(2)
       const review = await db!.$transaction(tx =>
         inspectBlockedCrewSafetyEvidenceInsideTransaction(tx, {
           crewDispatchId: staged.crewDispatchId, companyId,

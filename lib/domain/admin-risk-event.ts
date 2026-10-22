@@ -1,6 +1,57 @@
 import { PrismaClient } from '@prisma/client'
 import type { AdminSession, AuditAction } from '../admin-types'
 
+/**
+ * A standard CRM risk-event "reviewed" bit is NOT authority to close a
+ * consumed-PIN crew safety hold. It would remove the only pending HIGH event
+ * from the triage inventory while worker capacity remains safety-reserved.
+ * Keep that event visible until a separate, explicitly approved, atomic
+ * support resolution/capacity policy exists.
+ */
+export class CrewSafetyCaseRequiresDedicatedResolutionError extends Error {
+  constructor() {
+    super('Crew safety case requires dedicated resolution')
+    this.name = 'CrewSafetyCaseRequiresDedicatedResolutionError'
+  }
+}
+
+function assertGenericRiskReviewDoesNotCloseCrewSafetyHold(
+  event: { eventType: string; metadata: string | null },
+) {
+  if (event.eventType === 'CREW_CONSUMED_PIN_SAFETY_HOLD' ||
+      event.eventType === 'CREW_WORKFORCE_PIN_SAFETY_HOLD') {
+    // These events only originate from evidence-preserving holds.
+    throw new CrewSafetyCaseRequiresDedicatedResolutionError()
+  }
+  if (event.eventType !== 'WORKER_IDENTITY_MISMATCH') return
+
+  // Ordinary pre-arrival customer mismatch may release the roster BEFORE
+  // any PIN was consumed. Such non-held risk events retain normal review.
+  // Malformed/legacy metadata must fail CLOSED: never assume there was no
+  // consumed PIN and no capacity held.
+  let metadata: unknown
+  try {
+    metadata = JSON.parse(event.metadata || '')
+  } catch {
+    throw new CrewSafetyCaseRequiresDedicatedResolutionError()
+  }
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    throw new CrewSafetyCaseRequiresDedicatedResolutionError()
+  }
+  const m = metadata as Record<string, unknown>
+  if (m.consumedPinsPreserved !== 0 ||
+      m.capacityHeldForReview !== 0 ||
+      typeof m.companyId !== 'string' || !m.companyId.trim() ||
+      typeof m.crewId !== 'string' || !m.crewId.trim() ||
+      typeof m.assignmentId !== 'string' || !m.assignmentId.trim() ||
+      typeof m.workerUserId !== 'string' || !m.workerUserId.trim() ||
+      typeof m.previousVersion !== 'number' ||
+      !Number.isSafeInteger(m.previousVersion) || m.previousVersion < 1 ||
+      m.blockedVersion !== m.previousVersion + 1) {
+    throw new CrewSafetyCaseRequiresDedicatedResolutionError()
+  }
+}
+
 export type RiskEventResolution = 'CONFIRMED' | 'DISMISSED' | 'ESCALATED' | 'NO_ACTION'
 
 export interface ReviewRiskEventInput {
@@ -39,6 +90,11 @@ export async function reviewRiskEvent(
   if (event.reviewedAt) {
     throw new Error(`Risk event already reviewed: ${event.resolution}`)
   }
+
+  // Fail before setting reviewedAt, touching provider standing or writing an
+  // audit "resolution". Neither DISMISSED/NO_ACTION nor ESCALATED/CONFIRMED
+  // may silently consume a pending held-crew HIGH safety event.
+  assertGenericRiskReviewDoesNotCloseCrewSafetyHold(event)
 
   const oldValue = { resolution: event.resolution, reviewedAt: null }
   const newValue = { resolution, reviewedAt: new Date(), reason }
