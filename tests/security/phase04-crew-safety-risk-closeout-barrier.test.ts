@@ -35,11 +35,13 @@ const safeMismatch = {
   workerUserId: 'worker1', previousVersion: 1, blockedVersion: 2,
   consumedPinsPreserved: 0, capacityHeldForReview: 0,
 }
-const call = (resolution: RiskEventResolution) =>
-  reviewRiskEvent(tx as any, {
-    eventId: 'risk', resolution, reason: 'Investigated by CRM',
-    session: session as any, ipAddress: '127.0.0.1',
-  })
+const call = (
+  resolution: RiskEventResolution,
+  allowedCountries: string[] | null = ['LK'],
+) => reviewRiskEvent(tx as any, {
+  eventId: 'risk', resolution, reason: 'Investigated by CRM',
+  session: session as any, ipAddress: '127.0.0.1', allowedCountries,
+})
 const event = (eventType: string, metadata: unknown, status: Date | null = null) => ({
   id: 'risk', jobId: 'job-1', eventType, severity: 'HIGH', actorUserId: 'customer',
   resolution: null, reviewedAt: status,
@@ -52,7 +54,7 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
     m.update.mockResolvedValue({ count: 1 })
     m.audit.mockResolvedValue({})
     m.sql.mockResolvedValueOnce([{
-      id: 'job-1', status: 'QUOTE_ACCEPTED', workersCount: 2,
+      id: 'job-1', status: 'QUOTE_ACCEPTED', workersCount: 2, countryCode: 'LK',
     }]).mockResolvedValueOnce([{
       id: 'crew', jobId: 'job-1', companyId: 'company',
       status: 'BLOCKED', version: 2, requiredWorkersCount: 2,
@@ -176,7 +178,7 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
   it('rejects an earlier or re-formed crew epoch and unrelated booking', async () => {
     m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
     m.sql.mockReset().mockResolvedValueOnce([{
-      id: 'job-1', status: 'QUOTE_ACCEPTED', workersCount: 2,
+      id: 'job-1', status: 'QUOTE_ACCEPTED', workersCount: 2, countryCode: 'LK',
     }]).mockResolvedValueOnce([{
       id: 'crew', jobId: 'another-job', companyId: 'company',
       status: 'BLOCKED', version: 3, requiredWorkersCount: 2,
@@ -187,10 +189,59 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
     expect(m.update).not.toHaveBeenCalled()
   })
 
+  it('denies a CRM reviewer when locked booking country differs from selected market', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    await expect(call('NO_ACTION', ['CA'])).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.roster).not.toHaveBeenCalled()
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
+  it('denies absent or forged CRM country-scope input before reading booking evidence', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    await expect(reviewRiskEvent(tx as any, {
+      eventId: 'risk', resolution: 'NO_ACTION',
+      reason: 'Investigated by CRM', session: session as any,
+      ipAddress: '127.0.0.1',
+    })).rejects.toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.sql).not.toHaveBeenCalled()
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
+  it('does not infer global market access from empty or malformed assignments', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    for (const scope of [[], ['lk'], ['LK', 'USA']]) {
+      await expect(call('NO_ACTION', scope)).rejects
+        .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    }
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
+  it('permits explicit ALL-market superadmin scope while retaining no-hold evidence guards', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    expect((await call('NO_ACTION', null)).success).toBe(true)
+    expect(m.update).toHaveBeenCalledOnce()
+    expect(m.audit).toHaveBeenCalledOnce()
+  })
+
+  it('refuses a job moved out of the live market even with an old LK risk-event preflight', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    m.sql.mockReset().mockResolvedValueOnce([{
+      id: 'job-1', status: 'QUOTE_ACCEPTED', workersCount: 2, countryCode: 'CA',
+    }]).mockResolvedValueOnce([{
+      id: 'crew', jobId: 'job-1', companyId: 'company',
+      status: 'BLOCKED', version: 2, requiredWorkersCount: 2,
+    }])
+    await expect(call('DISMISSED', ['LK'])).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.update).not.toHaveBeenCalled()
+    expect(m.roster).not.toHaveBeenCalled()
+  })
+
   it('refuses a cancelled or moved booking under the locked job row before checking PINs', async () => {
     m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
     m.sql.mockReset().mockResolvedValueOnce([{
-      id: 'job-1', status: 'CANCELLED', workersCount: 2,
+      id: 'job-1', status: 'CANCELLED', workersCount: 2, countryCode: 'LK',
     }]).mockResolvedValueOnce([{
       id: 'crew', jobId: 'job-1', companyId: 'company',
       status: 'BLOCKED', version: 2, requiredWorkersCount: 2,
@@ -204,7 +255,7 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
   it('refuses inconsistent locked job roster counts without closing the risk', async () => {
     m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
     m.sql.mockReset().mockResolvedValueOnce([{
-      id: 'job-1', status: 'QUOTE_ACCEPTED', workersCount: 3,
+      id: 'job-1', status: 'QUOTE_ACCEPTED', workersCount: 3, countryCode: 'LK',
     }]).mockResolvedValueOnce([{
       id: 'crew', jobId: 'job-1', companyId: 'company',
       status: 'BLOCKED', version: 2, requiredWorkersCount: 2,
