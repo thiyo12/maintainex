@@ -8,14 +8,14 @@ import {
 const m = vi.hoisted(() => ({
   find: vi.fn(), update: vi.fn(), audit: vi.fn(),
   signalRead: vi.fn(), signalUpdate: vi.fn(), providerUpdate: vi.fn(),
-  crew: vi.fn(), roster: vi.fn(), pins: vi.fn(), witnesses: vi.fn(),
+  sql: vi.fn(), roster: vi.fn(), pins: vi.fn(), witnesses: vi.fn(),
   workspace: vi.fn(), legacyArrival: vi.fn(),
 }))
 
 const tx = {
   marketplaceRiskEvent: { findUnique: m.find, updateMany: m.update },
   auditLog: { create: m.audit },
-  companyCrewDispatch: { findUnique: m.crew },
+  $queryRaw: m.sql,
   companyJobAssignment: { findMany: m.roster },
   companyCrewPinChallenge: { findFirst: m.pins },
   companyCrewPresenceWitness: { findFirst: m.witnesses },
@@ -51,10 +51,12 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
     vi.resetAllMocks()
     m.update.mockResolvedValue({ count: 1 })
     m.audit.mockResolvedValue({})
-    m.crew.mockResolvedValue({
-      jobId: 'job-1', companyId: 'company',
+    m.sql.mockResolvedValueOnce([{
+      id: 'job-1', status: 'QUOTE_ACCEPTED', workersCount: 2,
+    }]).mockResolvedValueOnce([{
+      id: 'crew', jobId: 'job-1', companyId: 'company',
       status: 'BLOCKED', version: 2, requiredWorkersCount: 2,
-    })
+    }])
     m.roster.mockResolvedValue([
       { id: 'slot1', jobId: 'job-1', companyId: 'company',
         workerUserId: 'worker1', status: 'REVOKED',
@@ -133,6 +135,15 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
       data: expect.objectContaining({ reviewedBy: 'staff', resolution: 'CONFIRMED' }),
     }))
     expect(m.audit).toHaveBeenCalledOnce()
+    expect(m.sql).toHaveBeenCalledTimes(2)
+    // The raw queries are in canonical MarketplaceJob -> CrewDispatch order
+    // and keep exclusive row locks until the CRM transaction completes.
+    // Prisma's tagged $queryRaw passes a TemplateStringsArray as the
+    // first argument (the mock does not receive a Prisma.Sql object).
+    expect(m.sql.mock.calls[0][0].join(' ')).toContain('"MarketplaceJob"')
+    expect(m.sql.mock.calls[0][0].join(' ')).toContain('FOR UPDATE')
+    expect(m.sql.mock.calls[1][0].join(' ')).toContain('"CompanyCrewDispatch"')
+    expect(m.sql.mock.calls[1][0].join(' ')).toContain('FOR UPDATE')
   })
 
   it('refuses forged zero-hold metadata when PostgreSQL still has any consumed PIN in old epochs', async () => {
@@ -164,13 +175,42 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
 
   it('rejects an earlier or re-formed crew epoch and unrelated booking', async () => {
     m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
-    m.crew.mockResolvedValue({
-      jobId: 'another-job', companyId: 'company',
+    m.sql.mockReset().mockResolvedValueOnce([{
+      id: 'job-1', status: 'QUOTE_ACCEPTED', workersCount: 2,
+    }]).mockResolvedValueOnce([{
+      id: 'crew', jobId: 'another-job', companyId: 'company',
       status: 'BLOCKED', version: 3, requiredWorkersCount: 2,
-    })
+    }])
     await expect(call('CONFIRMED')).rejects
       .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
     expect(m.roster).not.toHaveBeenCalled()
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses a cancelled or moved booking under the locked job row before checking PINs', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    m.sql.mockReset().mockResolvedValueOnce([{
+      id: 'job-1', status: 'CANCELLED', workersCount: 2,
+    }]).mockResolvedValueOnce([{
+      id: 'crew', jobId: 'job-1', companyId: 'company',
+      status: 'BLOCKED', version: 2, requiredWorkersCount: 2,
+    }])
+    await expect(call('NO_ACTION')).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.roster).not.toHaveBeenCalled()
+    expect(m.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses inconsistent locked job roster counts without closing the risk', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    m.sql.mockReset().mockResolvedValueOnce([{
+      id: 'job-1', status: 'QUOTE_ACCEPTED', workersCount: 3,
+    }]).mockResolvedValueOnce([{
+      id: 'crew', jobId: 'job-1', companyId: 'company',
+      status: 'BLOCKED', version: 2, requiredWorkersCount: 2,
+    }])
+    await expect(call('DISMISSED')).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
     expect(m.update).not.toHaveBeenCalled()
   })
 

@@ -28,8 +28,8 @@ type ZeroHoldMismatchClaim = {
  * JSON counts are only a REQUEST to use ordinary CRM review, never proof of
  * safety. Verify the authoritative whole crew, all historical PINs, and
  * retained work/scheduling evidence before any reviewedAt write. Callers
- * should use a SERIALIZABLE transaction to prevent concurrent roster changes
- * between this read and the review update.
+ * must use a SERIALIZABLE transaction AND the canonical job -> crew
+ * row locks to prevent concurrent crew/PIN changes before review commits.
  */
 async function assertPersistedNoHeldCrewEvidence(
   tx: PrismaClient | Prisma.TransactionClient,
@@ -38,16 +38,31 @@ async function assertPersistedNoHeldCrewEvidence(
 ) {
   const deny = () => { throw new CrewSafetyCaseRequiresDedicatedResolutionError() }
   if (!jobId) return deny()
-  const crew = await tx.companyCrewDispatch.findUnique({
-    where: { id: m.crewId },
-    select: {
-      jobId: true, companyId: true, version: true,
-      status: true, requiredWorkersCount: true,
-    },
-  })
-  if (!crew || crew.jobId !== jobId || crew.companyId !== m.companyId ||
+  // Mirror the shared Phase04 job -> crew lock order. SERIALIZABLE alone
+  // does not guarantee that an independent concurrent PIN/witness writer
+  // cannot change physical-safety evidence during a read-only check.
+  // Keep both rows locked through reviewedAt update and the audit write.
+  const jobs = await tx.$queryRaw<Array<{
+    id: string; status: string; workersCount: number
+  }>>`
+    SELECT id, status, "workersCount" FROM "MarketplaceJob"
+    WHERE id = ${jobId} FOR UPDATE
+  `
+  const crews = await tx.$queryRaw<Array<{
+    id: string; jobId: string; companyId: string; version: number
+    status: string; requiredWorkersCount: number
+  }>>`
+    SELECT id, "jobId", "companyId", version, status,
+      "requiredWorkersCount"
+    FROM "CompanyCrewDispatch" WHERE id = ${m.crewId} FOR UPDATE
+  `
+  const job = jobs[0], crew = crews[0]
+  if (!job || !crew || crew.jobId !== job.id || job.id !== jobId ||
+      job.status !== 'QUOTE_ACCEPTED' ||
+      crew.jobId !== jobId || crew.companyId !== m.companyId ||
       crew.status !== 'BLOCKED' || crew.version !== m.blockedVersion ||
-      crew.requiredWorkersCount < 2 || crew.requiredWorkersCount > 12) return deny()
+      crew.requiredWorkersCount < 2 || crew.requiredWorkersCount > 12 ||
+      job.workersCount !== crew.requiredWorkersCount) return deny()
 
   const [roster, consumed, witnesses, workspace, legacyArrival] = await Promise.all([
     tx.companyJobAssignment.findMany({
