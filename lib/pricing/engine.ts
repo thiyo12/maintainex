@@ -99,6 +99,18 @@ export async function calculatePrice(
   client: PrismaClient,
   input: PricingInput,
 ): Promise<PriceBreakdown> {
+  // Reject malformed scalar modifiers before DB reads or BigInt arithmetic.
+  // Fractional, negative and unsafe quantities must never be rounded into
+  // a customer-facing price, nor produce a misleading validated estimate.
+  for (const [name, value] of [
+    ['quantity', input.quantity],
+    ['durationMinutes', input.durationMinutes],
+  ] as const) {
+    if (value !== undefined && value !== null &&
+        (!Number.isSafeInteger(value) || value < 1)) {
+      throw new PricingInputError(`${name} must be a positive safe integer`)
+    }
+  }
   const identifiers = await validatePricingIdentifiers(client, input)
   const config = await resolvePricingConfig(client, identifiers.countryCode || input.countryCode || 'GLOBAL')
 
