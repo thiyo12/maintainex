@@ -18,7 +18,7 @@ function makeClient() {
       create: vi.fn(async () => ({ id: 'revision' })),
     },
     $queryRaw: vi.fn(async () => [{ id: 'job', status: 'OPEN' }]),
-    quoteLineItem: { create: vi.fn(async () => ({})) },
+    quoteLineItem: { create: vi.fn(async (_args: any) => ({})) },
   }
   const client = { $transaction: vi.fn(async (fn: any) => fn(tx)) }
   return { client, tx }
