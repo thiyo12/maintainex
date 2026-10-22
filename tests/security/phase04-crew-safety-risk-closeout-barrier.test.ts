@@ -236,6 +236,13 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
       { id: 'slot1', jobId: 'job-1', companyId: 'company', workerUserId: 'worker1', status: 'REVOKED', startedAt: null, crewArrivedAt: new Date('2026-10-20T00:00:00Z') },
       { id: 'slot2', jobId: 'job-1', companyId: 'company', workerUserId: 'worker2', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
     ]],
+    ['wrong company in revoked roster', [
+      { id: 'slot1', jobId: 'job-1', companyId: 'unrelated-company', workerUserId: 'worker1', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
+      { id: 'slot2', jobId: 'job-1', companyId: 'company', workerUserId: 'worker2', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
+    ]],
+    ['missing crew member in roster', [
+      { id: 'slot1', jobId: 'job-1', companyId: 'company', workerUserId: 'worker1', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
+    ]],
     ['wrong booking in revoked roster', [
       { id: 'slot1', jobId: 'another-job', companyId: 'company', workerUserId: 'worker1', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
       { id: 'slot2', jobId: 'job-1', companyId: 'company', workerUserId: 'worker2', status: 'REVOKED', startedAt: null, crewArrivedAt: null },
