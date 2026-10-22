@@ -167,8 +167,10 @@ export async function getQuoteRevisionHistory(
 
   let rootId: string = initial.id
   let currentParentId: string | null = initial.parentQuoteId
+  const visitedParents = new Set<string>([initial.id])
 
-  while (currentParentId) {
+  while (currentParentId && !visitedParents.has(currentParentId)) {
+    visitedParents.add(currentParentId)
     const parent = await client.jobQuote.findUnique({ where: { id: currentParentId } })
     if (!parent) break
     rootId = parent.id
@@ -178,8 +180,10 @@ export async function getQuoteRevisionHistory(
   // Now walk forward through the chain
   const history: Array<{ id: string; revisionNumber: number; status: string; price: bigint; createdAt: Date; revisionReason: string | null }> = []
   let chainId: string | null = rootId
+  const visitedRevisions = new Set<string>()
 
-  while (chainId) {
+  while (chainId && !visitedRevisions.has(chainId)) {
+    visitedRevisions.add(chainId)
     const quote = await client.jobQuote.findUnique({ where: { id: chainId } })
     if (!quote) break
     history.push({
