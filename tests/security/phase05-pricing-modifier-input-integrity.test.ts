@@ -25,4 +25,25 @@ describe('Phase 05 pricing modifier input integrity', () => {
     expect(client.jobCategory.findUnique).not.toHaveBeenCalled()
     expect(client.serviceTemplate.findUnique).not.toHaveBeenCalled()
   })
+
+  it.each([
+    ['CA', 'LKR'],
+    ['LK', 'CAD'],
+  ] as const)('rejects %s booked prices under a %s fallback config', async (market, currency) => {
+    const client = {
+      marketplaceJob: { findUnique: vi.fn().mockResolvedValue({
+        categoryId: 'category', serviceTemplateId: null, countryCode: market,
+      }) },
+      jobCategory: { findUnique: vi.fn().mockResolvedValue({ id: 'category' }) },
+      marketConfig: { findUnique: vi.fn().mockResolvedValue({
+        countryCode: 'GLOBAL', defaultCurrency: currency,
+      }) },
+      templateJob: { findMany: vi.fn() },
+    }
+    await expect(calculatePrice(client as any, {
+      jobId: 'existing-booking', categoryId: 'category',
+      mode: 'QUOTE', urgency: 'NORMAL',
+    })).rejects.toBeInstanceOf(PricingInputError)
+    expect(client.templateJob.findMany).not.toHaveBeenCalled()
+  })
 })
