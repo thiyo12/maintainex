@@ -154,10 +154,43 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
     await expect(call('DISMISSED')).rejects
       .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
     expect(m.pins).toHaveBeenCalledWith({
-      where: { crewDispatchId: 'crew', consumedAt: { not: null } },
+      where: {
+        crewDispatchId: 'crew',
+        OR: [{ consumedAt: { not: null } }, { revokedAt: null }],
+      },
       select: { id: true },
     })
     expect(m.update).not.toHaveBeenCalled()
+  })
+
+  it('cannot close a no-held mismatch with an unrevoked historical crew arrival challenge', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    m.pins.mockResolvedValue({ id: 'unrevoked-expired-pin' })
+    await expect(call('NO_ACTION')).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.update).not.toHaveBeenCalled()
+    expect(m.audit).not.toHaveBeenCalled()
+  })
+
+  it('refuses an active unconsumed legacy arrival PIN even with zero counters', async () => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    m.legacyArrival.mockResolvedValue({ id: 'legacy-active-pin' })
+    await expect(call('DISMISSED')).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.legacyArrival).toHaveBeenCalledWith({
+      where: {
+        jobId: 'job-1',
+        OR: [
+          { status: 'ACTIVE' },
+          { arrivalVerifiedAt: { not: null } },
+          { workStartVerifiedAt: { not: null } },
+          { completionVerifiedAt: { not: null } },
+        ],
+      },
+      select: { id: true },
+    })
+    expect(m.update).not.toHaveBeenCalled()
+    expect(m.audit).not.toHaveBeenCalled()
   })
 
   it('denies an event when crew capacity is actually still accepted', async () => {

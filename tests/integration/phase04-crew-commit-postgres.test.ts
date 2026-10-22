@@ -1270,6 +1270,53 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
         where: { id: clearRisk.id },
       })).toMatchObject({ reviewedAt: null, resolution: null })
+      // A legacy ACTIVE arrival PIN is unsafe even if it has NEVER been
+      // consumed. This fixture is inert; no real PIN is issued or delivered.
+      const legacyPin = await db!.jobVerificationPin.create({
+        data: {
+          jobId: booking.id, customerId: ownerId,
+          pinHash: 'ci-inert-no-usable-pin', status: 'ACTIVE',
+        },
+      })
+      await expect(db!.$transaction(tx => reviewRiskEvent(tx, {
+        eventId: clearRisk.id, resolution: 'NO_ACTION',
+        session: {
+          id: 'ci-safety-review-only', email: 'ci@example.invalid',
+          role: 'MANAGER', firstName: '', lastName: '',
+          assignedCountries: ['LK'], authType: 'adminUser',
+        }, ipAddress: '127.0.0.1', allowedCountries: ['LK'],
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
+        .rejects.toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+      expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
+        where: { id: clearRisk.id },
+      })).toMatchObject({ reviewedAt: null, resolution: null })
+      await db!.jobVerificationPin.delete({ where: { id: legacyPin.id } })
+
+      // An unrevoked crew challenge (not consumed and schema-valid)
+      // must also be remediated before an ordinary CRM closeout.
+      const orphanPin = await db!.companyCrewPinChallenge.create({
+        data: {
+          crewDispatchId: staged.crewDispatchId,
+          assignmentId: saved[0].id, jobId: booking.id,
+          crewVersion: 1, purpose: 'ARRIVAL', challengeVersion: 99,
+          pinDigest: '0'.repeat(64), // Valid hex/HMAC shape, not a usable derived PIN
+          issuedByCustomerUserId: ownerId,
+          expiresAt: new Date(Date.now() + 15 * 60_000),
+        },
+      })
+      await expect(db!.$transaction(tx => reviewRiskEvent(tx, {
+        eventId: clearRisk.id, resolution: 'NO_ACTION',
+        session: {
+          id: 'ci-safety-review-only', email: 'ci@example.invalid',
+          role: 'MANAGER', firstName: '', lastName: '',
+          assignedCountries: ['LK'], authType: 'adminUser',
+        }, ipAddress: '127.0.0.1', allowedCountries: ['LK'],
+      }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
+        .rejects.toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+      expect(await db!.marketplaceRiskEvent.findUniqueOrThrow({
+        where: { id: clearRisk.id },
+      })).toMatchObject({ reviewedAt: null, resolution: null })
+      await db!.companyCrewPinChallenge.delete({ where: { id: orphanPin.id } })
       expect((await db!.$transaction(tx => reviewRiskEvent(tx, {
         eventId: clearRisk.id, resolution: 'NO_ACTION',
         session: {
@@ -1299,6 +1346,8 @@ describe.skipIf(!isolated)('Phase 04 — isolated PostgreSQL crew commit and sch
       await db!.marketplaceRiskEvent.deleteMany({ where: { jobId: booking.id } })
       await db!.providerIntegritySignal.deleteMany({ where: { jobId: booking.id } })
       await db!.jobWorkerIdentityCheck.deleteMany({ where: { jobId: booking.id } })
+      await db!.companyCrewPinChallenge.deleteMany({ where: { jobId: booking.id } })
+      await db!.jobVerificationPin.deleteMany({ where: { jobId: booking.id } })
       await db!.companyJobAssignment.deleteMany({ where: { jobId: booking.id } })
       await db!.companyCrewDispatch.deleteMany({ where: { jobId: booking.id } })
       await db!.jobQuote.deleteMany({ where: { jobId: booking.id } })
