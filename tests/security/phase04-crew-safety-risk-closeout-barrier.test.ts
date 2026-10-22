@@ -193,6 +193,21 @@ describe('Phase04 pending crew HIGH safety risk is never closed by generic CRM r
     expect(m.audit).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['arrival witness', 'witnesses'],
+    ['existing workspace', 'workspace'],
+    ['legacy arrival/start/completion proof', 'legacyArrival'],
+  ] as const)('keeps HIGH mismatch pending with persisted %s despite zero counters', async (_label, source) => {
+    m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
+    m[source].mockResolvedValue({ id: 'persisted-unsafe-evidence' })
+    await expect(call('NO_ACTION')).rejects
+      .toBeInstanceOf(CrewSafetyCaseRequiresDedicatedResolutionError)
+    expect(m.update).not.toHaveBeenCalled()
+    expect(m.audit).not.toHaveBeenCalled()
+    expect(m.signalUpdate).not.toHaveBeenCalled()
+    expect(m.providerUpdate).not.toHaveBeenCalled()
+  })
+
   it('denies an event when crew capacity is actually still accepted', async () => {
     m.find.mockResolvedValue(event('WORKER_IDENTITY_MISMATCH', safeMismatch))
     m.roster.mockResolvedValue([
