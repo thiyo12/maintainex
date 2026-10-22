@@ -44,6 +44,13 @@ describe('Phase06 quote revision integrity', () => {
     expect(tx.jobQuote.updateMany).not.toHaveBeenCalled()
   })
 
+  it('rejects an explicit empty line-item revision before superseding the original', async () => {
+    const { client, tx } = makeClient()
+    const result = await createQuoteRevision(client as any, { ...request, lineItems: [] })
+    expect(result.success).toBe(false)
+    expect(tx.jobQuote.updateMany).not.toHaveBeenCalled()
+  })
+
   it('persists calculated line totals instead of client-supplied totals', async () => {
     const { client, tx } = makeClient()
     const result = await createQuoteRevision(client as any, request)
