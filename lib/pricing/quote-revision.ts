@@ -82,6 +82,21 @@ export async function createQuoteRevision(
         return { success: false, error: 'Quote changed while revision was being submitted' }
       }
 
+      // Revision totals and line items must agree before a new commercial
+      // offer is persisted. Never accept client-supplied minor-unit totals
+      // without authoritative recomputation.
+      if (params.lineItems?.length) {
+        const { calculateQuoteTotal, validateLineItems } = await import('./line-items')
+        const checked = validateLineItems(params.lineItems, original.currency)
+        if (!checked.valid || checked.validatedItems.length !== params.lineItems.length) {
+          return { success: false, error: 'Invalid quote revision line items' }
+        }
+        const totals = calculateQuoteTotal(checked.validatedItems, params.subtotalCents ?? null, params.totalCents ?? null)
+        if (!totals.valid || totals.serverTotalCents !== params.price) {
+          return { success: false, error: 'Quote revision total does not match line items' }
+        }
+      }
+
       const newQuote = await tx.jobQuote.create({
         data: {
           jobId: original.jobId,
