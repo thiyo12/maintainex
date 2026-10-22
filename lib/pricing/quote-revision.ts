@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
+import { calculateQuoteTotal, validateLineItems } from '@/lib/pricing/line-items'
 
 /**
  * Create a new revision of an existing quote.
@@ -74,7 +75,6 @@ export async function createQuoteRevision(
       // offer is persisted. Never accept client-supplied minor-unit totals
       // without authoritative recomputation.
       if (params.lineItems?.length) {
-        const { calculateQuoteTotal, validateLineItems } = await import('./line-items')
         const checked = validateLineItems(params.lineItems, original.currency)
         if (!checked.valid || checked.validatedItems.length !== params.lineItems.length) {
           return { success: false, error: 'Invalid quote revision line items' }
