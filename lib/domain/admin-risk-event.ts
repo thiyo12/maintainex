@@ -35,17 +35,27 @@ async function assertPersistedNoHeldCrewEvidence(
   tx: PrismaClient | Prisma.TransactionClient,
   jobId: string | null,
   m: ZeroHoldMismatchClaim,
+  allowedCountries: string[] | null | undefined,
 ) {
   const deny = () => { throw new CrewSafetyCaseRequiresDedicatedResolutionError() }
-  if (!jobId) return deny()
+  // Explicit null means an authorized ALL-country CRM superadmin; an
+  // absent scope must NEVER default to global access. This is supplied by
+  // the canonical live guard, not by client JSON or risk event metadata.
+  if (!jobId || allowedCountries === undefined ||
+      (allowedCountries !== null && (
+        !Array.isArray(allowedCountries) ||
+        allowedCountries.some(value =>
+          typeof value !== 'string' || !/^[A-Z]{2}$/.test(value))
+      ))) return deny()
   // Mirror the shared Phase04 job -> crew lock order. SERIALIZABLE alone
   // does not guarantee that an independent concurrent PIN/witness writer
   // cannot change physical-safety evidence during a read-only check.
   // Keep both rows locked through reviewedAt update and the audit write.
   const jobs = await tx.$queryRaw<Array<{
     id: string; status: string; workersCount: number
+    countryCode: string | null
   }>>`
-    SELECT id, status, "workersCount" FROM "MarketplaceJob"
+    SELECT id, status, "workersCount", "countryCode" FROM "MarketplaceJob"
     WHERE id = ${jobId} FOR UPDATE
   `
   const crews = await tx.$queryRaw<Array<{
@@ -57,7 +67,13 @@ async function assertPersistedNoHeldCrewEvidence(
     FROM "CompanyCrewDispatch" WHERE id = ${m.crewId} FOR UPDATE
   `
   const job = jobs[0], crew = crews[0]
-  if (!job || !crew || crew.jobId !== job.id || job.id !== jobId ||
+  // A country preflight outside the transaction can race a market change.
+  // Deny against the currently locked authoritative booking country as well.
+  if (!job || !job.countryCode ||
+      !/^[A-Z]{2}$/.test(job.countryCode.toUpperCase()) ||
+      (allowedCountries !== null &&
+        !allowedCountries.includes(job.countryCode.toUpperCase()))) return deny()
+  if (!crew || crew.jobId !== job.id || job.id !== jobId ||
       job.status !== 'QUOTE_ACCEPTED' ||
       crew.jobId !== jobId || crew.companyId !== m.companyId ||
       crew.status !== 'BLOCKED' || crew.version !== m.blockedVersion ||
@@ -149,6 +165,8 @@ export interface ReviewRiskEventInput {
   reason?: string
   session: AdminSession
   ipAddress: string
+  /** From guardCrmRequest/getCrmCountryCodes. Undefined denies crew mismatch review. */
+  allowedCountries?: string[] | null
 }
 
 export async function reviewRiskEvent(
@@ -186,7 +204,9 @@ export async function reviewRiskEvent(
   // may silently consume a pending held-crew HIGH safety event.
   const zeroHold = assertGenericRiskReviewDoesNotCloseCrewSafetyHold(event)
   if (zeroHold) {
-    await assertPersistedNoHeldCrewEvidence(tx, event.jobId, zeroHold)
+    await assertPersistedNoHeldCrewEvidence(
+      tx, event.jobId, zeroHold, input.allowedCountries,
+    )
   }
 
   const oldValue = { resolution: event.resolution, reviewedAt: null }

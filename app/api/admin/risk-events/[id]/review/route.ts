@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client'
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
+import { assertCrmCountryAllowed, getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
 import { CrewSafetyCaseRequiresDedicatedResolutionError, reviewRiskEvent, type RiskEventResolution } from '@/lib/domain/admin-risk-event'
 import type { AdminSession } from '@/lib/admin-types'
 
@@ -71,6 +71,9 @@ export async function PATCH(
       reason,
       session,
       ipAddress: security.ipAddress,
+      // Recheck the live market assignment against the locked job within
+      // the review transaction; preflight alone is raceable.
+      allowedCountries: getCrmCountryCodes(security),
     }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
     return NextResponse.json({
