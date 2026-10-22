@@ -74,6 +74,9 @@ export async function createQuoteRevision(
       // Revision totals and line items must agree before a new commercial
       // offer is persisted. Never accept client-supplied minor-unit totals
       // without authoritative recomputation.
+      if (params.lineItems && params.lineItems.length === 0) {
+        return { success: false, error: 'Quote revision line items cannot be empty' }
+      }
       if (params.lineItems?.length) {
         const checked = validateLineItems(params.lineItems, original.currency)
         if (!checked.valid || checked.validatedItems.length !== params.lineItems.length) {
