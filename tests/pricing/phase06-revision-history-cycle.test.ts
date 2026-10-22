@@ -19,7 +19,7 @@ describe('Phase06 quote revision history cycle safety', () => {
     }
     const history = await getQuoteRevisionHistory(client as any, 'original')
     expect(history.map(x => x.id)).toEqual(['newer', 'original'])
-    expect(client.jobQuote.findUnique).toHaveBeenCalledTimes(5)
+    expect(client.jobQuote.findUnique).toHaveBeenCalledTimes(4)
     expect(client.jobQuote.findFirst).toHaveBeenCalledTimes(2)
   })
   it('terminates a self-referencing original without looping', async () => {
