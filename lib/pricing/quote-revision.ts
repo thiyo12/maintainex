@@ -78,6 +78,9 @@ export async function createQuoteRevision(
         return { success: false, error: 'Quote revision line items cannot be empty' }
       }
       if (params.lineItems?.length) {
+        if (params.lineItems.some(item => item.totalAmountCents !== BigInt(item.quantity) * item.unitAmountCents)) {
+          return { success: false, error: 'Quote revision line item total does not match quantity and unit price' }
+        }
         if (params.subtotalCents == null || params.taxCents == null || params.totalCents == null) {
           return { success: false, error: 'Quote revision itemized totals are required' }
         }
