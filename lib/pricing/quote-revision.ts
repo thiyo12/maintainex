@@ -92,6 +92,13 @@ export async function createQuoteRevision(
         }
       }
 
+      // Prevent an itemized revision from persisting a stale client-side
+      // total even when its declared subtotal/tax are arithmetically valid.
+      if (params.lineItems?.length &&
+          (params.subtotalCents! + params.taxCents! !== params.totalCents!)) {
+        return { success: false, error: 'Quote revision subtotal and tax do not equal total' }
+      }
+
       const claimed = await tx.jobQuote.updateMany({
         where: {
           id: params.originalQuoteId,
