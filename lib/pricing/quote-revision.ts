@@ -78,6 +78,9 @@ export async function createQuoteRevision(
         return { success: false, error: 'Quote revision line items cannot be empty' }
       }
       if (params.lineItems?.length) {
+        if (params.subtotalCents == null || params.taxCents == null || params.totalCents == null) {
+          return { success: false, error: 'Quote revision itemized totals are required' }
+        }
         const checked = validateLineItems(params.lineItems, original.currency)
         if (!checked.valid || checked.validatedItems.length !== params.lineItems.length) {
           return { success: false, error: 'Invalid quote revision line items' }
