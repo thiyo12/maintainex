@@ -60,6 +60,13 @@ describe('Phase06 quote revision integrity', () => {
     },
   )
 
+  it('rejects a revision whose subtotal plus tax disagrees with total', async () => {
+    const { client, tx } = makeClient()
+    const result = await createQuoteRevision(client as any, { ...request, totalCents: 2200n })
+    expect(result.success).toBe(false)
+    expect(tx.jobQuote.updateMany).not.toHaveBeenCalled()
+  })
+
   it('persists calculated line totals instead of client-supplied totals', async () => {
     const { client, tx } = makeClient()
     const result = await createQuoteRevision(client as any, request)
