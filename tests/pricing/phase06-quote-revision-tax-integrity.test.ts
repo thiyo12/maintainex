@@ -51,6 +51,15 @@ describe('Phase06 quote revision integrity', () => {
     expect(tx.jobQuote.updateMany).not.toHaveBeenCalled()
   })
 
+  it.each(['subtotalCents', 'taxCents', 'totalCents'] as const)(
+    'rejects an itemized revision missing %s before superseding', async (field) => {
+      const { client, tx } = makeClient()
+      const result = await createQuoteRevision(client as any, { ...request, [field]: undefined })
+      expect(result.success).toBe(false)
+      expect(tx.jobQuote.updateMany).not.toHaveBeenCalled()
+    },
+  )
+
   it('persists calculated line totals instead of client-supplied totals', async () => {
     const { client, tx } = makeClient()
     const result = await createQuoteRevision(client as any, request)
