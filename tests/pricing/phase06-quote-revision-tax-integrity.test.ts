@@ -67,6 +67,15 @@ describe('Phase06 quote revision integrity', () => {
     expect(tx.jobQuote.updateMany).not.toHaveBeenCalled()
   })
 
+  it.each([Number.NaN, Infinity, 1.5])('rejects malformed quantity %s without BigInt exception or quote mutation', async (quantity) => {
+    const { client, tx } = makeClient()
+    const result = await createQuoteRevision(client as any, {
+      ...request, lineItems: [{ ...lineItems[0], quantity }],
+    })
+    expect(result.success).toBe(false)
+    expect(tx.jobQuote.updateMany).not.toHaveBeenCalled()
+  })
+
   it('rejects forged line-item totals before superseding the original', async () => {
     const { client, tx } = makeClient()
     const forged = lineItems.map((item, index) => index === 0
