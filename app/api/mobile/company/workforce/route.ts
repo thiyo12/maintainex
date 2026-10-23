@@ -5,6 +5,8 @@ import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
 import { canAssignRole, canManageMember, hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
+import { Prisma } from '@prisma/client'
+import { blockWorkerFormingCrewsInsideTransaction } from '@/lib/domain/company-crew-workforce'
 
 /** Recheck the actor's live account and role under the same transaction that
  * modifies workforce. Caller holds the company row lock before invoking. */
@@ -105,6 +107,10 @@ export async function PATCH(request: NextRequest) {
               },
             })
             if (activeAssignments > 0) throw new Error('WORKER_HAS_ACTIVE_ASSIGNMENT')
+            await blockWorkerFormingCrewsInsideTransaction(tx, {
+              companyId, workerUserId: memberUserId,
+              actorUserId: user.id, actorRole: context!.role, reason: 'ROLE_CHANGED',
+            })
           }
 
           if (oldRole === 'COMPANY_OWNER' && role !== 'COMPANY_OWNER') {
@@ -129,7 +135,7 @@ export async function PATCH(request: NextRequest) {
             description: `Changed ${member.name} role from ${oldRole} to ${role}`,
             metadata: { oldRole, newRole: role, targetUserId: memberUserId },
           }, tx)
-        })
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
         return NextResponse.json({ success: true, member: { id: member.id, role } })
       }
@@ -186,6 +192,11 @@ export async function PATCH(request: NextRequest) {
             throw new Error('WORKER_HAS_IN_PROGRESS_JOB')
           }
 
+          const crewInvalidation = await blockWorkerFormingCrewsInsideTransaction(tx, {
+            companyId, workerUserId: memberUserId,
+            actorUserId: user.id, actorRole: context!.role, reason: 'SUSPENDED',
+          })
+
           await tx.teamMember.update({
             where: { id: member.id },
             data: { status: 'SUSPENDED' },
@@ -212,11 +223,16 @@ export async function PATCH(request: NextRequest) {
             targetType: 'TeamMember',
             targetId: member.id,
             description: `Deactivated ${member.name} (${member.role})`,
-            metadata: { targetUserId: memberUserId, revokedAssignments: revocableIds.length },
+            metadata: {
+              targetUserId: memberUserId,
+              revokedLegacyAssignments: revocableIds.length,
+              blockedCrews: crewInvalidation.blockedCrewsCount,
+              revokedCrewSlots: crewInvalidation.revokedCrewSlotsCount,
+            },
           }, tx)
 
-          return revocableIds.length
-        })
+          return revocableIds.length + crewInvalidation.revokedCrewSlotsCount
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
         return NextResponse.json({
           success: true,
@@ -302,6 +318,10 @@ export async function PATCH(request: NextRequest) {
     }
   } catch (err) {
     if (err instanceof Error) {
+      if (err.message === 'CREW_WORKFORCE_STATE_CONFLICT' ||
+          (err as Error & { code?: string }).code === 'P2034') {
+        return NextResponse.json({ error: 'Crew changed concurrently or has arrival/work evidence; retry or resolve roster first' }, { status: 409 })
+      }
       if (err.message === 'WORKFORCE_ACTOR_NO_LONGER_AUTHORIZED') {
         return NextResponse.json({ error: 'Workforce manager is no longer authorized' }, { status: 403 })
       }

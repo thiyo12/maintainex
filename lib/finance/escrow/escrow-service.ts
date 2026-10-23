@@ -22,6 +22,9 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   if (!job) throw new Error('Job not found')
   if (job.customerId !== ctx.actorId) throw new Error('Only the customer can deposit escrow')
   if (job.status !== 'QUOTE_ACCEPTED') throw new Error('Job not ready for escrow')
+  // Until crew arrival/start/settlement is fully supported, never hold funds
+  // against a booking that cannot be dispatched to all reserved workers.
+  if ((job.workersCount ?? 1) !== 1) throw new Error('CREW_PAYMENT_NOT_ENABLED')
 
   const quote = await prisma.jobQuote.findFirst({ where: { jobId, status: 'ACCEPTED' } })
   if (!quote) throw new Error('No accepted quote found')
@@ -224,12 +227,13 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
         id: string
         customerId: string
         status: string
+        workersCount: number
         countryCode: string | null
         latitude: number | null
         longitude: number | null
       }>
     >`
-      SELECT id, "customerId", status, "countryCode", latitude, longitude
+      SELECT id, "customerId", status, "workersCount", "countryCode", latitude, longitude
       FROM "MarketplaceJob"
       WHERE id = ${jobId}
       FOR UPDATE
@@ -238,6 +242,7 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
     if (!lockedJob) throw new Error('Job not found')
     if (lockedJob.customerId !== ctx.actorId) throw new Error('Only the customer can select cash payment')
     if (lockedJob.status !== 'QUOTE_ACCEPTED') throw new Error('Job is not ready for cash payment')
+    if ((lockedJob.workersCount ?? 1) !== 1) throw new Error('CREW_PAYMENT_NOT_ENABLED')
 
     // Phase 03: the cash market is revalidated from the LOCKED job row. The
     // pre-lock preview is not trusted, stored country alone does not prove

@@ -59,6 +59,12 @@ export default function AssignWorkerScreen() {
   const [crewJobs, setCrewJobs] = useState<DispatchJob[]>([])
   const [selectedCrewJob, setSelectedCrewJob] = useState<string | null>(null)
   const [selectedCrewWorkers, setSelectedCrewWorkers] = useState<string[]>([])
+  const [selectedCrewLead, setSelectedCrewLead] = useState<string | null>(null)
+  const [stagingCrew, setStagingCrew] = useState(false)
+  // Both client AND server must opt in. Server staging is *always* disabled
+  // with NODE_ENV=production, even if this mobile flag was misconfigured.
+  const allowDevCrewStaging = __DEV__ &&
+    process.env.EXPO_PUBLIC_MAINTAINEX_PHASE04_CREW_STAGING_UI === 'true'
   const [crewReadiness, setCrewReadiness] = useState<CrewReadinessReport | null>(null)
   const [checkingCrew, setCheckingCrew] = useState(false)
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null)
@@ -81,6 +87,7 @@ export default function AssignWorkerScreen() {
     setCrewJobs([])
     setSelectedCrewJob(null)
     setSelectedCrewWorkers([])
+    setSelectedCrewLead(null)
     setCrewReadiness(null)
     try {
       const activeCompanyId = await getActiveCompanyId()
@@ -178,6 +185,7 @@ export default function AssignWorkerScreen() {
 
   const toggleCrewWorker = (workerUserId: string) => {
     invalidateCrewReview()
+    if (selectedCrewLead === workerUserId) setSelectedCrewLead(null)
     setSelectedCrewWorkers(current =>
       current.includes(workerUserId)
         ? current.filter(id => id !== workerUserId)
@@ -214,6 +222,47 @@ export default function AssignWorkerScreen() {
       if (crewRequestVersion.current === requestVersion) setCheckingCrew(false)
     }
   }
+
+  const stageDevCrew = async () => {
+    if (!allowDevCrewStaging || !companyId || !selectedCrewJob || !selectedCrewJobData ||
+        !selectedCrewLead || stagingCrew || !crewReadiness?.preflightReady ||
+        !selectedCrewWorkers.includes(selectedCrewLead) ||
+        selectedCrewWorkers.length !== selectedCrewJobData.workersCount) return
+    setStagingCrew(true)
+    try {
+      await v2Request('/api/mobile/company/crew/roster', {
+        method: 'POST',
+        body: JSON.stringify({
+          companyId,
+          jobId: selectedCrewJob,
+          workerUserIds: [...selectedCrewWorkers],
+          leadWorkerUserId: selectedCrewLead,
+        }),
+      })
+      Alert.alert(
+        'Internal crew staged (development only)',
+        'Worker invitations are now available to test. Crew dispatch, arrival PIN, Start Work and payments remain disabled.',
+        [{ text: 'Review rosters', onPress: () => router.replace('/(company)/(tabs)/dispatch' as any) }],
+      )
+    } catch (error: any) {
+      Alert.alert(
+        'Crew staging not available',
+        error?.message || 'The server or worker eligibility checks blocked this test reservation.',
+      )
+      invalidateCrewReview()
+    } finally {
+      setStagingCrew(false)
+    }
+  }
+
+  const confirmStageDevCrew = () => Alert.alert(
+    'Stage a test-only crew?',
+    'Development environment only. This reserves all selected workers and cannot enable work, PINs or payments.',
+    [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Stage test roster', onPress: () => { void stageDevCrew() } },
+    ],
+  )
 
   const assign = async () => {
     if (!companyId || !selectedWorker || !selectedJob) return
@@ -289,6 +338,7 @@ export default function AssignWorkerScreen() {
                   invalidateCrewReview()
                   setSelectedCrewJob(job.id)
                   setSelectedCrewWorkers([])
+                  setSelectedCrewLead(null)
                 }}
               >
                 <UsersThree size={19} color={v3.colors.ink} />
@@ -318,6 +368,29 @@ export default function AssignWorkerScreen() {
                       : null}
                   </TouchableOpacity>
                 ))}
+                {allowDevCrewStaging && selectedCrewWorkers.length > 0 ? (
+                  <View style={styles.empty}>
+                    <Text style={styles.emptyTitle}>Development-only crew lead</Text>
+                    <Text style={styles.emptyText}>
+                      Select one accepted worker as the named lead.
+                      This is only for staging test invitations.
+                    </Text>
+                    {selectedCrewWorkers.map(workerId => (
+                      <TouchableOpacity key={workerId}
+                        style={[styles.option, selectedCrewLead === workerId && styles.optionActive]}
+                        onPress={() => {
+                          invalidateCrewReview()
+                          setSelectedCrewLead(workerId)
+                        }}>
+                        <UserCircle size={19} color={v3.colors.ink} />
+                        <Text style={styles.optionTitle}>
+                          {workers.find(person => person.userId === workerId)?.name || 'Worker'}
+                          {selectedCrewLead === workerId ? ' · Lead' : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
                 <TouchableOpacity
                   style={[styles.assignButton, checkingCrew && styles.disabled]}
                   disabled={checkingCrew}
@@ -327,6 +400,16 @@ export default function AssignWorkerScreen() {
                     ? <ActivityIndicator size="small" color={v3.colors.paper} />
                     : <Text style={styles.assignText}>Check crew eligibility · preview only</Text>}
                 </TouchableOpacity>
+                {allowDevCrewStaging && crewReadiness?.preflightReady &&
+                  selectedCrewLead && selectedCrewWorkers.includes(selectedCrewLead) &&
+                  selectedCrewWorkers.length === selectedCrewJobData.workersCount ? (
+                    <TouchableOpacity style={[styles.assignButton, stagingCrew && styles.disabled]}
+                      disabled={stagingCrew} onPress={confirmStageDevCrew}>
+                      {stagingCrew
+                        ? <ActivityIndicator size="small" color={v3.colors.paper} />
+                        : <Text style={styles.assignText}>Stage internal test crew · no dispatch</Text>}
+                    </TouchableOpacity>
+                ) : null}
                 {crewReadiness ? (
                   <View style={styles.empty}>
                     <Text style={styles.emptyTitle}>{crewReadiness.preflightReady ? 'Roster eligible (not dispatchable)' : 'Crew readiness blocked'}</Text>

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { acceptStagedCrewMemberInsideTransaction, rejectStagedCrewMemberInsideTransaction } from '@/lib/domain/company-crew-lifecycle'
+import { acceptStagedCrewMemberInsideTransaction, rejectStagedCrewMemberInsideTransaction, cancelStagedCrewInsideTransaction } from '@/lib/domain/company-crew-lifecycle'
 
 const mocks = vi.hoisted(() => ({
   sql: vi.fn(), crewLookup: vi.fn(), company: vi.fn(), slots: vi.fn(),
   update: vi.fn(), blockCrew: vi.fn(), schedule: vi.fn(), eligibility: vi.fn(),
   companyEligibility: vi.fn(), market: vi.fn(), arrival: vi.fn(),
-  mismatch: vi.fn(), audit: vi.fn(),
+  mismatch: vi.fn(), audit: vi.fn(), actor: vi.fn(), pinRevoke: vi.fn(),
 }))
 vi.mock('@/lib/geography/market-engine', () => ({ requireJobMarket: mocks.market }))
 vi.mock('@/lib/phase6/provider-eligibility', () => ({
@@ -14,8 +14,12 @@ vi.mock('@/lib/phase6/provider-eligibility', () => ({
 }))
 vi.mock('@/lib/domain/company-job-assignment', () => ({
   lockAndAssertWorkerScheduleAvailable: mocks.schedule,
+  lockAndAssertAssignmentActorAuthorized: mocks.actor,
 }))
 vi.mock('@/lib/phase6/audit', () => ({ writeCompanyAuditLog: mocks.audit }))
+vi.mock('@/lib/domain/company-crew-pin-revocation', () => ({
+  revokeCrewPinChallengesInsideTransaction: mocks.pinRevoke,
+}))
 vi.mock('@/lib/prisma', () => ({ prisma: {} }))
 
 const tx = {
@@ -184,5 +188,86 @@ describe('Phase 04 — accepting a staged crew slot never authorizes work', () =
     mocks.slots.mockResolvedValue([slots[0]])
     await expect(accept()).rejects.toThrow('incomplete or inconsistent')
     expect(mocks.update).not.toHaveBeenCalled()
+  })
+})
+
+// Cancellation needs the same staging/booking locks and capacity atomicity
+// as acceptance/refusal; it is intentionally not an external dispatch grant.
+describe('Phase 04 — dispatcher terminal crew cancellation', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mocks.crewLookup.mockResolvedValue({ companyId: 'company', jobId: 'booking' })
+    mocks.sql.mockResolvedValueOnce([job]).mockResolvedValueOnce([crew])
+    mocks.slots.mockResolvedValue(slots.map(s => ({ ...s, startedAt: null, crewArrivedAt: null })))
+    mocks.update.mockResolvedValue({ count: 2 })
+    mocks.blockCrew.mockResolvedValue({ count: 1 })
+    mocks.arrival.mockResolvedValue(null)
+  })
+  const cancel = (patch = {}) => cancelStagedCrewInsideTransaction(tx as any, {
+    crewDispatchId: 'crew', companyId: 'company', actorUserId: 'manager', actorRole: 'DISPATCHER',
+    expectedVersion: 1, reason: 'Worker schedules changed', ...patch,
+  })
+
+  it('locks the current manager, releases every slot and advances the crew epoch', async () => {
+    const result = await cancel()
+    expect(result).toEqual({
+      crewDispatchId: 'crew', status: 'CANCELLED', version: 2,
+      releasedWorkersCount: 2, dispatchEnabled: false,
+    })
+    expect(mocks.actor).toHaveBeenCalledWith(tx, 'company', 'manager', 'DISPATCHER')
+    expect(mocks.update).toHaveBeenCalledWith({
+      where: { crewDispatchId: 'crew', status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] } },
+      data: {
+        status: 'REVOKED', revokedAt: expect.any(Date),
+        revokedReason: 'Worker schedules changed',
+      },
+    })
+    expect(mocks.blockCrew).toHaveBeenCalledWith({
+      where: { id: 'crew', status: 'FORMING', version: 1 },
+      data: { status: 'CANCELLED', version: { increment: 1 } },
+    })
+    expect(mocks.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'CREW_ROSTER_CANCEL', actorId: 'manager' }), tx,
+    )
+  })
+
+  it('never releases slots for a demoted dispatcher', async () => {
+    mocks.actor.mockRejectedValue(new Error('Assigning actor is no longer authorized'))
+    await expect(cancel()).rejects.toThrow('no longer authorized')
+    expect(mocks.sql).not.toHaveBeenCalled()
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it('fails closed for stale versions, terminal crews, or a started booking', async () => {
+    mocks.sql.mockReset().mockResolvedValueOnce([job]).mockResolvedValueOnce([{ ...crew, version: 2 }])
+    await expect(cancel()).rejects.toThrow('changed')
+    mocks.sql.mockReset().mockResolvedValueOnce([job]).mockResolvedValueOnce([{ ...crew, status: 'IN_PROGRESS' }])
+    await expect(cancel()).rejects.toThrow('changed')
+    mocks.sql.mockReset().mockResolvedValueOnce([{ ...job, status: 'IN_PROGRESS' }]).mockResolvedValueOnce([crew])
+    await expect(cancel()).rejects.toThrow('changed')
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it('preserves customer safety evidence and refuses an arrival or PIN', async () => {
+    mocks.arrival.mockResolvedValueOnce({ id: 'arrival' })
+    await expect(cancel()).rejects.toThrow('arrival evidence')
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses any partially changed roster or partial database claim', async () => {
+    mocks.slots.mockResolvedValue([{ ...slots[0], startedAt: new Date(), crewArrivedAt: null },
+      { ...slots[1], startedAt: null, crewArrivedAt: null }])
+    await expect(cancel()).rejects.toThrow('not safe to cancel')
+    expect(mocks.update).not.toHaveBeenCalled()
+    mocks.slots.mockResolvedValue(slots.map(s => ({ ...s, startedAt: null, crewArrivedAt: null })))
+    mocks.sql.mockReset().mockResolvedValueOnce([job]).mockResolvedValueOnce([crew])
+    mocks.update.mockResolvedValue({ count: 1 })
+    await expect(cancel()).rejects.toThrow('changed during cancellation')
+    expect(mocks.blockCrew).not.toHaveBeenCalled()
+  })
+
+  it('rejects invalid reason before looking up a crew', async () => {
+    await expect(cancel({ reason: 'x'.repeat(251) })).rejects.toMatchObject({ status: 400 })
+    expect(mocks.crewLookup).not.toHaveBeenCalled()
   })
 })

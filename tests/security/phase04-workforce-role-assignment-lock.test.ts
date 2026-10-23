@@ -6,6 +6,7 @@ const mock = vi.hoisted(() => ({
   memberLocked: vi.fn(),
   memberUpdate: vi.fn(),
   countAssignments: vi.fn(),
+  crewHeld: vi.fn(),
   lock: vi.fn(),
   audit: vi.fn(),
 }))
@@ -29,7 +30,7 @@ vi.mock('@/lib/prisma', () => ({
     $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({
       $queryRaw: mock.lock,
       teamMember: { findUnique: mock.memberLocked, update: mock.memberUpdate },
-      companyJobAssignment: { count: mock.countAssignments },
+      companyJobAssignment: { count: mock.countAssignments, findMany: mock.crewHeld },
     }),
   },
 }))
@@ -58,6 +59,7 @@ describe('Phase 04 — changing a company worker role never strands an active as
     mock.memberLocked.mockResolvedValue({ role: 'WORKER', status: 'ACTIVE' })
     mock.memberUpdate.mockResolvedValue({ role: 'FINANCE' })
     mock.countAssignments.mockResolvedValue(0)
+    mock.crewHeld.mockResolvedValue([])
     mock.lock.mockImplementation(async (strings: TemplateStringsArray) => {
       const sql = strings.join(' ')
       if (sql.includes('FROM "User"')) return [{ isActive: true, isSuspended: false, isBanned: false }]
@@ -83,6 +85,10 @@ describe('Phase 04 — changing a company worker role never strands an active as
   it('allows a completed and unassigned worker to change roles', async () => {
     const response = await changeRole()
     expect(response.status).toBe(200)
+    expect(mock.crewHeld).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ workerUserId: 'worker',
+        status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] } }),
+    }))
     expect(mock.memberUpdate).toHaveBeenCalledWith({
       where: { id: 'member' }, data: { role: 'FINANCE' },
     })

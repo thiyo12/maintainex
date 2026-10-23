@@ -15,6 +15,7 @@ import JobLifecycleTracker from '@/components/ui/JobLifecycleTracker'
 import { emit, removedJobs } from '@/lib/events'
 import NewChatModal from '@/features/messaging/components/NewChatModal'
 import JobSafetyCentre from '@/features/safety/components/JobSafetyCentre'
+import CustomerCrewIdentityPanel from '@/features/jobs/components/CustomerCrewIdentityPanel'
 import { currencyForJobCountry, parseCounterofferAmount, quoteMatchesJobCurrency } from '@/lib/market-currency'
 
 function usePulse() {
@@ -500,8 +501,15 @@ export default function V2JobDetailScreen() {
           </View>
         )}
 
+        {/* ─── Phase04 crew identity: every member, never a shared PIN ─── */}
+        {(job.workersCount ?? 1) > 1 && job.status === 'QUOTE_ACCEPTED' ? (
+          <CustomerCrewIdentityPanel jobId={job.id} />
+        ) : null}
+
         {/* ─── Action Cards ─── */}
-        {(job.status === 'QUOTE_ACCEPTED' && escrow?.status === 'PENDING_PAYMENT') || (job.status === 'IN_PROGRESS' && !escrow) ? (
+        {(job.workersCount ?? 1) === 1 &&
+          ((job.status === 'QUOTE_ACCEPTED' && escrow?.status === 'PENDING_PAYMENT') ||
+           (job.status === 'IN_PROGRESS' && !escrow)) ? (
           <View style={styles.actionCard}>
             <View style={styles.actionIconCircle}>
               <Lock size={28} color={colors.ink} weight="fill" />
@@ -536,7 +544,7 @@ export default function V2JobDetailScreen() {
           </View>
         )}
 
-        {workspace?.progressStatus === 'ACCEPTED' && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) && (
+        {(job.workersCount ?? 1) === 1 && workspace?.progressStatus === 'ACCEPTED' && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) && (
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
@@ -587,7 +595,7 @@ export default function V2JobDetailScreen() {
         )}
 
         {/* ─── Job PIN ─── */}
-        {(job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS') && (
+        {(job.workersCount ?? 1) === 1 && (job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS') && (
           <TouchableOpacity
             style={[styles.linkBtn, { borderColor: colors.amber }]}
             onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}

@@ -8,6 +8,7 @@ const db = vi.hoisted(() => ({
   target: vi.fn(),
   ownerCount: vi.fn(),
   assignmentCount: vi.fn(),
+  crewHeld: vi.fn(),
   remove: vi.fn(),
   audit: vi.fn(),
 }))
@@ -36,7 +37,7 @@ vi.mock('@/lib/prisma', () => ({
         count: db.ownerCount,
         updateMany: db.remove,
       },
-      companyJobAssignment: { count: db.assignmentCount },
+      companyJobAssignment: { count: db.assignmentCount, findMany: db.crewHeld },
     }),
   },
 }))
@@ -73,6 +74,7 @@ describe('Phase 04 — member removal is serialized with workforce assignment an
     })
     db.ownerCount.mockResolvedValue(2)
     db.assignmentCount.mockResolvedValue(0)
+    db.crewHeld.mockResolvedValue([])
     db.remove.mockResolvedValue({ count: 1 })
   })
 
@@ -88,6 +90,10 @@ describe('Phase 04 — member removal is serialized with workforce assignment an
         status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
       },
     })
+    expect(db.crewHeld).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ workerUserId: 'worker-user',
+        status: { in: ['CREW_RESERVED', 'CREW_ACCEPTED'] } }),
+    }))
     expect(db.remove).toHaveBeenCalledWith({
       where: {
         id: 'worker-member', companyId: 'company',
