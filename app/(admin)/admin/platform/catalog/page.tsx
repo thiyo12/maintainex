@@ -32,11 +32,7 @@ import {
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 import { crmApiError } from '@/lib/crm/api-error'
 
-<<<<<<< HEAD
 type Tab = 'services' | 'categories' | 'templates' | 'v2jobs' | 'v2categories'
-=======
-type Tab = 'services' | 'categories' | 'templates' | 'v2jobs'
->>>>>>> 8e3fd77f (feat(crm): manage the canonical V2 catalogue from the existing screen)
 type CreateType = 'category' | 'service' | 'jobCategory' | 'templateJob'
 
 const LABEL: Record<CreateType, string> = {
@@ -103,18 +99,6 @@ interface Payload {
     countries: string[]
     isActive: boolean
     _count?: { jobs: number; serviceTemplates: number }
-  }>
-  // Canonical V2 catalogue. These are the records the website and mobile apps read.
-  templateJobs: Array<{
-    id: string
-    categoryId: string
-    name: string
-    description: string
-    currency: string
-    priceMin: number
-    priceMax: number
-    countries: string[]
-    isActive: boolean
   }>
   // Canonical V2 catalogue. These are the records the website and mobile apps read.
   templateJobs: Array<{
@@ -213,17 +197,12 @@ export default function CatalogManagementPage() {
         categories: body.categories || [],
         services: body.services || [],
         templates: body.templates || [],
-<<<<<<< HEAD
         jobCategories: Array.isArray(body.jobCategories)
           ? body.jobCategories.map((item: any) => ({ ...item, countries: readMarkets(item.countries) }))
           : [],
         templateJobs: Array.isArray(body.templateJobs)
           ? body.templateJobs.map((item: any) => ({ ...item, countries: readMarkets(item.countries) }))
           : [],
-=======
-        jobCategories: body.jobCategories || [],
-        templateJobs: body.templateJobs || [],
->>>>>>> 8e3fd77f (feat(crm): manage the canonical V2 catalogue from the existing screen)
       })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load catalog')
@@ -247,10 +226,7 @@ export default function CatalogManagementPage() {
       tab === 'services' ? data.services :
       tab === 'categories' ? data.categories :
       tab === 'v2jobs' ? data.templateJobs :
-<<<<<<< HEAD
       tab === 'v2categories' ? data.jobCategories :
-=======
->>>>>>> 8e3fd77f (feat(crm): manage the canonical V2 catalogue from the existing screen)
       data.templates
 
     const normalized = query.trim().toLowerCase()
@@ -499,10 +475,7 @@ export default function CatalogManagementPage() {
             { id: 'categories', label: 'Categories', count: data.categories.length },
             { id: 'templates', label: 'Templates', count: data.templates.length },
             { id: 'v2jobs', label: 'V2 jobs', count: data.templateJobs.length },
-<<<<<<< HEAD
             { id: 'v2categories', label: 'V2 categories', count: data.jobCategories.length },
-=======
->>>>>>> 8e3fd77f (feat(crm): manage the canonical V2 catalogue from the existing screen)
           ]}
           active={tab}
           onChange={id => setTab(id as Tab)}
@@ -533,20 +506,12 @@ export default function CatalogManagementPage() {
           title={
             tab === 'services' ? 'Services (legacy)' :
             tab === 'categories' ? 'Categories (legacy)' :
-<<<<<<< HEAD
             tab === 'v2jobs' ? 'V2 catalogue jobs' :
             tab === 'v2categories' ? 'V2 job categories' : 'Service templates'
           }
           description={
             tab === 'v2jobs' || tab === 'v2categories'
               ? 'Canonical JobCategory and TemplateJob records used by the website and mobile apps.'
-=======
-            tab === 'v2jobs' ? 'V2 catalogue jobs' : 'Service templates'
-          }
-          description={
-            tab === 'v2jobs'
-              ? 'Canonical JobCategory and TemplateJob records. These are what the website and mobile apps read.'
->>>>>>> 8e3fd77f (feat(crm): manage the canonical V2 catalogue from the existing screen)
               : 'Current market-scoped catalog records.'
           }
         >
@@ -566,10 +531,7 @@ export default function CatalogManagementPage() {
                   tab === 'services' ? 'service' :
                   tab === 'categories' ? 'category' :
                   tab === 'v2jobs' ? 'templateJob' :
-<<<<<<< HEAD
                   tab === 'v2categories' ? 'jobCategory' :
-=======
->>>>>>> 8e3fd77f (feat(crm): manage the canonical V2 catalogue from the existing screen)
                   'template'
 
                 const detail =
@@ -579,13 +541,9 @@ export default function CatalogManagementPage() {
                       ? `${item._count?.services || 0} services · order ${item.displayOrder ?? 0}`
                       : tab === 'v2jobs'
                         ? `${item.currency || ''} ${item.priceMin ?? 0}–${item.priceMax ?? 0} · ${(item.countries || []).join('/') || 'No market'} · canonical V2 job`
-<<<<<<< HEAD
                         : tab === 'v2categories'
                           ? `${item._count?.jobs ?? 0} V2 jobs · ${item._count?.serviceTemplates ?? 0} service templates`
                           : `${item.jobCategory?.name || 'No job category'} · ${String(item.pricingMode || 'UNSET').replaceAll('_', ' ')}`
-=======
-                        : `${item.jobCategory?.name || 'No job category'} · ${String(item.pricingMode || 'UNSET').replaceAll('_', ' ')}`
->>>>>>> 8e3fd77f (feat(crm): manage the canonical V2 catalogue from the existing screen)
 
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/70">
