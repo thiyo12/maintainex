@@ -7,6 +7,7 @@ import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { isCashPaymentAvailableForMarket } from '@/lib/finance/payments/provider-registry'
 import { resolvePaymentMarketForIntent } from '@/lib/finance/payments/payment-service'
 import { minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
+import { decideCashCollectionReport } from '@/lib/finance/payments/cash-collection-state'
 
 type CollectionAction = 'REPORT' | 'CONFIRM' | 'CONTEST'
 
@@ -78,7 +79,6 @@ export async function POST(
         return NextResponse.json({ error: 'amountMinor must be a non-negative integer string' }, { status: 400 })
       }
       amountMinor = BigInt(raw)
-      if (amountMinor <= 0n) return NextResponse.json({ error: 'Reported cash must be greater than zero' }, { status: 400 })
       if (amountMinor > escrow.totalAmount) {
         return NextResponse.json({ error: 'Reported cash cannot exceed the accepted invoice total' }, { status: 400 })
       }
@@ -87,23 +87,41 @@ export async function POST(
     const updated = await prisma.$transaction(async tx => {
       const currentEscrow = await tx.jobEscrow.findUnique({
         where: { id: escrow.id },
-        select: { cashCollectionStatus: true, cashCollectedMinor: true, cashReportedBy: true },
+        select: { status: true, cashCollectionStatus: true, cashCollectedMinor: true, cashReportedBy: true },
       })
       const current = currentEscrow?.cashCollectionStatus || null
       if (!currentEscrow || !current) throw new Error('CASH_COLLECTION_NOT_FOUND')
+      if (action === 'REPORT' && currentEscrow.status === 'RELEASED') {
+        throw new Error('CASH_COLLECTION_AFTER_RELEASE_REQUIRES_RECONCILIATION')
+      }
 
       // Retries after a lost response return the existing attestation without
       // duplicating lifecycle events or changing the reported amount.
+      const reportDecision = action === 'REPORT'
+        ? decideCashCollectionReport({
+          status: current,
+          previousAmountMinor: currentEscrow.cashCollectedMinor,
+          reportedAmountMinor: amountMinor!,
+          sameReporter: currentEscrow.cashReportedBy === actor.id,
+        })
+        : null
       if (
-        (action === 'REPORT' && current === 'PROVIDER_REPORTED' && currentEscrow.cashReportedBy === actor.id && currentEscrow.cashCollectedMinor === amountMinor) ||
+        (action === 'REPORT' && reportDecision === 'RETRY') ||
         (action === 'CONFIRM' && current === 'CUSTOMER_CONFIRMED') ||
         (action === 'CONTEST' && current === 'CONTESTED')
       ) return tx.jobEscrow.findUniqueOrThrow({ where: { id: escrow.id } })
 
       if (action === 'REPORT') {
-        if (!['NOT_REPORTED', 'CONTESTED'].includes(current)) throw new Error(current === 'CUSTOMER_CONFIRMED' ? 'CASH_COLLECTION_ALREADY_CONFIRMED' : 'CASH_COLLECTION_AWAITING_CUSTOMER')
+        if (reportDecision !== 'ACCEPT') {
+          throw new Error(current === 'PROVIDER_REPORTED' ? 'CASH_COLLECTION_AWAITING_CUSTOMER' : 'CASH_COLLECTION_REPORT_MUST_INCREASE')
+        }
         const claimed = await tx.jobEscrow.updateMany({
-          where: { id: escrow.id, cashCollectionStatus: current },
+          where: {
+            id: escrow.id,
+            status: currentEscrow.status,
+            cashCollectionStatus: current,
+            cashCollectedMinor: currentEscrow.cashCollectedMinor,
+          },
           data: {
             cashCollectedMinor: amountMinor!,
             cashCollectionStatus: 'PROVIDER_REPORTED',
@@ -148,7 +166,7 @@ export async function POST(
       currency,
       commissionRecorded: false,
       message: action === 'REPORT'
-        ? 'Cash amount reported. It is not treated as paid until you confirm it.'
+        ? 'Cumulative cash received to date was reported. It is not treated as paid until you confirm it.'
         : action === 'CONFIRM'
           ? 'Cash amount confirmed. Commission is recorded only after work is accepted.'
           : 'Cash amount contested. No commission was recorded; raise a dispute if needed.',

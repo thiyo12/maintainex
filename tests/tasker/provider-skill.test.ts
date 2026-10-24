@@ -1,30 +1,37 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
+import { randomUUID } from 'node:crypto'
 import { addTaskerProfessionSkill } from '../../lib/profession'
 
 const prisma = new PrismaClient()
+const fixture = randomUUID()
+const professionSlug = `test-skill-fk-prof-${fixture}`
+const professionI18nKey = `professions.testSkillFkProf-${fixture}`
+const skillSlug = `test-skill-fk-${fixture}`
+const skillI18nKey = `skills.test-skill-fk-prof.testSkillFk-${fixture}`
 
 describe('Phase 10.1 — Provider Skill Domain Integrity', () => {
   let professionId: string
   let skillId: string
   let taskerProfileId: string
   let taskerProfessionId: string
+  let otherProfessionId: string
 
   beforeAll(async () => {
     const prof = await prisma.profession.upsert({
-      where: { slug: 'test-skill-fk-prof' },
+      where: { slug: professionSlug },
       update: {},
-      create: { slug: 'test-skill-fk-prof', i18nKey: 'professions.testSkillFkProf' },
+      create: { slug: professionSlug, i18nKey: professionI18nKey },
     })
     professionId = prof.id
 
     const skill = await prisma.professionSkill.upsert({
-      where: { professionId_slug: { professionId, slug: 'test-skill-fk' } },
+      where: { professionId_slug: { professionId, slug: skillSlug } },
       update: {},
       create: {
         professionId,
-        slug: 'test-skill-fk',
-        i18nKey: 'skills.test-skill-fk-prof.testSkillFk',
+        slug: skillSlug,
+        i18nKey: skillI18nKey,
       },
     })
     skillId = skill.id
@@ -34,10 +41,16 @@ describe('Phase 10.1 — Provider Skill Domain Integrity', () => {
   })
 
   afterAll(async () => {
-    await prisma.taskerProfessionSkill.deleteMany({ where: { taskerProfession: { profession: { slug: { startsWith: 'test-' } } } } })
-    await prisma.taskerProfession.deleteMany({ where: { profession: { slug: { startsWith: 'test-' } } } })
-    await prisma.professionSkill.deleteMany({ where: { profession: { slug: { startsWith: 'test-' } } } })
-    await prisma.profession.deleteMany({ where: { slug: { startsWith: 'test-' } } })
+    if (professionId) {
+      await prisma.taskerProfessionSkill.deleteMany({ where: { taskerProfession: { professionId } } })
+      await prisma.taskerProfession.deleteMany({ where: { professionId } })
+      await prisma.professionSkill.deleteMany({ where: { professionId } })
+      await prisma.profession.deleteMany({ where: { id: professionId } })
+    }
+    if (otherProfessionId) {
+      await prisma.professionSkill.deleteMany({ where: { professionId: otherProfessionId } })
+      await prisma.profession.deleteMany({ where: { id: otherProfessionId } })
+    }
     await prisma.$disconnect()
   })
 
@@ -67,17 +80,18 @@ describe('Phase 10.1 — Provider Skill Domain Integrity', () => {
 
     // Create a skill in a different profession
     const otherProf = await prisma.profession.upsert({
-      where: { slug: 'test-other-prof' },
+      where: { slug: `${professionSlug}-other` },
       update: {},
-      create: { slug: 'test-other-prof', i18nKey: 'professions.testOtherProf' },
+      create: { slug: `${professionSlug}-other`, i18nKey: `${professionI18nKey}Other` },
     })
+    otherProfessionId = otherProf.id
     const otherSkill = await prisma.professionSkill.upsert({
-      where: { professionId_slug: { professionId: otherProf.id, slug: 'test-other-skill' } },
+      where: { professionId_slug: { professionId: otherProf.id, slug: `${skillSlug}-other` } },
       update: {},
       create: {
         professionId: otherProf.id,
-        slug: 'test-other-skill',
-        i18nKey: 'skills.test-other-prof.testOtherSkill',
+        slug: `${skillSlug}-other`,
+        i18nKey: `${skillI18nKey}Other`,
       },
     })
 

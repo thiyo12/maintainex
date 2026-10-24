@@ -95,6 +95,10 @@ describe('cash payment lifecycle contract', () => {
     expect(collectionRoute).toContain("'REPORT', 'CONFIRM', 'CONTEST'")
     expect(collectionRoute).toContain("action === 'CONFIRM' ? 'CUSTOMER_CONFIRMED' : 'CONTESTED'")
     expect(collectionRoute).toContain('Only the customer can confirm or contest')
+    expect(collectionRoute).toContain('decideCashCollectionReport')
+    expect(collectionRoute).toContain('cashCollectedMinor: currentEscrow.cashCollectedMinor')
+    expect(collectionRoute).toContain('CASH_COLLECTION_AFTER_RELEASE_REQUIRES_RECONCILIATION')
+    expect(collectionRoute).not.toContain('amountMinor <= 0n')
   })
 
   it('does not auto-release cash jobs without explicit customer/admin approval', () => {

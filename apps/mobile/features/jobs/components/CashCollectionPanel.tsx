@@ -43,10 +43,6 @@ export default function CashCollectionPanel({ jobId, role, jobStatus, escrow, on
         }
         const [whole, fraction = ''] = normalized.split('.')
         amountMinor = (BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'))).toString()
-        if (BigInt(amountMinor) <= 0n) {
-          setError('Enter an amount greater than zero.')
-          return
-        }
         if (Number(amountMinor) / 100 > (escrow.totalAmount || 0)) {
           setError('Reported cash cannot exceed the accepted invoice total.')
           return
@@ -66,7 +62,7 @@ export default function CashCollectionPanel({ jobId, role, jobStatus, escrow, on
   const statusText: Record<string, string> = {
     NOT_REPORTED: 'Cash collection has not been reported.',
     PROVIDER_REPORTED: 'Provider reported cash received. Waiting for your confirmation.',
-    CUSTOMER_CONFIRMED: 'Cash amount confirmed by the customer.',
+    CUSTOMER_CONFIRMED: 'Cash total confirmed by the customer. Later collections can be reported as a new cumulative total.',
     CONTESTED: 'Cash amount is contested. No commission has been recorded.',
   }
 
@@ -75,9 +71,9 @@ export default function CashCollectionPanel({ jobId, role, jobStatus, escrow, on
       <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700' }}>Cash collection · {currency}</Text>
       <Text style={{ color: colors.textSecondary || colors.text, fontSize: 14 }}>{statusText[status] || 'Cash collection status needs review.'}</Text>
       {reported !== null && <Text style={{ color: colors.text, fontSize: 15 }}>Reported: {money(reported, currency)}</Text>}
-      {role === 'provider' && ['NOT_REPORTED', 'PROVIDER_REPORTED', 'CONTESTED'].includes(status) && (
+      {role === 'provider' && ['NOT_REPORTED', 'PROVIDER_REPORTED', 'CUSTOMER_CONFIRMED', 'CONTESTED'].includes(status) && (
         <>
-          <Text style={{ color: colors.textSecondary || colors.text, fontSize: 13 }}>Enter the amount actually collected. This report alone does not confirm payment.</Text>
+          <Text style={{ color: colors.textSecondary || colors.text, fontSize: 13 }}>Enter the cumulative cash received to date, including earlier collections. Use 0 if no cash was collected. This report alone does not confirm payment.</Text>
           <TextInput
             accessibilityLabel={`Cash collected in ${currency}`}
             keyboardType="decimal-pad"
