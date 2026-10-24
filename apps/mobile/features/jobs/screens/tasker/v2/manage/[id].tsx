@@ -14,6 +14,7 @@ import { getAuthToken } from '@/api/token'
 import NewChatModal from '@/features/messaging/components/NewChatModal'
 import * as Location from 'expo-location'
 import JobSafetyCentre from '@/features/safety/components/JobSafetyCentre'
+import CashCollectionPanel from '@/features/jobs/components/CashCollectionPanel'
 
 export default function V2ProviderManageJobScreen() {
   const { t } = useTranslation()
@@ -209,7 +210,7 @@ export default function V2ProviderManageJobScreen() {
   const isCompleted = job.status === 'COMPLETED' || progressStatus === 'COMPLETED'
   const canDispute = job.status !== 'COMPLETED' && job.status !== 'CANCELLED'
   const canOtpCancel = isAccepted && ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)
-  const paymentReady = ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status)
+  const paymentReady = ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow?.status)
 
   const customerName = job.customer?.name || 'Customer'
   const customerInitial = customerName.trim().charAt(0).toUpperCase() || 'C'
@@ -339,6 +340,8 @@ export default function V2ProviderManageJobScreen() {
                 </View>
               </View>
             ) : null}
+
+            <CashCollectionPanel jobId={id} role="provider" jobStatus={job?.status || ''} escrow={escrow} onUpdated={loadJob} />
 
             {!locationSharing ? (
               <TouchableOpacity style={styles.primaryAction} activeOpacity={0.78} onPress={startLocationSharing}>

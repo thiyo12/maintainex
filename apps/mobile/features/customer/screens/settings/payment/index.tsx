@@ -1,55 +1,60 @@
 import { useEffect, useState } from 'react'
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Bank, CreditCard, Money, Plus, Wallet } from 'phosphor-react-native'
-import { useRouter } from 'expo-router'
-import { v3 } from '@/theme/v3/tokens'
+import { CreditCard, Money } from 'phosphor-react-native'
 import V3PageHeader from '@/components/v3/V3PageHeader'
-import { v2Payments } from '@/api/v2-payments'
 import { V3SectionLabel, V3SettingsCard, V3SettingsRow } from '@/components/v3/V3SettingsUI'
+import { v2Payments } from '@/api/v2-payments'
+import { v3 } from '@/theme/v3/tokens'
 
-export default function PaymentScreen() {
-  const router = useRouter()
-  // Online checkout availability is a server contract. A deployment without a
-  // configured online provider must not advertise a PayPal option.
-  const [onlinePaymentAvailable, setOnlinePaymentAvailable] = useState(true)
+export default function CustomerPaymentSettingsScreen() {
+  const [onlineAvailable, setOnlineAvailable] = useState<boolean | null>(null)
+  const [availabilityFailed, setAvailabilityFailed] = useState(false)
 
   useEffect(() => {
-    v2Payments
-      .availability()
-      .then(res => setOnlinePaymentAvailable(Boolean(res?.onlinePaymentAvailable)))
-      .catch(() => setOnlinePaymentAvailable(false))
+    let active = true
+    v2Payments.availability()
+      .then(result => active && setOnlineAvailable(result.onlinePaymentAvailable))
+      .catch(() => active && setAvailabilityFailed(true))
+    return () => { active = false }
   }, [])
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <V3PageHeader title="Payments" subtitle="Choose how you want to secure eligible bookings." />
+      <V3PageHeader title="Payments" subtitle="See eligible options when you confirm a booking." />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <V3SectionLabel>Payment methods</V3SectionLabel>
+        <V3SectionLabel>Booking payment options</V3SectionLabel>
         <V3SettingsCard>
           <V3SettingsRow
             icon={CreditCard}
-            title="PayPal online checkout"
-            subtitle={onlinePaymentAvailable ? 'Pay securely with PayPal for eligible online payments' : 'Online checkout is not configured for this deployment'}
-            value={onlinePaymentAvailable ? 'Online' : 'Unavailable'}
-            onPress={() =>
-              onlinePaymentAvailable
-                ? Alert.alert('PayPal', 'PayPal checkout opens when you confirm an eligible booking.')
-                : Alert.alert('Online payment unavailable', 'Online checkout is not configured. Cash payment remains available for eligible bookings.')
-            }
+            title="Online checkout"
+            subtitle={availabilityFailed
+              ? 'Availability could not be checked. Try again from the booking.'
+              : onlineAvailable === null
+                ? 'Checking current availability…'
+                : onlineAvailable
+                  ? 'Shown only when the booking market and provider are supported'
+                  : 'Not enabled for this deployment'}
+            value={availabilityFailed || onlineAvailable === null ? 'Unknown' : onlineAvailable ? 'Where eligible' : 'Unavailable'}
           />
-          <V3SettingsRow icon={Money} title="Cash" subtitle="Available for eligible jobs" value="Eligible" onPress={() => Alert.alert('Cash', 'Cash is shown only when the selected job supports it.')} />
-          <V3SettingsRow icon={Wallet} title="MX Wallet" subtitle="Balance, top ups and refunds" onPress={() => router.push('/(customer)/wallet' as any)} />
-          <V3SettingsRow icon={Bank} title="Payout / refund destination" subtitle="Manage where eligible refunds are returned" onPress={() => Alert.alert('Refund destination', 'Refund destination management is being connected to the payment provider.')} last />
+          <V3SettingsRow
+            icon={Money}
+            title="Cash"
+            subtitle="Only offered for eligible Sri Lankan bookings. Choosing cash does not confirm that money was received."
+            value="Check booking"
+            last
+          />
         </V3SettingsCard>
-
-        <TouchableOpacity activeOpacity={0.8} style={styles.primary} onPress={() => Alert.alert('Add payment method', 'Payment-provider setup is not enabled yet.')}>
-          <Plus size={18} color={v3.colors.paper} weight="bold" />
-          <Text style={styles.primaryText}>Add payment method</Text>
-        </TouchableOpacity>
-
+        {onlineAvailable === null && !availabilityFailed && (
+          <View style={styles.loading} accessibilityRole="progressbar">
+            <ActivityIndicator color={v3.colors.ink} />
+          </View>
+        )}
         <View style={styles.note}>
-          <Text style={styles.noteTitle}>Protected checkout</Text>
-          <Text style={styles.noteText}>MaintainEX shows the final amount, service fee and protection status before you confirm payment.</Text>
+          <Text style={styles.noteTitle}>No saved payment methods</Text>
+          <Text style={styles.noteText}>
+            Saved cards and bank accounts are not connected. Payment, refund and cash-collection status is shown on each booking from its verified record.
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -59,8 +64,7 @@ export default function PaymentScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: v3.colors.canvas },
   content: { paddingHorizontal: 18, paddingBottom: 36 },
-  primary: { marginTop: 16, height: 54, borderRadius: 16, backgroundColor: v3.colors.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  primaryText: { fontFamily: 'Outfit_700Bold', fontSize: 15, color: v3.colors.paper },
+  loading: { alignItems: 'center', padding: 16 },
   note: { marginTop: 16, padding: 16, borderRadius: 18, backgroundColor: v3.colors.amberSoft },
   noteTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 14, color: v3.colors.ink },
   noteText: { marginTop: 4, fontFamily: 'Outfit_400Regular', fontSize: 12, lineHeight: 18, color: v3.colors.textSecondary },

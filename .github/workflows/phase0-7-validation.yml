@@ -100,97 +100,14 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
-      - name: Bootstrap isolated DB from immutable production baseline
-        run: |
-          # Generate baseline from current schema (creates ALL 150 tables)
-          npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > /tmp/baseline.sql
-          npx prisma db execute --file /tmp/baseline.sql --schema prisma/schema.prisma
-          # Resolve ALL directory migrations as applied (baseline already created full schema)
-          for dir in prisma/migrations/*/; do
-            name=$(basename "$dir")
-            npx prisma migrate resolve --applied "$name" 2>&1 | grep -E "marked|Error" || true
-          done
-
-      - name: Restore raw production invariants omitted by Prisma schema baseline
-        run: |
-          psql "$DATABASE_URL" <<'SQL'
-          ALTER TABLE "ProviderOpportunity"
-            DROP CONSTRAINT IF EXISTS "ProviderOpportunity_xor_provider";
-          ALTER TABLE "ProviderOpportunity"
-            ADD CONSTRAINT "ProviderOpportunity_xor_provider"
-            CHECK (
-              ("taskerId" IS NOT NULL AND "companyId" IS NULL)
-              OR
-              ("taskerId" IS NULL AND "companyId" IS NOT NULL)
-            );
-
-          CREATE UNIQUE INDEX IF NOT EXISTS "JobVerificationPin_one_active_per_job"
-            ON "JobVerificationPin"("jobId")
-            WHERE "status" = 'ACTIVE';
-
-          CREATE OR REPLACE FUNCTION check_job_review_owner()
-          RETURNS TRIGGER AS $review_owner$
-          BEGIN
-            IF NOT EXISTS (
-              SELECT 1 FROM "MarketplaceJob"
-              WHERE id = NEW."jobId" AND "customerId" = NEW."customerId"
-            ) THEN
-              RAISE EXCEPTION 'Customer does not own this job';
-            END IF;
-            RETURN NEW;
-          END;
-          $review_owner$ LANGUAGE plpgsql;
-
-          DROP TRIGGER IF EXISTS trg_job_review_owner_check ON "JobReview";
-          CREATE TRIGGER trg_job_review_owner_check
-            BEFORE INSERT ON "JobReview"
-            FOR EACH ROW EXECUTE FUNCTION check_job_review_owner();
-
-          CREATE UNIQUE INDEX IF NOT EXISTS "CompanyJobAssignment_active_per_job_idx"
-            ON "CompanyJobAssignment"("jobId")
-            WHERE "status" IN ('ASSIGNED', 'ACCEPTED', 'IN_PROGRESS');
-
-          -- The Prisma-generated CI baseline omits custom SQL CHECK constraints
-          -- and partial indexes. Mirror only the additive Phase04 challenge
-          -- invariants so isolated CI matches the actual migration.
-          ALTER TABLE "CompanyCrewPinChallenge"
-            ADD CONSTRAINT "CompanyCrewPinChallenge_epoch_check"
-              CHECK ("crewVersion" >= 1 AND "challengeVersion" >= 1),
-            ADD CONSTRAINT "CompanyCrewPinChallenge_purpose_check"
-              CHECK ("purpose" IN ('ARRIVAL', 'WORK_START')),
-            ADD CONSTRAINT "CompanyCrewPinChallenge_attempt_check"
-              CHECK ("failedAttempts" BETWEEN 0 AND 5),
-            ADD CONSTRAINT "CompanyCrewPinChallenge_digest_check"
-              CHECK ("pinDigest" ~ '^[a-f0-9]{64}$'),
-            ADD CONSTRAINT "CompanyCrewPinChallenge_expiry_check"
-              CHECK ("expiresAt" > "createdAt"),
-            ADD CONSTRAINT "CompanyCrewPinChallenge_terminal_check"
-              CHECK ("consumedAt" IS NULL OR "revokedAt" IS NULL);
-
-          CREATE UNIQUE INDEX IF NOT EXISTS "CrewPinChallenge_one_live_idx"
-            ON "CompanyCrewPinChallenge"
-              ("crewDispatchId", "crewVersion", "assignmentId", "purpose")
-            WHERE "consumedAt" IS NULL AND "revokedAt" IS NULL;
-
-          -- CI bootstraps a Prisma-generated schema rather than replaying raw
-          -- migrations. Restore the two additive witness CHECK invariants.
-          ALTER TABLE "CompanyCrewPresenceWitness"
-            ADD CONSTRAINT "CrewPresenceWitness_positive_epoch_check"
-              CHECK ("crewVersion" >= 1),
-            ADD CONSTRAINT "CrewPresenceWitness_nonempty_check"
-              CHECK ("workerAttestedAt" IS NOT NULL OR "customerAttestedAt" IS NOT NULL);
-
-          CREATE UNIQUE INDEX IF NOT EXISTS "JobQuote_one_pending_per_provider_job"
-            ON "JobQuote"("jobId", "providerId")
-            WHERE status = 'PENDING';
-
-          CREATE UNIQUE INDEX IF NOT EXISTS "PaymentIntent_one_active_per_job"
-            ON "PaymentIntent"("jobId")
-            WHERE status IN ('CREATED', 'PENDING');
-          SQL
+      - name: Bootstrap isolated PostgreSQL from the checked-in baseline procedure
+        run: bash scripts/bootstrap-fresh-database.sh
 
       - name: Verify migration deploy is no-op
         run: npx prisma migrate deploy
+
+      - name: Verify additive commission bank migration on isolated prior-schema fixture
+        run: bash scripts/test-commission-bank-migration.sh
 
       - name: Verify Phase 8 migration columns exist in PostgreSQL
         run: |

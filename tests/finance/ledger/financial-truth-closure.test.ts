@@ -44,7 +44,7 @@ describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {
 
   it('cash lifecycle records no fake escrow/wallet money and delegates to canonical receivable accounting', () => {
     expect(cash).toContain('confirmCashPayment')
-    expect(cash).toContain("status: 'CASH_CONFIRMED'")
+    expect(cash).toContain("status: 'CASH_SELECTED'")
     expect(cash).not.toContain('providerWallet.upsert(')
     expect(lifecycle).toContain('recordCashPlatformReceivable')
     expect(lifecycle).toContain("paymentMethod === 'CASH'")
@@ -101,11 +101,12 @@ describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {
     expect(ledger).toContain('randomUUID')
   })
 
-  it('payout reserves, clears externally, and restores on failure/cancel', () => {
+  it('payout reserves, blocks unverified external success, and restores on failure/cancel', () => {
     expect(payout).toContain("referenceType: 'WITHDRAWAL_RESERVED'")
     expect(payout).toContain("accountType: 'PAYOUT_CLEARING'")
-    expect(payout).toContain("referenceType: 'PAYOUT_SUCCEEDED'")
-    expect(payout).toContain("accountType: 'EXTERNAL_PAYOUT'")
+    expect(payout).toContain("code: 'PAYOUT_EXTERNAL_EVIDENCE_REQUIRED'")
+    expect(payout).not.toContain("referenceType: 'PAYOUT_SUCCEEDED'")
+    expect(payout).not.toContain("accountType: 'EXTERNAL_PAYOUT'")
     expect(payout).toContain('restoreReservedPayout')
     expect(payout).toContain("referenceType: 'WITHDRAWAL_RELEASED'")
   })

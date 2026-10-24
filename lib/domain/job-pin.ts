@@ -91,7 +91,7 @@ export async function generateJobPin(
     throw new Error('PIN is only available for an accepted active booking')
   }
   const paymentReady = await prisma.jobEscrow.findFirst({
-    where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+    where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] } },
     select: { id: true, paymentMethod: true },
   })
   if (!paymentReady) throw new Error('Payment method must be confirmed before generating a PIN')
@@ -160,7 +160,7 @@ export async function rotateJobPin(
     throw new Error('PIN is only available for an accepted active booking')
   }
   const paymentReady = await prisma.jobEscrow.findFirst({
-    where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+    where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] } },
     select: { id: true, paymentMethod: true },
   })
   if (!paymentReady) throw new Error('Payment method must be confirmed before rotating a PIN')
@@ -616,7 +616,7 @@ async function validatePurposeTx(
 
   const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
   const paymentReady = await tx.jobEscrow.findFirst({
-    where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+    where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] } },
     select: { id: true, paymentMethod: true },
   })
 

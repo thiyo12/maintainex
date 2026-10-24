@@ -25,6 +25,7 @@ import {
 import {
   resolvePaymentProviderForMarket,
   PAYMENT_PROVIDER_NOT_AVAILABLE,
+  isLegacyReadOnlyProvider,
   type ResolvedPaymentProvider,
 } from '@/lib/finance/payments/provider-registry'
 import { assertProviderOnlineEligible } from '@/lib/finance/commissions/provider-balance-service'
@@ -1366,7 +1367,7 @@ export async function reconcilePayHereRefund(
 async function finalizeExternalProviderRefund(
   paymentIntentId: string,
   details: {
-    provider: 'PAYHERE' | 'PAYPAL'
+    provider: 'PAYHERE' | 'PAYPAL' | 'MANUAL'
     gatewayStatus: string
     refundReference: string | null
     message: string
@@ -2001,6 +2002,14 @@ export async function requestRequiredProviderRefund(
       code: 'PAYMENT_INTENT_NOT_FOUND',
     }
   }
+  if (isLegacyReadOnlyProvider(intent.gateway)) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Legacy payment records are read-only; gateway refund processing is retired',
+      code: 'PAYMENT_PROVIDER_RETIRED',
+    }
+  }
   if (intent.gateway === 'PAYPAL') {
     return requestRequiredPayPalRefund(paymentIntentId, approvalRequestId)
   }
@@ -2028,6 +2037,14 @@ export async function reconcileProviderRefund(
       status: 'REFUND_REQUIRED',
       error: 'Payment intent not found',
       code: 'PAYMENT_INTENT_NOT_FOUND',
+    }
+  }
+  if (isLegacyReadOnlyProvider(intent.gateway)) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Legacy payment records are read-only; gateway refund reconciliation is retired',
+      code: 'PAYMENT_PROVIDER_RETIRED',
     }
   }
   if (intent.gateway === 'PAYPAL') {
@@ -2064,7 +2081,7 @@ export async function confirmManualExternalRefund(
 
   const intent = await prisma.paymentIntent.findUnique({
     where: { id: paymentIntentId },
-    select: { id: true, status: true, gateway: true },
+    select: { id: true, gateway: true },
   })
   if (!intent) {
     return {
@@ -2074,40 +2091,22 @@ export async function confirmManualExternalRefund(
       code: 'PAYMENT_INTENT_NOT_FOUND',
     }
   }
-  if (intent.status === 'REFUNDED') {
-    return { success: true, status: 'REFUNDED', refundReference: reference }
-  }
-  if (!['REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(intent.status)) {
+  if (isLegacyReadOnlyProvider(intent.gateway)) {
     return {
       success: false,
       status: 'REFUND_REQUIRED',
-      error: `Payment is not awaiting refund (status=${intent.status})`,
-      code: 'PAYMENT_NOT_IN_REFUND_QUEUE',
+      error: 'Legacy payment records are read-only; manual gateway refund processing is retired',
+      code: 'PAYMENT_PROVIDER_RETIRED',
     }
   }
-
-  const provider =
-    intent.gateway === 'PAYPAL'
-      ? 'PAYPAL'
-      : intent.gateway === 'PAYHERE'
-        ? 'PAYHERE'
-        : null
-  if (!provider) {
-    return {
-      success: false,
-      status: 'REFUND_REQUIRED',
-      error: `Manual external refund is unsupported for gateway ${intent.gateway}`,
-      code: 'PAYMENT_PROVIDER_REFUND_UNSUPPORTED',
-    }
+  // A staff-entered reference proves only that somebody supplied a string. A
+  // separate verified bank/PSP result must be reconciled before refund state
+  // or the canonical ledger can change.
+  return {
+    success: false,
+    status: 'REFUND_REQUIRED',
+    error: 'Independent bank or PSP refund evidence is required',
+    code: 'REFUND_EXTERNAL_EVIDENCE_REQUIRED',
   }
-
-  return finalizeExternalProviderRefund(paymentIntentId, {
-    provider,
-    gatewayStatus: 'MANUAL_REFUND_CONFIRMED',
-    refundReference: reference,
-    message: input.note?.trim().slice(0, 500) || 'Manual external refund confirmed by finance',
-    actorId: input.actorId,
-    source: 'MANUAL',
-  })
 }
 

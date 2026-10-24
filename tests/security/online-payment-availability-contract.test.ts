@@ -43,7 +43,7 @@ describe('canonical online payment availability', () => {
     })
   })
 
-  it('reports available only when the full provider set is configured', () => {
+  it('does not enable a legacy provider for new checkout even when credentials exist', () => {
     process.env.PAYPAL_CLIENT_ID = 'id'
     expect(isPayPalConfigured()).toBe(false)
     process.env.PAYPAL_CLIENT_SECRET = 'secret'
@@ -51,9 +51,9 @@ describe('canonical online payment availability', () => {
     process.env.PAYPAL_WEBHOOK_ID = 'hook'
     expect(isPayPalConfigured()).toBe(true)
     expect(onlinePaymentAvailability()).toEqual({
-      onlinePaymentAvailable: true,
-      provider: 'PAYPAL',
-      reason: 'available',
+      onlinePaymentAvailable: false,
+      provider: null,
+      reason: 'not_configured',
     })
   })
 })
@@ -65,7 +65,7 @@ describe('availability endpoint and client contract', () => {
     const code = source(route)
     expect(code).toContain('onlinePaymentAvailability()')
     expect(code).toContain("reason: 'not_configured'")
-    expect(code).toContain('cashAvailable: true')
+    expect(code).not.toContain('cashAvailable: true')
     expect(code).not.toContain('PAYPAL_CLIENT_SECRET')
     expect(code).not.toContain('process.env.PAYPAL_CLIENT_SECRET')
   })
@@ -73,7 +73,7 @@ describe('availability endpoint and client contract', () => {
   it('fails closed for clients when the lookup throws', () => {
     const code = source(route)
     expect(code).toContain('onlinePaymentAvailable: false')
-    expect(code).toContain('cashAvailable: true')
+    expect(code).not.toContain('cashAvailable: true')
   })
 
   it('mobile client reads the contract instead of hardcoding an online option', () => {
@@ -84,7 +84,7 @@ describe('availability endpoint and client contract', () => {
     const confirm = source('apps/mobile/features/jobs/screens/customer/v2/confirm/[id].tsx')
     expect(confirm).toContain('v2Payments')
     expect(confirm).toContain('.availability()')
-    // PayPal is only offered when the contract says it is available; cash stays.
+    // Checkout methods are offered only when the job-specific contract permits them.
     expect(confirm).toContain('onlinePaymentAvailable ? (')
     expect(confirm).toContain('Online payment is not available')
     expect(confirm).toContain('Use Cash Instead')
@@ -95,6 +95,9 @@ describe('availability endpoint and client contract', () => {
     expect(settings).toContain('.availability()')
     expect(settings).toContain('onlinePaymentAvailable')
     expect(settings).toContain("'Unavailable'")
+    expect(settings).not.toContain('PayPal online checkout')
+    expect(settings).not.toContain('Add payment method')
+    expect(settings).toContain('Choosing cash does not confirm')
   })
 })
 

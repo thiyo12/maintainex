@@ -5,11 +5,11 @@ import {
   inspectCrmJobCancellation,
 } from '@/lib/crm/jobs/cancellation'
 import { buildApprovalPlan } from './approval-engine'
-import { confirmManualExternalRefund, requestRequiredProviderRefund } from '@/lib/finance/payments/payment-service'
-import { markProcessing, markSucceeded } from '@/lib/finance/payouts/payout-engine'
+import { requestRequiredProviderRefund } from '@/lib/finance/payments/payment-service'
 import { releaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { tierAtLeast } from './action-registry'
 import { resolveCurrentApprovalRisk } from './current-risk'
+import { postApprovedCommissionBankReconciliation } from '@/lib/finance/commissions/bank-credit-reconciliation'
 import type { ApprovalTier } from './types'
 import type { AdminRole } from '@/lib/admin-types'
 
@@ -31,43 +31,9 @@ function higherTier(current: ApprovalTier, stored: ApprovalTier): boolean {
   return current !== stored && tierAtLeast(current, stored)
 }
 
-type PayoutExecutionPayload = {
-  mode: 'CONFIRM_EXTERNAL_PAYOUT'
-  providerRef: string
-}
-
-function parsePayoutExecutionPayload(raw: string | null): PayoutExecutionPayload {
-  if (!raw) throw new Error('APPROVAL_ACTION_PAYLOAD_MISSING')
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
-  }
-
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
-  }
-
-  const value = parsed as Record<string, unknown>
-  const providerRef =
-    typeof value.providerRef === 'string' ? value.providerRef.trim() : ''
-
-  if (
-    value.mode !== 'CONFIRM_EXTERNAL_PAYOUT' ||
-    providerRef.length < 4 ||
-    providerRef.length > 500
-  ) {
-    throw new Error('APPROVAL_PAYOUT_REFERENCE_INVALID')
-  }
-
-  return { mode: 'CONFIRM_EXTERNAL_PAYOUT', providerRef }
-}
-
 type RefundExecutionPayload =
   | { mode: 'REQUEST_GATEWAY_REFUND' }
-  | { mode: 'CONFIRM_MANUAL'; manualReference: string; note?: string }
+  | { mode: 'CONFIRM_MANUAL' }
 
 function parseRefundExecutionPayload(raw: string | null): RefundExecutionPayload {
   if (!raw) throw new Error('APPROVAL_ACTION_PAYLOAD_MISSING')
@@ -89,15 +55,7 @@ function parseRefundExecutionPayload(raw: string | null): RefundExecutionPayload
   }
 
   if (value.mode === 'CONFIRM_MANUAL') {
-    const manualReference =
-      typeof value.manualReference === 'string' ? value.manualReference.trim() : ''
-    const note = typeof value.note === 'string' ? value.note.trim().slice(0, 500) : undefined
-
-    if (manualReference.length < 4 || manualReference.length > 200) {
-      throw new Error('APPROVAL_MANUAL_REFUND_REFERENCE_INVALID')
-    }
-
-    return { mode: 'CONFIRM_MANUAL', manualReference, note }
+    return { mode: 'CONFIRM_MANUAL' }
   }
 
   throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
@@ -239,14 +197,10 @@ export async function executeApprovedCrmRequest(
       }
 
       const payload = parseRefundExecutionPayload(request.actionPayload)
-      const result =
-        payload.mode === 'REQUEST_GATEWAY_REFUND'
-          ? await requestRequiredProviderRefund(request.targetId, request.id)
-          : await confirmManualExternalRefund(request.targetId, {
-              actorId: actor.adminId,
-              reference: payload.manualReference,
-              note: payload.note,
-            })
+      if (payload.mode !== 'REQUEST_GATEWAY_REFUND') {
+        throw new Error('REFUND_EXTERNAL_EVIDENCE_REQUIRED')
+      }
+      const result = await requestRequiredProviderRefund(request.targetId, request.id)
 
       if (!result.success) {
         throw new Error(`REFUND_EXECUTION_FAILED:${result.code || result.error || 'UNKNOWN'}`)
@@ -265,10 +219,7 @@ export async function executeApprovedCrmRequest(
         entityType: 'PaymentIntent',
         entityId: request.targetId,
         entityName: request.targetId,
-        description:
-          payload.mode === 'CONFIRM_MANUAL'
-            ? 'Approved manual external refund confirmation executed'
-            : 'Approved provider refund request executed',
+        description: 'Approved provider refund request executed',
         oldValue: {
           approvalRequestId: request.id,
         },
@@ -346,79 +297,32 @@ export async function executeApprovedCrmRequest(
         riskLevel: 'CRITICAL',
       })
     } else if (request.actionId === 'finance.payout') {
-      if (request.targetType !== 'Payout') {
+      // Old approval requests only carry a user-entered reference. That is not
+      // independent PSP/bank evidence, so they must not create a paid payout.
+      throw new Error('PAYOUT_EXTERNAL_EVIDENCE_REQUIRED')
+    } else if (request.actionId === 'finance.commission.reconcile') {
+      if (request.targetType !== 'CommissionBankTransaction' || !request.actionPayload) {
         throw new Error('APPROVAL_TARGET_TYPE_INVALID')
       }
-
-      const payload = parsePayoutExecutionPayload(request.actionPayload)
-      const payout = await prisma.payout.findUnique({
-        where: { id: request.targetId },
-        select: {
-          id: true,
-          status: true,
-          amount: true,
-          currency: true,
-          countryCode: true,
-          userId: true,
-        },
-      })
-      if (!payout) throw new Error('APPROVAL_TARGET_NOT_FOUND')
-
-      if (payout.status === 'RESERVED') {
-        const processing = await markProcessing(
-          payout.id,
-          actor.adminId,
-          `approval-payout:processing:${request.id}`
-        )
-        if (!processing.ok) {
-          throw new Error(
-            `PAYOUT_EXECUTION_FAILED:${processing.code || processing.error}`
-          )
-        }
-      } else if (payout.status !== 'PROCESSING') {
-        throw new Error(`PAYOUT_STATUS_NOT_EXECUTABLE:${payout.status}`)
+      let payload: unknown
+      try {
+        payload = JSON.parse(request.actionPayload)
+      } catch {
+        throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
       }
-
-      const succeeded = await markSucceeded(
-        payout.id,
-        payload.providerRef,
-        `approval-payout:succeeded:${request.id}`,
-        actor.adminId
-      )
-      if (!succeeded.ok) {
-        throw new Error(
-          `PAYOUT_EXECUTION_FAILED:${succeeded.code || succeeded.error}`
-        )
+      if (
+        !payload || typeof payload !== 'object' || Array.isArray(payload) ||
+        (payload as Record<string, unknown>).mode !== 'BANK_CREDIT' ||
+        (payload as Record<string, unknown>).bankTransactionId !== request.targetId
+      ) {
+        throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
       }
-
-      executionRef = `Payout:${payout.id}:${payload.providerRef}`
-
-      await createAuditLog({
-        action: 'UPDATE',
-        category: 'FINANCE',
-        userId: actor.adminId,
-        userEmail: actor.email,
-        userRole: actor.role,
-        entityType: 'Payout',
-        entityId: payout.id,
-        entityName: payout.userId,
-        description: 'Approved external payout confirmation executed',
-        oldValue: {
-          status: payout.status,
-          approvalRequestId: request.id,
-        },
-        newValue: {
-          status: 'SUCCEEDED',
-          approvalRequestId: request.id,
-          externalReferencePresent: true,
-          amountMinor: payout.amount.toString(),
-          currency: payout.currency,
-          countryCode: payout.countryCode,
-        },
-        ipAddress: actor.ipAddress,
-        userAgent: actor.userAgent || undefined,
-        riskLevel: 'CRITICAL',
+      await postApprovedCommissionBankReconciliation({
+        bankTransactionId: request.targetId,
+        actorAdminId: actor.adminId,
+        approvalRequestId: request.id,
       })
+      executionRef = `CommissionBankTransaction:${request.targetId}:POSTED`
     } else if (request.actionId === 'jobs.cancel') {
       const source =
         request.targetType === 'MarketplaceJob'

@@ -17,7 +17,6 @@ export async function GET() {
     return NextResponse.json(
       {
         ...onlinePaymentAvailability(),
-        cashAvailable: true,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     )
@@ -29,7 +28,6 @@ export async function GET() {
         onlinePaymentAvailable: false,
         provider: null,
         reason: 'not_configured',
-        cashAvailable: true,
       },
       { status: 200, headers: { 'Cache-Control': 'no-store' } }
     )

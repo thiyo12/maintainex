@@ -12,9 +12,28 @@ describe('CRM refund approval boundary', () => {
     expect(source).toContain("guardCrmAction(request, 'finance.refund')")
     expect(source).toContain('createCrmApprovalRequest')
     expect(source).toContain("mode: 'REQUEST_GATEWAY_REFUND'")
-    expect(source).toContain("mode: 'CONFIRM_MANUAL'")
+    expect(source).toContain('REFUND_EXTERNAL_EVIDENCE_REQUIRED')
+    expect(source).not.toContain("mode: 'CONFIRM_MANUAL'")
     expect(source).not.toContain('await requestRequiredPayHereRefund(intent.id)')
     expect(source).not.toContain('await confirmManualExternalRefund(intent.id')
+  })
+
+  it('keeps retired gateway refund records read-only across Admin and approval execution paths', () => {
+    const route = readFileSync(
+      resolve(process.cwd(), 'app/api/admin/financial/refunds/route.ts'),
+      'utf8'
+    )
+    const service = readFileSync(
+      resolve(process.cwd(), 'lib/finance/payments/payment-service.ts'),
+      'utf8'
+    )
+
+    expect(route).toContain('isLegacyReadOnlyProvider(intent.gateway)')
+    expect(route).toContain("code: 'PAYMENT_PROVIDER_RETIRED'")
+    expect(service).toContain('Legacy payment records are read-only; gateway refund processing is retired')
+    expect(service).toContain('Legacy payment records are read-only; gateway refund reconciliation is retired')
+    expect(service).toContain('Legacy payment records are read-only; manual gateway refund processing is retired')
+    expect(service).toContain("code: 'REFUND_EXTERNAL_EVIDENCE_REQUIRED'")
   })
 
   it('executes approved refunds only from the centralized approval executor', () => {
@@ -25,7 +44,8 @@ describe('CRM refund approval boundary', () => {
 
     expect(source).toContain("request.actionId === 'finance.refund'")
     expect(source).toContain('requestRequiredProviderRefund(request.targetId, request.id)')
-    expect(source).toContain('confirmManualExternalRefund(request.targetId')
+    expect(source).toContain('REFUND_EXTERNAL_EVIDENCE_REQUIRED')
+    expect(source).not.toContain('confirmManualExternalRefund(request.targetId')
     expect(source).toContain('parseRefundExecutionPayload')
   })
 
@@ -52,5 +72,17 @@ describe('CRM refund approval boundary', () => {
     expect(source).not.toContain('ROLE_PERMISSIONS')
     expect(source).not.toContain('window.prompt')
     expect(source).not.toContain('window.confirm')
+  })
+
+  it('does not offer staff a typed-reference path to complete external refunds', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'app/(admin)/admin/financial/refunds/page.tsx'),
+      'utf8'
+    )
+
+    expect(source).not.toContain('CONFIRM_MANUAL')
+    expect(source).not.toContain('Confirm external')
+    expect(source).not.toContain('manualReference')
+    expect(source).toContain('independently verified refund evidence')
   })
 })

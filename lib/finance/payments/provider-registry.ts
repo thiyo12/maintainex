@@ -3,12 +3,11 @@ import { prisma } from '@/lib/prisma'
 export const PAYMENT_PROVIDER_CODES = ['PAYPAL', 'PAYHERE', 'MANUAL_BANK'] as const
 export type PaymentProviderCode = (typeof PAYMENT_PROVIDER_CODES)[number]
 
-/**
- * Only PayPal may create a new online checkout. PayHere is retained strictly
- * for historical transactions, refunds, reconciliation and audit visibility.
- */
-export const NEW_ONLINE_CHECKOUT_PROVIDER_CODES = ['PAYPAL'] as const
-export const LEGACY_READ_ONLY_PROVIDER_CODES = ['PAYHERE'] as const
+/** No replacement marketplace processor has been approved for new checkout. */
+export const NEW_ONLINE_CHECKOUT_PROVIDER_CODES = [] as const
+// PayPal and PayHere are retired. Keep their codes recognizable so existing
+// database rows and reports remain readable, but never allow new activation.
+export const LEGACY_READ_ONLY_PROVIDER_CODES = ['PAYPAL', 'PAYHERE'] as const
 export const PAYMENT_PROVIDER_NOT_AVAILABLE = 'PAYMENT_PROVIDER_NOT_AVAILABLE' as const
 
 /**
@@ -35,11 +34,8 @@ export function isCashPaymentAvailableForMarket(
 /**
  * Canonical online-payment availability.
  *
- * Online checkout is only offered when the provider is actually configured for
- * this deployment. When the deployment intentionally runs cash-only (for
- * example an initial production test with no online provider configured), the
- * contract reports that so clients never present a payment option the backend
- * would reject with PAYMENT_PROVIDER_NOT_AVAILABLE.
+ * Online checkout remains disabled until an approved marketplace provider is
+ * configured. Legacy PayPal credentials alone do not authorize new checkout.
  *
  * This is derived from configuration only. It never weakens the fail-closed
  * server-side enforcement in the payment routes.
@@ -59,17 +55,10 @@ export type OnlinePaymentAvailability = {
 }
 
 export function onlinePaymentAvailability(): OnlinePaymentAvailability {
-  if (!isPayPalConfigured()) {
-    return {
-      onlinePaymentAvailable: false,
-      provider: null,
-      reason: 'not_configured',
-    }
-  }
   return {
-    onlinePaymentAvailable: true,
-    provider: 'PAYPAL',
-    reason: 'available',
+    onlinePaymentAvailable: false,
+    provider: null,
+    reason: 'not_configured',
   }
 }
 

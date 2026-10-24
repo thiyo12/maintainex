@@ -38,7 +38,7 @@ export const v2JobActions = {
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`),
   updateProgress: (jobId: string, progressStatus: string) =>
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`, { method: 'PATCH', body: JSON.stringify({ progressStatus }) }),
-  complete: (jobId: string, action: string, reason?: string, cashPaidConfirmed?: boolean) =>
+  complete: (jobId: string, action: string, reason?: string) =>
     v2Request<{
       success: boolean
       message: string
@@ -48,24 +48,36 @@ export const v2JobActions = {
       platformDue?: number
     }>(`/api/mobile/v2/jobs/${jobId}/complete`, {
       method: 'POST',
-      body: JSON.stringify({ action, reason, cashPaidConfirmed }),
+      body: JSON.stringify({ action, reason }),
     }),
-  releaseEscrow: (jobId: string, cashPaidConfirmed?: boolean) =>
+  releaseEscrow: (jobId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, {
       method: 'POST',
-      body: JSON.stringify({ cashPaidConfirmed }),
+      body: JSON.stringify({}),
     }),
   confirmCashPayment: (jobId: string) =>
     v2Request<{
       success: boolean
       escrowId: string
       paymentMethod: 'CASH'
-      status: 'CASH_CONFIRMED'
+      status: 'CASH_SELECTED'
       amountDueMinor: string
       amountDue: number
       currency: string
       alreadyConfirmed: boolean
     }>(`/api/mobile/v2/jobs/${jobId}/cash-payment`, { method: 'POST' }),
+  cashCollection: (jobId: string, action: 'REPORT' | 'CONFIRM' | 'CONTEST', amountMinor?: string) =>
+    v2Request<{
+      success: boolean
+      status: 'PROVIDER_REPORTED' | 'CUSTOMER_CONFIRMED' | 'CONTESTED'
+      amountMinor: string | null
+      amount: number | null
+      currency: string
+      commissionRecorded: false
+      message: string
+    }>(`/api/mobile/v2/jobs/${jobId}/cash-collection`, {
+      method: 'POST', body: JSON.stringify({ action, ...(amountMinor !== undefined ? { amountMinor } : {}) }),
+    }),
   createReview: (jobId: string, data: any) =>
     v2Request<{ review: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
   getReviews: (jobId: string) =>

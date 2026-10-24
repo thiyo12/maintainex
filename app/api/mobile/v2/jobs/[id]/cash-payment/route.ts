@@ -51,7 +51,7 @@ export async function POST(
       await createNotification({
         userId: providerUserId,
         title: 'Cash payment selected',
-        body: 'The customer selected cash. No funds are held by MaintainEX; platform commission will be recorded when the job is completed.',
+        body: 'The customer selected cash. No funds are held by MaintainEX. The provider must report the amount actually received and the customer must confirm it.',
         referenceType: 'JOB',
         referenceId: id,
       })
@@ -62,7 +62,7 @@ export async function POST(
       success: true,
       escrowId: result.escrowId,
       paymentMethod: 'CASH',
-      status: 'CASH_CONFIRMED',
+      status: 'CASH_SELECTED',
       amountDueMinor: result.amountDue.toString(),
       amountDue: minorUnitsToMajorUnits(result.amountDue, currency),
       currency,

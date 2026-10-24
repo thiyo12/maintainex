@@ -2,7 +2,7 @@ import type { PrismaClient, Prisma } from '@prisma/client'
 
 type DbClient = PrismaClient | Prisma.TransactionClient
 
-export type EscrowFundingSource = 'PAYHERE' | 'WALLET' | 'UNKNOWN'
+export type EscrowFundingSource = 'PAYHERE' | 'PAYPAL' | 'WALLET' | 'UNKNOWN'
 
 export async function resolveEscrowFundingSource(
   client: DbClient,
@@ -22,9 +22,10 @@ export async function resolveEscrowFundingSource(
   })
 
   if (debit) {
-    if (debit.accountId === 'external:payhere' || debit.accountType === 'EXTERNAL_PAYOUT') {
+    if (debit.accountId === 'external:payhere') {
       return 'PAYHERE'
     }
+    if (debit.accountId === 'external:paypal') return 'PAYPAL'
     if (debit.accountType === 'CUSTOMER_WALLET') {
       return 'WALLET'
     }
@@ -37,9 +38,12 @@ export async function resolveEscrowFundingSource(
         in: ['SUCCESS', 'REFUND_REQUIRED', 'REFUND_PROCESSING', 'REFUNDED', 'CHARGEDBACK'],
       },
     },
-    select: { id: true },
+    select: { id: true, gateway: true },
+    orderBy: { createdAt: 'desc' },
   })
 
-  if (capturedPayment) return 'PAYHERE'
+  if (capturedPayment?.gateway === 'PAYHERE' || capturedPayment?.gateway === 'PAYPAL') {
+    return capturedPayment.gateway
+  }
   return 'UNKNOWN'
 }

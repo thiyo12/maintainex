@@ -100,8 +100,8 @@ describe('server secret boundaries', () => {
     expect(cleanup).not.toContain("authHeader !== `Bearer ${process.env.CRON_SECRET}`")
 
     const payHereRefunds = source('app/api/cron/payhere-refunds/route.ts')
-    expect(payHereRefunds).toContain('matchesBearerSecret')
-    expect(payHereRefunds).not.toContain("request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`")
+    expect(payHereRefunds).toContain('PAYMENT_PROVIDER_RETIRED')
+    expect(payHereRefunds).toContain('status: 410')
   })
 
   it('keeps sensitive local material outside the Docker build context', () => {

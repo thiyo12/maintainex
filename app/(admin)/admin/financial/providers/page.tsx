@@ -123,17 +123,17 @@ const CAPABILITIES: Array<{ key: CapabilityKey; label: string }> = [
 function defaults(): FormState {
   return {
     countryCode: 'CA',
-    provider: 'PAYPAL',
+    provider: 'MANUAL_BANK',
     enabled: false,
     environment: 'SANDBOX',
     supportedCurrencies: 'CAD',
-    paymentMethods: 'PAYPAL',
+    paymentMethods: '',
     captureMode: 'CAPTURE',
     operationalStatus: 'DISABLED',
     priority: '100',
     commissionRateBps: '',
     capabilities: {
-      checkout: true,
+      checkout: false,
       authorize: false,
       capture: true,
       refund: true,
@@ -203,7 +203,10 @@ export default function PaymentProvidersPage() {
     const events = payload?.eventStats || []
     return {
       configured: configs.length,
-      active: configs.filter(item => item.enabled && item.operationalStatus === 'ACTIVE').length,
+      active: configs.filter(item =>
+        item.provider !== 'PAYPAL' && item.provider !== 'PAYHERE' &&
+        item.enabled && item.operationalStatus === 'ACTIVE'
+      ).length,
       unhealthy: configs.filter(item =>
         item.enabled &&
         (!item.runtime.configured || item.runtime.environment !== item.environment)
@@ -221,6 +224,7 @@ export default function PaymentProvidersPage() {
   }
 
   function beginEdit(config: ProviderConfig) {
+    if (config.provider === 'PAYPAL' || config.provider === 'PAYHERE') return
     setEditing(config)
     setForm({
       countryCode: config.countryCode,
@@ -335,6 +339,11 @@ export default function PaymentProvidersPage() {
           </>
         }
       />
+
+      <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+        <div className="font-semibold">PayPal and PayHere are retired</div>
+        Historical records remain available for audit. Neither provider can be configured for new checkout; online payments stay disabled until a provider is approved.
+      </div>
 
       <div className="flex flex-wrap items-center gap-4">
         <Link
@@ -480,11 +489,13 @@ export default function PaymentProvidersPage() {
                   <span className="font-mono text-xs font-semibold text-slate-700">{config.priority}</span>
                 </td>
                 <td className={`${crmTdClass} text-right`}>
-                  {payload?.canManage ? (
-                    <CrmButton variant="secondary" size="sm" onClick={() => beginEdit(config)}>
-                      <FiEdit2 size={13} />
-                      Edit
-                    </CrmButton>
+                  {config.provider === 'PAYPAL' || config.provider === 'PAYHERE' ? (
+                    <CrmBadge tone="neutral">Retired · read only</CrmBadge>
+                  ) : payload?.canManage ? (
+                      <CrmButton variant="secondary" size="sm" onClick={() => beginEdit(config)}>
+                        <FiEdit2 size={13} />
+                        Edit
+                      </CrmButton>
                   ) : (
                     <span className="text-xs text-slate-400">Read-only</span>
                   )}
@@ -599,7 +610,6 @@ export default function PaymentProvidersPage() {
               onChange={event => setForm(current => ({ ...current, provider: event.target.value as ProviderCode }))}
               className={crmInputClass}
             >
-              <option value="PAYPAL">PayPal</option>
               <option value="MANUAL_BANK">Manual bank</option>
             </select>
           </CrmField>

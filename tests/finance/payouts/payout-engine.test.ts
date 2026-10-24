@@ -207,24 +207,22 @@ describe('Phase 5F — canonical payout engine', () => {
     if (!conflict.ok) expect(conflict.code).toBe('IDEMPOTENCY_CONFLICT')
   })
 
-  it('successful payout clears the reservation to an external payout account exactly once', async () => {
+  it('does not clear a payout from a typed bank reference alone', async () => {
     const requested = await requestPayout(USER_ID, 125_000n, 'bank', null, 'test-5f-success-request', 'test-5f')
     expect(requested.ok).toBe(true)
     if (!requested.ok) return
 
     expect((await markProcessing(requested.payoutId, 'admin-test', 'test-5f-success-processing')).ok).toBe(true)
-    expect((await markSucceeded(requested.payoutId, 'BANK-123', 'test-5f-success-callback', 'test-5f')).ok).toBe(true)
-    expect((await markSucceeded(requested.payoutId, 'BANK-123', 'test-5f-success-duplicate', 'test-5f')).ok).toBe(true)
+    const result = await markSucceeded(requested.payoutId, 'BANK-123', 'test-5f-success-callback', 'test-5f')
+    expect(result).toMatchObject({ ok: false, code: 'PAYOUT_EXTERNAL_EVIDENCE_REQUIRED' })
 
     const payout = await prisma.payout.findUniqueOrThrow({ where: { id: requested.payoutId } })
-    expect(payout.status).toBe('SUCCEEDED')
-    expect(payout.clearedAt).not.toBeNull()
+    expect(payout.status).toBe('PROCESSING')
+    expect(payout.clearedAt).toBeNull()
 
     const entries = await ledgerFor(requested.payoutId)
     const successEntries = entries.filter(e => e.referenceType === 'PAYOUT_SUCCEEDED')
-    expect(successEntries).toHaveLength(2)
-    expect(successEntries.find(e => e.accountId === `payout:${requested.payoutId}` && e.entryType === 'DEBIT')?.amount).toBe(125_000n)
-    expect(successEntries.find(e => e.accountId === `external:payout:${requested.payoutId}` && e.entryType === 'CREDIT')?.amount).toBe(125_000n)
+    expect(successEntries).toHaveLength(0)
   })
 
   it('failed payout restores provider funds exactly once', async () => {
@@ -252,19 +250,21 @@ describe('Phase 5F — canonical payout engine', () => {
     expect((await balanceMajor()).balance).toBe(10000)
   })
 
-  it('success/failure race produces one terminal outcome without wallet underflow', async () => {
+  it('does not let a typed success reference beat an independently reported payout failure', async () => {
     const requested = await requestPayout(USER_ID, 100_000n, 'bank', null, 'test-5f-race-request', 'test-5f')
     expect(requested.ok).toBe(true)
     if (!requested.ok) return
     await markProcessing(requested.payoutId, 'admin-test', 'test-5f-race-processing')
 
-    await Promise.all([
+    const [successAttempt, failure] = await Promise.all([
       markSucceeded(requested.payoutId, 'BANK-RACE', 'test-5f-race-success', 'test-5f'),
       markFailed(requested.payoutId, 'timeout', 'test-5f-race-failure', 'test-5f'),
     ])
+    expect(successAttempt).toMatchObject({ ok: false, code: 'PAYOUT_EXTERNAL_EVIDENCE_REQUIRED' })
+    expect(failure.ok).toBe(true)
 
     const payout = await prisma.payout.findUniqueOrThrow({ where: { id: requested.payoutId } })
-    expect(['SUCCEEDED', 'FAILED']).toContain(payout.status)
+    expect(payout.status).toBe('FAILED')
     const terminalEntries = (await ledgerFor(requested.payoutId)).filter(e =>
       e.referenceType === 'PAYOUT_SUCCEEDED' || e.referenceType === 'WITHDRAWAL_RELEASED'
     )

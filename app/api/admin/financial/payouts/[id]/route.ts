@@ -3,10 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, guardCrmAction } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
-import {
-  createCrmApprovalRequest,
-} from '@/lib/crm/governance'
-import { resolveCurrentApprovalRisk } from '@/lib/crm/governance/current-risk'
 import { consumeCrmStepUpFromHeader } from '@/lib/crm/governance/step-up'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import {
@@ -44,12 +40,6 @@ export async function PATCH(
     const reason = typeof body?.reason === 'string'
       ? body.reason.trim().slice(0, 2000)
       : ''
-    const providerRef = typeof body?.providerRef === 'string'
-      ? body.providerRef.trim().slice(0, 500)
-      : ''
-    const idempotencyKey = typeof body?.idempotencyKey === 'string'
-      ? body.idempotencyKey.trim().slice(0, 200)
-      : ''
 
     if (!VALID_ACTIONS.includes(action as (typeof VALID_ACTIONS)[number])) {
       return NextResponse.json(
@@ -63,21 +53,6 @@ export async function PATCH(
         { error: 'A clear reason is required for FAILED/CANCELLED' },
         { status: 400 }
       )
-    }
-
-    if (action === 'CONFIRM_EXTERNAL') {
-      if (providerRef.length < 4) {
-        return NextResponse.json(
-          { error: 'External transfer reference is required' },
-          { status: 400 }
-        )
-      }
-      if (idempotencyKey.length < 8) {
-        return NextResponse.json(
-          { error: 'A valid idempotencyKey is required' },
-          { status: 400 }
-        )
-      }
     }
 
     const payout = await prisma.payout.findUnique({
@@ -101,52 +76,13 @@ export async function PATCH(
     }
 
     if (action === 'CONFIRM_EXTERNAL') {
-      if (!['RESERVED', 'PROCESSING'].includes(payout.status)) {
-        return NextResponse.json(
-          { error: `Payout in status ${payout.status} cannot be externally confirmed` },
-          { status: 409 }
-        )
-      }
-
-      const currentRisk = await resolveCurrentApprovalRisk({
-        actionId: 'finance.payout',
-        market: payout.countryCode,
-        targetType: 'Payout',
-        targetId: payout.id,
-        amountMinor: payout.amount,
-        currency: payout.currency,
-      })
-
-      const approval = await createCrmApprovalRequest({
-        actionId: 'finance.payout',
-        initiatorAdminId: security.adminId,
-        market: payout.countryCode,
-        targetType: 'Payout',
-        targetId: payout.id,
-        amountMinor: payout.amount,
-        currency: payout.currency,
-        reasonCode: 'EXTERNAL_PAYOUT_CONFIRMATION',
-        note: 'External payout confirmation submitted for governed approval',
-        idempotencyKey,
-        actionPayload: {
-          mode: 'CONFIRM_EXTERNAL_PAYOUT',
-          providerRef,
-        },
-        risk: currentRisk.risk,
-      })
-
       return NextResponse.json(
         {
-          mode: 'APPROVAL_REQUIRED',
-          approval: {
-            id: approval.request.id,
-            status: approval.request.status,
-            tier: approval.request.tier,
-            expiresAt: approval.request.expiresAt,
-            reused: approval.reused,
-          },
+          error: 'A typed reference is not payout evidence. Wait for an independently verified bank or PSP result.',
+          code: 'PAYOUT_EXTERNAL_EVIDENCE_REQUIRED',
+          status: 'WAITING_BANK',
         },
-        { status: 202 }
+        { status: 409 }
       )
     }
 

@@ -319,106 +319,19 @@ describe('payment provider PATCH security gates', () => {
     expect(route).toContain('requireCountryScope: true')
   })
 
-  it('saves a valid CA PAYPAL SANDBOX config for the authorized owner', async () => {
+  it('rejects config writes for retired gateways before touching the database', async () => {
     guardMocks.guardCrmRequest.mockResolvedValue({
       ok: true,
       context: superAdminContext(),
     })
-    guardMocks.providerConfigFindUnique.mockResolvedValue(null)
-    guardMocks.providerConfigUpsert.mockResolvedValue({ id: 'pp-ca-1' })
-
     const { PATCH } = await loadRoute()
-    const response = await PATCH(providerPatchRequest(CA_SANDBOX_PAYLOAD))
-
-    expect(response.status).toBe(200)
-    expect(guardMocks.providerConfigUpsert).toHaveBeenCalledTimes(1)
-
-    const written = guardMocks.providerConfigUpsert.mock.calls[0][0]
-    expect(written.where).toEqual({
-      countryCode_provider: { countryCode: 'CA', provider: 'PAYPAL' },
-    })
-    expect(written.create.enabled).toBe(true)
-    expect(written.create.environment).toBe('SANDBOX')
-    expect(written.create.operationalStatus).toBe('ACTIVE')
-    expect(written.create.captureMode).toBe('CAPTURE')
-    expect(JSON.parse(written.create.supportedCurrencies)).toEqual(['CAD'])
-  })
-
-  it('rejects a LIVE enable while the server runs PayPal sandbox (fail closed)', async () => {
-    guardMocks.guardCrmRequest.mockResolvedValue({
-      ok: true,
-      context: superAdminContext(),
-    })
-
-    const { PATCH } = await loadRoute()
-    const response = await PATCH(
-      providerPatchRequest({ ...CA_SANDBOX_PAYLOAD, environment: 'LIVE' })
-    )
-
-    // The market-verification gate fires first for an unverified LIVE market;
-    // either way the request must be rejected with 409 and nothing written.
-    expect(response.status).toBe(409)
-    const body = await response.json()
-    expect(String(body.error)).toMatch(/not verified for CA in LIVE|cannot be enabled until its server runtime/)
+    for (const provider of ['PAYPAL', 'PAYHERE']) {
+      const response = await PATCH(providerPatchRequest({ ...CA_SANDBOX_PAYLOAD, provider }))
+      expect(response.status).toBe(409)
+      const body = await response.json()
+      expect(String(body.error)).toMatch(/retired; historical records remain read-only/)
+    }
     expect(guardMocks.providerConfigUpsert).not.toHaveBeenCalled()
-  })
-
-  it('blocks the webhook capability when no webhook ID is configured', async () => {
-    process.env.PAYPAL_WEBHOOK_ID = ''
-    guardMocks.guardCrmRequest.mockResolvedValue({
-      ok: true,
-      context: superAdminContext(),
-    })
-
-    const { PATCH } = await loadRoute()
-    const response = await PATCH(providerPatchRequest(CA_SANDBOX_PAYLOAD))
-
-    expect(response.status).toBe(409)
-    const body = await response.json()
-    expect(String(body.error)).toMatch(/webhook verification is not configured/)
-    expect(guardMocks.providerConfigUpsert).not.toHaveBeenCalled()
-  })
-
-  it('rejects enabling a provider when PayPal credentials are absent', async () => {
-    delete process.env.PAYPAL_CLIENT_ID
-    delete process.env.PAYPAL_CLIENT_SECRET
-    guardMocks.guardCrmRequest.mockResolvedValue({
-      ok: true,
-      context: superAdminContext(),
-    })
-
-    const { PATCH } = await loadRoute()
-    const response = await PATCH(providerPatchRequest(CA_SANDBOX_PAYLOAD))
-
-    expect(response.status).toBe(409)
-    expect(guardMocks.providerConfigUpsert).not.toHaveBeenCalled()
-  })
-
-  it('stores the partialRefund capability verbatim, with no CRM-level gate', async () => {
-    // Documented behaviour: this revision has no partial-refund gate on the
-    // provider config route. Partial refunds must still be refused at the
-    // canonical refund approval/execution layer, not merely flagged here.
-    guardMocks.guardCrmRequest.mockResolvedValue({
-      ok: true,
-      context: superAdminContext(),
-    })
-    guardMocks.providerConfigFindUnique.mockResolvedValue(null)
-    guardMocks.providerConfigUpsert.mockResolvedValue({ id: 'pp-ca-partial' })
-
-    const { PATCH } = await loadRoute()
-    const response = await PATCH(
-      providerPatchRequest({
-        ...CA_SANDBOX_PAYLOAD,
-        capabilities: { ...CA_SANDBOX_PAYLOAD.capabilities, partialRefund: true },
-      })
-    )
-
-    expect(response.status).toBe(200)
-    const written = guardMocks.providerConfigUpsert.mock.calls[0][0]
-    expect(JSON.parse(written.create.capabilities).partialRefund).toBe(true)
-
-    const registry = source('lib/finance/payments/provider-registry.ts')
-    expect(registry).toContain('partialRefund')
   })
 
   it('does not store PayPal secrets in the provider configuration row', () => {

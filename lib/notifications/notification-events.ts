@@ -171,11 +171,13 @@ export async function notifyCashJobCompleted(
   platformDueCents: bigint,
   currency: Currency = 'LKR',
 ) {
-  const formattedDue = formatCurrency(platformDueCents, currency)
+  const body = platformDueCents > 0n
+    ? `Cash for "${jobTitle}" was customer-confirmed. MaintainEX commission due: ${formatCurrency(platformDueCents, currency)}.`
+    : `Cash for "${jobTitle}" was customer-confirmed. No commission was recorded for a zero eligible collection.`
   return createNotification({
     userId: providerId,
     title: 'Cash Job Completed',
-    body: `Cash payment for "${jobTitle}" is handled directly with the customer. MaintainEX platform amount due: ${formattedDue}.`,
+    body,
     referenceType: 'JOB',
     referenceId: jobId,
   })

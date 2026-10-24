@@ -1,5 +1,14 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { PrismaClient } from '@prisma/client'
+import { NextRequest } from 'next/server'
+
+const mobileAuth = vi.hoisted(() => ({ actorId: '' }))
+vi.mock('@/lib/auth/compatibility/mobile-auth', () => ({
+  authenticateRequest: vi.fn(async () => ({ id: mobileAuth.actorId, role: 'CUSTOMER' })),
+  assertNotSuspended: vi.fn(() => null),
+}))
+
+import { POST as createJobReview } from '@/app/api/mobile/v2/jobs/[id]/reviews/route'
 
 const prisma = new PrismaClient()
 
@@ -168,18 +177,20 @@ describe('Phase 10.5 — Completion / Review', () => {
   })
 
   it('unrelated customer cannot review', async () => {
-    await expect(
-      prisma.jobReview.create({
-        data: {
-          jobId: completedJobId,
-          customerId: customerBId,
-          providerId,
-          quality: 5,
-          communication: 5,
-          timeliness: 5,
-        },
-      })
-    ).rejects.toThrow()
+    mobileAuth.actorId = customerBId
+    const request = new NextRequest(`http://localhost/api/mobile/v2/jobs/${completedJobId}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewType: 'CUSTOMER_REVIEWS_PROVIDER',
+        quality: 5,
+        communication: 5,
+        timeliness: 5,
+      }),
+    })
+    const response = await createJobReview(request, { params: Promise.resolve({ id: completedJobId }) })
+    expect(response.status).toBe(403)
+    expect(await prisma.jobReview.count({ where: { jobId: completedJobId, customerId: customerBId } })).toBe(0)
   })
 
   it('completion replay idempotent (same job cannot be completed twice)', async () => {

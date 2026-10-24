@@ -27,6 +27,7 @@ import { getActiveCompanyId } from '@/api/companies'
 import { v2JobActions, v2Jobs } from '@/api/v2-jobs'
 import { v3 } from '@/theme/v3/tokens'
 import NewChatModal from '@/features/messaging/components/NewChatModal'
+import CashCollectionPanel from '@/features/jobs/components/CashCollectionPanel'
 
 export default function CompanyManageJobScreen() {
   const router = useRouter()
@@ -77,7 +78,7 @@ export default function CompanyManageJobScreen() {
   )
 
   const accepted = myQuote?.status === 'ACCEPTED'
-  const protectedPayment = !!job && ['PROTECTED', 'CASH_CONFIRMED'].includes(job.escrow?.status)
+  const protectedPayment = !!job && ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(job.escrow?.status)
   const isReadyToTravel = accepted && protectedPayment && progress === 'ACCEPTED'
   const isInProgress = progress === 'IN_PROGRESS'
   const isWaitingCustomer = progress === 'COMPLETION_REQUESTED'
@@ -343,6 +344,8 @@ export default function CompanyManageJobScreen() {
           <Detail label="Escrow" value={job.escrow?.status || 'Not funded'} />
           <Detail label="Job status" value={String(job.status || '—').replaceAll('_', ' ')} last />
         </View>
+
+        <CashCollectionPanel jobId={id} role="provider" jobStatus={job?.status || ''} escrow={job?.escrow || null} onUpdated={load} />
 
         {canOtpCancel ? (
           <TouchableOpacity

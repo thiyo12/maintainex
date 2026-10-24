@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   isPayPalMarketVerified,
+  isLegacyReadOnlyProvider,
   parseProviderCapabilities,
   parseProviderList,
   selectProviderFromConfigs,
@@ -98,7 +99,7 @@ describe('payment provider registry', () => {
     ).toBeNull()
   })
 
-  it('never selects PayHere for a new checkout even if it has higher priority', () => {
+  it('keeps both legacy gateways out of new checkout until a processor is approved', () => {
     const selected = selectProviderFromConfigs(
       [
         config({ provider: 'PAYPAL', priority: 20 }),
@@ -111,7 +112,9 @@ describe('payment provider registry', () => {
       { countryCode: 'CA', currency: 'CAD' }
     )
 
-    expect(selected?.provider).toBe('PAYPAL')
+    expect(selected).toBeNull()
+    expect(isLegacyReadOnlyProvider('paypal')).toBe(true)
+    expect(isLegacyReadOnlyProvider('PayHere')).toBe(true)
   })
 
   it('restricts sandbox PayPal checkout to the controlled CA fixture', () => {
@@ -129,13 +132,13 @@ describe('payment provider registry', () => {
     expect(isPayPalMarketVerified('LK', 'LIVE')).toBe(false)
   })
 
-  it('honors an explicit PayPal request and refuses legacy PayHere requests', () => {
+  it('refuses legacy PayPal and PayHere requests for new checkout', () => {
     expect(
       selectProviderFromConfigs(
         [config()],
         { countryCode: 'CA', currency: 'CAD', requestedProvider: 'PAYPAL' }
-      )?.provider
-    ).toBe('PAYPAL')
+    )
+    ).toBeNull()
 
     expect(
       selectProviderFromConfigs(

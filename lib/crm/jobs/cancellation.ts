@@ -54,7 +54,7 @@ export async function inspectCrmJobCancellation(
     ])
 
     const protectedEscrow = Boolean(
-      escrow && ['PROTECTED', 'ON_HOLD', 'CASH_CONFIRMED'].includes(escrow.status)
+      escrow && ['PROTECTED', 'ON_HOLD', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow.status)
     )
     const paidIntent = Boolean(
       payment && ['SUCCESS', 'REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(payment.status)

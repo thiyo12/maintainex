@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 const src = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 const migration = src('prisma/migrations/20261020090000_phase04_crew_presence_witness_scaffold/migration.sql')
 const schema = src('prisma/schema.prisma')
-const workflow = src('.github/workflows/phase0-7-validation.yml')
+const bootstrapInvariants = src('prisma/bootstrap/postgresql-invariants.sql')
 
 describe('Phase04 inert per-member witness schema and CI parity', () => {
   it('uses additive restricted FK-backed evidence and one slot per crew epoch', () => {
@@ -19,10 +19,10 @@ describe('Phase04 inert per-member witness schema and CI parity', () => {
     expect(migration).not.toMatch(/\b(?:DROP|TRUNCATE|DELETE)\s+(?:TABLE|INDEX|FROM)/i)
   })
   it('restores custom witness constraints when CI bootstraps from Prisma baseline', () => {
-    expect(workflow).toContain('ADD CONSTRAINT "CrewPresenceWitness_positive_epoch_check"')
-    expect(workflow).toContain('ADD CONSTRAINT "CrewPresenceWitness_nonempty_check"')
-    expect(workflow).toContain('CHECK ("crewVersion" >= 1)')
-    expect(workflow).toContain('"workerAttestedAt" IS NOT NULL OR "customerAttestedAt" IS NOT NULL')
+    expect(bootstrapInvariants).toContain('ADD CONSTRAINT "CrewPresenceWitness_positive_epoch_check"')
+    expect(bootstrapInvariants).toContain('ADD CONSTRAINT "CrewPresenceWitness_nonempty_check"')
+    expect(bootstrapInvariants).toContain('CHECK ("crewVersion" >= 1)')
+    expect(bootstrapInvariants).toContain('"workerAttestedAt" IS NOT NULL OR "customerAttestedAt" IS NOT NULL')
   })
   it('preserves single-worker PIN and permission guards with no live presence grant', () => {
     const pin = src('lib/domain/job-pin.ts')

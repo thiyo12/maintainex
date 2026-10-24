@@ -18,7 +18,7 @@ export type WorkspaceStatus = 'ACCEPTED' | 'IN_PROGRESS' | 'WAITING_CUSTOMER' | 
 export type EscrowStatus = 'PENDING_PAYMENT' | 'PROTECTED' | 'ON_HOLD' | 'RELEASED' | 'REFUNDED' | 'CANCELLED'
 export type ActorType = 'CUSTOMER' | 'PROVIDER' | 'COMPANY' | 'STAFF' | 'SYSTEM'
 
-async function hasCompanyJobManagement(
+export async function hasCompanyJobManagement(
   db: PrismaClient | Prisma.TransactionClient,
   companyId: string,
   userId: string,
@@ -32,7 +32,7 @@ async function hasCompanyJobManagement(
     hasCompanyPermission(member.role, 'jobs:manage')
 }
 
-async function isAssignedCompanyWorker(
+export async function isAssignedCompanyWorker(
   db: PrismaClient | Prisma.TransactionClient,
   companyId: string,
   jobId: string,
@@ -257,7 +257,7 @@ export async function cancelJob(
 
     if (lockedJob.status === 'QUOTE_ACCEPTED') {
       const paymentCommitment = await tx.jobEscrow.findFirst({
-        where: { jobId: ctx.jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+        where: { jobId: ctx.jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] } },
         select: { id: true },
       })
       if (paymentCommitment) {
@@ -553,7 +553,7 @@ export async function raiseJobDispute(
     }
 
     const escrow = await tx.jobEscrow.findFirst({
-      where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+      where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] } },
     })
     if (!escrow) throw new Error('No payment commitment available for dispute')
 
