@@ -3899,10 +3899,120 @@ model ProviderCommissionReceivable {
   updatedAt          DateTime         @updatedAt
 
   recoveries ProviderCommissionRecovery[]
+  bankAllocations CommissionBankAllocation[]
 
   @@index([providerIdentityId, currency, status, dueAt])
   @@index([jobId])
   @@index([weeklySettlementId])
+}
+
+/// Imported bank evidence is kept separate from ledger postings. Statement
+/// imports remain UNVERIFIED until an authenticated source adapter confirms
+/// provenance; uploaded documents alone never settle a receivable.
+model CommissionBankStatementImport {
+  id                String   @id @default(cuid())
+  sourceSystem      String
+  statementId       String
+  accountRef        String
+  countryCode       String
+  currency          String
+  contentSha256     String
+  provenanceType    String   // BANK_FEED, STATEMENT_FILE, SIMULATED
+  provenanceStatus  String   @default("UNVERIFIED") // UNVERIFIED, VERIFIED, REJECTED
+  verificationSource String?
+  verificationRef   String?
+  verifiedAt        DateTime?
+  importedByAdminId String
+  rowCount          Int
+  createdAt         DateTime @default(now())
+  transactions      CommissionBankTransaction[]
+  events            CommissionBankStatementEvent[]
+
+  @@unique([sourceSystem, statementId])
+  @@unique([sourceSystem, contentSha256])
+  @@index([countryCode, provenanceStatus, createdAt])
+}
+
+model CommissionBankStatementEvent {
+  id               String   @id @default(cuid())
+  statementImportId String
+  statementImport  CommissionBankStatementImport @relation(fields: [statementImportId], references: [id], onDelete: Restrict)
+  eventType        String
+  actor            String
+  evidenceHash     String?
+  metadata         String?
+  createdAt        DateTime @default(now())
+
+  @@index([statementImportId, createdAt])
+}
+
+model CommissionBankTransaction {
+  id                    String   @id @default(cuid())
+  statementImportId     String
+  statementImport       CommissionBankStatementImport @relation(fields: [statementImportId], references: [id], onDelete: Restrict)
+  sourceSystem          String
+  transactionId         String
+  bankAccountRef        String
+  direction             String // CREDIT, DEBIT
+  amountMinor           BigInt
+  currency              String
+  countryCode           String
+  reference             String
+  reversalOfTransactionId String?
+  status                String   @default("UNREVIEWED") // UNREVIEWED, MATCHED, MISMATCH, DUPLICATE, REVERSED, RECONCILED
+  mismatchCode          String?
+  createdAt             DateTime @default(now())
+  reconciliation        CommissionBankReconciliation?
+
+  @@unique([sourceSystem, bankAccountRef, transactionId])
+  @@index([countryCode, status, createdAt])
+  @@index([reference, bankAccountRef])
+  @@index([reversalOfTransactionId])
+}
+
+model CommissionBankReconciliation {
+  id                     String   @id @default(cuid())
+  bankTransactionId      String   @unique
+  bankTransaction        CommissionBankTransaction @relation(fields: [bankTransactionId], references: [id], onDelete: Restrict)
+  providerIdentityId     String
+  approvalRequestId      String?  @unique
+  initiatedByAdminId     String
+  status                 String   @default("PENDING_REVIEW") // PENDING_REVIEW, APPROVED, POSTED, REJECTED, REVERSED
+  totalAmountMinor       BigInt
+  currency               String
+  countryCode            String
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  allocations            CommissionBankAllocation[]
+  events                 CommissionBankReconciliationEvent[]
+
+  @@index([providerIdentityId, status, createdAt])
+  @@index([countryCode, status, createdAt])
+}
+
+model CommissionBankReconciliationEvent {
+  id               String   @id @default(cuid())
+  reconciliationId String
+  reconciliation   CommissionBankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Restrict)
+  eventType        String
+  actorAdminId     String
+  metadata         String?
+  createdAt        DateTime @default(now())
+
+  @@index([reconciliationId, createdAt])
+}
+
+model CommissionBankAllocation {
+  id               String   @id @default(cuid())
+  reconciliationId String
+  reconciliation   CommissionBankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Restrict)
+  receivableId     String
+  receivable       ProviderCommissionReceivable @relation(fields: [receivableId], references: [id], onDelete: Restrict)
+  amountMinor      BigInt
+  createdAt        DateTime @default(now())
+
+  @@unique([reconciliationId, receivableId])
+  @@index([receivableId, createdAt])
 }
 
 model ProviderCommissionRecovery {

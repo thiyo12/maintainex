@@ -267,6 +267,42 @@ export async function resolveCurrentApprovalRisk(request: {
     }
   }
 
+  if (request.actionId === 'finance.commission.reconcile') {
+    if (request.targetType !== 'CommissionBankTransaction') {
+      throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+    }
+    const bankTransaction = await prisma.commissionBankTransaction.findUnique({
+      where: { id: request.targetId },
+      include: { statementImport: true, reconciliation: true },
+    })
+    if (!bankTransaction || !bankTransaction.reconciliation) throw new Error('APPROVAL_TARGET_NOT_FOUND')
+    if (bankTransaction.countryCode.toUpperCase() !== request.market.toUpperCase() ||
+        bankTransaction.reconciliation.countryCode.toUpperCase() !== request.market.toUpperCase()) {
+      throw new Error('APPROVAL_MARKET_CHANGED')
+    }
+    if (request.amountMinor !== null && request.amountMinor !== bankTransaction.amountMinor) {
+      throw new Error('APPROVAL_AMOUNT_CHANGED')
+    }
+    if (request.currency && request.currency.toUpperCase() !== bankTransaction.currency.toUpperCase()) {
+      throw new Error('APPROVAL_CURRENCY_CHANGED')
+    }
+    if (bankTransaction.statementImport.provenanceStatus !== 'VERIFIED' ||
+        bankTransaction.reconciliation.status !== 'PENDING_REVIEW' ||
+        bankTransaction.direction !== 'CREDIT' || bankTransaction.reversalOfTransactionId) {
+      throw new Error('BANK_RECONCILIATION_NO_LONGER_ELIGIBLE')
+    }
+    return {
+      actionId: 'finance.commission.reconcile',
+      market: bankTransaction.countryCode,
+      amountMinor: bankTransaction.amountMinor,
+      currency: bankTransaction.currency,
+      risk: {
+        currencyMismatch: false,
+        countryOrRecipientMismatch: false,
+      },
+    }
+  }
+
   if (request.actionId === 'jobs.cancel') {
     const source =
       request.targetType === 'MarketplaceJob'

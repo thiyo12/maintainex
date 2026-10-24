@@ -9,6 +9,7 @@ import { requestRequiredProviderRefund } from '@/lib/finance/payments/payment-se
 import { releaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { tierAtLeast } from './action-registry'
 import { resolveCurrentApprovalRisk } from './current-risk'
+import { postApprovedCommissionBankReconciliation } from '@/lib/finance/commissions/bank-credit-reconciliation'
 import type { ApprovalTier } from './types'
 import type { AdminRole } from '@/lib/admin-types'
 
@@ -299,6 +300,45 @@ export async function executeApprovedCrmRequest(
       // Old approval requests only carry a user-entered reference. That is not
       // independent PSP/bank evidence, so they must not create a paid payout.
       throw new Error('PAYOUT_EXTERNAL_EVIDENCE_REQUIRED')
+    } else if (request.actionId === 'finance.commission.reconcile') {
+      if (request.targetType !== 'CommissionBankTransaction' || !request.actionPayload) {
+        throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+      }
+      let payload: unknown
+      try {
+        payload = JSON.parse(request.actionPayload)
+      } catch {
+        throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+      }
+      if (
+        !payload || typeof payload !== 'object' || Array.isArray(payload) ||
+        (payload as Record<string, unknown>).mode !== 'BANK_CREDIT' ||
+        (payload as Record<string, unknown>).bankTransactionId !== request.targetId
+      ) {
+        throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+      }
+      const result = await postApprovedCommissionBankReconciliation({
+        bankTransactionId: request.targetId,
+        actorAdminId: actor.adminId,
+        approvalRequestId: request.id,
+      })
+      executionRef = `CommissionBankTransaction:${request.targetId}:POSTED`
+      await createAuditLog({
+        action: 'UPDATE',
+        category: 'FINANCE',
+        userId: actor.adminId,
+        userEmail: actor.email,
+        userRole: actor.role,
+        entityType: 'CommissionBankTransaction',
+        entityId: request.targetId,
+        entityName: request.targetId,
+        description: 'Approved independently verified commission bank credit and posted ledger recovery',
+        oldValue: { status: 'MATCHED', approvalRequestId: request.id },
+        newValue: { status: 'RECONCILED', approvalRequestId: request.id, replayed: result.replayed },
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent || undefined,
+        riskLevel: 'CRITICAL',
+      })
     } else if (request.actionId === 'jobs.cancel') {
       const source =
         request.targetType === 'MarketplaceJob'

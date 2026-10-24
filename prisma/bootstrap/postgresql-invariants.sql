@@ -66,3 +66,42 @@ CREATE UNIQUE INDEX "JobQuote_one_pending_per_provider_job"
 
 CREATE UNIQUE INDEX "PaymentIntent_one_active_per_job"
   ON "PaymentIntent"("jobId") WHERE status IN ('CREATED', 'PENDING');
+
+ALTER TABLE "CommissionBankStatementImport"
+  ADD CONSTRAINT "CommissionBankStatementImport_rowCount_check"
+    CHECK ("rowCount" BETWEEN 1 AND 10000),
+  ADD CONSTRAINT "CommissionBankStatementImport_hash_check"
+    CHECK ("contentSha256" ~ '^[a-f0-9]{64}$'),
+  ADD CONSTRAINT "CommissionBankStatementImport_provenance_check"
+    CHECK ("provenanceStatus" IN ('UNVERIFIED','VERIFIED','REJECTED')),
+  ADD CONSTRAINT "CommissionBankStatementImport_verified_evidence_check"
+    CHECK ("provenanceStatus" <> 'VERIFIED' OR ("verificationSource" IS NOT NULL AND "verificationRef" IS NOT NULL AND "verifiedAt" IS NOT NULL));
+
+ALTER TABLE "CommissionBankTransaction"
+  ADD CONSTRAINT "CommissionBankTransaction_amount_check" CHECK ("amountMinor" > 0),
+  ADD CONSTRAINT "CommissionBankTransaction_direction_check" CHECK ("direction" IN ('CREDIT','DEBIT'));
+
+ALTER TABLE "CommissionBankReconciliation"
+  ADD CONSTRAINT "CommissionBankReconciliation_amount_check" CHECK ("totalAmountMinor" > 0);
+
+ALTER TABLE "CommissionBankAllocation"
+  ADD CONSTRAINT "CommissionBankAllocation_amount_check" CHECK ("amountMinor" > 0);
+
+CREATE OR REPLACE FUNCTION reject_immutable_commission_finance_row()
+RETURNS TRIGGER AS $commission_immutable$
+BEGIN
+  RAISE EXCEPTION 'Commission bank audit and allocation rows are append-only';
+END;
+$commission_immutable$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_commission_bank_allocation_append_only
+  BEFORE UPDATE OR DELETE ON "CommissionBankAllocation"
+  FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();
+
+CREATE TRIGGER trg_commission_bank_event_append_only
+  BEFORE UPDATE OR DELETE ON "CommissionBankReconciliationEvent"
+  FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();
+
+CREATE TRIGGER trg_commission_bank_statement_event_append_only
+  BEFORE UPDATE OR DELETE ON "CommissionBankStatementEvent"
+  FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();

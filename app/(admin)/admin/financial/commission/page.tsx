@@ -290,6 +290,12 @@ export default function CommissionPage() {
         description="Monitor weekly provider commission obligations and reviewed appeals. A recorded transfer reference stays pending until a bank credit is independently matched."
         actions={
           <>
+            <Link href="/admin/financial/commission/bank-reconciliation">
+              <CrmButton variant="secondary">
+                <FiCheckCircle size={14} />
+                Bank reconciliation
+              </CrmButton>
+            </Link>
             <Link href="/admin/approvals">
               <CrmButton variant="secondary">
                 <FiShield size={14} />
