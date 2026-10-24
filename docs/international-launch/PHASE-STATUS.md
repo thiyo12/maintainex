@@ -330,7 +330,10 @@ files (467 passed, 5 skipped), using one worker and the isolated PostgreSQL test
 changed safety, geography, pricing, alias and locale tests also passed targeted runs. Mobile
 TypeScript and iOS/Android Expo exports passed from an isolated dependency clone. The final
 production build passed; lint reported zero errors and 41 existing warnings. `npm audit` could not
-reach `registry.npmjs.org` in this local environment, so exact-head GitHub dependency audit and CI
-remain required. The exact pushed SHA and CI results are recorded in PR #80 after synchronization.
+reach `registry.npmjs.org` in this local environment. For exact source SHA
+`a9f5a5d343040f5710f0c238a4e1e680e45594b9`, GitHub Security Exposure Audit and International Fast
+Gates passed; CRM V2 Release Validation remained queued at the time of this record. The GitHub
+workflow results and links are recorded in PR #80. This does not substitute for a completed npm
+audit or the still-pending release workflow.
 No production or payment actions were performed. Physical/device, crew and other operational tests
 remain **PENDING**.
