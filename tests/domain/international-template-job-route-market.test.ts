@@ -1,0 +1,33 @@
+import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+const search = readFileSync(resolve(process.cwd(), 'app/api/mobile/template-jobs/search/route.ts'), 'utf8')
+const listing = readFileSync(resolve(process.cwd(), 'app/api/mobile/template-jobs/route.ts'), 'utf8')
+
+describe('legacy-consumer V2 template job country isolation', () => {
+  for (const [name, source] of [['search', search], ['list', listing]] as const) {
+    it(`${name} rejects unsupported markets`, () => {
+      expect(source).toContain("market !== 'LK' && market !== 'CA'".replaceAll('market', name === 'list' ? 'country' : 'market'))
+      expect(source).toContain("error: 'Unsupported market'")
+    })
+    it(`${name} rejects job prices denominated in a different market currency`, () => {
+      expect(source).toContain("const expectedCurrency = ")
+      expect(source).toContain("j.currency === expectedCurrency")
+    })
+    it(`${name} checks both job and active parent category market grants`, () => {
+      expect(source).toContain('j.category.isActive')
+      expect(source).toContain('isCatalogAvailableInMarket(j.countries,')
+      expect(source).toContain('isCatalogAvailableInMarket(j.category.countries,')
+    })
+  }
+  it('applies currency and parent activity at database query time before the search cap', () => {
+    expect(search).toContain('currency: expectedCurrency,')
+    expect(search).toContain('category: { is: { isActive: true } },')
+    expect(search.indexOf('currency: expectedCurrency,')).toBeLessThan(search.indexOf('take: 200'))
+  })
+  it('caps search inputs and checks eligibility before returning the first 20 matches', () => {
+    expect(search).toContain('query.length > 160')
+    expect(search).toContain('eligible.slice(0, 20)')
+  })
+})

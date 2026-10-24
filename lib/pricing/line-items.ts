@@ -49,8 +49,8 @@ export function validateLineItems(
     }
 
     // Validate quantity
-    if (item.quantity <= 0) {
-      errors.push(`${prefix}: quantity must be positive, got ${item.quantity}`)
+    if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0) {
+      errors.push(`${prefix}: quantity must be a positive safe integer`)
       continue
     }
 
@@ -67,7 +67,7 @@ export function validateLineItems(
     }
 
     // Calculate total (server-side, not trusted from client)
-    const serverTotal = BigInt(Math.round(item.quantity)) * item.unitAmountCents
+    const serverTotal = BigInt(item.quantity) * item.unitAmountCents
 
     validated.push({
       ...item,

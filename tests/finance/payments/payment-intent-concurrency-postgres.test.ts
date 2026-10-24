@@ -106,6 +106,7 @@ describe.skipIf(!isTestDb)('Release gate — PaymentIntent concurrency', () => {
   afterAll(async () => {
     await prisma.paymentIntent.deleteMany({ where: { jobId } }).catch(() => {})
     await prisma.jobEscrow.deleteMany({ where: { id: escrowId } }).catch(() => {})
+    await prisma.jobWorkspace.deleteMany({ where: { jobId } }).catch(() => {})
     await prisma.jobQuote.deleteMany({ where: { id: quoteId } }).catch(() => {})
     await prisma.marketplaceJob.deleteMany({ where: { id: jobId } }).catch(() => {})
     await prisma.jobCategory.deleteMany({ where: { id: categoryId } }).catch(() => {})

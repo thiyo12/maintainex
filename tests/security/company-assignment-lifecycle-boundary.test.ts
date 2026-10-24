@@ -49,6 +49,7 @@ describe('company assignment lifecycle boundary', () => {
 
     expect(route).toContain("message.includes('concurrently')")
     expect(route).toContain("message.includes('scheduling conflict')")
+    expect(route).toContain("message.includes('arrival PIN verification')")
     expect(route).toContain('{ status: isConflict ? 409 : 400 }')
   })
 

@@ -20,21 +20,27 @@ export class PricingInputError extends Error {
 interface ResolvedPricingIdentifiers {
   categoryId: string
   serviceTemplateId?: string
+  countryCode?: string
 }
 
 export async function validatePricingIdentifiers(
   client: PrismaClient,
-  input: Pick<PricingInput, 'jobId' | 'categoryId' | 'serviceTemplateId'>,
+  input: Pick<PricingInput, 'jobId' | 'categoryId' | 'serviceTemplateId' | 'countryCode'>,
 ): Promise<ResolvedPricingIdentifiers> {
   let categoryId = input.categoryId?.trim() || ''
   let serviceTemplateId = input.serviceTemplateId?.trim() || undefined
+  let countryCode: string | undefined
 
   if (input.jobId && !input.jobId.startsWith('estimate-') && !input.jobId.startsWith('pending-')) {
     const job = await client.marketplaceJob.findUnique({
       where: { id: input.jobId },
-      select: { categoryId: true, serviceTemplateId: true },
+      select: { categoryId: true, serviceTemplateId: true, countryCode: true },
     })
     if (!job) throw new PricingInputError('Job not found')
+    if (input.countryCode && input.countryCode !== job.countryCode) {
+      throw new PricingInputError('Pricing country does not match the job service country')
+    }
+    countryCode = job.countryCode
     if (categoryId && categoryId !== job.categoryId) throw new PricingInputError('categoryId does not match job')
     if (serviceTemplateId && serviceTemplateId !== (job.serviceTemplateId || undefined)) {
       throw new PricingInputError('serviceTemplateId does not match job')
@@ -47,9 +53,20 @@ export async function validatePricingIdentifiers(
   if (serviceTemplateId) {
     const template = await client.serviceTemplate.findUnique({
       where: { id: serviceTemplateId },
-      select: { id: true, jobCategoryId: true, templateJobId: true },
+      select: { id: true, jobCategoryId: true, templateJobId: true, countryCode: true, currency: true },
     })
     if (!template) throw new PricingInputError('Service template not found')
+    // A saved job's country is authoritative. Avoid pricing a Canadian job
+    // using an LKR-only service template (or vice versa).
+    if (countryCode && template.countryCode && template.countryCode !== countryCode) {
+      throw new PricingInputError('Service template country does not match job country')
+    }
+    if (countryCode === 'LK' && template.currency !== 'LKR') {
+      throw new PricingInputError('Service template currency does not match job country')
+    }
+    if (countryCode === 'CA' && template.currency !== 'CAD') {
+      throw new PricingInputError('Service template currency does not match job country')
+    }
     serviceTemplateCategoryId = template.jobCategoryId
 
     if (template.templateJobId) {
@@ -75,20 +92,49 @@ export async function validatePricingIdentifiers(
     throw new PricingInputError('Service template/category mismatch')
   }
 
-  return { categoryId, serviceTemplateId }
+  return { categoryId, serviceTemplateId, countryCode }
 }
 
 export async function calculatePrice(
   client: PrismaClient,
   input: PricingInput,
 ): Promise<PriceBreakdown> {
+  // Reject malformed scalar modifiers before DB reads or BigInt arithmetic.
+  // Fractional, negative and unsafe quantities must never be rounded into
+  // a customer-facing price, nor produce a misleading validated estimate.
+  for (const [name, value] of [
+    ['quantity', input.quantity],
+    ['durationMinutes', input.durationMinutes],
+  ] as const) {
+    if (value !== undefined && value !== null &&
+        (!Number.isSafeInteger(value) || value < 1)) {
+      throw new PricingInputError(`${name} must be a positive safe integer`)
+    }
+  }
+  // Unknown urgency must not silently price as NORMAL; unknown modes
+  // must not appear as validated fixed-price or quote contracts.
+  if (!['NORMAL', 'URGENT', 'EMERGENCY'].includes(input.urgency)) {
+    throw new PricingInputError('Unsupported pricing urgency')
+  }
+  if (!['BOOK_NOW', 'QUOTE', 'PROJECT', 'RECURRING'].includes(input.mode)) {
+    throw new PricingInputError('Unsupported pricing mode')
+  }
   const identifiers = await validatePricingIdentifiers(client, input)
-  const config = await resolvePricingConfig(client, input.countryCode || 'GLOBAL')
+  const config = await resolvePricingConfig(client, identifiers.countryCode || input.countryCode || 'GLOBAL')
+
+  // An absent/stale market config may fall back to GLOBAL/LKR. Never
+  // publish a Canadian amount under an LKR configuration (or vice versa).
+  const marketCurrency = identifiers.countryCode === 'CA' ? 'CAD'
+    : identifiers.countryCode === 'LK' ? 'LKR' : null
+  if (marketCurrency && config.defaultCurrency !== marketCurrency) {
+    throw new PricingInputError('Pricing configuration currency does not match job market')
+  }
 
   const baseAmount = await resolveBaseAmount(client, {
     ...input,
     categoryId: identifiers.categoryId,
     serviceTemplateId: identifiers.serviceTemplateId,
+    countryCode: identifiers.countryCode || input.countryCode,
   })
   const urgency = computeUrgencyModifier(input.urgency, config)
   const urgencyAmount = capUrgencySurge(
@@ -143,8 +189,19 @@ async function resolveBaseAmount(
     }
   }
 
+  const market = input.countryCode?.trim().toUpperCase()
+  const expectedCurrency = market === 'CA' ? 'CAD' : market === 'LK' ? 'LKR' : null
   const templateJobs = await client.templateJob.findMany({
-    where: { categoryId: input.categoryId, isActive: true },
+    where: {
+      categoryId: input.categoryId,
+      isActive: true,
+      // Query only genuinely local prices — never average LKR and CAD
+      // templates from a multi-market parent category.
+      ...(expectedCurrency ? {
+        currency: expectedCurrency,
+        countries: { contains: JSON.stringify(market) },
+      } : {}),
+    },
     select: { priceMin: true, priceMax: true },
     take: 5,
   })
@@ -155,6 +212,13 @@ async function resolveBaseAmount(
     return BigInt(Math.max(avg, 100))
   }
 
+  // No currency exchange or fabricated Canadian default price.
+  if (market === 'CA') {
+    throw new PricingInputError('A locally priced service is required for a Canadian estimate')
+  }
+
+  // Preserve historic Sri Lankan category-level fallback; pricing can be
+  // configured independently per market without copying an LKR seed to CAD.
   return 5000n
 }
 

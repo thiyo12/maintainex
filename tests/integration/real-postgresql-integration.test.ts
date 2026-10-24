@@ -665,8 +665,8 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
 
     await prisma.user.createMany({
       data: [
-        { id: customerId, email: `${PREFIX}@test.com`, passwordHash: 'hash', name: 'Test Customer', role: 'CUSTOMER', isActive: true, updatedAt: new Date() },
-        { id: providerId, email: `${PREFIX}-p@test.com`, passwordHash: 'hash', name: 'Provider', role: 'TASKER', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
+        { id: customerId, email: `${PREFIX}@test.com`, passwordHash: 'hash', name: 'Test Customer', role: 'CUSTOMER', countryCode: 'LK', isActive: true, updatedAt: new Date() },
+        { id: providerId, email: `${PREFIX}-p@test.com`, passwordHash: 'hash', name: 'Provider', role: 'TASKER', countryCode: 'LK', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
       ],
     })
 
@@ -677,7 +677,7 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
         slug: `${PREFIX}-cat`,
         iconName: 'wrench',
         colorHex: '#FF0000',
-        countries: 'LK',
+        countries: '["LK"]',
         isActive: true,
       },
     })
@@ -692,7 +692,9 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
         priceMax: 5000,
         whatIsIncluded: 'Basic service',
         typicalDurationMinutes: 60,
-        countries: 'LK',
+        countries: '["LK"]',
+        currency: 'LKR',
+        isActive: true,
       },
     })
 
@@ -709,13 +711,17 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
         priceMin: 3000,
         priceMax: 5000,
         countryCode: 'LK',
+        currency: 'LKR',
+        isActive: true,
       },
     })
 
     const taskerProfile = await prisma.taskerProfile.create({
       data: {
         userId: providerId,
+        countryCode: 'LK',
         skills: '[]',
+        serviceAreas: '["Colombo"]',
         rating: 4.5,
         completedJobs: 10,
         hourlyRate: 500,
@@ -732,6 +738,8 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
         experienceYears: 2,
         experienceLevel: 2,
         hourlyRate: 500,
+        countryCode: 'LK',
+        currency: 'LKR',
       },
     })
   })
@@ -805,13 +813,31 @@ describe.skipIf(!isVPS)('4D.7 — FK/Orphan Audit', () => {
     await prisma.$disconnect()
   })
 
+  // Read-only, bounded diagnostics from the isolated CI database. Keep
+  // all eight zero-orphan assertions blocking: sample IDs identify which
+  // regression fixture leaked a row instead of blindly deleting evidence.
+  async function assertNoOrphans(
+    count: bigint,
+    relation: string,
+    sampleSql: string,
+  ) {
+    if (Number(count) === 0) return
+    const samples = await prisma.$queryRawUnsafe<Array<Record<string, string>>>(sampleSql)
+    expect(Number(count), `${relation}: orphaned fixture IDs ${JSON.stringify(samples)}`).toBe(0)
+  }
+
   it('MarketplaceJob.customerId orphans = 0', async () => {
     const result = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `SELECT COUNT(*) as count FROM "MarketplaceJob" mj
        LEFT JOIN "User" u ON mj."customerId" = u.id
        WHERE u.id IS NULL`
     )
-    expect(Number(result[0].count)).toBe(0)
+    await assertNoOrphans(result[0].count, 'MarketplaceJob.customerId', `
+      SELECT mj.id, mj."customerId" FROM "MarketplaceJob" mj
+       LEFT JOIN "User" u ON mj."customerId" = u.id
+       WHERE u.id IS NULL
+       ORDER BY mj.id LIMIT 25
+    `)
   })
 
   it('JobQuote.jobId orphans = 0', async () => {
@@ -834,7 +860,18 @@ describe.skipIf(!isVPS)('4D.7 — FK/Orphan Audit', () => {
           OR (jq."providerType" = 'COMPANY' AND cp.id IS NULL)
           OR jq."providerType" NOT IN ('INDIVIDUAL', 'COMPANY')`
     )
-    expect(Number(result[0].count)).toBe(0)
+    await assertNoOrphans(result[0].count, 'JobQuote.providerId', `
+      SELECT jq.id, jq."jobId", jq."providerId", jq."providerType"
+       FROM "JobQuote" jq
+       LEFT JOIN "User" u
+         ON jq."providerType" = 'INDIVIDUAL' AND jq."providerId" = u.id
+       LEFT JOIN "CompanyProfile" cp
+         ON jq."providerType" = 'COMPANY' AND jq."providerId" = cp.id
+       WHERE (jq."providerType" = 'INDIVIDUAL' AND u.id IS NULL)
+          OR (jq."providerType" = 'COMPANY' AND cp.id IS NULL)
+          OR jq."providerType" NOT IN ('INDIVIDUAL', 'COMPANY')
+       ORDER BY jq.id LIMIT 25
+    `)
   })
 
   it('JobWorkspace.jobId orphans = 0', async () => {
@@ -843,7 +880,12 @@ describe.skipIf(!isVPS)('4D.7 — FK/Orphan Audit', () => {
        LEFT JOIN "MarketplaceJob" mj ON jw."jobId" = mj.id
        WHERE mj.id IS NULL`
     )
-    expect(Number(result[0].count)).toBe(0)
+    await assertNoOrphans(result[0].count, 'JobWorkspace.jobId', `
+      SELECT jw.id, jw."jobId" FROM "JobWorkspace" jw
+       LEFT JOIN "MarketplaceJob" mj ON jw."jobId" = mj.id
+       WHERE mj.id IS NULL
+       ORDER BY jw.id LIMIT 25
+    `)
   })
 
   it('JobEscrow.jobId orphans = 0', async () => {

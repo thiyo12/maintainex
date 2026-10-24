@@ -14,6 +14,7 @@ describe('cash payment lifecycle contract', () => {
   const completeRoute = read('app/api/mobile/v2/jobs/[id]/complete/route.ts')
   const refundRoute = read('app/api/mobile/v2/jobs/[id]/escrow/refund/route.ts')
   const customer = read('apps/mobile/features/jobs/screens/customer/v2/[id].tsx')
+  const customerPayment = read('apps/mobile/features/jobs/screens/customer/v2/confirm/[id].tsx')
   const tasker = read('apps/mobile/features/jobs/screens/tasker/v2/manage/[id].tsx')
   const company = read('apps/mobile/features/jobs/screens/company/v2/manage/[id].tsx')
 
@@ -98,8 +99,15 @@ describe('cash payment lifecycle contract', () => {
   })
 
   it('exposes cash selection and cash-ready work start in the mobile clients', () => {
-    expect(customer).toContain('handleCashPayment')
-    expect(customer).toContain('v2JobActions.confirmCashPayment(id)')
+    // Job detail links to the dedicated payment screen. That screen owns
+    // cash selection, requires server-approved market/method availability,
+    // and never silently treats cash as funded escrow.
+    expect(customer).toContain('handleReviewPayment')
+    expect(customer).toContain("router.push({ pathname: '/(customer)/jobs/v2/confirm/[id]', params: { id } })")
+    expect(customerPayment).toContain('handleCash')
+    expect(customerPayment).toContain("canSubmitPayment(paymentPresentation, 'cash')")
+    expect(customerPayment).toContain('v2JobActions.confirmCashPayment(id)')
+    expect(customerPayment).toContain("escrow?.status === 'CASH_CONFIRMED'")
     expect(customer).toContain("['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status)")
     expect(tasker).toContain("['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status)")
     expect(company).toContain("['PROTECTED', 'CASH_CONFIRMED'].includes(job.escrow?.status)")

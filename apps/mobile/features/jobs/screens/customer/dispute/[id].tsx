@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { FileText, Lock, WarningCircle } from 'phosphor-react-native'
+import { FileText, WarningCircle } from 'phosphor-react-native'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { useTranslation } from 'react-i18next'
@@ -25,6 +25,7 @@ export default function DisputeScreen() {
   const [description, setDescription] = useState('')
   const [expectation, setExpectation] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [submittedSafety, setSubmittedSafety] = useState(false)
   const [disputeId, setDisputeId] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -46,6 +47,11 @@ export default function DisputeScreen() {
       Alert.alert(t('common.error'), t('errors.describeIssue'))
       return
     }
+    if (step === 1 && reason.startsWith('SAFETY_') &&
+        (description.trim().length < 10 || description.trim().length > 2000)) {
+      Alert.alert('Safety report details', 'Describe the incident in 10–2000 characters.')
+      return
+    }
     if (step < 2) setStep(step + 1)
   }
 
@@ -55,8 +61,24 @@ export default function DisputeScreen() {
       const resolutionContext = expectation.trim()
         ? `${description.trim()}\n\nRequested resolution: ${expectation.trim()}`
         : description.trim()
-      const res = await v2JobActions.dispute(id as string, reason, resolutionContext)
-      setDisputeId(res.disputeId || (id as string))
+      if (reason.startsWith('SAFETY_')) {
+        // Incident intake is separate from a financial dispute. No escrow or
+        // booking state changes are implied by recording a safety report.
+        if (resolutionContext.length < 10 || resolutionContext.length > 2000) {
+          Alert.alert('Safety report details', 'Keep the incident and requested help within 2000 characters.')
+          return
+        }
+        const res = await v2JobActions.reportSafety(id as string, {
+          reason: reason as Parameters<typeof v2JobActions.reportSafety>[1]['reason'],
+          description: resolutionContext,
+        })
+        setDisputeId(res.reportId)
+        setSubmittedSafety(true)
+      } else {
+        const res = await v2JobActions.dispute(id as string, reason, resolutionContext)
+        setDisputeId(res.disputeId || (id as string))
+        setSubmittedSafety(false)
+      }
       setSubmitted(true)
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message || t('common.error'))
@@ -66,7 +88,14 @@ export default function DisputeScreen() {
   }
 
   const reasonLabels = t('dispute.reasons', { returnObjects: true }) as string[]
-  const disputeReasons = reasonLabels.map((label, i) => ({ key: ['incomplete', 'quality', 'damage', 'price', 'behavior', 'other'][i], label }))
+  const disputeReasons = [
+    ...reasonLabels.map((label, i) => ({ key: ['incomplete', 'quality', 'damage', 'price', 'behavior', 'other'][i], label })),
+    { key: 'SAFETY_IMMEDIATE_DANGER', label: 'Immediate danger or threat' },
+    { key: 'SAFETY_THREAT_OR_HARASSMENT', label: 'Threats or harassment' },
+    { key: 'SAFETY_INJURY', label: 'Injury during the job' },
+    { key: 'SAFETY_UNSAFE_WORK', label: 'Unsafe work or hazardous conditions' },
+    { key: 'SAFETY_IDENTITY_MISMATCH', label: 'Worker identity does not match profile' },
+  ]
 
   const taskerName = job?.acceptedQuote?.provider?.name || t('dispute.tasker')
   const jobTitle = job?.title || t('dispute.job')
@@ -98,17 +127,22 @@ export default function DisputeScreen() {
           <View style={styles.successCircle}>
             <FileText size={36} color="#FFFFFF" weight="regular" />
           </View>
-          <Text style={styles.successTitle}>{t('dispute.submitted')}</Text>
+          <Text style={styles.successTitle}>{submittedSafety ? 'Safety report recorded' : t('dispute.submitted')}</Text>
           <Text style={styles.successSub}>
-            {t('dispute.submittedDesc')}
+            {submittedSafety
+              ? 'Your incident was added to the staff queue. This is not emergency dispatch.'
+              : t('dispute.submittedDesc')}
           </Text>
           <View style={styles.ticketBox}>
-            <Text style={styles.ticketLabel}>{t('dispute.disputeId')}</Text>
+            <Text style={styles.ticketLabel}>{submittedSafety ? 'Safety reference' : t('dispute.disputeId')}</Text>
             <Text style={styles.ticketId}>#{disputeId}</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 32 }}>
-            <Lock size={14} color="#6F6B6B" weight="regular" />
-            <Text style={styles.refundNote}>{t('dispute.escrowHeld')}</Text>
+            <Text style={styles.refundNote}>
+              {submittedSafety
+                ? 'A safety report does not automatically put payment on hold. Contact emergency services if in immediate danger.'
+                : 'Your dispute was submitted. Payment status and next steps will be reviewed by MaintainEX support.'}
+            </Text>
           </View>
           <TouchableOpacity
             style={styles.homeBtn}
@@ -213,7 +247,9 @@ export default function DisputeScreen() {
             <View style={styles.warningBox}>
               <WarningCircle size={18} color="#F5A623" weight="fill" />
               <Text style={styles.warningText}>
-                {t('dispute.warning')}
+                {reason.startsWith('SAFETY_')
+                  ? 'Safety intake alerts staff but does not automatically hold escrow or dispatch emergency services. Use the payment dispute flow separately if needed.'
+                  : t('dispute.warning')}
               </Text>
             </View>
           </View>

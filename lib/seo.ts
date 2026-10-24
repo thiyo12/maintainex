@@ -1,3 +1,13 @@
+/** Serialize JSON-LD without permitting HTML raw-text/script termination. */
+export function serializeStructuredData(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+}
+
 export function organizationSchema(region: string) {
   const isCA = region === 'CA'
   return {
@@ -23,7 +33,7 @@ export function organizationSchema(region: string) {
 export function localBusinessSchema(region: string, city?: string) {
   const isCA = region === 'CA'
   const areas = isCA
-    ? ['Toronto', 'Mississauga', 'Brampton', 'Markham', 'Scarborough', 'North York', 'Etobicoke']
+    ? ['Vancouver']
     : ['Colombo', 'Kandy', 'Galle', 'Negombo', 'Jaffna', 'Kurunegala', 'Matara']
   return {
     '@context': 'https://schema.org',

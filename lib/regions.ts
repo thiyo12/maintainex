@@ -48,13 +48,10 @@ export const REGIONS: Record<string, RegionConfig> = {
     whatsapp: '14164279518',
     countryName: 'Canada',
     countryNamePossessive: "Canada's",
-    districts: [
-      'Toronto (Downtown)', 'Scarborough', 'North York', 'Etobicoke',
-      'York', 'East York', 'Mississauga', 'Brampton',
-      'Markham', 'Richmond Hill', 'Vaughan', 'Oakville',
-      'Burlington', 'Milton', 'Ajax', 'Pickering',
-      'Whitby', 'Oshawa', 'Newmarket', 'Aurora',
-    ],
+    // Canadian launch scope: Vancouver municipal limits only.
+    // This UI list is not a geofence; booking authorization must validate
+    // the confirmed service coordinates against Vancouver city boundaries.
+    districts: ['Vancouver'],
     budgetMax: 5000,
     budgetStep: 50,
     phoneExample: '+1 416 555 0123',

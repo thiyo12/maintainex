@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
+import { calculateQuoteTotal, validateLineItems } from '@/lib/pricing/line-items'
 
 /**
  * Create a new revision of an existing quote.
@@ -34,6 +35,14 @@ export async function createQuoteRevision(
 
       if (!original) return { success: false, error: 'Original quote not found' }
       if (original.providerId !== params.providerId) return { success: false, error: 'Not your quote' }
+      // A bargaining revision cannot reinterpret the original quote's money
+      // or mix currencies within an immutable commercial revision chain.
+      if (params.currency != null && params.currency !== original.currency) {
+        return { success: false, error: 'Quote revision currency must match the original quote' }
+      }
+      if (params.price <= 0n) {
+        return { success: false, error: 'Quote revision amount must be positive' }
+      }
       if (original.status === 'ACCEPTED') return { success: false, error: 'Cannot revise an accepted quote' }
       if (original.status === 'REJECTED') return { success: false, error: 'Cannot revise a rejected quote' }
       if (original.status === 'WITHDRAWN') return { success: false, error: 'Cannot revise a withdrawn quote' }
@@ -62,6 +71,37 @@ export async function createQuoteRevision(
         return { success: false, error: 'Quote revisions are only allowed while the job is open' }
       }
 
+      // Revision totals and line items must agree before a new commercial
+      // offer is persisted. Never accept client-supplied minor-unit totals
+      // without authoritative recomputation.
+      if (params.lineItems && params.lineItems.length === 0) {
+        return { success: false, error: 'Quote revision line items cannot be empty' }
+      }
+      if (params.lineItems?.length) {
+        if (params.subtotalCents == null || params.taxCents == null || params.totalCents == null) {
+          return { success: false, error: 'Quote revision itemized totals are required' }
+        }
+        const checked = validateLineItems(params.lineItems, original.currency)
+        if (!checked.valid || checked.validatedItems.length !== params.lineItems.length) {
+          return { success: false, error: 'Invalid quote revision line items' }
+        }
+        if (params.lineItems.some(item => item.totalAmountCents !== BigInt(item.quantity) * item.unitAmountCents)) {
+          return { success: false, error: 'Quote revision line item total does not match quantity and unit price' }
+        }
+        const totals = calculateQuoteTotal(checked.validatedItems, params.subtotalCents ?? null, params.totalCents ?? null)
+        if (!totals.valid || totals.serverTotalCents !== params.price ||
+          (params.taxCents != null && params.taxCents !== totals.serverTaxCents)) {
+          return { success: false, error: 'Quote revision total does not match line items' }
+        }
+      }
+
+      // Prevent an itemized revision from persisting a stale client-side
+      // total even when its declared subtotal/tax are arithmetically valid.
+      if (params.lineItems?.length &&
+          (params.subtotalCents! + params.taxCents! !== params.totalCents!)) {
+        return { success: false, error: 'Quote revision subtotal and tax do not equal total' }
+      }
+
       const claimed = await tx.jobQuote.updateMany({
         where: {
           id: params.originalQuoteId,
@@ -86,7 +126,7 @@ export async function createQuoteRevision(
           message: params.message ?? original.message,
           attachments: params.attachments ?? original.attachments,
           status: 'PENDING',
-          currency: params.currency ?? original.currency,
+          currency: original.currency,
           subtotalCents: params.subtotalCents ?? null,
           taxCents: params.taxCents ?? null,
           totalCents: params.totalCents ?? null,
@@ -108,7 +148,7 @@ export async function createQuoteRevision(
               quantity: item.quantity,
               unit: item.unit ?? null,
               unitAmountCents: item.unitAmountCents,
-              totalAmountCents: item.totalAmountCents,
+              totalAmountCents: BigInt(item.quantity) * item.unitAmountCents,
               currency: item.currency,
               sortOrder: item.sortOrder,
               metadata: item.metadata ?? null,
@@ -144,8 +184,10 @@ export async function getQuoteRevisionHistory(
 
   let rootId: string = initial.id
   let currentParentId: string | null = initial.parentQuoteId
+  const visitedParents = new Set<string>([initial.id])
 
-  while (currentParentId) {
+  while (currentParentId && !visitedParents.has(currentParentId)) {
+    visitedParents.add(currentParentId)
     const parent = await client.jobQuote.findUnique({ where: { id: currentParentId } })
     if (!parent) break
     rootId = parent.id
@@ -155,8 +197,10 @@ export async function getQuoteRevisionHistory(
   // Now walk forward through the chain
   const history: Array<{ id: string; revisionNumber: number; status: string; price: bigint; createdAt: Date; revisionReason: string | null }> = []
   let chainId: string | null = rootId
+  const visitedRevisions = new Set<string>()
 
-  while (chainId) {
+  while (chainId && !visitedRevisions.has(chainId)) {
+    visitedRevisions.add(chainId)
     const quote = await client.jobQuote.findUnique({ where: { id: chainId } })
     if (!quote) break
     history.push({

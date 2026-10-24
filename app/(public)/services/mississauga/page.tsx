@@ -1,6 +1,6 @@
 import { headers } from 'next/headers'
 import { getRegionFromHost, REGIONS } from '@/lib/regions'
-import { localBusinessSchema, breadcrumbSchema } from '@/lib/seo'
+import { serializeStructuredData, localBusinessSchema, breadcrumbSchema } from '@/lib/seo'
 import type { Metadata } from 'next'
 import ServicesPage from '../client'
 
@@ -38,8 +38,8 @@ export default async function MississaugaPage() {
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(cityJson) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJson) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(cityJson) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(breadcrumbJson) }} />
       <ServicesPage cityName="Mississauga" />
     </>
   )

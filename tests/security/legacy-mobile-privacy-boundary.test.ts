@@ -44,7 +44,9 @@ describe('legacy mobile privacy boundary', () => {
 
   it('validates coordinate writes before storing them', () => {
     const route = read('app/api/mobile/taskers/location/route.ts')
-    expect(route).toContain('Number.isFinite(parsedLatitude)')
+    expect(route).toContain('const parseCoordinate = (value: unknown)')
+    expect(route).toContain('Number.isFinite(parsed)')
+    expect(route).toContain('parsedLatitude === null')
     expect(route).toContain('parsedLatitude < -90')
     expect(route).toContain('parsedLongitude > 180')
   })

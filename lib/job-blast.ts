@@ -2,6 +2,8 @@ import { prisma } from './prisma'
 import { createNotification } from './notifications'
 import { sendExpoPush } from './push'
 import { findCandidates } from './matching'
+import { requireJobMarket } from './geography/market-engine'
+import { secureConsole } from './shared/observability/secure-console'
 
 /**
  * Notify every provider entity returned by the canonical matching engine.
@@ -12,6 +14,15 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job || job.status !== 'OPEN') return { matched: 0, totalCandidates: 0 }
 
+  // Phase 03: the blast is the primary provider dispatcher. It must resolve the
+  // market from the validated service address; a job whose market cannot be
+  // established is never pushed to any provider.
+  const jobMarket = requireJobMarket(job)
+  if (!jobMarket.ok) {
+    secureConsole.warn('Job blast skipped: unresolved job market', { jobId: job.id })
+    return { matched: 0, totalCandidates: 0 }
+  }
+
   const result = await findCandidates(prisma, {
     jobId: job.id,
     userId: job.customerId,
@@ -21,7 +32,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     serviceTemplateId: job.serviceTemplateId || undefined,
     latitude: job.latitude,
     longitude: job.longitude,
-    countryCode: job.countryCode || 'GLOBAL',
+    countryCode: jobMarket.countryCode,
     preferredDate: job.preferredDate,
   })
 

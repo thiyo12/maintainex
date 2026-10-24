@@ -14,7 +14,8 @@ export async function GET(
       where: { id },
       select: { id: true, slug: true, i18nKey: true, isActive: true },
     })
-    if (!profession) {
+    // Inactive professions cannot expose archived skills to new providers.
+    if (!profession || !profession.isActive) {
       return NextResponse.json({ error: 'Profession not found' }, { status: 404 })
     }
 

@@ -1,13 +1,17 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { jsonArrayContains, safeParseJsonArr } from '@/lib/db-utils'
+import { safeParseJsonArr } from '@/lib/db-utils'
+import { isCatalogAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const categoryId = searchParams.get('categoryId')
-    const country = searchParams.get('country') || 'LK'
+    const country = (searchParams.get('country') || 'LK').trim().toUpperCase()
+    if (country !== 'LK' && country !== 'CA') {
+      return NextResponse.json({ error: 'Unsupported market' }, { status: 400 })
+    }
 
     const where: any = { isActive: true }
     if (categoryId) where.categoryId = categoryId
@@ -18,7 +22,10 @@ export async function GET(request: NextRequest) {
       orderBy: [{ isPopular: 'desc' }, { name: 'asc' }],
     })
 
-    jobs = jobs.filter(j => jsonArrayContains(j.countries, country))
+    const expectedCurrency = country === 'LK' ? 'LKR' : 'CAD'
+    jobs = jobs.filter(j => j.currency === expectedCurrency && j.category.isActive &&
+      isCatalogAvailableInMarket(j.countries, country) &&
+      isCatalogAvailableInMarket(j.category.countries, country))
 
     return NextResponse.json(jobs.map(j => ({
       id: j.id,

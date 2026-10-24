@@ -154,6 +154,20 @@ export const LOCATIONS: LocationCountry[] = [
               { id: 'lk-vavuniya-town', name: 'Vavuniya Town' },
             ],
           },
+          {
+            id: 'lk-mannar',
+            name: 'Mannar',
+            areas: [
+              { id: 'lk-mannar-town', name: 'Mannar Town' },
+            ],
+          },
+          {
+            id: 'lk-mullaitivu',
+            name: 'Mullaitivu',
+            areas: [
+              { id: 'lk-mullaitivu-town', name: 'Mullaitivu Town' },
+            ],
+          },
         ],
       },
       {
@@ -274,6 +288,33 @@ export const LOCATIONS: LocationCountry[] = [
     name: 'Canada',
     code: 'CA',
     states: [
+      {
+        // Vancouver launch district; historical Ontario entries below are
+        // retained for pre-launch data but are not an active launch market.
+        id: 'ca-bc',
+        name: 'British Columbia',
+        cities: [
+          {
+            id: 'ca-vancouver',
+            name: 'Vancouver',
+            areas: [
+              { id: 'ca-vancouver-downtown', name: 'Downtown' },
+              { id: 'ca-vancouver-west-end', name: 'West End' },
+              { id: 'ca-vancouver-yaletown', name: 'Yaletown' },
+              { id: 'ca-vancouver-mount-pleasant', name: 'Mount Pleasant' },
+              { id: 'ca-vancouver-commercial-drive', name: 'Commercial Drive' },
+              { id: 'ca-vancouver-kitsilano', name: 'Kitsilano' },
+              { id: 'ca-vancouver-fairview', name: 'Fairview' },
+              { id: 'ca-vancouver-shaughnessy', name: 'Shaughnessy' },
+              { id: 'ca-vancouver-marpole', name: 'Marpole' },
+              { id: 'ca-vancouver-riley-park', name: 'Riley Park' },
+              { id: 'ca-vancouver-kensington', name: 'Kensington' },
+              { id: 'ca-vancouver-gastown', name: 'Gastown' },
+              { id: 'ca-vancouver-stanley-park', name: 'Stanley Park' },
+            ],
+          },
+        ],
+      },
       {
         id: 'ca-ontario',
         name: 'Ontario',

@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router'
 import { useAuth } from '@/features/auth/context/auth'
 import { useColors } from '@/lib/ThemeContext'
+import { useCountry } from '@/lib/country'
 import { useTranslation } from 'react-i18next'
 import { fonts } from '@/lib/fonts'
 import { getCategoryI18nKey } from '@/lib/categories'
@@ -58,7 +59,14 @@ export default function CompanySetupOnboarding() {
   const styles = makeStyles(colors)
   const router = useRouter()
   const { t } = useTranslation()
-  const { refreshUser } = useAuth()
+  const { user, refreshUser } = useAuth()
+  const { selectedCountry } = useCountry()
+  // The authenticated account market takes priority; the selected country
+  // is only a display fallback before mobile account data is refreshed.
+  const accountMarket = user?.countryCode?.toUpperCase()
+  const market = accountMarket === 'CA' || (!accountMarket && selectedCountry?.code === 'CA')
+    ? 'CA' : 'LK'
+  const [servesVancouver, setServesVancouver] = useState(false)
   const [step, setStep] = useState(0)
 
   const [companyName, setCompanyName] = useState('')
@@ -74,14 +82,16 @@ export default function CompanySetupOnboarding() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
+    setSelectedIds(new Set())
+    setCategories([])
     fetchCategories()
-  }, [])
+  }, [market])
 
   const fetchCategories = async () => {
     setCategoriesLoading(true)
     try {
       const token = await getAuthToken()
-      const res = await fetch(`${API_URL}/api/mobile/job-categories`, {
+      const res = await fetch(`${API_URL}/api/mobile/job-categories?country=${market}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
@@ -123,6 +133,10 @@ export default function CompanySetupOnboarding() {
       Alert.alert(t('common.error'), t('errors.selectServiceCompany'))
       return
     }
+    if (market === 'CA' && !servesVancouver) {
+      Alert.alert('Choose your service area', 'Confirm City of Vancouver coverage before completing company setup.')
+      return
+    }
     setSaving(true)
     try {
       const token = await getAuthToken()
@@ -135,7 +149,7 @@ export default function CompanySetupOnboarding() {
           registrationNo: registrationNo || undefined,
           description: description || undefined,
           services: Array.from(selectedIds),
-          serviceAreas: [],
+          serviceAreas: market === 'CA' && servesVancouver ? ['Vancouver'] : [],
         }),
       })
       if (!profileRes.ok) {
@@ -276,6 +290,23 @@ export default function CompanySetupOnboarding() {
             <Text style={styles.sectionTitle}>Your company workspace</Text>
             <Text style={styles.sectionSub}>Your owner account is created first. After company verification, you can invite managers, dispatchers, workers and finance staff from the Team workspace.</Text>
 
+            {market === 'CA' ? (
+              <TouchableOpacity
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: servesVancouver }}
+                style={styles.workspaceCard}
+                onPress={() => setServesVancouver(value => !value)}
+              >
+                <View style={styles.workspaceIcon}>
+                  <CheckCircle size={24} color={servesVancouver ? colors.amberDark : colors.ink} weight={servesVancouver ? 'fill' : 'regular'} />
+                </View>
+                <View style={styles.workspaceCopy}>
+                  <Text style={styles.workspaceTitle}>City of Vancouver coverage</Text>
+                  <Text style={styles.workspaceBody}>My company accepts service bookings inside City of Vancouver. Check to declare this service area before setup.</Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
+
             <View style={styles.workspaceCard}>
               <View style={styles.workspaceIcon}><UsersThree size={24} color={colors.ink} weight="fill" /></View>
               <View style={styles.workspaceCopy}>
@@ -313,6 +344,12 @@ export default function CompanySetupOnboarding() {
                 {categories.flatMap(category => category.jobs).filter(job => selectedIds.has(job.id)).map(job => job.name).join(', ')}
               </Text>
             </View>
+            {market === 'CA' ? (
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewLabel}>Service area</Text>
+                <Text style={styles.reviewValue}>{servesVancouver ? 'City of Vancouver' : 'Not declared — return to company workspace'}</Text>
+              </View>
+            ) : null}
             <View style={styles.reviewSection}>
               <Text style={styles.reviewLabel}>Company status</Text>
               <Text style={styles.reviewValue}>Pending verification · Team access after approval</Text>
@@ -357,9 +394,9 @@ export default function CompanySetupOnboarding() {
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              style={[styles.primaryBtn, (!companyName || selectedIds.size === 0 || saving) && styles.primaryBtnDisabled]}
+              style={[styles.primaryBtn, (!companyName || selectedIds.size === 0 || saving || (market === 'CA' && !servesVancouver)) && styles.primaryBtnDisabled]}
               onPress={handleSubmit}
-              disabled={!companyName || selectedIds.size === 0 || saving}
+              disabled={!companyName || selectedIds.size === 0 || saving || (market === 'CA' && !servesVancouver)}
             >
               {saving ? (
                 <ActivityIndicator color={colors.white} />

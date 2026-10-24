@@ -68,7 +68,15 @@ async function isAssignedInspectionProvider(
     },
     select: { id: true },
   })
-  return Boolean(assignment)
+  if (!assignment) return false
+
+  // Assignments are retained for audit after offboarding. They must never
+  // confer execution or diagnosis-write privileges without active membership.
+  const activeMember = await client.teamMember.findFirst({
+    where: { companyId: inspection.companyId, userId, status: 'ACTIVE' },
+    select: { id: true },
+  })
+  return Boolean(activeMember)
 }
 
 async function canScheduleInspection(
@@ -109,11 +117,16 @@ async function isInspectionParty(
   if (await isAssignedInspectionProvider(client, inspection, userId)) return true
 
   if (inspection.companyId) {
+    // The generic WORKER role has jobs:read but cannot dispute an inspection
+    // for work they were never assigned. Management retains oversight.
     const membership = await client.teamMember.findFirst({
       where: { companyId: inspection.companyId, userId, status: 'ACTIVE' },
-      select: { id: true },
+      select: { role: true },
     })
-    return Boolean(membership)
+    return Boolean(
+      membership && membership.role !== 'WORKER' &&
+      hasCompanyPermission(membership.role as CompanyRole, 'quotes:read')
+    )
   }
 
   return false

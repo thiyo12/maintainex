@@ -2,9 +2,38 @@ import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
-import { prisma } from '@/lib/prisma'
-import { canAssignRole, canManageMember, isValidCompanyRole } from '@/lib/phase6/rbac'
+import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
+import { canAssignRole, canManageMember, hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
+import { Prisma } from '@prisma/client'
+import { blockWorkerFormingCrewsInsideTransaction } from '@/lib/domain/company-crew-workforce'
+
+/** Recheck the actor's live account and role under the same transaction that
+ * modifies workforce. Caller holds the company row lock before invoking. */
+async function assertCurrentWorkforceManager(
+  tx: PrismaClientOrTx, companyId: string, actorUserId: string, actorRole: string,
+): Promise<void> {
+  const accounts = await tx.$queryRaw<Array<{
+    isActive: boolean; isSuspended: boolean; isBanned: boolean
+  }>>`
+    SELECT "isActive", "isSuspended", "isBanned"
+    FROM "User" WHERE id = ${actorUserId} FOR UPDATE
+  `
+  if (accounts.length !== 1 || !accounts[0].isActive ||
+      accounts[0].isSuspended || accounts[0].isBanned) {
+    throw new Error('WORKFORCE_ACTOR_NO_LONGER_AUTHORIZED')
+  }
+  const members = await tx.$queryRaw<Array<{ role: string; status: string }>>`
+    SELECT role, status FROM "TeamMember"
+    WHERE "companyId" = ${companyId} AND "userId" = ${actorUserId}
+    FOR UPDATE
+  `
+  if (members.length !== 1 || members[0].status !== 'ACTIVE' ||
+      members[0].role !== actorRole || !isValidCompanyRole(members[0].role) ||
+      !hasCompanyPermission(members[0].role, 'members:manage')) {
+    throw new Error('WORKFORCE_ACTOR_NO_LONGER_AUTHORIZED')
+  }
+}
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -53,6 +82,37 @@ export async function PATCH(request: NextRequest) {
             FOR UPDATE
           `
 
+          await assertCurrentWorkforceManager(tx, companyId, user.id, context!.role)
+
+          // Serialize role transitions with dispatch, which locks the same
+          // membership row before writing a worker assignment. Otherwise a
+          // WORKER could become FINANCE after the dispatch preflight passed.
+          await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "TeamMember" WHERE id = ${member.id} FOR UPDATE
+          `
+          const lockedMember = await tx.teamMember.findUnique({
+            where: { id: member.id },
+            select: { role: true, status: true },
+          })
+          if (!lockedMember || lockedMember.role !== oldRole || lockedMember.status === 'REMOVED') {
+            throw new Error('MEMBER_ROLE_CHANGED')
+          }
+
+          if (oldRole === 'WORKER' && role !== 'WORKER') {
+            const activeAssignments = await tx.companyJobAssignment.count({
+              where: {
+                companyId,
+                workerUserId: memberUserId,
+                status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+              },
+            })
+            if (activeAssignments > 0) throw new Error('WORKER_HAS_ACTIVE_ASSIGNMENT')
+            await blockWorkerFormingCrewsInsideTransaction(tx, {
+              companyId, workerUserId: memberUserId,
+              actorUserId: user.id, actorRole: context!.role, reason: 'ROLE_CHANGED',
+            })
+          }
+
           if (oldRole === 'COMPANY_OWNER' && role !== 'COMPANY_OWNER') {
             const ownerCount = await tx.teamMember.count({
               where: { companyId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
@@ -75,7 +135,7 @@ export async function PATCH(request: NextRequest) {
             description: `Changed ${member.name} role from ${oldRole} to ${role}`,
             metadata: { oldRole, newRole: role, targetUserId: memberUserId },
           }, tx)
-        })
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
         return NextResponse.json({ success: true, member: { id: member.id, role } })
       }
@@ -91,6 +151,26 @@ export async function PATCH(request: NextRequest) {
             WHERE id = ${companyId}
             FOR UPDATE
           `
+
+          await assertCurrentWorkforceManager(tx, companyId, user.id, context!.role)
+
+          // Dispatch locks this same TeamMember row before writing an
+          // assignment. Hold it until the assignment lookup and revocation
+          // finish, or a competing dispatch can escape the suspension.
+          await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "TeamMember" WHERE id = ${member.id} FOR UPDATE
+          `
+          const lockedMember = await tx.teamMember.findUnique({
+            where: { id: member.id },
+            select: { role: true, status: true },
+          })
+          if (
+            !lockedMember ||
+            lockedMember.role !== member.role ||
+            lockedMember.status !== 'ACTIVE'
+          ) {
+            throw new Error('MEMBER_STATUS_CHANGED')
+          }
 
           if (member.role === 'COMPANY_OWNER') {
             const ownerCount = await tx.teamMember.count({
@@ -111,6 +191,11 @@ export async function PATCH(request: NextRequest) {
           if (activeAssignments.some(assignment => assignment.status === 'IN_PROGRESS')) {
             throw new Error('WORKER_HAS_IN_PROGRESS_JOB')
           }
+
+          const crewInvalidation = await blockWorkerFormingCrewsInsideTransaction(tx, {
+            companyId, workerUserId: memberUserId,
+            actorUserId: user.id, actorRole: context!.role, reason: 'SUSPENDED',
+          })
 
           await tx.teamMember.update({
             where: { id: member.id },
@@ -138,11 +223,16 @@ export async function PATCH(request: NextRequest) {
             targetType: 'TeamMember',
             targetId: member.id,
             description: `Deactivated ${member.name} (${member.role})`,
-            metadata: { targetUserId: memberUserId, revokedAssignments: revocableIds.length },
+            metadata: {
+              targetUserId: memberUserId,
+              revokedLegacyAssignments: revocableIds.length,
+              blockedCrews: crewInvalidation.blockedCrewsCount,
+              revokedCrewSlots: crewInvalidation.revokedCrewSlotsCount,
+            },
           }, tx)
 
-          return revocableIds.length
-        })
+          return revocableIds.length + crewInvalidation.revokedCrewSlotsCount
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
         return NextResponse.json({
           success: true,
@@ -168,6 +258,41 @@ export async function PATCH(request: NextRequest) {
         }
 
         await prisma.$transaction(async tx => {
+          await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "CompanyProfile" WHERE id = ${companyId} FOR UPDATE
+          `
+          await assertCurrentWorkforceManager(tx, companyId, user.id, context!.role)
+
+          // The global account and membership may change after the HTTP
+          // preflight. Lock them in dispatch order (User -> TeamMember) and
+          // revalidate before restoring a worker's privileges.
+          const accounts = await tx.$queryRaw<Array<{
+            isActive: boolean; isSuspended: boolean; isBanned: boolean
+          }>>`
+            SELECT "isActive", "isSuspended", "isBanned"
+            FROM "User" WHERE id = ${memberUserId} FOR UPDATE
+          `
+          const account = accounts[0]
+          if (!account || !account.isActive || account.isSuspended || account.isBanned) {
+            throw new Error('MEMBER_REACTIVATION_BLOCKED')
+          }
+
+          await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "TeamMember" WHERE id = ${member.id} FOR UPDATE
+          `
+          const lockedMember = await tx.teamMember.findUnique({
+            where: { id: member.id },
+            select: { role: true, status: true },
+          })
+          if (
+            !lockedMember ||
+            lockedMember.role !== member.role ||
+            lockedMember.status !== member.status ||
+            lockedMember.status === 'REMOVED'
+          ) {
+            throw new Error('MEMBER_STATUS_CHANGED')
+          }
+
           await tx.teamMember.update({
             where: { id: member.id },
             data: { status: 'ACTIVE' },
@@ -193,8 +318,35 @@ export async function PATCH(request: NextRequest) {
     }
   } catch (err) {
     if (err instanceof Error) {
+      if (err.message === 'CREW_WORKFORCE_STATE_CONFLICT' ||
+          (err as Error & { code?: string }).code === 'P2034') {
+        return NextResponse.json({ error: 'Crew changed concurrently or has arrival/work evidence; retry or resolve roster first' }, { status: 409 })
+      }
+      if (err.message === 'WORKFORCE_ACTOR_NO_LONGER_AUTHORIZED') {
+        return NextResponse.json({ error: 'Workforce manager is no longer authorized' }, { status: 403 })
+      }
       if (err.message === 'LAST_COMPANY_OWNER') {
         return NextResponse.json({ error: 'Cannot remove or demote the last active company owner' }, { status: 409 })
+      }
+      if (err.message === 'WORKER_HAS_ACTIVE_ASSIGNMENT') {
+        return NextResponse.json(
+          { error: 'Reassign or finish the worker\'s active jobs before changing their role.' },
+          { status: 409 }
+        )
+      }
+      if (err.message === 'MEMBER_REACTIVATION_BLOCKED') {
+        return NextResponse.json({
+          error: 'Cannot reactivate membership while the user account is inactive, suspended, or banned',
+        }, { status: 409 })
+      }
+      if (err.message === 'MEMBER_STATUS_CHANGED') {
+        return NextResponse.json(
+          { error: 'Member status changed concurrently; retry the request' },
+          { status: 409 }
+        )
+      }
+      if (err.message === 'MEMBER_ROLE_CHANGED') {
+        return NextResponse.json({ error: 'Member role changed concurrently; retry the request' }, { status: 409 })
       }
       if (err.message === 'WORKER_HAS_IN_PROGRESS_JOB') {
         return NextResponse.json(

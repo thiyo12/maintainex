@@ -7,6 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { v2Request } from '@/api/v2-client'
+import JobSafetyCentre from '@/features/safety/components/JobSafetyCentre'
 
 interface AssignmentDetail {
   id: string
@@ -22,7 +23,8 @@ interface AssignmentDetail {
   revokedAt: string | null
   revokedReason: string | null
   rejectReason: string | null
-  job: { id: string; title: string; status: string }
+  job: { id: string; title: string; status: string; countryCode: string }
+  capabilities?: { isAssignedWorker: boolean; canManageAssignment: boolean }
   worker: { id: string; name: string; email: string }
   company: { id: string; companyName: string }
 }
@@ -169,7 +171,7 @@ export default function AssignmentDetailScreen() {
             </TouchableOpacity>
           )}
 
-          {assignment.status === 'ASSIGNED' && (
+          {assignment.capabilities?.isAssignedWorker && assignment.status === 'ASSIGNED' && (
             <>
               <TouchableOpacity
                 style={[styles.actionBtn, styles.acceptBtn]}
@@ -192,7 +194,7 @@ export default function AssignmentDetailScreen() {
             </>
           )}
 
-          {['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(assignment.status) && (
+          {assignment.capabilities?.canManageAssignment && ['ASSIGNED', 'ACCEPTED'].includes(assignment.status) && (
             <TouchableOpacity
               style={[styles.actionBtn, styles.revokeBtn]}
               onPress={() => confirmAction('revoke', t('company.workforce.confirmRevoke'))}
@@ -203,15 +205,15 @@ export default function AssignmentDetailScreen() {
           )}
 
           {assignment.status === 'IN_PROGRESS' && (
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.completeBtn]}
-              onPress={() => handleAction('complete')}
-              disabled={actionLoading}
-            >
-              <Text style={styles.actionBtnText}>{t('company.workforce.complete')}</Text>
-            </TouchableOpacity>
+            <Text style={styles.cardMeta}>
+              Work completion follows the job verification and customer approval flow.
+            </Text>
           )}
         </View>
+        {assignment.capabilities?.isAssignedWorker &&
+          ['ACCEPTED', 'IN_PROGRESS', 'COMPLETED'].includes(assignment.status) ? (
+          <JobSafetyCentre jobId={assignment.jobId} countryCode={assignment.job.countryCode} />
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   )

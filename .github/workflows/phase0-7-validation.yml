@@ -13,6 +13,7 @@ on:
   pull_request:
     branches:
       - main
+      - feature/international-launch-12phase
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -46,6 +47,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://maintainex:maintainex_ci@localhost:5432/maintainex_test_phase07_ci
+      TEST_DB_URL: postgresql://maintainex:maintainex_ci@localhost:5432/maintainex_test_phase07_ci
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: phase07-ci-nextauth-secret-0123456789
       MARKETPLACE_JWT_SECRET: phase07-ci-marketplace-jwt-secret-01234567890123456789
@@ -86,11 +88,11 @@ jobs:
       - name: Install mobile dependencies
         run: npm ci --prefix apps/mobile
 
-      - name: Audit web production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      - name: Audit web dependency graph
+        run: npm audit --audit-level=high
 
-      - name: Audit mobile production dependencies
-        run: node scripts/mobile-production-audit.mjs
+      - name: Audit mobile dependency graph
+        run: node scripts/mobile-dependency-audit.mjs
 
       - name: Generate Prisma client
         run: npx prisma generate
@@ -148,6 +150,36 @@ jobs:
             ON "CompanyJobAssignment"("jobId")
             WHERE "status" IN ('ASSIGNED', 'ACCEPTED', 'IN_PROGRESS');
 
+          -- The Prisma-generated CI baseline omits custom SQL CHECK constraints
+          -- and partial indexes. Mirror only the additive Phase04 challenge
+          -- invariants so isolated CI matches the actual migration.
+          ALTER TABLE "CompanyCrewPinChallenge"
+            ADD CONSTRAINT "CompanyCrewPinChallenge_epoch_check"
+              CHECK ("crewVersion" >= 1 AND "challengeVersion" >= 1),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_purpose_check"
+              CHECK ("purpose" IN ('ARRIVAL', 'WORK_START')),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_attempt_check"
+              CHECK ("failedAttempts" BETWEEN 0 AND 5),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_digest_check"
+              CHECK ("pinDigest" ~ '^[a-f0-9]{64}$'),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_expiry_check"
+              CHECK ("expiresAt" > "createdAt"),
+            ADD CONSTRAINT "CompanyCrewPinChallenge_terminal_check"
+              CHECK ("consumedAt" IS NULL OR "revokedAt" IS NULL);
+
+          CREATE UNIQUE INDEX IF NOT EXISTS "CrewPinChallenge_one_live_idx"
+            ON "CompanyCrewPinChallenge"
+              ("crewDispatchId", "crewVersion", "assignmentId", "purpose")
+            WHERE "consumedAt" IS NULL AND "revokedAt" IS NULL;
+
+          -- CI bootstraps a Prisma-generated schema rather than replaying raw
+          -- migrations. Restore the two additive witness CHECK invariants.
+          ALTER TABLE "CompanyCrewPresenceWitness"
+            ADD CONSTRAINT "CrewPresenceWitness_positive_epoch_check"
+              CHECK ("crewVersion" >= 1),
+            ADD CONSTRAINT "CrewPresenceWitness_nonempty_check"
+              CHECK ("workerAttestedAt" IS NOT NULL OR "customerAttestedAt" IS NOT NULL);
+
           CREATE UNIQUE INDEX IF NOT EXISTS "JobQuote_one_pending_per_provider_job"
             ON "JobQuote"("jobId", "providerId")
             WHERE status = 'PENDING';
@@ -171,6 +203,33 @@ jobs:
         run: |
           psql "$DATABASE_URL" -c "\di *countryCode*"
 
+      # Isolated CI PostgreSQL only: create a dedicated SELECT-only account
+      # and exercise the actual SQL of the launch provider-coverage audit.
+      # This proves query compatibility, never real-world provider supply.
+      - name: Phase 11 aggregate provider coverage query (isolated read-only CI DB)
+        run: |
+          set -euo pipefail
+          [[ "$DATABASE_URL" == *'@localhost:5432/maintainex_test_phase07_ci' ]] || { echo 'Refusing a non-CI database'; exit 1; }
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE phase11_coverage_auditor LOGIN PASSWORD 'phase11-ci-readonly-0123456789';
+          GRANT CONNECT ON DATABASE maintainex_test_phase07_ci TO phase11_coverage_auditor;
+          GRANT USAGE ON SCHEMA public TO phase11_coverage_auditor;
+          GRANT SELECT ON ALL TABLES IN SCHEMA public TO phase11_coverage_auditor;
+          SQL
+          export MAINTAINEX_READONLY_DATABASE_URL='postgresql://phase11_coverage_auditor:phase11-ci-readonly-0123456789@localhost:5432/maintainex_test_phase07_ci'
+          bash scripts/international-provider-coverage-audit.sh 2>&1 | tee /tmp/phase11-coverage-sql-test.txt
+          grep -Eq '\(28 rows\)' /tmp/phase11-coverage-sql-test.txt
+      - name: Upload Phase 11 coverage SQL diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase11-coverage-sql-diagnostics
+          path: /tmp/phase11-coverage-sql-test.txt
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Lint
+        run: npm run lint
+
       - name: TypeScript
         run: npx tsc --noEmit 2>&1 | tee /tmp/tsc.txt
 
@@ -186,7 +245,48 @@ jobs:
       - name: Mobile TypeScript
         run: |
           cd apps/mobile
-          npx tsc --noEmit
+          npx tsc --noEmit 2>&1 | tee /tmp/mobile-tsc.txt
+
+      - name: Upload Mobile TypeScript diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mobile-typescript-diagnostics
+          path: /tmp/mobile-tsc.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: International launch Phases 04-11 blocking acceptance gates
+        if: always()
+        run: |
+          set -euo pipefail
+          npx vitest run \
+            tests/security/phase04-vancouver-company-onboarding.test.ts \
+            tests/security/phase04-company-invitation-market.test.ts \
+            tests/security/phase07-company-work-start-authorization.test.ts \
+            tests/security/phase11-inactive-company-owner-matching.test.ts \
+            tests/regions/phase11-provider-coverage-audit-contract.test.ts \
+            tests/e2e/e2e-fix-batch.test.ts \
+            tests/security/crm-canonical-catalog.test.ts \
+            tests/finance/phase05-price-input-isolation.test.ts \
+            tests/pricing/phase05-market-price-estimate.test.ts \
+            tests/quotes/quote-revision.test.ts \
+            tests/security/quote-revision-route-security.test.ts \
+            tests/domain/phase08-seasonal-offer-market.test.ts \
+            apps/mobile/lib/i18n/__tests__/french-locale.test.ts \
+            tests/structural/phase11-launch-gate-contract.test.ts \
+            --reporter=verbose 2>&1 | tee /tmp/international-launch-phase-gates.txt
+
+      - name: Upload international launch acceptance diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: international-launch-acceptance-diagnostics
+          path: /tmp/international-launch-phase-gates.txt
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: International launch market regression checks
+        run: npx vitest run tests/regions/international-launch-regions.test.ts tests/security/international-v2-search-market-contract.test.ts tests/domain/catalog-market-eligibility.test.ts tests/domain/catalog-inventory.test.ts tests/domain/international-template-job-route-market.test.ts tests/pricing/international-estimate-market-contract.test.ts tests/pricing/international-authoritative-job-country.test.ts tests/security/international-tracking-issue-report-contract.test.ts tests/security/international-safety-escalation-contract.test.ts tests/security/international-active-v2-safety-report-contract.test.ts tests/integration/phase04-crew-commit-postgres.test.ts
 
       - name: Schema integrity tests
         run: npx vitest run tests/structural/schema-integrity.test.ts tests/structural/migration-validation.test.ts tests/structural/crm-legacy-role-retirement.test.ts tests/structural/crm-app-web-v2.test.ts tests/structural/crm-legacy-customer-api-retirement.test.ts tests/structural/crm-v2-shell-permissions.test.ts tests/structural/crm-v2-visual-contract.test.ts tests/structural/crm-reference-parity-all-pages.test.ts tests/structural/crm-global-readability.test.ts tests/structural/crm-v2-migrated-page-contract.test.ts tests/structural/crm-v2-shell.test.ts tests/structural/crm-phase14-v2.test.ts tests/structural/crm-phase15-legacy-demolition.test.ts --reporter=verbose 2>&1 | tee /tmp/schema-tests.txt
@@ -328,10 +428,37 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-      - name: Historical full regression baseline (non-blocking)
-        continue-on-error: true
-        run: npx vitest run tests --reporter=verbose 2>&1 | tee /tmp/regression-tests.txt
+      - name: Production build
+        env:
+          NODE_ENV: production
+          ALLOW_TEST_OTP: "false"
+        run: npm run build 2>&1 | tee /tmp/build-output.txt
         if: always()
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: build-diagnostics
+          path: /tmp/build-output.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Full regression suite including local HTTP security (blocking)
+        if: always()
+        run: |
+          set -euo pipefail
+          NODE_ENV=production ALLOW_TEST_OTP=false node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3198 > /tmp/http-test-server.txt 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3198/api/health > /dev/null; then ready=true; break; fi
+            kill -0 "$server_pid" || { cat /tmp/http-test-server.txt; exit 1; }
+            sleep 1
+          done
+          [ "$ready" = true ] || { cat /tmp/http-test-server.txt; exit 1; }
+          PHASE10_TEST_API_BASE=http://127.0.0.1:3198 npx vitest run --no-file-parallelism --reporter=verbose 2>&1 | tee /tmp/regression-tests.txt
 
       - name: Upload regression test diagnostics
         if: always()
@@ -339,6 +466,29 @@ jobs:
         with:
           name: regression-test-diagnostics
           path: /tmp/regression-tests.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
+      # Audit persisted integrity after every fixture teardown. The full suite
+      # is serialized above so database snapshots cannot observe partial cleanup.
+      - name: Final PostgreSQL orphan audit after regression cleanup (blocking)
+        if: always()
+        run: |
+          set -euo pipefail
+          [[ "$DATABASE_URL" == *'@localhost:5432/maintainex_test_phase07_ci' ]] || {
+            echo 'Refusing to audit an unexpected database'
+            exit 1
+          }
+          npx vitest run tests/integration/real-postgresql-integration.test.ts \
+            -t '4D.7 — FK/Orphan Audit' --reporter=verbose \
+            2>&1 | tee /tmp/phase11-final-postgres-orphan-audit.txt
+
+      - name: Upload final PostgreSQL orphan audit diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: phase11-final-postgres-orphan-audit-diagnostics
+          path: /tmp/phase11-final-postgres-orphan-audit.txt
           if-no-files-found: ignore
           retention-days: 3
 
@@ -370,22 +520,6 @@ jobs:
           grep -q 'APP_RELEASE_SHA' deploy-rsync.sh
           ! grep -q 'sed -i.*provider' deploy-rsync.sh
           ! grep -q 'docker cp.*CONTAINER:/app' deploy-rsync.sh
-
-      - name: Production build
-        env:
-          NODE_ENV: production
-          ALLOW_TEST_OTP: "false"
-        run: npm run build 2>&1 | tee /tmp/build-output.txt
-        if: always()
-
-      - name: Upload build diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: build-diagnostics
-          path: /tmp/build-output.txt
-          if-no-files-found: ignore
-          retention-days: 3
 
       - name: Docker build
         run: |
@@ -459,6 +593,12 @@ jobs:
           exit 1
         if: always()
 
+      - name: International launch running-container market-isolation smoke
+        run: |
+          set -euo pipefail
+          node scripts/international-catalogue-smoke.mjs --self-test
+          node scripts/international-catalogue-smoke.mjs http://127.0.0.1:3199
+        if: always()
       - name: Verify non-root user
         run: |
           RUNNING=$(docker inspect -f '{{.State.Running}}' phase9-ci-test 2>/dev/null || echo "false")

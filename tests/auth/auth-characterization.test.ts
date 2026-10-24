@@ -155,10 +155,12 @@ describe('Phase D — auth characterization (current behavior pinning)', () => {
   })
 
   describe('getAdminSession', () => {
-    it('resolves a bearer admin access JWT (with assignedCountries)', async () => {
+    it('normalizes a development-compatible bearer admin JWT into the legacy session shape', async () => {
       const session = await getAdminSession(bearer(signAccessToken(adminUser)))
       expect(session).toBeTruthy()
-      expect(session.sub).toBe('admin-1')
+      // getAdminSession accepts the JWT_SECRET token only outside production.
+      // The compatibility normalizer returns id rather than the raw JWT sub.
+      expect(session.id).toBe('admin-1')
       expect(session.role).toBe('SUPER_ADMIN')
       expect(session.assignedCountries).toEqual(['LK', 'CA'])
       expect(session.type).toBe('access')
@@ -194,14 +196,15 @@ describe('Phase D — auth characterization (current behavior pinning)', () => {
   })
 
   describe('auth-utils getSession (website session shape)', () => {
-    it('returns the SessionUser shape from a bearer token (no authType/assignedCountries fields)', async () => {
+    it('returns the normalized legacy SessionUser with an explicit auth source', async () => {
       const session = await getSession(bearer(signAccessToken(adminUser)))
       expect(session).toBeTruthy()
       expect(Object.keys(session!).sort()).toEqual(
-        ['branchId', 'canEditServices', 'email', 'id', 'name', 'province', 'region', 'role'].sort()
+        ['authType', 'branchId', 'canEditServices', 'email', 'id', 'name', 'province', 'region', 'role'].sort()
       )
       expect(session!.id).toBe('admin-1')
       expect(session!.name).toBe('Ada Lovelace')
+      expect(session!.authType).toBe('LEGACY')
     })
 
     it('falls back to the admin_token cookie', async () => {

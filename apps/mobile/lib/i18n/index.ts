@@ -3,8 +3,9 @@ import { initReactI18next } from 'react-i18next'
 import en from './locales/en'
 import ta from './locales/ta'
 import si from './locales/si'
+import fr from './locales/fr'
 
-const resources = { en: { translation: en }, ta: { translation: ta }, si: { translation: si } }
+const resources = { en: { translation: en }, ta: { translation: ta }, si: { translation: si }, fr: { translation: fr } }
 
 let initialized = false
 

@@ -96,6 +96,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     ownerAId = ownerA.id
     const companyA = await prisma.companyProfile.create({
       data: {
+        countryCode: 'LK',
         userId: ownerAId,
         companyName: `ME CoA ${ts}`,
         services: JSON.stringify([`me-cat-${ts}`, 'electrical']),
@@ -134,6 +135,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     ownerBId = ownerB.id
     const companyB = await prisma.companyProfile.create({
       data: {
+        countryCode: 'LK',
         userId: ownerBId,
         companyName: `ME CoB ${ts}`,
         services: JSON.stringify([`me-cat-${ts}`]),
@@ -172,6 +174,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     individualProviderId = indivUser.id
     const individualProfile = await prisma.taskerProfile.create({
       data: {
+          countryCode: 'LK',
         userId: individualProviderId,
         skills: JSON.stringify([`me-cat-${ts}`, 'renovation']),
         isVerified: true,
@@ -203,6 +206,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     suspendedProviderId = suspendedUser.id
     await prisma.taskerProfile.create({
       data: {
+          countryCode: 'LK',
         userId: suspendedProviderId,
         skills: JSON.stringify([`me-cat-${ts}`]),
         isVerified: true,
@@ -224,6 +228,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     bannedProviderId = bannedUser.id
     await prisma.taskerProfile.create({
       data: {
+          countryCode: 'LK',
         userId: bannedProviderId,
         skills: JSON.stringify([`me-cat-${ts}`]),
         isVerified: true,
@@ -244,6 +249,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     unverifiedIdentityProviderId = unverifiedUser.id
     await prisma.taskerProfile.create({
       data: {
+          countryCode: 'LK',
         userId: unverifiedIdentityProviderId,
         skills: JSON.stringify([`me-cat-${ts}`]),
         isVerified: true,
@@ -264,6 +270,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     noCapabilitiesProviderId = noCapUser.id
     await prisma.taskerProfile.create({
       data: {
+          countryCode: 'LK',
         userId: noCapabilitiesProviderId,
         skills: '[]',
         isVerified: true,
@@ -300,6 +307,9 @@ describe('Phase 7 — Matching Engine Integration', () => {
         title: 'ME Test Job',
         description: 'Plumbing repair',
         categoryId: testCategoryId,
+        // Matching fails closed when the job market cannot be established, so the
+        // fixture must carry the market the job is actually located in.
+        countryCode: 'LK',
         photos: '[]',
         budgetType: 'FIXED',
         budgetAmount: 15000n,

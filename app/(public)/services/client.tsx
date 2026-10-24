@@ -110,7 +110,10 @@ function ServicesContent({ cityName }: { cityName?: string }) {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/categories')
+      // Canonical V2 marketplace catalogue, shared with the mobile app.
+      // The legacy /api/categories (V1) endpoint is retained for historical
+      // bookings and legacy admin screens, but is no longer the public source.
+      const res = await fetch('/api/catalog', { cache: 'no-store' })
       if (res.ok) {
         const data = await res.json()
         setCategories(data)

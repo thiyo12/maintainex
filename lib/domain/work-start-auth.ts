@@ -26,11 +26,17 @@ export async function checkWorkStartAuthorization(
       approvedQuoteId: true,
       status: true,
       customerId: true,
+      workersCount: true,
     },
   })
 
   if (!job) {
     return { authorized: false, reason: 'JOB_NOT_FOUND' }
+  }
+  // A job with multiple people cannot be represented by one accepted
+  // assignment or one work-start PIN. Never silently start partial crews.
+  if ((job.workersCount ?? 1) !== 1) {
+    return { authorized: false, reason: 'CREW_UNSUPPORTED' }
   }
 
   const acceptedQuote = await client.jobQuote.findFirst({
@@ -46,18 +52,37 @@ export async function checkWorkStartAuthorization(
     acceptedQuote.providerType === 'INDIVIDUAL' &&
     acceptedQuote.providerId === providerId
 
-  const isCompanyMember =
-    acceptedQuote.providerType === 'COMPANY' &&
-    (await client.teamMember.findFirst({
-      where: {
-        companyId: acceptedQuote.providerId,
-        userId: providerId,
-        status: 'ACTIVE',
-      },
-      select: { id: true },
-    }))
+  // Company membership alone is insufficient: an unrelated manager,
+  // dispatcher or finance employee cannot start an assigned worker's job.
+  // The work-start PIN checks the same accepted-assignment boundary.
+  let isAssignedCompanyWorker = false
+  if (acceptedQuote.providerType === 'COMPANY') {
+    const [membership, assignment, actor] = await Promise.all([
+      client.teamMember.findFirst({
+        where: { companyId: acceptedQuote.providerId, userId: providerId, status: 'ACTIVE', role: 'WORKER' },
+        select: { id: true },
+      }),
+      client.companyJobAssignment.findFirst({
+        where: {
+          companyId: acceptedQuote.providerId,
+          jobId,
+          workerUserId: providerId,
+          status: 'ACCEPTED',
+        },
+        select: { id: true },
+      }),
+      client.user.findUnique({
+        where: { id: providerId },
+        select: { isActive: true, isSuspended: true, isBanned: true, identityStatus: true },
+      }),
+    ])
+    isAssignedCompanyWorker = Boolean(
+      membership && assignment && actor && actor.isActive &&
+      !actor.isSuspended && !actor.isBanned && actor.identityStatus === 'VERIFIED'
+    )
+  }
 
-  if (!isProvider && !isCompanyMember) {
+  if (!isProvider && !isAssignedCompanyWorker) {
     return { authorized: false, reason: 'NOT_PROVIDER' }
   }
 

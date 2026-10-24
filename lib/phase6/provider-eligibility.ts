@@ -1,5 +1,13 @@
-import { prisma } from '@/lib/prisma'
+import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { readStoredList } from '@/lib/db-utils'
+
+/** Legacy capabilities can be JSON lists or old comma-separated labels.
+ * An empty JSON array is NOT a declared capability, even if the string is truthy.
+ */
+export function hasDeclaredProviderCapabilities(stored: string | null | undefined): boolean {
+  return readStoredList(stored).some(value => value.trim().length > 0)
+}
 
 export interface ProviderEligibility {
   eligible: boolean
@@ -11,12 +19,13 @@ export async function checkIndividualProviderEligibility(userId: string): Promis
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { identityStatus: true, isSuspended: true, isBanned: true, role: true },
+    select: { identityStatus: true, isActive: true, isSuspended: true, isBanned: true, role: true },
   })
   if (!user) {
     return { eligible: false, reasons: ['User not found'] }
   }
 
+  if (user.isActive === false) reasons.push('Account is inactive')
   if (user.isSuspended) reasons.push('Account is suspended')
   if (user.isBanned) reasons.push('Account is banned')
   if (user.identityStatus !== 'VERIFIED') reasons.push('Identity not verified')
@@ -32,7 +41,7 @@ export async function checkIndividualProviderEligibility(userId: string): Promis
   if (profile.verificationStatus !== 'VERIFIED') reasons.push('Provider verification not approved')
   if (!profile.isVerified) reasons.push('Provider not marked as verified')
 
-  const hasLegacySkills = profile.skills && profile.skills !== '[]' && profile.skills !== ''
+  const hasLegacySkills = hasDeclaredProviderCapabilities(profile.skills)
   if (!hasLegacySkills) {
     const relationalSkillCount = await prisma.taskerSkill.count({ where: { taskerId: profile.id } })
     if (relationalSkillCount === 0) {
@@ -43,17 +52,16 @@ export async function checkIndividualProviderEligibility(userId: string): Promis
   return { eligible: reasons.length === 0, reasons }
 }
 
-export async function checkCompanyEligibility(companyId: string): Promise<ProviderEligibility> {
+export async function checkCompanyEligibility(companyId: string, db: PrismaClientOrTx = prisma): Promise<ProviderEligibility> {
   const reasons: string[] = []
 
-  const company = await prisma.companyProfile.findUnique({
+  const company = await db.companyProfile.findUnique({
     where: { id: companyId },
     select: {
       verificationStatus: true,
       isVerified: true,
       services: true,
       subscriptionStatus: true,
-      userId: true,
     },
   })
   if (!company) {
@@ -63,122 +71,209 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
   if (company.verificationStatus !== 'VERIFIED') reasons.push('Company verification not approved')
   if (!company.isVerified) reasons.push('Company not marked as verified')
 
-  const hasLegacyServices = company.services && company.services !== ''
+  const hasLegacyServices = hasDeclaredProviderCapabilities(company.services)
   if (!hasLegacyServices) {
-    const relationalSpecialtyCount = await prisma.companySpecialty.count({ where: { companyId } })
+    const relationalSpecialtyCount = await db.companySpecialty.count({ where: { companyId } })
     if (relationalSpecialtyCount === 0) {
       reasons.push('No service capabilities declared')
     }
   }
   if (company.subscriptionStatus === 'CANCELLED') reasons.push('Subscription cancelled')
 
-  const user = await prisma.user.findUnique({
-    where: { id: company.userId },
-    select: { isSuspended: true, isBanned: true },
-  })
-  if (user?.isSuspended) reasons.push('Company owner account is suspended')
-  if (user?.isBanned) reasons.push('Company owner account is banned')
-
-  const ownerCount = await prisma.teamMember.count({
+  // CompanyProfile.userId is the historical creator link. Ownership transfer
+  // changes TeamMember roles, not that creator link. Check the actual active
+  // owners' global restrictions so a suspended successor never authorizes
+  // onboarding and a healthy transferred company is not penalized when the
+  // original creator later becomes inactive.
+  const owners = await db.teamMember.findMany({
     where: { companyId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
+    select: {
+      user: {
+        select: { isActive: true, isSuspended: true, isBanned: true },
+      },
+    },
   })
-  if (ownerCount === 0) reasons.push('No active company owner')
+  const unrestrictedOwner = owners.some(owner =>
+    owner.user && owner.user.isActive && !owner.user.isSuspended && !owner.user.isBanned
+  )
+  if (owners.length === 0) {
+    reasons.push('No active company owner')
+  } else if (!unrestrictedOwner) {
+    if (owners.every(owner => !owner.user)) {
+      reasons.push('Company owner account is missing')
+    } else if (owners.every(owner => !owner.user || owner.user.isActive === false)) {
+      reasons.push('Company owner account is inactive')
+    } else if (owners.every(owner => !owner.user || owner.user.isSuspended)) {
+      reasons.push('Company owner account is suspended')
+    } else if (owners.every(owner => !owner.user || owner.user.isBanned)) {
+      reasons.push('Company owner account is banned')
+    } else {
+      reasons.push('No unrestricted active company owner')
+    }
+  }
 
   return { eligible: reasons.length === 0, reasons }
 }
 
-export async function checkWorkerEligibility(
+async function checkWorkerEligibilityCore(
   companyId: string,
   userId: string,
-  requiredJobId?: string
+  requiredJobId: string | undefined,
+  allowCrewPreview: boolean,
+  db: PrismaClientOrTx,
 ): Promise<ProviderEligibility> {
   const reasons: string[] = []
 
-  const member = await prisma.teamMember.findFirst({
+  const member = await db.teamMember.findFirst({
     where: { companyId, userId, status: 'ACTIVE' },
   })
   if (!member) {
     return { eligible: false, reasons: ['Not an active member of this company'] }
   }
 
-  const user = await prisma.user.findUnique({
+  const user = await db.user.findUnique({
     where: { id: userId },
-    select: { identityStatus: true, isSuspended: true, isBanned: true },
+    select: { identityStatus: true, isActive: true, isSuspended: true, isBanned: true },
   })
   if (!user) {
     return { eligible: false, reasons: ['User account not found'] }
   }
 
+  if (requiredJobId && member.role !== 'WORKER') {
+    reasons.push('Company member does not hold the worker role')
+  }
+  if (user.isActive === false) reasons.push('Worker account is inactive')
   if (user.isSuspended) reasons.push('Worker account is suspended')
   if (user.isBanned) reasons.push('Worker account is banned')
   if (user.identityStatus !== 'VERIFIED') reasons.push('Worker identity not verified')
 
   if (requiredJobId) {
-    const job = await prisma.marketplaceJob.findUnique({
+    const job = await db.marketplaceJob.findUnique({
       where: { id: requiredJobId },
       select: {
         categoryId: true,
         serviceTemplateId: true,
+        templateJobId: true,
         preferredDate: true,
         preferredTimeSlot: true,
         workerIdentityCheckRequired: true,
+        workersCount: true,
+        countryCode: true,
+        latitude: true,
+        longitude: true,
       },
     })
     if (!job) {
       reasons.push('Job not found')
     } else {
+      // Phase 03: a company worker may only be assigned to a job in their own
+      // market. Assignment overwrites the job's target provider, so this must be
+      // decided from the validated service address, not from stored metadata.
+      const jobMarket = requireJobMarket(job)
+      if (!jobMarket.ok) {
+        reasons.push('Job service address is not in a supported market')
+      } else {
+        const workerProfile = await db.taskerProfile.findUnique({
+          where: { userId },
+          select: { countryCode: true },
+        })
+        const workerUser = await db.user.findUnique({
+          where: { id: userId },
+          select: { countryCode: true },
+        })
+        const workerCountry = (workerProfile?.countryCode || workerUser?.countryCode || '')
+          .trim()
+          .toUpperCase()
+        if (!workerCountry) {
+          reasons.push('Worker market is unknown')
+        } else if (workerCountry !== jobMarket.countryCode) {
+          reasons.push('Worker market does not match the job market')
+        }
+      }
+    }
+
+    if (job) {
+      // PostgreSQL permits only one active CompanyJobAssignment per job.
+      // Until a crew workflow exists, a single assignee cannot represent a
+      // multi-worker service. Do not claim full capacity from one worker.
+      if (!allowCrewPreview && job.workersCount > 1) {
+        reasons.push('Job requires a multi-worker crew; one worker is insufficient')
+      }
       const [profile, category, template] = await Promise.all([
-        prisma.taskerProfile.findUnique({
+        db.taskerProfile.findUnique({
           where: { userId },
           select: { id: true, skills: true },
         }),
-        prisma.jobCategory.findUnique({
+        db.jobCategory.findUnique({
           where: { id: job.categoryId },
           select: { id: true, name: true, slug: true },
         }),
         job.serviceTemplateId
-          ? prisma.serviceTemplate.findUnique({
+          ? db.serviceTemplate.findUnique({
               where: { id: job.serviceTemplateId },
-              select: { id: true, jobCategoryId: true },
+              select: { id: true, jobCategoryId: true, templateJobId: true },
             })
           : Promise.resolve(null),
       ])
 
-      const requiredCategoryId = template?.jobCategoryId || job.categoryId
+      // Reject contradictory catalogue pointers rather than using an unrelated
+      // service's category to grant a worker permission. Historical jobs with
+      // no service template remain supported as category-level bookings.
+      if (job.serviceTemplateId && (
+        !template ||
+        template.jobCategoryId !== job.categoryId ||
+        (job.templateJobId && template.templateJobId &&
+          job.templateJobId !== template.templateJobId)
+      )) {
+        reasons.push('Job service category does not match its catalogue selection')
+      }
+
+      const requiredCategoryId = job.categoryId
+      const requiredTemplateJobId = job.templateJobId || template?.templateJobId || null
       const relationalCapability = profile
-        ? await prisma.taskerSkill.findFirst({
+        ? await db.taskerSkill.findFirst({
             where: {
               taskerId: profile.id,
-              job: { categoryId: requiredCategoryId },
+              // A worker selecting one TemplateJob must not inherit every
+              // sibling capability in the same category. Category matching is
+              // retained only for legacy bookings without a specific job ID.
+              ...(requiredTemplateJobId
+                ? { jobId: requiredTemplateJobId }
+                : { job: { categoryId: requiredCategoryId } }),
             },
             select: { id: true },
           })
         : null
 
-      const capabilityTokens = new Set(
-        readStoredList(member.skills)
-          .concat(profile ? readStoredList(profile.skills) : [])
-          .map(value => value.trim().toLowerCase())
-          .filter(Boolean)
-      )
+      const normalize = (stored: string | null | undefined) =>
+        new Set(readStoredList(stored).map(value => value.trim().toLowerCase()).filter(Boolean))
+      // Company membership skills are explicitly granted by dispatch/management.
+      // TaskerProfile.skills contains *derived* category labels written by
+      // syncCategorySkills after selecting any one TemplateJob. Combining the
+      // two gave a worker every sibling service in that category.
+      const memberTokens = normalize(member.skills)
+      const profileTokens = normalize(profile?.skills)
       const categoryTokens = [
-        requiredCategoryId,
-        category?.id,
-        category?.name,
-        category?.slug,
-        job.serviceTemplateId,
-      ]
-        .filter((value): value is string => !!value)
-        .map(value => value.trim().toLowerCase())
+        requiredCategoryId, category?.id, category?.name, category?.slug,
+      ].filter((value): value is string => !!value).map(value => value.trim().toLowerCase())
+      const exactTokens = [
+        job.serviceTemplateId, requiredTemplateJobId,
+      ].filter((value): value is string => !!value).map(value => value.trim().toLowerCase())
 
-      const declaredCapability = categoryTokens.some(token => capabilityTokens.has(token))
+      const explicitMemberCategoryGrant = categoryTokens.some(token => memberTokens.has(token))
+      const exactDeclaredCapability = exactTokens.some(token =>
+        memberTokens.has(token) || profileTokens.has(token))
+      const historicalCategoryCapability =
+        !requiredTemplateJobId && categoryTokens.some(token => profileTokens.has(token))
+      const declaredCapability =
+        explicitMemberCategoryGrant || exactDeclaredCapability || historicalCategoryCapability
 
       if (!relationalCapability && !declaredCapability) {
         reasons.push('Worker lacks required capability for this job')
       }
 
       if (job.workerIdentityCheckRequired) {
-        const approvedIdentity = await prisma.providerIdentity.findFirst({
+        const approvedIdentity = await db.providerIdentity.findFirst({
           where: {
             currentUserId: userId,
             identityType: { in: ['TASKER', 'COMPANY_WORKER'] },
@@ -192,7 +287,21 @@ export async function checkWorkerEligibility(
         }
       }
 
-      if (job.preferredDate) {
+      if (!job.preferredDate) {
+        // No date cannot establish a non-overlapping appointment.
+        // A worker already performing any active assignment is unavailable.
+        const busy = await db.companyJobAssignment.findFirst({
+          where: {
+            workerUserId: userId,
+            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
+            jobId: { not: requiredJobId },
+          },
+          select: { id: true },
+        })
+        if (busy) {
+          reasons.push('Worker has an active assignment and no date to prove capacity')
+        }
+      } else {
         const dayStart = new Date(job.preferredDate)
         dayStart.setHours(0, 0, 0, 0)
         const dayEnd = new Date(dayStart)
@@ -209,15 +318,24 @@ export async function checkWorkerEligibility(
               }
             : {}
 
-        const conflictingAssignments = await prisma.companyJobAssignment.findMany({
+        const conflictingAssignments = await db.companyJobAssignment.findMany({
           where: {
             workerUserId: userId,
-            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
             jobId: { not: requiredJobId },
-            job: {
-              preferredDate: { gte: dayStart, lt: dayEnd },
-              ...slotFilter,
-            },
+            OR: [
+              // An unfinished job blocks additional dispatch regardless of
+              // its original appointment date: it is active real-world work.
+              { status: 'IN_PROGRESS' },
+              {
+                status: { in: ['ASSIGNED', 'ACCEPTED', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
+                job: {
+                  OR: [
+                    { preferredDate: null },
+                    { preferredDate: { gte: dayStart, lt: dayEnd }, ...slotFilter },
+                  ],
+                },
+              },
+            ],
           },
           select: { id: true, jobId: true },
         })
@@ -229,4 +347,27 @@ export async function checkWorkerEligibility(
   }
 
   return { eligible: reasons.length === 0, reasons }
+}
+
+/**
+ * Production assignment callers must use checkWorkerEligibility() and retain
+ * its strict one-worker capacity guard. Crew-preview callers may evaluate
+ * individual eligibility without granting dispatch, PIN or job permissions.
+ */
+export async function checkWorkerEligibility(
+  companyId: string,
+  userId: string,
+  requiredJobId?: string,
+): Promise<ProviderEligibility> {
+  return checkWorkerEligibilityCore(companyId, userId, requiredJobId, false, prisma)
+}
+
+/** Read-only planning check. Never use to create assignments or authorize work. */
+export async function checkCrewCandidateEligibility(
+  companyId: string,
+  userId: string,
+  jobId: string,
+  db: PrismaClientOrTx = prisma,
+): Promise<ProviderEligibility> {
+  return checkWorkerEligibilityCore(companyId, userId, jobId, true, db)
 }

@@ -1,5 +1,177 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import type { AdminSession, AuditAction } from '../admin-types'
+
+/**
+ * A standard CRM risk-event "reviewed" bit is NOT authority to close a
+ * consumed-PIN crew safety hold. It would remove the only pending HIGH event
+ * from the triage inventory while worker capacity remains safety-reserved.
+ * Keep that event visible until a separate, explicitly approved, atomic
+ * support resolution/capacity policy exists.
+ */
+export class CrewSafetyCaseRequiresDedicatedResolutionError extends Error {
+  constructor() {
+    super('Crew safety case requires dedicated resolution')
+    this.name = 'CrewSafetyCaseRequiresDedicatedResolutionError'
+  }
+}
+
+type ZeroHoldMismatchClaim = {
+  companyId: string
+  crewId: string
+  assignmentId: string
+  workerUserId: string
+  previousVersion: number
+  blockedVersion: number
+}
+
+/**
+ * JSON counts are only a REQUEST to use ordinary CRM review, never proof of
+ * safety. Verify the authoritative whole crew, all historical PINs, and
+ * retained work/scheduling evidence before any reviewedAt write. Callers
+ * must use a SERIALIZABLE transaction AND the canonical job -> crew
+ * row locks to prevent concurrent crew/PIN changes before review commits.
+ */
+async function assertPersistedNoHeldCrewEvidence(
+  tx: PrismaClient | Prisma.TransactionClient,
+  jobId: string | null,
+  m: ZeroHoldMismatchClaim,
+  allowedCountries: string[] | null | undefined,
+) {
+  const deny = () => { throw new CrewSafetyCaseRequiresDedicatedResolutionError() }
+  // Explicit null means an authorized ALL-country CRM superadmin; an
+  // absent scope must NEVER default to global access. This is supplied by
+  // the canonical live guard, not by client JSON or risk event metadata.
+  if (!jobId || allowedCountries === undefined ||
+      (allowedCountries !== null && (
+        !Array.isArray(allowedCountries) ||
+        allowedCountries.some(value =>
+          typeof value !== 'string' || !/^[A-Z]{2}$/.test(value))
+      ))) return deny()
+  // Mirror the shared Phase04 job -> crew lock order. SERIALIZABLE alone
+  // does not guarantee that an independent concurrent PIN/witness writer
+  // cannot change physical-safety evidence during a read-only check.
+  // Keep both rows locked through reviewedAt update and the audit write.
+  const jobs = await tx.$queryRaw<Array<{
+    id: string; status: string; workersCount: number
+    countryCode: string | null
+  }>>`
+    SELECT id, status, "workersCount", "countryCode" FROM "MarketplaceJob"
+    WHERE id = ${jobId} FOR UPDATE
+  `
+  const crews = await tx.$queryRaw<Array<{
+    id: string; jobId: string; companyId: string; version: number
+    status: string; requiredWorkersCount: number
+  }>>`
+    SELECT id, "jobId", "companyId", version, status,
+      "requiredWorkersCount"
+    FROM "CompanyCrewDispatch" WHERE id = ${m.crewId} FOR UPDATE
+  `
+  const job = jobs[0], crew = crews[0]
+  // A country preflight outside the transaction can race a market change.
+  // Deny against the currently locked authoritative booking country as well.
+  if (!job || !job.countryCode ||
+      !/^[A-Z]{2}$/.test(job.countryCode.toUpperCase()) ||
+      (allowedCountries !== null &&
+        !allowedCountries.includes(job.countryCode.toUpperCase()))) return deny()
+  if (!crew || crew.jobId !== job.id || job.id !== jobId ||
+      job.status !== 'QUOTE_ACCEPTED' ||
+      crew.jobId !== jobId || crew.companyId !== m.companyId ||
+      crew.status !== 'BLOCKED' || crew.version !== m.blockedVersion ||
+      crew.requiredWorkersCount < 2 || crew.requiredWorkersCount > 12 ||
+      job.workersCount !== crew.requiredWorkersCount) return deny()
+
+  const [roster, consumed, witnesses, workspace, legacyArrival] = await Promise.all([
+    tx.companyJobAssignment.findMany({
+      where: { crewDispatchId: m.crewId },
+      select: {
+        id: true, jobId: true, companyId: true, workerUserId: true,
+        status: true, startedAt: true, crewArrivedAt: true,
+      },
+    }),
+    // Any historical consumed claim OR still-unrevoked challenge is
+    // unresolved arrival evidence, even if its expiry passed or a later
+    // crew epoch was started. Ignore risk-event metadata zero counters.
+    tx.companyCrewPinChallenge.findFirst({
+      where: {
+        crewDispatchId: m.crewId,
+        OR: [{ consumedAt: { not: null } }, { revokedAt: null }],
+      },
+      select: { id: true },
+    }),
+    tx.companyCrewPresenceWitness.findFirst({
+      where: { crewDispatchId: m.crewId },
+      select: { id: true },
+    }),
+    tx.jobWorkspace.findUnique({
+      where: { jobId }, select: { id: true },
+    }),
+    // An old ACTIVE arrival PIN is unsafe even with no verification yet.
+    // Legacy verified work-start/completion timestamps also deny closeout.
+    tx.jobVerificationPin.findFirst({
+      where: {
+        jobId,
+        OR: [
+          { status: 'ACTIVE' },
+          { arrivalVerifiedAt: { not: null } },
+          { workStartVerifiedAt: { not: null } },
+          { completionVerifiedAt: { not: null } },
+        ],
+      },
+      select: { id: true },
+    }),
+  ])
+  if (consumed || witnesses || workspace || legacyArrival ||
+      roster.length !== crew.requiredWorkersCount ||
+      new Set(roster.map(s => s.id)).size !== roster.length ||
+      new Set(roster.map(s => s.workerUserId)).size !== roster.length ||
+      !roster.some(s => s.id === m.assignmentId &&
+        s.workerUserId === m.workerUserId) ||
+      roster.some(s => s.jobId !== jobId || s.companyId !== m.companyId ||
+        s.status !== 'REVOKED' || s.startedAt !== null ||
+        s.crewArrivedAt !== null)) return deny()
+}
+
+function assertGenericRiskReviewDoesNotCloseCrewSafetyHold(
+  event: { eventType: string; metadata: string | null },
+): ZeroHoldMismatchClaim | null {
+  if (event.eventType === 'CREW_CONSUMED_PIN_SAFETY_HOLD' ||
+      event.eventType === 'CREW_WORKFORCE_PIN_SAFETY_HOLD') {
+    // These events only originate from evidence-preserving holds.
+    throw new CrewSafetyCaseRequiresDedicatedResolutionError()
+  }
+  if (event.eventType !== 'WORKER_IDENTITY_MISMATCH') return null
+
+  // Ordinary pre-arrival customer mismatch may release the roster BEFORE
+  // any PIN was consumed. Such non-held risk events retain normal review.
+  // Malformed/legacy metadata must fail CLOSED: never assume there was no
+  // consumed PIN and no capacity held.
+  let metadata: unknown
+  try {
+    metadata = JSON.parse(event.metadata || '')
+  } catch {
+    throw new CrewSafetyCaseRequiresDedicatedResolutionError()
+  }
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    throw new CrewSafetyCaseRequiresDedicatedResolutionError()
+  }
+  const m = metadata as Record<string, unknown>
+  if (m.consumedPinsPreserved !== 0 ||
+      m.capacityHeldForReview !== 0 ||
+      typeof m.companyId !== 'string' || !m.companyId.trim() ||
+      typeof m.crewId !== 'string' || !m.crewId.trim() ||
+      typeof m.assignmentId !== 'string' || !m.assignmentId.trim() ||
+      typeof m.workerUserId !== 'string' || !m.workerUserId.trim() ||
+      typeof m.previousVersion !== 'number' ||
+      !Number.isSafeInteger(m.previousVersion) || m.previousVersion < 1 ||
+      m.blockedVersion !== m.previousVersion + 1) {
+    throw new CrewSafetyCaseRequiresDedicatedResolutionError()
+  }
+  return {
+    companyId: m.companyId, crewId: m.crewId,
+    assignmentId: m.assignmentId, workerUserId: m.workerUserId,
+    previousVersion: m.previousVersion, blockedVersion: m.blockedVersion,
+  } as ZeroHoldMismatchClaim
+}
 
 export type RiskEventResolution = 'CONFIRMED' | 'DISMISSED' | 'ESCALATED' | 'NO_ACTION'
 
@@ -9,10 +181,12 @@ export interface ReviewRiskEventInput {
   reason?: string
   session: AdminSession
   ipAddress: string
+  /** From guardCrmRequest/getCrmCountryCodes. Undefined denies crew mismatch review. */
+  allowedCountries?: string[] | null
 }
 
 export async function reviewRiskEvent(
-  tx: PrismaClient,
+  tx: PrismaClient | Prisma.TransactionClient,
   input: ReviewRiskEventInput
 ) {
   const { eventId, resolution, reason, session, ipAddress } = input
@@ -31,6 +205,7 @@ export async function reviewRiskEvent(
     select: {
       id: true, eventType: true, severity: true,
       resolution: true, reviewedAt: true, actorUserId: true, metadata: true,
+      jobId: true,
     },
   })
 
@@ -38,6 +213,16 @@ export async function reviewRiskEvent(
 
   if (event.reviewedAt) {
     throw new Error(`Risk event already reviewed: ${event.resolution}`)
+  }
+
+  // Fail before setting reviewedAt, touching provider standing or writing an
+  // audit "resolution". Neither DISMISSED/NO_ACTION nor ESCALATED/CONFIRMED
+  // may silently consume a pending held-crew HIGH safety event.
+  const zeroHold = assertGenericRiskReviewDoesNotCloseCrewSafetyHold(event)
+  if (zeroHold) {
+    await assertPersistedNoHeldCrewEvidence(
+      tx, event.jobId, zeroHold, input.allowedCountries,
+    )
   }
 
   const oldValue = { resolution: event.resolution, reviewedAt: null }

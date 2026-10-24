@@ -1,4 +1,6 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
+import { resolveMarketFromServiceAddress } from '@/lib/geography/market-engine'
+import { verifyServiceCoordinates } from '@/lib/geography/geocoder'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { createBookNowJob } from '@/lib/domain/book-now'
@@ -44,11 +46,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'providerType must be INDIVIDUAL or COMPANY' }, { status: 400 })
     }
 
-    const requestedCountryCode = typeof countryCode === 'string' && countryCode.trim()
-      ? countryCode.trim().toUpperCase()
-      : user.countryCode
+    // Phase 02: the service address decides the market. The client-claimed
+    // country is advisory only and can never authorize a booking.
+    const market = resolveMarketFromServiceAddress({
+      district: String(district).trim(),
+      latitude: typeof latitude === 'number' ? latitude : undefined,
+      longitude: typeof longitude === 'number' ? longitude : undefined,
+      claimedCountryCode: typeof countryCode === 'string' ? countryCode : user.countryCode,
+    })
 
-    if (requestedCountryCode !== user.countryCode) {
+    if (!market.ok) {
+      return NextResponse.json({ error: market.error, code: market.code }, { status: 400 })
+    }
+
+    if (typeof latitude === 'number' && typeof longitude === 'number') {
+      const verifiedAddress = await verifyServiceCoordinates(latitude, longitude)
+      if (!verifiedAddress.ok) {
+        const unavailable = verifiedAddress.code === 'GEOCODER_NOT_CONFIGURED' ||
+          verifiedAddress.code === 'GEOCODER_UNAVAILABLE'
+        return NextResponse.json({
+          error: unavailable ? 'Service address verification is temporarily unavailable' : 'Service address could not be verified',
+          code: verifiedAddress.code,
+        }, { status: unavailable ? 503 : 400 })
+      }
+      if (verifiedAddress.countryCode !== market.countryCode ||
+          (verifiedAddress.countryCode === 'CA' && verifiedAddress.locality?.trim().toLowerCase() !== 'vancouver')) {
+        return NextResponse.json({ error: 'Geocoded service address does not match a supported launch market', code: 'GEOCODED_MARKET_MISMATCH' }, { status: 400 })
+      }
+    }
+
+    const requestedCountryCode = market.countryCode
+
+    // A valid coordinate market must not be combined with an arbitrary district
+    // supplied by the client. All 25 named LK districts are supported; CA is
+    // the Vancouver municipality only. Persist the canonical district label.
+    if (!market.district) {
+      return NextResponse.json({
+        error: 'District does not match the verified service address market',
+        code: 'SERVICE_DISTRICT_MISMATCH',
+      }, { status: 400 })
+    }
+
+    if (user.countryCode && requestedCountryCode !== user.countryCode.toUpperCase()) {
       return NextResponse.json({
         error: 'Country mismatch: you cannot create jobs in a different country',
         code: 'COUNTRY_MISMATCH',
@@ -63,7 +102,7 @@ export async function POST(request: NextRequest) {
       scheduledDate,
       timeSlot: normalizedTimeSlot,
       address: String(address).trim(),
-      district: String(district).trim(),
+      district: market.district,
       notes: typeof notes === 'string' ? notes.slice(0, 5000) : undefined,
       latitude: typeof latitude === 'number' ? latitude : undefined,
       longitude: typeof longitude === 'number' ? longitude : undefined,
@@ -86,6 +125,7 @@ export async function POST(request: NextRequest) {
       message.includes('Cannot book yourself') ||
       message.includes('Cannot book your own company') ||
       message.includes('Invalid template/category') ||
+      message.includes('Template job is not available in booking country') ||
       message.includes('does not match booking country') ||
       message.includes('does not serve the requested district')
     ) {
@@ -102,6 +142,7 @@ export async function POST(request: NextRequest) {
     }
     if (
       message.includes('Booking country is required') ||
+      message.includes('Unsupported booking country') ||
       message.includes('availability configuration is invalid')
     ) {
       return NextResponse.json({ error: message }, { status: 400 })

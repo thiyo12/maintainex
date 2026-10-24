@@ -1,6 +1,7 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { validateLineItems, calculateQuoteTotal } from '@/lib/pricing/line-items'
 import { resolveBenchmark } from '@/lib/pricing/benchmark'
@@ -150,7 +151,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cannot quote on your own job' }, { status: 400 })
     }
 
-    const canonicalCountry = (job.countryCode || 'LK').toUpperCase()
+    // Phase 03: the web quote path derives the market from the validated service
+    // address too. The client-supplied country is compared against it, never trusted.
+    const jobMarket = requireJobMarket(job)
+    if (!jobMarket.ok) {
+      return NextResponse.json({ error: jobMarket.error, code: jobMarket.code }, { status: 409 })
+    }
+    const canonicalCountry = jobMarket.countryCode
+
     if (countryCode.toUpperCase() !== canonicalCountry) {
       return NextResponse.json({ error: 'Quote country does not match the job market' }, { status: 400 })
     }

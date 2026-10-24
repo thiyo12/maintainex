@@ -1,0 +1,435 @@
+import type { ProposedDepartment, ProposedSkill } from '../proposed-expansion'
+
+/**
+ * PROPOSED departments. None of these were previously approved; each is
+ * imported inactive until reviewed.
+ */
+export const PROPOSED_DEPARTMENTS: ProposedDepartment[] = [
+  {
+    name: 'Pet Care Services',
+    slug: 'pet-care-services',
+    description:
+      'In-home and on-site care for dogs, cats and other household pets, including feeding, walking, grooming assistance and cover while the owner is away.',
+    markets: ['LK', 'CA'],
+    iconName: 'paw-print',
+    colorHex: '#8D6E63',
+    sortOrder: 25,
+  },
+  {
+    name: 'Waste Management and Junk Removal',
+    slug: 'waste-management-and-junk-removal',
+    description:
+      'Collection, sorting, transport and lawful disposal of household waste, bulky items and post-project debris, with proof of disposal.',
+    markets: ['LK', 'CA'],
+    iconName: 'trash-2',
+    colorHex: '#607D8B',
+    sortOrder: 26,
+  },
+  {
+    name: 'Childcare and Family Support',
+    slug: 'childcare-and-family-support',
+    description:
+      'Home-based childcare, school-run assistance and household support delivered by identity-verified providers with safeguarding training.',
+    markets: ['LK', 'CA'],
+    iconName: 'baby',
+    colorHex: '#F06292',
+    sortOrder: 27,
+  },
+]
+
+/** PROPOSED skills referenced by the expansion. Undeclared skills fail validation. */
+export const PROPOSED_SKILLS: ProposedSkill[] = [
+  // electrical-works
+  { slug: 'ev-charger-installation', name: 'EV charger installation', description: 'Install and commission home EV charging equipment', department: 'electrical-works' },
+  { slug: 'panel-board-upgrade', name: 'Panel board upgrade', description: 'Upgrade and re-rate consumer distribution boards', department: 'electrical-works' },
+  { slug: 'surge-protection', name: 'Surge protection', description: 'Install type 1 and type 2 surge protection devices', department: 'electrical-works' },
+  { slug: 'lighting-design', name: 'Lighting design', description: 'Plan and install interior and exterior lighting layouts', department: 'electrical-works' },
+  { slug: 'standby-generator-installation', name: 'Standby generator installation', description: 'Install and commission standby generators and changeover panels', department: 'electrical-works' },
+  { slug: 'earthing-and-grounding', name: 'Earthing and grounding', description: 'Install and test protective earthing systems', department: 'electrical-works' },
+  { slug: 'smoke-alarm-wiring', name: 'Smoke alarm wiring', description: 'Hardwire and interconnect smoke and heat alarms', department: 'electrical-works' },
+  { slug: 'data-cabling', name: 'Data cabling', description: 'Run and terminate structured network cabling', department: 'electrical-works' },
+  { slug: 'outdoor-socket-installation', name: 'Outdoor socket installation', description: 'Install weatherproof sockets and outdoor power points', department: 'electrical-works' },
+  { slug: 'three-phase-installation', name: 'Three phase installation', description: 'Install three phase supplies and consumer units', department: 'electrical-works' },
+  { slug: 'energy-meter-installation', name: 'Energy meter installation', description: 'Fit and commission domestic and sub-metering equipment', department: 'electrical-works' },
+  { slug: 'fault-finding', name: 'Fault finding', description: 'Trace and isolate electrical faults systematically', department: 'electrical-works' },
+  { slug: 'lighting-installation', name: 'Lighting installation', description: 'Install light fittings, chandeliers and fittings', department: 'electrical-works' },
+  { slug: 'switch-and-socket-installation', name: 'Switch and socket installation', description: 'Install and repair switches and sockets', department: 'electrical-works' },
+  { slug: 'wiring-and-rewiring', name: 'Wiring and rewiring', description: 'New wiring, rewiring and cable management', department: 'electrical-works' },
+  { slug: 'certified-electrician', name: 'Certified electrician', description: 'Holds a recognised electrical trade certification', department: 'electrical-works' },
+
+  // plumbing
+  { slug: 'water-heater-maintenance', name: 'Water heater maintenance', description: 'Service and descale water heating systems', department: 'plumbing' },
+  { slug: 'boiler-installation', name: 'Boiler installation', description: 'Install and commission heating boilers', department: 'plumbing' },
+  { slug: 'bathroom-plumbing-fit-out', name: 'Bathroom plumbing fit out', description: 'Rough-in and fit out complete bathroom plumbing', department: 'plumbing' },
+  { slug: 'gas-line-installation', name: 'Gas line installation', description: 'Install and commission LPG or natural gas lines', department: 'plumbing' },
+  { slug: 'water-softener-installation', name: 'Water softener installation', description: 'Install and commission water treatment and softeners', department: 'plumbing' },
+  { slug: 'rainwater-harvesting', name: 'Rainwater harvesting', description: 'Install gutters, downpipes and rainwater storage', department: 'plumbing' },
+  { slug: 'leak-detection', name: 'Leak detection', description: 'Locate concealed water leaks non-destructively', department: 'plumbing' },
+  { slug: 'sewer-line-inspection', name: 'Sewer line inspection', description: 'Inspect and clear sewer and stormwater lines', department: 'plumbing' },
+  { slug: 'grease-trap-service', name: 'Grease trap service', description: 'Clean and maintain commercial grease traps', department: 'plumbing' },
+  { slug: 'pressure-pump-installation', name: 'Pressure pump installation', description: 'Install booster and pressure pumping systems', department: 'plumbing' },
+  { slug: 'plumbing', name: 'Plumbing', description: 'General plumbing installation and repair', department: 'plumbing' },
+  { slug: 'licensed-plumber', name: 'Licensed plumber', description: 'Holds a recognised plumbing trade certification', department: 'plumbing' },
+
+  // ac-and-refrigeration
+  { slug: 'ducted-ac-installation', name: 'Ducted AC installation', description: 'Install ducted air conditioning systems', department: 'ac-and-refrigeration' },
+  { slug: 'split-system-commissioning', name: 'Split system commissioning', description: 'Commission split systems and record performance', department: 'ac-and-refrigeration' },
+  { slug: 'hvac-duct-cleaning', name: 'HVAC duct cleaning', description: 'Clean air ducts and improve indoor air quality', department: 'ac-and-refrigeration' },
+  { slug: 'commercial-cold-room-installation', name: 'Commercial cold room installation', description: 'Build and commission cold rooms and freezers', department: 'ac-and-refrigeration' },
+  { slug: 'ice-machine-service', name: 'Ice machine service', description: 'Service commercial ice makers', department: 'ac-and-refrigeration' },
+  { slug: 'display-cooler-service', name: 'Display cooler service', description: 'Service retail display and upright coolers', department: 'ac-and-refrigeration' },
+  { slug: 'wine-cooler-installation', name: 'Wine cooler installation', description: 'Install and service wine storage coolers', department: 'ac-and-refrigeration' },
+  { slug: 'heat-pump-installation', name: 'Heat pump installation', description: 'Install reverse cycle heat pumps', department: 'ac-and-refrigeration' },
+  { slug: 'air-conditioning-refrigeration-technician', name: 'HVAC technician', description: 'Trained and certified in refrigeration and air conditioning', department: 'ac-and-refrigeration' },
+  { slug: 'refrigeration-repair', name: 'Refrigeration repair', description: 'Diagnose and repair refrigeration circuits', department: 'ac-and-refrigeration' },
+
+  // painting-and-decorating
+  { slug: 'specialist-finishes', name: 'Specialist finishes', description: 'Apply lime plaster, putty, stucco and specialty coatings', department: 'painting-and-decorating' },
+  { slug: 'wood-staining', name: 'Wood staining', description: 'Prepare, stain and seal timber surfaces', department: 'painting-and-decorating' },
+  { slug: 'decorative-murals', name: 'Decorative murals', description: 'Design and hand-paint decorative wall murals', department: 'painting-and-decorating' },
+  { slug: 'surface-preparation', name: 'Surface preparation', description: 'Clean, sand, fill and prime surfaces for painting', department: 'painting-and-decorating' },
+  { slug: 'paint-colour-consultation', name: 'Paint colour consultation', description: 'Advise on colour schemes and finish selections', department: 'painting-and-decorating' },
+  { slug: 'exterior-masonry-painting', name: 'Exterior masonry painting', description: 'Paint and seal exterior masonry and render', department: 'painting-and-decorating' },
+  { slug: 'cabinet-refinishing', name: 'Cabinet refinishing', description: 'Refinish and repaint kitchen and bathroom cabinetry', department: 'painting-and-decorating' },
+  { slug: 'floor-and-deck-painting', name: 'Floor and deck painting', description: 'Paint floors, decks and timber surfaces', department: 'painting-and-decorating' },
+  { slug: 'industrial-painting', name: 'Industrial painting', description: 'Protective and anti-corrosion industrial coatings', department: 'painting-and-decorating' },
+  { slug: 'spray-painting', name: 'Spray painting', description: 'Apply even coatings using spray equipment', department: 'painting-and-decorating' },
+  { slug: 'anti-mould-and-antimicrobial-painting', name: 'Anti-mould painting', description: 'Apply anti-mould and antimicrobial coatings in damp areas', department: 'painting-and-decorating' },
+
+  // carpentry-and-furniture
+  { slug: 'furniture-restoration', name: 'Furniture restoration', description: 'Restore damaged or worn antique and modern furniture', department: 'carpentry-and-furniture' },
+  { slug: 'custom-furniture-design', name: 'Custom furniture design', description: 'Design and build bespoke furniture pieces', department: 'carpentry-and-furniture' },
+  { slug: 'loft-conversion-carpentry', name: 'Loft conversion carpentry', description: 'Carpentry work for loft conversions and extensions', department: 'carpentry-and-furniture' },
+  { slug: 'skylight-framing', name: 'Skylight framing', description: 'Frame and fit skylight openings', department: 'carpentry-and-furniture' },
+  { slug: 'timber-structure-repair', name: 'Timber structure repair', description: 'Repair and reinforce timber roof and floor structures', department: 'carpentry-and-furniture' },
+  { slug: 'kitchen-cabinet-installation', name: 'Kitchen cabinet installation', description: 'Install fitted kitchen cabinetry accurately', department: 'carpentry-and-furniture' },
+  { slug: 'built-in-wardrobe-installation', name: 'Built-in wardrobe installation', description: 'Install built-in wardrobes and closet systems', department: 'carpentry-and-furniture' },
+  { slug: 'door-frame-installation', name: 'Door frame installation', description: 'Fit and align internal and external door frames', department: 'carpentry-and-furniture' },
+  { slug: 'formwork-carpentry', name: 'Formwork carpentry', description: 'Build formwork for concrete work', department: 'carpentry-and-furniture' },
+  { slug: 'wooden-stairs', name: 'Wooden stairs', description: 'Build and install timber staircases and steps', department: 'carpentry-and-furniture' },
+  { slug: 'carpentry', name: 'Carpentry', description: 'General carpentry and joinery', department: 'carpentry-and-furniture' },
+
+  // tiling-and-flooring
+  { slug: 'large-format-tiling', name: 'Large format tiling', description: 'Handle and lay large format and slab tiles', department: 'tiling-and-flooring' },
+  { slug: 'tile-grouting-and-sealing', name: 'Grouting and sealing', description: 'Grout, clean and seal tiled surfaces', department: 'tiling-and-flooring' },
+  { slug: 'underfloor-heating-installation', name: 'Underfloor heating installation', description: 'Install underfloor heating systems under tile', department: 'tiling-and-flooring' },
+  { slug: 'terrazzo-work', name: 'Terrazzo work', description: 'Lay, grind and polish terrazzo surfaces', department: 'tiling-and-flooring' },
+  { slug: 'natural-stone-installation', name: 'Natural stone installation', description: 'Install marble, granite and slate', department: 'tiling-and-flooring' },
+  { slug: 'lino-and-rubber-flooring', name: 'Lino and rubber flooring', description: 'Install sheet and tile resilient flooring', department: 'tiling-and-flooring' },
+  { slug: 'floor-levelling', name: 'Floor levelling', description: 'Level and prepare substrates before flooring', department: 'tiling-and-flooring' },
+  { slug: 'staircase-tiling', name: 'Staircase tiling', description: 'Tile stair treads, risers and landings safely', department: 'tiling-and-flooring' },
+  { slug: 'wet-room-tiling', name: 'Wet room tiling', description: 'Tile wet rooms to waterproofing standards', department: 'tiling-and-flooring' },
+  { slug: 'tiling', name: 'Tiling', description: 'General tiling installation and repair', department: 'tiling-and-flooring' },
+  { slug: 'waterproofing-certificate', name: 'Waterproofing certificate', description: 'Certified in wet-area waterproofing standards', department: 'tiling-and-flooring' },
+
+  // masonry-and-concrete
+  { slug: 'retaining-wall-construction', name: 'Retaining wall construction', description: 'Build and reinforce retaining walls', department: 'masonry-and-concrete' },
+  { slug: 'concrete-repair-and-restoration', name: 'Concrete repair', description: 'Restore spalled and damaged concrete surfaces', department: 'masonry-and-concrete' },
+  { slug: 'foundation-repair', name: 'Foundation repair', description: 'Stabilise and repair building foundations', department: 'masonry-and-concrete' },
+  { slug: 'blockwork', name: 'Blockwork', description: 'Build walls using block and masonry units', department: 'masonry-and-concrete' },
+  { slug: 'concrete-finishing', name: 'Concrete finishing', description: 'Float, trowel and finish concrete surfaces', department: 'masonry-and-concrete' },
+  { slug: 'coring-and-diamond-drilling', name: 'Diamond drilling', description: 'Core holes accurately in concrete and masonry', department: 'masonry-and-concrete' },
+  { slug: 'demolition-work', name: 'Demolition work', description: 'Controlled demolition of structures and slabs', department: 'masonry-and-concrete' },
+  { slug: 'concrete-sealing-and-waterproofing', name: 'Concrete waterproofing', description: 'Seal and waterproof concrete against moisture', department: 'masonry-and-concrete' },
+  { slug: 'precast-installation', name: 'Precast installation', description: 'Install precast panels, lintels and stairs', department: 'masonry-and-concrete' },
+  { slug: 'groundwork-and-excavation', name: 'Groundwork and excavation', description: 'Excavate, backfill and prepare building groundworks', department: 'masonry-and-concrete' },
+  { slug: 'masonry', name: 'Masonry', description: 'General masonry and concrete work', department: 'masonry-and-concrete' },
+
+  // roofing-and-gutters
+  { slug: 'flat-roofing', name: 'Flat roofing', description: 'Build and maintain flat roof systems', department: 'roofing-and-gutters' },
+  { slug: 'metal-roofing', name: 'Metal roofing', description: 'Install and repair sheet metal roofing', department: 'roofing-and-gutters' },
+  { slug: 'roof-insulation', name: 'Roof insulation', description: 'Install roof and attic insulation', department: 'roofing-and-gutters' },
+  { slug: 'chimney-maintenance', name: 'Chimney maintenance', description: 'Maintain, repoint and cap chimneys', department: 'roofing-and-gutters' },
+  { slug: 'downpipe-installation', name: 'Downpipe installation', description: 'Install and repair rainwater downpipes', department: 'roofing-and-gutters' },
+  { slug: 'roof-coating', name: 'Roof coating', description: 'Apply reflective and protective roof coatings', department: 'roofing-and-gutters' },
+  { slug: 'storm-damage-roof-repair', name: 'Storm damage roof repair', description: 'Repair roofs damaged by storms and wind', department: 'roofing-and-gutters' },
+  { slug: 'roof-structure-inspection', name: 'Roof structure inspection', description: 'Inspect roof structures for damage and rot', department: 'roofing-and-gutters' },
+  { slug: 'roofing', name: 'Roofing', description: 'General roofing installation and repair', department: 'roofing-and-gutters' },
+  { slug: 'height-safety-training', name: 'Height safety training', description: 'Certified for working at height', department: 'roofing-and-gutters' },
+
+  // pest-control
+  { slug: 'cockroach-control', name: 'Cockroach control', description: 'Treat and prevent cockroach infestations', department: 'pest-control' },
+  { slug: 'rodent-proofing', name: 'Rodent proofing', description: 'Seal entry points to exclude rodents', department: 'pest-control' },
+  { slug: 'ant-control', name: 'Ant control', description: 'Treat ant trails and nesting sites', department: 'pest-control' },
+  { slug: 'bee-and-wasp-removal', name: 'Bee and wasp removal', description: 'Safely remove bee and wasp nests', department: 'pest-control' },
+  { slug: 'mosquito-misting', name: 'Mosquito misting', description: 'Install and service mosquito misting systems', department: 'pest-control' },
+  { slug: 'commercial-pest-control', name: 'Commercial pest control', description: 'Pest control programmes for commercial premises', department: 'pest-control' },
+  { slug: 'bed-bug-heat-treatment', name: 'Bed bug heat treatment', description: 'Heat treat bed bug infestations', department: 'pest-control' },
+  { slug: 'bird-proofing', name: 'Bird proofing', description: 'Install bird spikes, netting and deterrents', department: 'pest-control' },
+  { slug: 'mould-treatment', name: 'Mould treatment', description: 'Treat and remediate indoor mould growth', department: 'pest-control' },
+  { slug: 'pest-control-technician', name: 'Pest control technician', description: 'Trained in safe pesticide handling and treatment', department: 'pest-control' },
+  { slug: 'exterminator', name: 'Exterminator', description: 'General pest extermination', department: 'pest-control' },
+  { slug: 'termite-treatment', name: 'Termite treatment', description: 'Bait, barrier and fumigation termite treatments', department: 'pest-control' },
+
+  // cleaning-services
+  { slug: 'sanitising-disinfection', name: 'Sanitising and disinfection', description: 'Professional sanitising of high-touch surfaces', department: 'cleaning-services' },
+  { slug: 'end-of-tenancy-cleaning', name: 'End of tenancy cleaning', description: 'Landlord and tenant end of lease cleaning', department: 'cleaning-services' },
+  { slug: 'airbnb-turnover-cleaning', name: 'Short-stay turnover cleaning', description: 'Guest-ready turnover cleaning for short-stay lets', department: 'cleaning-services' },
+  { slug: 'commercial-kitchen-cleaning', name: 'Commercial kitchen cleaning', description: 'Degrease and sanitise commercial kitchens', department: 'cleaning-services' },
+  { slug: 'carpet-and-upholstery-shampooing', name: 'Carpet shampooing', description: 'Extraction clean carpets and upholstery', department: 'cleaning-services' },
+  { slug: 'high-rise-window-cleaning', name: 'Window cleaning', description: 'Clean windows including at height', department: 'cleaning-services' },
+  { slug: 'pressure-washing', name: 'Pressure washing', description: 'Pressure wash drives, decks and facades', department: 'cleaning-services' },
+  { slug: 'green-cleaning', name: 'Eco-friendly cleaning', description: 'Use low-impact, environmentally safer products', department: 'cleaning-services' },
+  { slug: 'laundry-and-ironing', name: 'Laundry and ironing', description: 'Wash, dry, fold and iron household linen', department: 'cleaning-services' },
+  { slug: 'gutter-cleaning', name: 'Gutter cleaning', description: 'Clear gutters and downpipes of debris', department: 'cleaning-services' },
+  { slug: 'cleaning', name: 'Cleaning', description: 'General domestic and commercial cleaning', department: 'cleaning-services' },
+  { slug: 'bonded-cleaner', name: 'Bonded cleaner', description: 'Verified and insured cleaning professional', department: 'cleaning-services' },
+
+  // gardening-and-landscaping
+  { slug: 'tree-removal', name: 'Tree removal', description: 'Safely remove trees and dispose of debris', department: 'gardening-and-landscaping' },
+  { slug: 'stump-grinding', name: 'Stump grinding', description: 'Grind and remove tree stumps', department: 'gardening-and-landscaping' },
+  { slug: 'soil-testing', name: 'Soil testing', description: 'Test soil and recommend amendments', department: 'gardening-and-landscaping' },
+  { slug: 'vertical-gardening', name: 'Vertical gardening', description: 'Install and maintain vertical green walls', department: 'gardening-and-landscaping' },
+  { slug: 'rooftop-gardening', name: 'Rooftop gardening', description: 'Establish and maintain rooftop gardens', department: 'gardening-and-landscaping' },
+  { slug: 'landscape-lighting', name: 'Landscape lighting', description: 'Design and install garden and pathway lighting', department: 'gardening-and-landscaping' },
+  { slug: 'stone-and-hard-landscaping', name: 'Hard landscaping', description: 'Build paths, terraces and retaining garden walls', department: 'gardening-and-landscaping' },
+  { slug: 'pest-and-disease-plant-treatment', name: 'Plant disease treatment', description: 'Diagnose and treat plant pests and disease', department: 'gardening-and-landscaping' },
+  { slug: 'aquarium-and-pond-care', name: 'Aquarium and pond care', description: 'Maintain ponds and aquariums', department: 'gardening-and-landscaping' },
+  { slug: 'plant-nursery-delivery', name: 'Plant nursery delivery', description: 'Source and deliver plants and nursery stock', department: 'gardening-and-landscaping' },
+  { slug: 'gardener', name: 'Gardener', description: 'General gardening and landscaping', department: 'gardening-and-landscaping' },
+
+  // home-security-and-automation
+  { slug: 'access-control-installation', name: 'Access control installation', description: 'Install card, keypad and biometric access control', department: 'home-security-and-automation' },
+  { slug: 'alarm-monitoring', name: 'Alarm monitoring', description: 'Connect alarms to monitoring centres', department: 'home-security-and-automation' },
+  { slug: 'wireless-security-systems', name: 'Wireless security systems', description: 'Install wireless alarm and camera systems', department: 'home-security-and-automation' },
+  { slug: 'smart-lighting-automation', name: 'Smart lighting automation', description: 'Automate lighting with schedules and scenes', department: 'home-security-and-automation' },
+  { slug: 'smart-thermostat-installation', name: 'Smart thermostat installation', description: 'Install and configure smart thermostats', department: 'home-security-and-automation' },
+  { slug: 'ev-and-security-integration', name: 'Security system integration', description: 'Integrate cameras, alarms and access control', department: 'home-security-and-automation' },
+  { slug: 'water-leak-sensor-installation', name: 'Leak sensor installation', description: 'Install water leak and shutoff sensors', department: 'home-security-and-automation' },
+  { slug: 'perimeter-security', name: 'Perimeter security', description: 'Install perimeter fencing, lighting and detection', department: 'home-security-and-automation' },
+  { slug: 'security-consultation', name: 'Security consultation', description: 'Assess risks and recommend security measures', department: 'home-security-and-automation' },
+  { slug: 'electrician-security-technician', name: 'Security technician', description: 'Trained in alarm and camera installation', department: 'home-security-and-automation' },
+
+  // moving-and-packing
+  { slug: 'international-relocation', name: 'International relocation', description: 'Plan and manage international relocations', department: 'moving-and-packing' },
+  { slug: 'packing-supply-advice', name: 'Packing advice', description: 'Advise on packing materials and techniques', department: 'moving-and-packing' },
+  { slug: 'vehicle-shuttle-transport', name: 'Shuttle transport', description: 'Provide shuttle transport for moves', department: 'moving-and-packing' },
+  { slug: 'storage-cleaning', name: 'Storage cleaning', description: 'Clean and prepare storage units', department: 'moving-and-packing' },
+  { slug: 'apartment-move-in-setup', name: 'Move-in setup', description: 'Prepare apartments for move-in after handover', department: 'moving-and-packing' },
+  { slug: 'specialist-item-moving', name: 'Specialist item moving', description: 'Move pianos, safes, art and fragile items', department: 'moving-and-packing' },
+  { slug: 'office-it-relocation', name: 'Office IT relocation', description: 'Relocate office IT and AV equipment', department: 'moving-and-packing' },
+  { slug: 'packaging-supply', name: 'Packaging supply', description: 'Supply boxes, wrap and protective materials', department: 'moving-and-packing' },
+  { slug: 'carpet-and-upholstery-move-clean', name: 'Move-out cleaning', description: 'Clean carpets and upholstery after a move', department: 'moving-and-packing' },
+  { slug: 'unloading-and-placement', name: 'Unloading and placement', description: 'Unpack, place and reassemble items at destination', department: 'moving-and-packing' },
+  { slug: 'moving-and-packing', name: 'Moving and packing', description: 'General household and office moving', department: 'moving-and-packing' },
+  { slug: 'licensed-transport-operator', name: 'Licensed transport operator', description: 'Holds a valid goods transport licence', department: 'moving-and-packing' },
+
+  // vehicle-care-and-maintenance
+  { slug: 'windscreen-repair', name: 'Windscreen repair', description: 'Repair and replace vehicle windscreens', department: 'vehicle-care-and-maintenance' },
+  { slug: 'suspension-service', name: 'Suspension service', description: 'Service and repair vehicle suspension', department: 'vehicle-care-and-maintenance' },
+  { slug: 'brake-service', name: 'Brake service', description: 'Service and replace brakes and pads', department: 'vehicle-care-and-maintenance' },
+  { slug: 'tyre-repair-and-balancing', name: 'Tyre service', description: 'Repair, balance and fit tyres', department: 'vehicle-care-and-maintenance' },
+  { slug: 'vehicle-diagnostics', name: 'Vehicle diagnostics', description: 'Diagnose faults with scanning equipment', department: 'vehicle-care-and-maintenance' },
+  { slug: 'engine-repair', name: 'Engine repair', description: 'Diagnose and repair engine faults', department: 'vehicle-care-and-maintenance' },
+  { slug: 'clutch-and-transmission-service', name: 'Transmission service', description: 'Service clutch and transmission components', department: 'vehicle-care-and-maintenance' },
+  { slug: 'vehicle-air-conditioning-service', name: 'Vehicle air conditioning', description: 'Service vehicle air conditioning', department: 'vehicle-care-and-maintenance' },
+  { slug: 'underbody-rust-treatment', name: 'Rust treatment', description: 'Treat and protect vehicle underbodies', department: 'vehicle-care-and-maintenance' },
+  { slug: 'pre-purchase-vehicle-inspection', name: 'Vehicle inspection', description: 'Inspect used vehicles before purchase', department: 'vehicle-care-and-maintenance' },
+  { slug: 'mechanic', name: 'Mechanic', description: 'General vehicle mechanical maintenance', department: 'vehicle-care-and-maintenance' },
+
+  // it-and-electronics-repair
+  { slug: 'network-infrastructure-installation', name: 'Network infrastructure installation', description: 'Install routers, switches and structured cabling', department: 'it-and-electronics-repair' },
+  { slug: 'server-installation-and-maintenance', name: 'Server maintenance', description: 'Install, secure and maintain servers', department: 'it-and-electronics-repair' },
+  { slug: 'data-recovery', name: 'Data recovery', description: 'Recover data from failed drives and devices', department: 'it-and-electronics-repair' },
+  { slug: 'cyber-security-hardening', name: 'Security hardening', description: 'Harden devices and networks against threats', department: 'it-and-electronics-repair' },
+  { slug: 'audio-visual-installation', name: 'Audio visual installation', description: 'Install home and office audio visual systems', department: 'it-and-electronics-repair' },
+  { slug: 'console-and-gaming-repair', name: 'Gaming console repair', description: 'Repair game consoles and accessories', department: 'it-and-electronics-repair' },
+  { slug: 'tablet-repair', name: 'Tablet repair', description: 'Repair tablets and e-readers', department: 'it-and-electronics-repair' },
+  { slug: 'projector-installation', name: 'Projector installation', description: 'Install and calibrate projectors and screens', department: 'it-and-electronics-repair' },
+  { slug: 'smart-tv-and-streaming-setup', name: 'Smart TV setup', description: 'Configure smart TVs and streaming services', department: 'it-and-electronics-repair' },
+  { slug: 'electronics-repair', name: 'Electronics repair', description: 'Repair consumer electronics', department: 'it-and-electronics-repair' },
+  { slug: 'it-support', name: 'IT support', description: 'General on-site and remote IT support', department: 'it-and-electronics-repair' },
+
+  // event-and-party-services
+  { slug: 'event-security-staffing', name: 'Event security staffing', description: 'Provide trained event security and marshals', department: 'event-and-party-services' },
+  { slug: 'stage-and-truss-rental', name: 'Stage and truss rental', description: 'Rent and install staging and trussing', department: 'event-and-party-services' },
+  { slug: 'catering-staffing', name: 'Catering staffing', description: 'Provide catering staff for events', department: 'event-and-party-services' },
+  { slug: 'event-cleanup', name: 'Event cleanup', description: 'Clean venues after events', department: 'event-and-party-services' },
+  { slug: 'wedding-event-planning', name: 'Wedding planning', description: 'Plan and coordinate wedding events', department: 'event-and-party-services' },
+  { slug: 'corporate-event-management', name: 'Corporate event management', description: 'Deliver corporate events and conferences', department: 'event-and-party-services' },
+  { slug: 'flower-arrangement', name: 'Flower arrangement', description: 'Arrange flowers and floral installations', department: 'event-and-party-services' },
+  { slug: 'table-and-chair-rental', name: 'Table and chair rental', description: 'Rent and set out event furniture', department: 'event-and-party-services' },
+  { slug: 'livestream-production', name: 'Livestream production', description: 'Operate multi-camera livestreams', department: 'event-and-party-services' },
+  { slug: 'entertainment-booking', name: 'Entertainment booking', description: 'Book performers and entertainers', department: 'event-and-party-services' },
+  { slug: 'event-planning', name: 'Event planning', description: 'General event planning and coordination', department: 'event-and-party-services' },
+
+  // personal-care-and-wellness
+  { slug: 'barber-and-grooming', name: 'Barber and grooming', description: 'Men’s barbering and grooming services at home', department: 'personal-care-and-wellness' },
+  { slug: 'bridal-makeup', name: 'Bridal makeup', description: 'Bridal and event makeup artistry', department: 'personal-care-and-wellness' },
+  { slug: 'spa-and-wellness-rituals', name: 'Spa and wellness rituals', description: 'Provide spa and wellness treatments', department: 'personal-care-and-wellness' },
+  { slug: 'physiotherapy-at-home', name: 'Physiotherapy at home', description: 'Home physiotherapy and rehabilitation', department: 'personal-care-and-wellness' },
+  { slug: 'postnatal-care', name: 'Postnatal care', description: 'Postnatal and new parent support services', department: 'personal-care-and-wellness' },
+  { slug: 'nutrition-consultation', name: 'Nutrition consultation', description: 'Nutrition and diet planning consultations', department: 'personal-care-and-wellness' },
+  { slug: 'hair-treatment-and-colouring', name: 'Hair colour and treatment', description: 'Hair colouring, treatment and styling', department: 'personal-care-and-wellness' },
+  { slug: 'traditional-massage', name: 'Traditional massage', description: 'Traditional and ayurvedic massage therapies', department: 'personal-care-and-wellness' },
+  { slug: 'wellness-coach', name: 'Wellness coach', description: 'Wellness coaching and lifestyle guidance', department: 'personal-care-and-wellness' },
+  { slug: 'registered-therapist', name: 'Registered therapist', description: 'Registered with a recognised therapy body', department: 'personal-care-and-wellness' },
+
+  // home-renovation-and-interiors
+  { slug: 'accessibility-modification', name: 'Accessibility modification', description: 'Modify homes for accessibility and mobility', department: 'home-renovation-and-interiors' },
+  { slug: 'home-office-fit-out', name: 'Home office fit out', description: 'Fit out functional home office spaces', department: 'home-renovation-and-interiors' },
+  { slug: 'loft-conversion', name: 'Loft conversion', description: 'Convert lofts into usable living space', department: 'home-renovation-and-interiors' },
+  { slug: 'wet-room-installation', name: 'Wet room installation', description: 'Install complete wet rooms', department: 'home-renovation-and-interiors' },
+  { slug: 'structural-modification', name: 'Structural modification', description: 'Engineered structural alterations', department: 'home-renovation-and-interiors' },
+  { slug: 'kitchen-and-bathroom-planning', name: 'Kitchen and bathroom planning', description: 'Plan functional kitchens and bathrooms', department: 'home-renovation-and-interiors' },
+  { slug: 'interior-styling', name: 'Interior styling', description: 'Style interiors with furniture and accessories', department: 'home-renovation-and-interiors' },
+  { slug: 'lighting-design-consultation', name: 'Lighting design consultation', description: 'Design lighting schemes for interiors', department: 'home-renovation-and-interiors' },
+  { slug: 'room-addition-construction', name: 'Room addition construction', description: 'Construct room additions and extensions', department: 'home-renovation-and-interiors' },
+  { slug: 'renovation-project-management', name: 'Renovation project management', description: 'Manage renovation projects end to end', department: 'home-renovation-and-interiors' },
+  { slug: 'interior-designer', name: 'Interior designer', description: 'Qualified interior design professional', department: 'home-renovation-and-interiors' },
+
+  // solar-and-energy-solutions
+  { slug: 'solar-battery-maintenance', name: 'Solar battery maintenance', description: 'Maintain and service solar batteries', department: 'solar-and-energy-solutions' },
+  { slug: 'off-grid-solar-systems', name: 'Off-grid solar systems', description: 'Design and install off-grid solar systems', department: 'solar-and-energy-solutions' },
+  { slug: 'solar-panel-cleaning', name: 'Solar panel cleaning', description: 'Clean and maintain solar panels', department: 'solar-and-energy-solutions' },
+  { slug: 'home-automation-energy-management', name: 'Energy management automation', description: 'Automate energy use and monitoring', department: 'solar-and-energy-solutions' },
+  { slug: 'solar-water-heater-maintenance', name: 'Solar water heater maintenance', description: 'Service solar water heating systems', department: 'solar-and-energy-solutions' },
+  { slug: 'ev-charger-and-solar-integration', name: 'Solar and EV charging integration', description: 'Integrate solar with EV charging', department: 'solar-and-energy-solutions' },
+  { slug: 'commercial-solar-installation', name: 'Commercial solar installation', description: 'Install solar systems for commercial premises', department: 'solar-and-energy-solutions' },
+  { slug: 'energy-monitoring-systems', name: 'Energy monitoring systems', description: 'Install consumption monitoring and reporting', department: 'solar-and-energy-solutions' },
+  { slug: 'solar-installer', name: 'Solar installer', description: 'Certified solar installation professional', department: 'solar-and-energy-solutions' },
+  { slug: 'electrician-solar', name: 'Solar electrician', description: 'Electrician qualified for solar installation work', department: 'solar-and-energy-solutions' },
+
+  // handyman-and-general-repairs
+  { slug: 'flat-pack-furniture-assembly', name: 'Flat-pack furniture assembly', description: 'Assemble flat-pack and modular furniture', department: 'handyman-and-general-repairs' },
+  { slug: 'tv-mounting-and-cable-management', name: 'TV mounting and cable management', description: 'Mount televisions and conceal cables', department: 'handyman-and-general-repairs' },
+  { slug: 'shelf-and-storage-installation', name: 'Shelf and storage installation', description: 'Install shelving and storage systems', department: 'handyman-and-general-repairs' },
+  { slug: 'door-and-window-maintenance', name: 'Door and window maintenance', description: 'Maintain and adjust doors and windows', department: 'handyman-and-general-repairs' },
+  { slug: 'drywall-and-plasterboard-repair', name: 'Drywall repair', description: 'Repair and patch drywall and plasterboard', department: 'handyman-and-general-repairs' },
+  { slug: 'caulking-and-sealing', name: 'Caulking and sealing', description: 'Seal joints to prevent water ingress', department: 'handyman-and-general-repairs' },
+  { slug: 'furniture-repair', name: 'Furniture repair', description: 'Repair and reinforce furniture', department: 'handyman-and-general-repairs' },
+  { slug: 'picture-hanging-services', name: 'Hanging services', description: 'Hang pictures, mirrors and wall art safely', department: 'handyman-and-general-repairs' },
+  { slug: 'window-cleaning-maintenance', name: 'Window maintenance', description: 'Maintain windows, tracks and screens', department: 'handyman-and-general-repairs' },
+  { slug: 'general-handyman', name: 'General handyman', description: 'General household repair and maintenance', department: 'handyman-and-general-repairs' },
+  { slug: 'odd-jobs', name: 'Odd jobs', description: 'Small household tasks and repairs', department: 'handyman-and-general-repairs' },
+
+  // glass-and-aluminium
+  { slug: 'glass-safety-film', name: 'Glass safety film', description: 'Apply safety and security film to glass', department: 'glass-and-aluminium' },
+  { slug: 'balcony-glass-installation', name: 'Balcony glass installation', description: 'Install balcony and balustrade glass', department: 'glass-and-aluminium' },
+  { slug: 'window-screen-installation', name: 'Window screen installation', description: 'Install window screens and insect guards', department: 'glass-and-aluminium' },
+  { slug: 'aluminium-window-repair', name: 'Aluminium window repair', description: 'Repair aluminium frames and hardware', department: 'glass-and-aluminium' },
+  { slug: 'tempered-glass-installation', name: 'Tempered glass installation', description: 'Install and replace tempered safety glass', department: 'glass-and-aluminium' },
+  { slug: 'glass-cutter', name: 'Glass cutter', description: 'Cut and process glass to size', department: 'glass-and-aluminium' },
+  { slug: 'shopfront-glass', name: 'Shopfront glass', description: 'Install and repair shopfront glazing', department: 'glass-and-aluminium' },
+  { slug: 'glazier', name: 'Glazier', description: 'Professional glass installation and replacement', department: 'glass-and-aluminium' },
+
+  // appliance-installation-and-repair
+  { slug: 'range-hood-installation', name: 'Range hood installation', description: 'Install and service range hoods', department: 'appliance-installation-and-repair' },
+  { slug: 'gas-cooker-connection', name: 'Gas cooker connection', description: 'Connect and commission gas cookers safely', department: 'appliance-installation-and-repair' },
+  { slug: 'air-conditioner-installation', name: 'Air conditioner installation', description: 'Install room and split air conditioners', department: 'appliance-installation-and-repair' },
+  { slug: 'vacuum-cleaner-repair', name: 'Vacuum cleaner repair', description: 'Repair vacuum cleaners and floor care machines', department: 'appliance-installation-and-repair' },
+  { slug: 'kitchen-appliance-repair', name: 'Kitchen appliance repair', description: 'Repair kitchen appliances', department: 'appliance-installation-and-repair' },
+  { slug: 'laundry-machine-repair', name: 'Laundry machine repair', description: 'Repair washing and drying machines', department: 'appliance-installation-and-repair' },
+  { slug: 'home-appliance-installation', name: 'Appliance installation', description: 'Install household appliances', department: 'appliance-installation-and-repair' },
+  { slug: 'appliance-technician', name: 'Appliance technician', description: 'Trained appliance repair technician', department: 'appliance-installation-and-repair' },
+
+  // locksmith-services
+  { slug: 'master-key-systems', name: 'Master key systems', description: 'Design and install master key systems', department: 'locksmith-services' },
+  { slug: 'high-security-lock-installation', name: 'High security locks', description: 'Install high security and anti-snap locks', department: 'locksmith-services' },
+  { slug: 'lock-rekeying', name: 'Lock rekeying', description: 'Reseal and rekey locks after occupancy change', department: 'locksmith-services' },
+  { slug: 'car-key-programming', name: 'Car key programming', description: 'Cut and program vehicle keys', department: 'locksmith-services' },
+  { slug: 'access-control-locks', name: 'Access control locks', description: 'Install electronic access control locks', department: 'locksmith-services' },
+  { slug: 'lock-change-over', name: 'Lock changeover', description: 'Change locks after tenancy change', department: 'locksmith-services' },
+  { slug: 'safe-installation', name: 'Safe installation', description: 'Install and anchor home safes', department: 'locksmith-services' },
+  { slug: 'magnetic-key-systems', name: 'Magnetic key systems', description: 'Install restricted magnetic key systems', department: 'locksmith-services' },
+  { slug: 'lock-repair-and-maintenance', name: 'Lock maintenance', description: 'Repair and maintain locks and cylinders', department: 'locksmith-services' },
+  { slug: 'locksmith', name: 'Locksmith', description: 'Lock installation, repair and opening', department: 'locksmith-services' },
+  { slug: 'licensed-locksmith', name: 'Licensed locksmith', description: 'Licensed and identity-verified locksmith', department: 'locksmith-services' },
+
+  // curtains-blinds-and-upholstery
+  { slug: 'sheers-and-voile-installation', name: 'Sheers and voile installation', description: 'Install sheer and voile window treatments', department: 'curtains-blinds-and-upholstery' },
+  { slug: 'motorised-blind-installation', name: 'Motorised blind installation', description: 'Install and automate blinds and shades', department: 'curtains-blinds-and-upholstery' },
+  { slug: 'mattress-upholstery', name: 'Mattress upholstery', description: 'Reupholster and service mattresses', department: 'curtains-blinds-and-upholstery' },
+  { slug: 'headboard-upholstery', name: 'Headboard upholstery', description: 'Upholster headboards and bed surrounds', department: 'curtains-blinds-and-upholstery' },
+  { slug: 'window-upholstery-repair', name: 'Window seat upholstery', description: 'Repair upholstered window seats and benches', department: 'curtains-blinds-and-upholstery' },
+  { slug: 'curtain-and-blind-installation', name: 'Curtain and blind installation', description: 'Install curtains, blinds and tracks', department: 'curtains-blinds-and-upholstery' },
+  { slug: 'blind-repair-and-replacement', name: 'Blind repair', description: 'Repair and replace blind mechanisms', department: 'curtains-blinds-and-upholstery' },
+  { slug: 'commercial-upholstery', name: 'Commercial upholstery', description: 'Upholster commercial seating', department: 'curtains-blinds-and-upholstery' },
+  { slug: 'reupholstery', name: 'Reupholstery', description: 'Reupholster furniture and seating', department: 'curtains-blinds-and-upholstery' },
+  { slug: 'upholsterer', name: 'Upholsterer', description: 'Professional furniture upholstery', department: 'curtains-blinds-and-upholstery' },
+
+  // pet-care-services (new department)
+  { slug: 'dog-walking', name: 'Dog walking', description: 'Walk dogs individually or in small groups', department: 'pet-care-services' },
+  { slug: 'dog-visits-and-feeding', name: 'Dog visits and feeding', description: 'Visit and feed dogs in the owner’s home', department: 'pet-care-services' },
+  { slug: 'cat-care-visits', name: 'Cat care visits', description: 'Cat feeding, litter and companionship visits', department: 'pet-care-services' },
+  { slug: 'pet-overnight-boarding', name: 'Pet overnight boarding', description: 'Overnight care in the pet’s familiar home', department: 'pet-care-services' },
+  { slug: 'pet-grooming-assistance', name: 'Pet grooming assistance', description: 'Grooming assistance and blow dry', department: 'pet-care-services' },
+  { slug: 'puppy-socialisation', name: 'Puppy socialisation', description: 'Puppy walks, socialisation and basic manners', department: 'pet-care-services' },
+  { slug: 'pet-transport-to-vet', name: 'Pet transport to vet', description: 'Transport pets to veterinary appointments', department: 'pet-care-services' },
+  { slug: 'fish-and-small-pet-care', name: 'Fish and small pet care', description: 'Care for fish, birds, reptiles and small pets', department: 'pet-care-services' },
+  { slug: 'pet-cleaning-and-hygiene', name: 'Pet cleaning', description: 'Clean pet bedding, litter areas and homes', department: 'pet-care-services' },
+  { slug: 'dog-walking-and-exercise', name: 'Dog exercise programmes', description: 'Structured exercise programmes for dogs', department: 'pet-care-services' },
+  { slug: 'pet-behaviour-support', name: 'Pet behaviour support', description: 'Basic behaviour support and enrichment', department: 'pet-care-services' },
+  { slug: 'pet-sitting', name: 'Pet sitting', description: 'House sitting and care for household pets', department: 'pet-care-services' },
+  { slug: 'pet-first-aid-and-safety', name: 'Pet first aid', description: 'Trained in pet first aid and safe handling', department: 'pet-care-services' },
+  { slug: 'pet-handler', name: 'Pet handler', description: 'Experienced and verifiable pet care provider', department: 'pet-care-services' },
+
+  // waste-management-and-junk-removal (new department)
+  { slug: 'household-waste-collection', name: 'Household waste collection', description: 'Collect household and bagged refuse', department: 'waste-management-and-junk-removal' },
+  { slug: 'bulky-item-removal', name: 'Bulky item removal', description: 'Remove furniture, appliances and bulky waste', department: 'waste-management-and-junk-removal' },
+  { slug: 'construction-debris-removal', name: 'Construction debris removal', description: 'Remove renovation and construction debris', department: 'waste-management-and-junk-removal' },
+  { slug: 'electronic-waste-recycling', name: 'Electronic waste recycling', description: 'Collect and recycle electronic waste', department: 'waste-management-and-junk-removal' },
+  { slug: 'garden-waste-removal', name: 'Garden waste removal', description: 'Remove green waste and tree debris', department: 'waste-management-and-junk-removal' },
+  { slug: 'recycling-sorting-service', name: 'Recycling sorting', description: 'Sort and separate recyclable materials', department: 'waste-management-and-junk-removal' },
+  { slug: 'mattress-and-bed-waste-removal', name: 'Mattress removal', description: 'Collect and dispose of mattresses lawfully', department: 'waste-management-and-junk-removal' },
+  { slug: 'hoarding-and-declutter-removal', name: 'Decluttering removal', description: 'Clear clutter and remove unwanted possessions', department: 'waste-management-and-junk-removal' },
+  { slug: 'commercial-waste-collection', name: 'Commercial waste collection', description: 'Scheduled waste collection for businesses', department: 'waste-management-and-junk-removal' },
+  { slug: 'hazardous-waste-collection', name: 'Hazardous waste collection', description: 'Collect batteries, chemicals and hazardous waste', department: 'waste-management-and-junk-removal' },
+  { slug: 'waste-transport-and-disposal', name: 'Waste transport and disposal', description: 'Transport waste to licensed disposal facilities', department: 'waste-management-and-junk-removal' },
+  { slug: 'licensed-waste-handler', name: 'Licensed waste handler', description: 'Holds a valid waste transport or disposal permit', department: 'waste-management-and-junk-removal' },
+
+  // childcare-and-family-support (new department)
+  { slug: 'after-school-care', name: 'After school care', description: 'Care for children after school hours', department: 'childcare-and-family-support' },
+  { slug: 'school-run-assistance', name: 'School run assistance', description: 'Assist with school transport and pickups', department: 'childcare-and-family-support' },
+  { slug: 'homework-support', name: 'Homework support', description: 'Support children with homework and study', department: 'childcare-and-family-support' },
+  { slug: 'newborn-care-support', name: 'Newborn care support', description: 'Support parents with newborn care routines', department: 'childcare-and-family-support' },
+  { slug: 'date-evening-babysitting', name: 'Evening babysitting', description: 'Evening and weekend babysitting', department: 'childcare-and-family-support' },
+  { slug: 'holiday-camp-and-activity-care', name: 'Holiday activity care', description: 'Supervise children during school holidays', department: 'childcare-and-family-support' },
+  { slug: 'elder-sitting-and-escort', name: 'Elder sitting and escort', description: 'Sit with and escort older family members', department: 'childcare-and-family-support' },
+  { slug: 'household-errand-support', name: 'Household errand support', description: 'Support families with errands and shopping', department: 'childcare-and-family-support' },
+  { slug: 'meal-preparation-for-families', name: 'Family meal preparation', description: 'Prepare family meals in the home', department: 'childcare-and-family-support' },
+  { slug: 'pet-and-child-care-combined', name: 'Combined family care', description: 'Care for children and pets together safely', department: 'childcare-and-family-support' },
+  { slug: 'safeguarding-trained-carer', name: 'Safeguarding trained carer', description: 'Completed verified safeguarding and first aid training', department: 'childcare-and-family-support' },
+  { slug: 'childcare-provider', name: 'Childcare provider', description: 'Identity-verified and reference-checked carer', department: 'childcare-and-family-support' },
+  { slug: 'weed-control', name: 'Weed control', description: 'Targeted weed identification and treatment', department: 'gardening-and-landscaping' },
+  { slug: 'garden-lighting-installation', name: 'Garden lighting installation', description: 'Install and aim low-voltage garden lighting', department: 'gardening-and-landscaping' },
+
+  // ---- security ----
+  { slug: 'cameras-and-cctv', name: 'Cameras and CCTV', description: 'Design, install and configure camera systems', department: 'home-security-and-automation' },
+  { slug: 'electric-fence-installation', name: 'Electric fence installation', description: 'Install and service perimeter electric fencing', department: 'home-security-and-automation' },
+  { slug: 'gate-automation', name: 'Gate automation', description: 'Automate gates and barriers with safety controls', department: 'home-security-and-automation' },
+  { slug: 'fire-alarm-certification', name: 'Fire alarm certification', description: 'Certified to install and certify fire alarm systems', department: 'home-security-and-automation' },
+
+  // ---- moving ----
+  { slug: 'packing-service', name: 'Packing service', description: 'Professional wrapping and packing of belongings', department: 'moving-and-packing' },
+  { slug: 'furniture-assembly', name: 'Furniture assembly', description: 'Assemble and disassemble furniture safely', department: 'moving-and-packing' },
+
+  // ---- it ----
+  { slug: 'data-backup-and-recovery', name: 'Data backup and recovery', description: 'Back up and recover data from failed devices', department: 'it-and-electronics-repair' },
+
+  // ---- event ----
+  { slug: 'food-hygiene-certification', name: 'Food hygiene certification', description: 'Certified in safe food handling and preparation', department: 'event-and-party-services' },
+
+  // ---- personal care ----
+  { slug: 'massage-therapy-at-home', name: 'Massage therapy', description: 'Professional massage delivered at the client location', department: 'personal-care-and-wellness' },
+  { slug: 'haircut-and-styling-at-home', name: 'Haircut and styling', description: 'Haircutting, styling and finishing services', department: 'personal-care-and-wellness' },
+  { slug: 'solar-water-heater-installation', name: 'Solar water heater installation', description: 'Install solar water heating systems', department: 'solar-and-energy-solutions' },
+  { slug: 'energy-audit-and-consultation', name: 'Energy audit', description: 'Assess energy consumption and efficiency', department: 'solar-and-energy-solutions' },
+  { slug: 'battery-storage-system-setup', name: 'Battery storage setup', description: 'Install and configure battery storage systems', department: 'solar-and-energy-solutions' },
+
+  // ---- renovation ----
+  { slug: 'closet-and-storage-design', name: 'Closet and storage design', description: 'Design fitted storage and closet systems', department: 'home-renovation-and-interiors' },
+  { slug: 'waterproofing-certification', name: 'Waterproofing certification', description: 'Certified in wet-area and tank waterproofing', department: 'home-renovation-and-interiors' },
+
+  // ---- glass ----
+  { slug: 'glass-partition-installation', name: 'Glass partition installation', description: 'Install framed glass partition walls', department: 'glass-and-aluminium' },
+
+  // ---- locksmith ----
+  { slug: 'door-unlocking', name: 'Door unlocking', description: 'Open locked doors without damage where possible', department: 'locksmith-services' },
+  { slug: 'key-duplication', name: 'Key duplication', description: 'Cut and duplicate keys', department: 'locksmith-services' },
+  { slug: 'emergency-locksmith-service', name: 'Emergency locksmith service', description: 'Out-of-hours lockout response', department: 'locksmith-services' },
+
+  // ---- curtains ----
+  { slug: 'curtain-repair', name: 'Curtain repair', description: 'Repair and alter curtains and drapes', department: 'curtains-blinds-and-upholstery' },
+  { slug: 'curtain-track-installation', name: 'Curtain track installation', description: 'Install curtain tracks and rails', department: 'curtains-blinds-and-upholstery' },
+]

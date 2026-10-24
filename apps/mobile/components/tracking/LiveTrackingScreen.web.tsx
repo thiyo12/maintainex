@@ -119,6 +119,15 @@ export default function LiveTrackingWebScreen() {
             <Text style={styles.actionText}>Open messages</Text>
           </View>
         </PressableScale>
+        <PressableScale
+          onPress={() => router.push(`/(customer)/jobs/dispute/${id}` as any)}
+          scaleTo={0.98}
+          style={styles.actionPress}
+        >
+          <View style={styles.reportAction}>
+            <Text style={styles.reportText}>Report a job concern</Text>
+          </View>
+        </PressableScale>
       </ScrollView>
     </SafeAreaView>
   )
@@ -149,4 +158,6 @@ const styles = StyleSheet.create({
   actionPress: { width: '100%' },
   action: { height: 54, borderRadius: 14, backgroundColor: v3.colors.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   actionText: { fontFamily: 'Outfit_700Bold', fontSize: 16, color: v3.colors.paper },
+  reportAction: { height: 54, borderRadius: 14, borderWidth: 1, borderColor: v3.colors.line, backgroundColor: v3.colors.paper, alignItems: 'center', justifyContent: 'center' },
+  reportText: { fontFamily: 'Outfit_600SemiBold', fontSize: 15, color: v3.colors.ink },
 })

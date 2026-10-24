@@ -70,6 +70,29 @@ export const v2JobActions = {
     v2Request<{ review: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
   getReviews: (jobId: string) =>
     v2Request<{ reviews: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`),
+  reportSafety: (jobId: string, data: {
+    reason: 'SAFETY_IMMEDIATE_DANGER' | 'SAFETY_THREAT_OR_HARASSMENT' |
+      'SAFETY_INJURY' | 'SAFETY_UNSAFE_WORK' | 'SAFETY_IDENTITY_MISMATCH'
+    description: string
+  }) =>
+    v2Request<{ success: boolean; reportId: string; status: 'RECEIVED' }>(
+      `/api/mobile/v2/jobs/${jobId}/safety-report`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+  createTrustedContactShare: (jobId: string, expiresInHours: number) =>
+    v2Request<{
+      share: { id: string; expiresAt: string; consentedAt: string }
+      url: string
+      sharedFields: string[]
+      excludedFields: string[]
+    }>(`/api/mobile/v2/jobs/${jobId}/trusted-contact`, {
+      method: 'POST', body: JSON.stringify({ consent: true, expiresInHours }),
+    }),
+  revokeTrustedContactShare: (jobId: string, shareId: string) =>
+    v2Request<{ success: boolean }>(
+      `/api/mobile/v2/jobs/${jobId}/trusted-contact/${encodeURIComponent(shareId)}`,
+      { method: 'DELETE' },
+    ),
   dispute: (jobId: string, reason?: string, description?: string) =>
     v2Request<{ success: boolean; message: string; disputeId?: string }>(
       `/api/mobile/v2/jobs/${jobId}/complete`,

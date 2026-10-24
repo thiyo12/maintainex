@@ -1,4 +1,5 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
@@ -48,7 +49,11 @@ export async function POST(
       secureConsole.error('Quote accepted notification failed after successful acceptance:', notificationError)
     }
 
-    const currency = getCurrencyForCountry(result.job.countryCode)
+    const jobMarket = requireJobMarket(result.job)
+    if (!jobMarket.ok) {
+      return NextResponse.json({ error: jobMarket.error, code: jobMarket.code }, { status: 409 })
+    }
+    const currency = getCurrencyForCountry(jobMarket.countryCode)
     return NextResponse.json({
       success: true,
       quote: {
