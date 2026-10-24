@@ -16,6 +16,7 @@ import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import {
   reconcileProviderRefund,
 } from '@/lib/finance/payments/payment-service'
+import { isLegacyReadOnlyProvider } from '@/lib/finance/payments/provider-registry'
 
 const REFUND_STATUSES = ['REFUND_REQUIRED', 'REFUND_PROCESSING', 'REFUNDED'] as const
 
@@ -186,6 +187,12 @@ export async function PATCH(request: NextRequest) {
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (!assertCrmCountryAllowed(security, job.countryCode)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    if (isLegacyReadOnlyProvider(intent.gateway)) {
+      return NextResponse.json(
+        { error: 'Legacy payment records are read-only; PayPal and PayHere refund actions are retired', code: 'PAYMENT_PROVIDER_RETIRED' },
+        { status: 409 }
+      )
     }
 
     if (action === 'RECONCILE') {

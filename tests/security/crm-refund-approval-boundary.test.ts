@@ -17,6 +17,24 @@ describe('CRM refund approval boundary', () => {
     expect(source).not.toContain('await confirmManualExternalRefund(intent.id')
   })
 
+  it('keeps retired gateway refund records read-only across Admin and approval execution paths', () => {
+    const route = readFileSync(
+      resolve(process.cwd(), 'app/api/admin/financial/refunds/route.ts'),
+      'utf8'
+    )
+    const service = readFileSync(
+      resolve(process.cwd(), 'lib/finance/payments/payment-service.ts'),
+      'utf8'
+    )
+
+    expect(route).toContain('isLegacyReadOnlyProvider(intent.gateway)')
+    expect(route).toContain("code: 'PAYMENT_PROVIDER_RETIRED'")
+    expect(service).toContain('Legacy payment records are read-only; gateway refund processing is retired')
+    expect(service).toContain('Legacy payment records are read-only; gateway refund reconciliation is retired')
+    expect(service).toContain('Legacy payment records are read-only; manual gateway refund processing is retired')
+    expect(service).toContain("provider: 'MANUAL'")
+  })
+
   it('executes approved refunds only from the centralized approval executor', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'lib/crm/governance/approval-execution.ts'),

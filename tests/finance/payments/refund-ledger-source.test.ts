@@ -62,7 +62,7 @@ function paymentIntent(overrides: Record<string, unknown> = {}) {
     paymentId: 'pay-1',
     amount: 10000n,
     currency: 'LKR',
-    gateway: 'PAYHERE',
+    gateway: 'MANUAL_BANK',
     status: 'REFUND_REQUIRED',
     gatewayResponse: null,
     ...overrides,
@@ -83,7 +83,7 @@ describe('external refund ledger source finalization', () => {
     mocks.recordJobLifecycleEvent.mockResolvedValue(undefined)
   })
 
-  it('clears refund suspense for a late capture without touching escrow state', async () => {
+  it('clears refund suspense for a manually confirmed external refund without touching escrow state', async () => {
     mocks.financialLedgerFindFirst.mockResolvedValue({
       id: 'ledger-suspense-1',
       amount: 10000n,
@@ -95,7 +95,7 @@ describe('external refund ledger source finalization', () => {
     const result = await confirmManualExternalRefund('pi-1', {
       actorId: 'admin-1',
       reference: 'BANK-REF-1001',
-      note: 'Customer refunded outside PayHere',
+      note: 'Customer refunded by bank transfer',
     })
 
     expect(result).toEqual({
@@ -115,7 +115,7 @@ describe('external refund ledger source finalization', () => {
             amount: 10000n,
           }),
           expect.objectContaining({
-            accountId: 'external:payhere',
+            accountId: 'external:manual',
             accountType: 'EXTERNAL_PAYOUT',
             entryType: 'CREDIT',
             amount: 10000n,
@@ -142,7 +142,7 @@ describe('external refund ledger source finalization', () => {
     )
   })
 
-  it('debits protected escrow for a normal external refund', async () => {
+  it('debits protected escrow for a normal manually confirmed refund', async () => {
     mocks.financialLedgerFindFirst.mockResolvedValue(null)
     mocks.jobEscrowFindUnique.mockResolvedValue({
       id: 'escrow-1',
@@ -177,7 +177,7 @@ describe('external refund ledger source finalization', () => {
             amount: 10000n,
           }),
           expect.objectContaining({
-            accountId: 'external:payhere',
+            accountId: 'external:manual',
             accountType: 'EXTERNAL_PAYOUT',
             entryType: 'CREDIT',
             amount: 10000n,
@@ -210,6 +210,20 @@ describe('external refund ledger source finalization', () => {
       success: false,
       code: 'REFUND_ESCROW_MISMATCH',
     })
+    expect(mocks.transaction).not.toHaveBeenCalled()
+    expect(mocks.postLedgerTransaction).not.toHaveBeenCalled()
+  })
+
+  it('keeps retired gateway records read-only without changing ledger or payment state', async () => {
+    mocks.paymentIntentFindUnique.mockResolvedValue(paymentIntent({ gateway: 'PAYHERE' }))
+
+    const { confirmManualExternalRefund } = await import('@/lib/payment/payment-service')
+    const result = await confirmManualExternalRefund('pi-1', {
+      actorId: 'admin-1',
+      reference: 'BANK-REF-1004',
+    })
+
+    expect(result).toMatchObject({ success: false, code: 'PAYMENT_PROVIDER_RETIRED' })
     expect(mocks.transaction).not.toHaveBeenCalled()
     expect(mocks.postLedgerTransaction).not.toHaveBeenCalled()
   })

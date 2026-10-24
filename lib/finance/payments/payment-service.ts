@@ -25,6 +25,7 @@ import {
 import {
   resolvePaymentProviderForMarket,
   PAYMENT_PROVIDER_NOT_AVAILABLE,
+  isLegacyReadOnlyProvider,
   type ResolvedPaymentProvider,
 } from '@/lib/finance/payments/provider-registry'
 import { assertProviderOnlineEligible } from '@/lib/finance/commissions/provider-balance-service'
@@ -1366,7 +1367,7 @@ export async function reconcilePayHereRefund(
 async function finalizeExternalProviderRefund(
   paymentIntentId: string,
   details: {
-    provider: 'PAYHERE' | 'PAYPAL'
+    provider: 'PAYHERE' | 'PAYPAL' | 'MANUAL'
     gatewayStatus: string
     refundReference: string | null
     message: string
@@ -2001,6 +2002,14 @@ export async function requestRequiredProviderRefund(
       code: 'PAYMENT_INTENT_NOT_FOUND',
     }
   }
+  if (isLegacyReadOnlyProvider(intent.gateway)) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Legacy payment records are read-only; gateway refund processing is retired',
+      code: 'PAYMENT_PROVIDER_RETIRED',
+    }
+  }
   if (intent.gateway === 'PAYPAL') {
     return requestRequiredPayPalRefund(paymentIntentId, approvalRequestId)
   }
@@ -2028,6 +2037,14 @@ export async function reconcileProviderRefund(
       status: 'REFUND_REQUIRED',
       error: 'Payment intent not found',
       code: 'PAYMENT_INTENT_NOT_FOUND',
+    }
+  }
+  if (isLegacyReadOnlyProvider(intent.gateway)) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Legacy payment records are read-only; gateway refund reconciliation is retired',
+      code: 'PAYMENT_PROVIDER_RETIRED',
     }
   }
   if (intent.gateway === 'PAYPAL') {
@@ -2074,6 +2091,14 @@ export async function confirmManualExternalRefund(
       code: 'PAYMENT_INTENT_NOT_FOUND',
     }
   }
+  if (isLegacyReadOnlyProvider(intent.gateway)) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Legacy payment records are read-only; manual gateway refund processing is retired',
+      code: 'PAYMENT_PROVIDER_RETIRED',
+    }
+  }
   if (intent.status === 'REFUNDED') {
     return { success: true, status: 'REFUNDED', refundReference: reference }
   }
@@ -2086,23 +2111,8 @@ export async function confirmManualExternalRefund(
     }
   }
 
-  const provider =
-    intent.gateway === 'PAYPAL'
-      ? 'PAYPAL'
-      : intent.gateway === 'PAYHERE'
-        ? 'PAYHERE'
-        : null
-  if (!provider) {
-    return {
-      success: false,
-      status: 'REFUND_REQUIRED',
-      error: `Manual external refund is unsupported for gateway ${intent.gateway}`,
-      code: 'PAYMENT_PROVIDER_REFUND_UNSUPPORTED',
-    }
-  }
-
   return finalizeExternalProviderRefund(paymentIntentId, {
-    provider,
+    provider: 'MANUAL',
     gatewayStatus: 'MANUAL_REFUND_CONFIRMED',
     refundReference: reference,
     message: input.note?.trim().slice(0, 500) || 'Manual external refund confirmed by finance',
