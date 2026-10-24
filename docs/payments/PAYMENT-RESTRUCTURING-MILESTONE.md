@@ -15,12 +15,12 @@ Starting head: `956fd471fdcbafdf3d2c4494005598d73b48d3a7`
 
 ## Test evidence
 
-- Focused bootstrap safety tests: 3 passed.
+- Focused bootstrap and raw-invariant regression tests: 9 passed.
 - `npx prisma validate`: passed.
 - Prisma baseline SQL generation: passed (5,329 lines generated from the current schema).
 - Root TypeScript check: passed.
 - `bash -n scripts/bootstrap-fresh-database.sh` and `git diff --check`: passed.
-- Isolated PostgreSQL execution of the bootstrap was attempted locally but could not start in the sandbox because PostgreSQL shared-memory setup is denied. The exact-head CI run is required to verify the end-to-end bootstrap.
+- Isolated PostgreSQL execution of the bootstrap was attempted locally but could not start in the sandbox because PostgreSQL shared-memory setup is denied. Exact-head CI is exercising the full PostgreSQL procedure.
 
 Previously verified at `956fd471fdcbafdf3d2c4494005598d73b48d3a7`: full regression 4,547 passed / 100 environment-gated skips, financial suite 402 passed / 4 skipped, production build and all three exact-head GitHub Actions workflows passed.
 
