@@ -2208,6 +2208,7 @@ model MarketplaceJob {
   changeOrders      JobChangeOrder[]
   evidenceRecords   JobEvidence[]
   riskEvents        MarketplaceRiskEvent[]
+  trustedContactShares TrustedContactShare[]
   verificationPins  JobVerificationPin[]
   assignments       CompanyJobAssignment[]
   crewDispatch      CompanyCrewDispatch?
@@ -2220,6 +2221,25 @@ model MarketplaceJob {
   @@index([status])
   @@index([createdAt])
   @@index([countryCode])
+}
+
+/// Short-lived, user-authorized safety status access for a trusted contact.
+/// Only a token digest and booking ownership metadata are stored; the recipient
+/// sees a minimal status summary and never the service address or account PII.
+model TrustedContactShare {
+  id               String         @id @default(cuid())
+  jobId            String
+  job              MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  actorUserId      String
+  tokenHash        String         @unique
+  consentedAt      DateTime
+  consentVersion   String
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime       @default(now())
+
+  @@index([jobId, actorUserId, expiresAt])
+  @@index([expiresAt, revokedAt])
 }
 
 model JobQuote {

@@ -27,6 +27,7 @@ const PUBLIC_MUTATION_ROUTES = new Set([
   'app/api/admin/auth/2fa/verify/route.ts',
   'app/api/admin/auth/refresh/route.ts',
   'app/api/admin/auth/logout/route.ts',
+  'app/api/mobile/v2/safety-share/route.ts',
 ])
 
 const RETIRED_MUTATION_ROUTES = new Set([

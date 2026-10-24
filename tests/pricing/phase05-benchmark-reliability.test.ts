@@ -16,7 +16,8 @@ function makeClient(fallbackEnabled: boolean, samples: number[]) {
       sampleSize, medianAmountCents: 1500n, lowerPercentileCents: 1200n,
       upperPercentileCents: 1800n, minimumObservedCents: 1000n,
       maximumObservedCents: 1900n, sourceType: 'PARTNER_DATA',
-      sourceReference: null, methodologyNote: null, version: 1,
+      sourceReference: 'https://market.example/observations/benchmark-2026',
+      methodologyNote: 'Collected verified completed job prices and normalized each item to the same service scope.', version: 1,
       effectiveFrom: now, effectiveTo: null,
     }
   })

@@ -10,6 +10,12 @@ vi.mock('@/lib/auth/compatibility/mobile-auth', () => ({
   assertNotSuspended: () => null,
 }))
 vi.mock('@/lib/domain/book-now', () => ({ createBookNowJob: mock.book }))
+vi.mock('@/lib/geography/geocoder', () => ({
+  verifyServiceCoordinates: async (latitude: number) => ({
+    ok: true, countryCode: latitude > 30 ? 'CA' : 'LK',
+    locality: latitude > 30 ? 'Vancouver' : 'Colombo', district: null,
+  }),
+}))
 
 const VANCOUVER = { latitude: 49.2827, longitude: -123.1207 }
 const COLOMBO = { latitude: 6.9271, longitude: 79.8612 }

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
 import { serializeBigInts } from '@/lib/crm/benchmark-utils'
 import { createAuditLog } from '@/lib/crm/audit'
+import { benchmarkEvidenceErrors } from '@/lib/pricing/benchmark-evidence'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -22,8 +23,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (existing.status !== 'DRAFT') {
       return NextResponse.json({ error: `Cannot submit a benchmark with status ${existing.status}. Only DRAFT benchmarks can be submitted.` }, { status: 409 })
     }
-    if (existing.sampleSize < 1) {
-      return NextResponse.json({ error: 'Cannot submit a benchmark with sample size < 1' }, { status: 400 })
+    const evidenceErrors = benchmarkEvidenceErrors(existing)
+    if (evidenceErrors.length) {
+      return NextResponse.json({ error: 'Benchmark evidence is incomplete', details: evidenceErrors }, { status: 400 })
     }
 
     const benchmark = await prisma.priceBenchmark.update({

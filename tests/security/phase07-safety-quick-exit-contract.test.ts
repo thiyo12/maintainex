@@ -9,7 +9,7 @@ const entry = readFileSync(resolve(process.cwd(),
 
 describe('Phase 07 — discreet safety exit is not emergency dispatch', () => {
   it('provides an accessible one-tap exit to the ordinary application entry', () => {
-    expect(src).toContain('accessibilityLabel="Quick exit Safety Centre"')
+    expect(src).toContain("accessibilityLabel={t('safetyCentre.quickExit')}")
     expect(src).toContain('onPress={quickExit}')
     expect(src).toContain("router.replace('/')")
     expect(entry).toContain("router.replace('/(customer)')")
@@ -33,8 +33,9 @@ describe('Phase 07 — discreet safety exit is not emergency dispatch', () => {
   })
   it('does not claim to cancel or delete a server-recorded incident', () => {
     expect(src).toContain('never remove an already-sent staff report')
-    expect(src).toContain('cannot dispatch responders')
-    expect(src).toContain('does not automatically change a payment.')
+    const english = readFileSync(resolve(process.cwd(), 'apps/mobile/lib/i18n/locales/en.ts'), 'utf8')
+    expect(english).toContain('cannot dispatch responders')
+    expect(english).toContain('does not automatically change a payment.')
     expect(src).not.toContain('deleteSafetyReport(')
   })
 })

@@ -5,6 +5,7 @@ import type {
   GeographyLevel,
   PricingMode,
 } from './benchmark-types'
+import { benchmarkEvidenceErrors } from './benchmark-evidence'
 
 /**
  * Canonical benchmark resolution with geographic fallback hierarchy.
@@ -52,7 +53,7 @@ export async function resolveBenchmark(
       now,
     })
 
-    if (benchmark && Number.isSafeInteger(benchmark.sampleSize) &&
+    if (benchmark && benchmarkEvidenceErrors(benchmark).length === 0 && Number.isSafeInteger(benchmark.sampleSize) &&
         benchmark.sampleSize >= Math.max(1, config.minBenchmarkSample)) {
       const confidence = deriveConfidence(benchmark.sampleSize, params.serviceTemplateId)
       return {

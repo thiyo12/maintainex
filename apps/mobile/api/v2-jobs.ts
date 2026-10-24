@@ -79,6 +79,20 @@ export const v2JobActions = {
       `/api/mobile/v2/jobs/${jobId}/safety-report`,
       { method: 'POST', body: JSON.stringify(data) },
     ),
+  createTrustedContactShare: (jobId: string, expiresInHours: number) =>
+    v2Request<{
+      share: { id: string; expiresAt: string; consentedAt: string }
+      url: string
+      sharedFields: string[]
+      excludedFields: string[]
+    }>(`/api/mobile/v2/jobs/${jobId}/trusted-contact`, {
+      method: 'POST', body: JSON.stringify({ consent: true, expiresInHours }),
+    }),
+  revokeTrustedContactShare: (jobId: string, shareId: string) =>
+    v2Request<{ success: boolean }>(
+      `/api/mobile/v2/jobs/${jobId}/trusted-contact/${encodeURIComponent(shareId)}`,
+      { method: 'DELETE' },
+    ),
   dispute: (jobId: string, reason?: string, description?: string) =>
     v2Request<{ success: boolean; message: string; disputeId?: string }>(
       `/api/mobile/v2/jobs/${jobId}/complete`,

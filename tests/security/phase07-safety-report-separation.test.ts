@@ -160,9 +160,11 @@ describe('Phase 07 safety intake never mutates financial disputes', () => {
     expect(src).toContain("number: '911'")
     expect(src).toContain("number: '119'")
     expect(src).toContain("number: '1990'")
-    expect(src).toContain('cannot dispatch responders')
-    expect(src).toContain('Close without reporting')
-    expect(src).toContain('does not automatically change a payment.')
+    const english = readFileSync(resolve(process.cwd(),
+      'apps/mobile/lib/i18n/locales/en.ts'), 'utf8')
+    expect(english).toContain('cannot dispatch responders')
+    expect(english).toContain('Close without reporting')
+    expect(english).toContain('does not automatically change a payment.')
   })
 
   it('uses the new safety route, not the escrow dispute operation', () => {

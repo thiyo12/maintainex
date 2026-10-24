@@ -23,6 +23,12 @@ vi.mock('@/lib/auth/compatibility/mobile-auth', () => ({
   assertNotSuspended: () => null,
 }))
 vi.mock('@/lib/geography/market-engine', () => ({ resolveMarketFromServiceAddress: mock.location }))
+vi.mock('@/lib/geography/geocoder', () => ({
+  verifyServiceCoordinates: async (latitude: number) => ({
+    ok: true, countryCode: latitude > 30 ? 'CA' : 'LK',
+    locality: latitude > 30 ? 'Vancouver' : 'Colombo', district: null,
+  }),
+}))
 vi.mock('@/lib/rate-limit/middleware', () => ({ checkRateLimit: async () => ({ allowed: true }), userKey: vi.fn() }))
 vi.mock('@/lib/pricing/engine', () => ({ calculatePrice: mock.price }))
 vi.mock('@/lib/job-blast', () => ({ blastJobToTaskers: mock.blast }))
@@ -118,7 +124,7 @@ describe('Phase 01 — job creation validates canonical catalogue against addres
     mock.category.countries = '["LK"]'
     mock.service.countryCode = 'LK'; mock.service.currency = 'LKR'
     mock.job.countries = '["LK"]'; mock.job.currency = 'LKR'
-    expect((await create({ serviceTemplateId: 'service', templateJobId: 'service-job', postalCode: '00100' })).status).toBe(201)
+    expect((await create({ serviceTemplateId: 'service', templateJobId: 'service-job', postalCode: '00100', latitude: 6.9271, longitude: 79.8612 })).status).toBe(201)
     expect(mock.jobCreate).toHaveBeenCalledTimes(1)
   })
 

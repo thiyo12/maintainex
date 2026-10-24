@@ -152,6 +152,9 @@ export async function POST(request: NextRequest) {
     if (template.countryCode !== countryCode) {
       return NextResponse.json({ error: 'Service template country does not match benchmark country' }, { status: 400 })
     }
+    if (currency !== (countryCode === 'LK' ? 'LKR' : countryCode === 'CA' ? 'CAD' : '')) {
+      return NextResponse.json({ error: 'Benchmark currency does not match its market' }, { status: 400 })
+    }
 
     try {
       const sampleSize = boundedInteger(body?.sampleSize ?? 0, 'sampleSize', 0, 1_000_000)

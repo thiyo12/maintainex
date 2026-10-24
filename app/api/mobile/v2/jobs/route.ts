@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { resolveMarketFromServiceAddress } from '@/lib/geography/market-engine'
+import { verifyServiceCoordinates } from '@/lib/geography/geocoder'
 import { blastJobToTaskers } from '@/lib/job-blast'
 import { calculatePrice } from '@/lib/pricing/engine'
 import { getSetting } from '@/lib/settings'
@@ -196,6 +197,30 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       )
+    }
+
+    // GPS pins and the client-side reverse-geocoder are user-controlled.
+    // Confirm their country and municipality server-side before accepting a
+    // canonical marketplace job. Missing provider credentials fail closed.
+    if (coordinatesProvided) {
+      const verifiedAddress = await verifyServiceCoordinates(latitude, longitude)
+      if (!verifiedAddress.ok) {
+        const unavailable = verifiedAddress.code === 'GEOCODER_NOT_CONFIGURED' ||
+          verifiedAddress.code === 'GEOCODER_UNAVAILABLE'
+        return NextResponse.json({
+          error: unavailable
+            ? 'Service address verification is temporarily unavailable'
+            : 'Service address could not be verified',
+          code: verifiedAddress.code,
+        }, { status: unavailable ? 503 : 400 })
+      }
+      if (verifiedAddress.countryCode !== addressResolution.countryCode ||
+          (verifiedAddress.countryCode === 'CA' && verifiedAddress.locality?.trim().toLowerCase() !== 'vancouver')) {
+        return NextResponse.json({
+          error: 'Geocoded service address does not match a supported launch market',
+          code: 'GEOCODED_MARKET_MISMATCH',
+        }, { status: 400 })
+      }
     }
 
     const finalCountryCode = addressResolution.countryCode

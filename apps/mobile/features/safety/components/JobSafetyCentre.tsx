@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'expo-router'
+import * as Clipboard from 'expo-clipboard'
+import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator, Alert, Linking, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
@@ -8,11 +10,11 @@ import { v2JobActions } from '@/api/v2-jobs'
 import { v3 } from '@/theme/v3/tokens'
 
 const REASONS = [
-  { id: 'SAFETY_IMMEDIATE_DANGER', name: 'Immediate danger' },
-  { id: 'SAFETY_THREAT_OR_HARASSMENT', name: 'Threat or harassment' },
-  { id: 'SAFETY_INJURY', name: 'Injury' },
-  { id: 'SAFETY_UNSAFE_WORK', name: 'Unsafe work conditions' },
-  { id: 'SAFETY_IDENTITY_MISMATCH', name: 'Identity mismatch' },
+  { id: 'SAFETY_IMMEDIATE_DANGER', nameKey: 'safetyCentre.immediateDangerReason' },
+  { id: 'SAFETY_THREAT_OR_HARASSMENT', nameKey: 'safetyCentre.threatReason' },
+  { id: 'SAFETY_INJURY', nameKey: 'safetyCentre.injuryReason' },
+  { id: 'SAFETY_UNSAFE_WORK', nameKey: 'safetyCentre.unsafeWorkReason' },
+  { id: 'SAFETY_IDENTITY_MISMATCH', nameKey: 'safetyCentre.identityReason' },
 ] as const
 
 type Reason = typeof REASONS[number]['id']
@@ -29,12 +31,16 @@ export default function JobSafetyCentre({
   countryCode?: string
 }) {
   const router = useRouter()
+  const { t } = useTranslation()
   const exited = useRef(false)
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState<Reason>('SAFETY_UNSAFE_WORK')
   const [description, setDescription] = useState('')
   const [sending, setSending] = useState(false)
   const [reference, setReference] = useState<string | null>(null)
+  const [shareConsent, setShareConsent] = useState(false)
+  const [share, setShare] = useState<{ id: string; url: string; expiresAt: string } | null>(null)
+  const [sharing, setSharing] = useState(false)
 
   const emergencyNumbers = countryCode?.toUpperCase() === 'CA'
     ? [{ number: '911', label: 'Emergency police, fire or ambulance (911)' }]
@@ -50,7 +56,7 @@ export default function JobSafetyCentre({
       // The user's dialler opens; MaintainEX does not place a call itself.
       await Linking.openURL('tel:' + number)
     } catch {
-      Alert.alert('Dialler unavailable', 'Call your local emergency services directly.')
+      Alert.alert(t('safetyCentre.diallerTitle'), t('safetyCentre.diallerBody'))
     }
   }
 
@@ -62,6 +68,12 @@ export default function JobSafetyCentre({
     setDescription('')
     setReference(null)
     setReason('SAFETY_UNSAFE_WORK')
+    setShareConsent(false)
+    const activeShare = share
+    setShare(null)
+    if (activeShare) {
+      void v2JobActions.revokeTrustedContactShare(jobId, activeShare.id).catch(() => undefined)
+    }
     router.replace('/')
   }
 
@@ -69,7 +81,7 @@ export default function JobSafetyCentre({
     exited.current = false
     const detail = description.trim()
     if (detail.length < 10 || detail.length > 2000) {
-      Alert.alert('Details needed', 'Describe the safety issue in 10–2000 characters.')
+      Alert.alert(t('safetyCentre.detailsNeededTitle'), t('safetyCentre.detailsNeededBody'))
       return
     }
     setSending(true)
@@ -82,14 +94,13 @@ export default function JobSafetyCentre({
         setDescription('')
         setOpen(false)
         Alert.alert(
-          'Report recorded',
-          'Staff can review your report. This is not emergency dispatch and does not automatically change a payment.',
+          t('safetyCentre.recordedTitle'),
+          t('safetyCentre.recordedBody'),
         )
       }
     } catch (error: any) {
       if (!exited.current) {
-        Alert.alert('Could not record report', error?.message ||
-          'Check your connection. In immediate danger, call emergency services.')
+        Alert.alert(t('safetyCentre.reportFailedTitle'), error?.message || t('safetyCentre.reportFailedBody'))
       }
     } finally {
       setSending(false)
@@ -103,24 +114,24 @@ export default function JobSafetyCentre({
         style={styles.toggle}
         onPress={() => setOpen(current => !current)}
       >
-        <Text style={styles.headline}>{open ? 'Close Safety Centre' : 'Safety Centre — report danger or get help'}</Text>
+        <Text style={styles.headline}>{open ? t('safetyCentre.close') : t('safetyCentre.open')}</Text>
       </TouchableOpacity>
-      {reference ? <Text style={styles.note}>Recorded reference: {reference}</Text> : null}
+      {reference ? <Text style={styles.note}>{t('safetyCentre.reference', { reference })}</Text> : null}
       {open ? (
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel="Quick exit Safety Centre"
-          accessibilityHint="Clears unsent details and leaves this screen without a confirmation"
+          accessibilityLabel={t('safetyCentre.quickExit')}
+          accessibilityHint={t('safetyCentre.quickExitHint')}
           onPress={quickExit}
           style={styles.quickExit}
         >
-          <Text style={styles.quickExitLabel}>Quick exit — return to home</Text>
+          <Text style={styles.quickExitLabel}>{t('safetyCentre.quickExit')}</Text>
         </TouchableOpacity>
       ) : null}
       {open ? (
         <View style={styles.content}>
-          <Text style={styles.important}>If you are in immediate danger, leave if safe and call emergency services.</Text>
-          <Text style={styles.note}>MaintainEX cannot dispatch responders or guarantee 24/7 monitoring.</Text>
+          <Text style={styles.important}>{t('safetyCentre.immediateDanger')}</Text>
+          <Text style={styles.note}>{t('safetyCentre.noDispatch')}</Text>
           {emergencyNumbers.map(choice => (
             <TouchableOpacity
               accessibilityRole="button"
@@ -132,9 +143,9 @@ export default function JobSafetyCentre({
             </TouchableOpacity>
           ))}
           {emergencyNumbers.length === 0 ? (
-            <Text style={styles.note}>Use your phone's emergency dialler for the local emergency number.</Text>
+            <Text style={styles.note}>{t('safetyCentre.localNumber')}</Text>
           ) : null}
-          <Text style={styles.headline}>Report a safety incident (not a payment dispute)</Text>
+          <Text style={styles.headline}>{t('safetyCentre.reportTitle')}</Text>
           {REASONS.map(option => (
             <TouchableOpacity
               accessibilityRole="radio"
@@ -143,13 +154,13 @@ export default function JobSafetyCentre({
               onPress={() => setReason(option.id)}
               style={styles.choice}
             >
-              <Text style={styles.choiceText}>{option.id === reason ? '●' : '○'} {option.name}</Text>
+              <Text style={styles.choiceText}>{option.id === reason ? '●' : '○'} {t(option.nameKey)}</Text>
             </TouchableOpacity>
           ))}
           <TextInput
-            accessibilityLabel="Safety incident details"
+            accessibilityLabel={t('safetyCentre.detailsLabel')}
             style={styles.input}
-            placeholder="What happened and what help do you need?"
+            placeholder={t('safetyCentre.detailsPlaceholder')}
             placeholderTextColor={v3.colors.textMuted}
             multiline
             textAlignVertical="top"
@@ -164,13 +175,72 @@ export default function JobSafetyCentre({
             onPress={report}
           >
             {sending ? <ActivityIndicator color={v3.colors.paper} /> : (
-              <Text style={styles.sendLabel}>Send safety report</Text>
+              <Text style={styles.sendLabel}>{t('safetyCentre.sendReport')}</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" onPress={() => setOpen(false)} style={styles.dismiss}>
-            <Text style={styles.note}>Close without reporting</Text>
+            <Text style={styles.note}>{t('safetyCentre.closeWithoutReporting')}</Text>
           </TouchableOpacity>
-          <Text style={styles.note}>Payment disputes use a separate process. Safety intake does not place escrow on hold.</Text>
+          <Text style={styles.note}>{t('safetyCentre.paymentBoundary')}</Text>
+          <Text style={styles.headline}>{t('safetyCentre.trustedTitle')}</Text>
+          <Text style={styles.note}>{t('safetyCentre.trustedDescription')}</Text>
+          <TouchableOpacity
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: shareConsent }}
+            onPress={() => setShareConsent(current => !current)}
+            style={styles.choice}
+          >
+            <Text style={styles.choiceText}>{shareConsent ? '☑' : '☐'} {t('safetyCentre.consent')}</Text>
+          </TouchableOpacity>
+          {share ? (
+            <View style={styles.shareBox}>
+              <Text selectable style={styles.note}>{share.url}</Text>
+              <Text style={styles.note}>{t('safetyCentre.expires', { date: new Date(share.expiresAt).toLocaleString() })}</Text>
+              <TouchableOpacity accessibilityRole="button" style={styles.emergency} onPress={async () => {
+                await Clipboard.setStringAsync(share.url)
+                Alert.alert(t('safetyCentre.linkCopied'), t('safetyCentre.shareOnly'))
+              }}>
+                <Text style={styles.emergencyLabel}>{t('safetyCentre.copyLink')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" style={styles.dismiss} onPress={async () => {
+                try {
+                  await v2JobActions.revokeTrustedContactShare(jobId, share.id)
+                  setShare(null)
+                  setShareConsent(false)
+                } catch (error: any) {
+                  Alert.alert(t('safetyCentre.revokeFailedTitle'), error?.message || t('safetyCentre.tryAgain'))
+                }
+              }}>
+                <Text style={styles.note}>{t('safetyCentre.revoke')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={[styles.send, (!shareConsent || sharing) && { opacity: 0.5 }]}
+              disabled={!shareConsent || sharing}
+              onPress={async () => {
+                setSharing(true)
+                try {
+                  exited.current = false
+                  const response = await v2JobActions.createTrustedContactShare(jobId, 4)
+                  if (exited.current) {
+                    await v2JobActions.revokeTrustedContactShare(jobId, response.share.id).catch(() => undefined)
+                    return
+                  }
+                  setShare({ id: response.share.id, url: response.url, expiresAt: response.share.expiresAt })
+                } catch (error: any) {
+                  Alert.alert(t('safetyCentre.linkFailedTitle'), error?.message || t('safetyCentre.tryAgain'))
+                } finally {
+                  setSharing(false)
+                }
+              }}
+            >
+              {sharing ? <ActivityIndicator color={v3.colors.paper} /> : (
+                <Text style={styles.sendLabel}>{t('safetyCentre.createLink')}</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       ) : null}
     </View>
@@ -194,4 +264,5 @@ const styles = StyleSheet.create({
   dismiss: { paddingVertical: 8, alignItems: 'center' },
   quickExit: { backgroundColor: v3.colors.line, paddingVertical: 12, paddingHorizontal: 10, borderRadius: 8, marginTop: 4 },
   quickExitLabel: { color: v3.colors.ink, fontWeight: '700', textAlign: 'center' },
+  shareBox: { gap: 8, padding: 10, borderWidth: 1, borderColor: v3.colors.line, borderRadius: 8 },
 })
