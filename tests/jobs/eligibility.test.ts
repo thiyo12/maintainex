@@ -843,7 +843,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
           ]),
         },
       })
-      input.job.preferredDate = new Date('2026-10-25T12:00:00')
+      input.job.preferredDate = new Date('2099-01-01T12:00:00Z')
       const result = await evaluateEligibility(input)
       expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(true)
     })

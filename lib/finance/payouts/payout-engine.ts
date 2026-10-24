@@ -382,86 +382,14 @@ export async function markProcessing(
 
 export async function markSucceeded(
   payoutId: string,
-  providerRef: string | null,
-  idempotencyKey: string,
-  createdBy: string
+  _providerRef: string | null,
+  _idempotencyKey: string,
+  _createdBy: string
 ): Promise<PayoutResult> {
-  const existing = await readCompletedIdempotency(idempotencyKey)
-  if (existing) return { ok: true, payoutId, status: existing.status }
-
-  const payoutMeta = await prisma.payout.findUnique({
-    where: { id: payoutId },
-    select: { countryCode: true },
-  })
-  if (!payoutMeta) return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
-  if (await isPayoutExecutionFrozen(payoutMeta.countryCode)) {
-    return {
-      ok: false,
-      error: 'Payout execution is temporarily frozen',
-      code: 'PAYOUTS_FROZEN',
-    }
-  }
-
-  // PAYOUT_SUCCESS_FROZEN_CHECK
-  try {
-    await prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string; currency: string; countryCode: string }>>(
-        `SELECT id, "userId", amount::text, status, currency, "countryCode" FROM "Payout" WHERE id = $1 FOR UPDATE`,
-        payoutId,
-      )
-      if (rows.length === 0) throw new Error('NOT_FOUND')
-      const payout = rows[0]
-      if (payout.status === 'SUCCEEDED') return
-
-      await assertPayoutNotFrozenInTransaction(tx, payout.countryCode)
-      // PAYOUT_SUCCESS_TRANSACTION_FREEZE_CHECK
-      if (!isValidTransition(payout.status as PayoutStatus, 'SUCCEEDED')) {
-        throw new Error(`INVALID_TRANSITION:${payout.status}->SUCCEEDED`)
-      }
-
-      const amount = BigInt(payout.amount)
-      await tx.payout.update({
-        where: { id: payoutId },
-        data: { status: 'SUCCEEDED', clearedAt: new Date() },
-      })
-
-      // Clear the reserved payout liability to an explicit external account.
-      // This removes the old platform-credit residue on successful payouts.
-      await postLedgerTransaction({
-        entries: [
-          { accountId: `payout:${payout.id}`, accountType: 'PAYOUT_CLEARING', entryType: 'DEBIT', amount },
-          { accountId: `external:payout:${payout.id}`, accountType: 'EXTERNAL_PAYOUT', entryType: 'CREDIT', amount },
-        ],
-        currency: payout.currency as Currency,
-        referenceType: 'PAYOUT_SUCCEEDED',
-        referenceId: payout.id,
-        idempotencyKey: `payout-success:${idempotencyKey}`,
-        description: `Payout ${payoutId} completed${providerRef ? ` (ref: ${providerRef})` : ''}`,
-        createdBy,
-      }, tx)
-
-      await tx.idempotencyRecord.create({
-        data: {
-          idempotencyKey,
-          operation: 'PAYOUT_SUCCEEDED',
-          status: 'COMPLETED',
-          metadata: JSON.stringify({ payoutId, status: 'SUCCEEDED', providerRef }),
-          requestFingerprint: `PAYOUT_SUCCEEDED:${payoutId}:${providerRef || ''}`,
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        },
-      })
-    })
-
-    return { ok: true, payoutId, status: 'SUCCEEDED' }
-  } catch (error: any) {
-    if (error?.message === 'NOT_FOUND') return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
-    if (error?.message === 'PAYOUTS_FROZEN') {
-      return { ok: false, error: 'Payout execution is temporarily frozen', code: 'PAYOUTS_FROZEN' }
-    }
-    if (error?.message?.startsWith('INVALID_TRANSITION')) {
-      return { ok: false, error: error.message, code: 'INVALID_TRANSITION' }
-    }
-    throw error
+  return {
+    ok: false,
+    error: 'A typed reference is not payout evidence. Reconcile an independent bank or PSP result first.',
+    code: 'PAYOUT_EXTERNAL_EVIDENCE_REQUIRED',
   }
 }
 

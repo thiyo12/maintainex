@@ -52,7 +52,10 @@ export default function CashCollectionPanel({ jobId, role, jobStatus, escrow, on
       setAmount('')
       onUpdated()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not update cash collection.')
+      const message = e instanceof Error ? e.message : ''
+      setError(message.includes('CASH_COLLECTION_REVERSAL_REQUIRES_FINANCIAL_CASE')
+        ? 'A lower post-completion cash total needs financial review. No commission adjustment was posted.'
+        : message || 'Could not update cash collection.')
     } finally {
       setBusy(false)
     }
@@ -63,7 +66,7 @@ export default function CashCollectionPanel({ jobId, role, jobStatus, escrow, on
     NOT_REPORTED: 'Cash collection has not been reported.',
     PROVIDER_REPORTED: 'Provider reported cash received. Waiting for your confirmation.',
     CUSTOMER_CONFIRMED: 'Cash total confirmed by the customer. Later collections can be reported as a new cumulative total.',
-    CONTESTED: 'Cash amount is contested. No commission has been recorded.',
+    CONTESTED: 'Cash amount is contested. A review is required before this report can affect commission.',
   }
 
   return (

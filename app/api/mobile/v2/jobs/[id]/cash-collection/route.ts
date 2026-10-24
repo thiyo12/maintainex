@@ -7,7 +7,19 @@ import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { isCashPaymentAvailableForMarket } from '@/lib/finance/payments/provider-registry'
 import { resolvePaymentMarketForIntent } from '@/lib/finance/payments/payment-service'
 import { minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
-import { decideCashCollectionReport } from '@/lib/finance/payments/cash-collection-state'
+import { calculateIncrementalCashCommission, decideCashCollectionReport } from '@/lib/finance/payments/cash-collection-state'
+import { recordCashPlatformReceivable, type FinancialProviderType } from '@/lib/finance/commissions/provider-balance-service'
+import { hasCompanyJobManagement, isAssignedCompanyWorker } from '@/lib/domain/job-lifecycle'
+
+function parseLifecycleMetadata(metadata: string | null | undefined): Record<string, unknown> | null {
+  if (!metadata) return null
+  try {
+    const value = JSON.parse(metadata)
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : null
+  } catch {
+    return null
+  }
+}
 
 type CollectionAction = 'REPORT' | 'CONFIRM' | 'CONTEST'
 
@@ -37,6 +49,9 @@ export async function POST(
       prisma.jobQuote.findFirst({ where: { jobId, status: 'ACCEPTED' } }),
     ])
     if (!job || !escrow || !quote) return NextResponse.json({ error: 'Cash booking not found' }, { status: 404 })
+    if (quote.providerType !== 'INDIVIDUAL' && quote.providerType !== 'COMPANY') {
+      return NextResponse.json({ error: 'Cash provider type is invalid' }, { status: 409 })
+    }
     if (escrow.paymentMethod !== 'CASH') {
       return NextResponse.json({ error: 'This booking is not a cash payment' }, { status: 409 })
     }
@@ -48,18 +63,11 @@ export async function POST(
     const isCustomer = job.customerId === actor.id
     let isAuthorizedProvider = quote.providerType === 'INDIVIDUAL' && quote.providerId === actor.id
     if (quote.providerType === 'COMPANY') {
-      const [companyOwner, assignedWorker] = await Promise.all([
-        prisma.companyProfile.findFirst({
-          where: { id: quote.providerId, userId: actor.id }, select: { id: true },
-        }),
-        prisma.companyJobAssignment.findFirst({
-          where: {
-            jobId, companyId: quote.providerId, workerUserId: actor.id,
-            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
-          }, select: { id: true },
-        }),
+      const [companyManager, assignedWorker] = await Promise.all([
+        hasCompanyJobManagement(prisma, quote.providerId, actor.id),
+        isAssignedCompanyWorker(prisma, quote.providerId, jobId, actor.id, ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED']),
       ])
-      isAuthorizedProvider = Boolean(companyOwner || assignedWorker)
+      isAuthorizedProvider = companyManager || assignedWorker
     }
 
     if (action === 'REPORT' && !isAuthorizedProvider) {
@@ -84,6 +92,7 @@ export async function POST(
       }
     }
 
+    let commissionAdjustmentMinor = 0n
     const updated = await prisma.$transaction(async tx => {
       const currentEscrow = await tx.jobEscrow.findUnique({
         where: { id: escrow.id },
@@ -91,8 +100,8 @@ export async function POST(
       })
       const current = currentEscrow?.cashCollectionStatus || null
       if (!currentEscrow || !current) throw new Error('CASH_COLLECTION_NOT_FOUND')
-      if (action === 'REPORT' && currentEscrow.status === 'RELEASED') {
-        throw new Error('CASH_COLLECTION_AFTER_RELEASE_REQUIRES_RECONCILIATION')
+      if (action === 'REPORT' && currentEscrow.status === 'RELEASED' && job.status !== 'COMPLETED') {
+        throw new Error('CASH_COLLECTION_RELEASE_STATE_INVALID')
       }
 
       // Retries after a lost response return the existing attestation without
@@ -138,6 +147,47 @@ export async function POST(
       } else {
         if (current !== 'PROVIDER_REPORTED') throw new Error('CASH_COLLECTION_NOT_AWAITING_CUSTOMER')
         const next = action === 'CONFIRM' ? 'CUSTOMER_CONFIRMED' : 'CONTESTED'
+        let postReleaseAdjustment: {
+          previousAmountMinor: bigint
+          nextAmountMinor: bigint
+          commissionRateBps: bigint
+        } | null = null
+        if (action === 'CONFIRM' && currentEscrow.status === 'RELEASED') {
+          const [completionEvent, confirmations] = await Promise.all([
+            tx.jobLifecycleEvent.findFirst({
+              where: { jobId, action: 'JOB_COMPLETED' },
+              orderBy: { createdAt: 'desc' },
+              select: { metadata: true },
+            }),
+            tx.jobLifecycleEvent.findMany({
+              where: { jobId, action: 'CASH_COLLECTION_CONFIRMED' },
+              orderBy: { createdAt: 'desc' },
+              take: 20,
+              select: { metadata: true },
+            }),
+          ])
+          const completion = parseLifecycleMetadata(completionEvent?.metadata)
+          if (completion?.escrowId !== escrow.id || typeof completion.commissionRateBps !== 'string') {
+            throw new Error('CASH_COLLECTION_POST_RELEASE_REQUIRES_RATE_EVIDENCE')
+          }
+          let previousAmountMinor = BigInt(typeof completion.cashCollectedMinor === 'string' ? completion.cashCollectedMinor : '0')
+          for (const confirmation of confirmations) {
+            const metadata = parseLifecycleMetadata(confirmation.metadata)
+            if (metadata?.escrowId === escrow.id && typeof metadata.amountMinor === 'string') {
+              previousAmountMinor = BigInt(metadata.amountMinor)
+              break
+            }
+          }
+          const nextAmountMinor = currentEscrow.cashCollectedMinor ?? 0n
+          if (nextAmountMinor < previousAmountMinor) {
+            throw new Error('CASH_COLLECTION_REVERSAL_REQUIRES_FINANCIAL_CASE')
+          }
+          postReleaseAdjustment = {
+            previousAmountMinor,
+            nextAmountMinor,
+            commissionRateBps: BigInt(completion.commissionRateBps),
+          }
+        }
         const claimed = await tx.jobEscrow.updateMany({
           where: { id: escrow.id, cashCollectionStatus: 'PROVIDER_REPORTED' },
           data: {
@@ -146,12 +196,67 @@ export async function POST(
           },
         })
         if (claimed.count !== 1) throw new Error('CASH_COLLECTION_STATE_CHANGED')
-        await recordJobLifecycleEvent(tx, {
+        const confirmationEvent = await recordJobLifecycleEvent(tx, {
           jobId, actorId: actor.id, actorType: 'CUSTOMER',
           action: action === 'CONFIRM' ? 'CASH_COLLECTION_CONFIRMED' : 'CASH_COLLECTION_CONTESTED',
           fromState: current, toState: next,
-          metadata: { escrowId: escrow.id, amountMinor: (await tx.jobEscrow.findUnique({ where: { id: escrow.id }, select: { cashCollectedMinor: true } }))?.cashCollectedMinor?.toString() ?? null, currency: escrow.currency },
+          metadata: {
+            escrowId: escrow.id,
+            amountMinor: currentEscrow.cashCollectedMinor?.toString() ?? null,
+            currency: escrow.currency,
+            ...(postReleaseAdjustment ? {
+              previousConfirmedAmountMinor: postReleaseAdjustment.previousAmountMinor.toString(),
+              reportedIncrementMinor: (postReleaseAdjustment.nextAmountMinor - postReleaseAdjustment.previousAmountMinor).toString(),
+            } : {}),
+          },
         })
+        if (action === 'CONTEST') {
+          const openCase = await tx.adminAlert.findFirst({
+            where: { targetTable: 'JobEscrow', targetId: escrow.id, status: { in: ['open', 'in_progress'] } },
+            select: { id: true },
+          })
+          if (!openCase) {
+            await tx.adminAlert.create({
+              data: {
+                type: 'dispute', severity: 'high', priority: 'high',
+                title: 'Cash collection amount contested',
+                description: `Customer contested the reported cash collection for job ${jobId}. Verify both parties’ evidence; no MaintainEX funds are implied.`,
+                targetTable: 'JobEscrow', targetId: escrow.id,
+                assignedRole: 'SUPPORT', status: 'open', slaMinutes: 2880,
+              },
+            })
+          }
+        }
+        if (postReleaseAdjustment) {
+          const commissionDeltaMinor = calculateIncrementalCashCommission({
+            previousCollectedMinor: postReleaseAdjustment.previousAmountMinor,
+            nextCollectedMinor: postReleaseAdjustment.nextAmountMinor,
+            chargeableLimitMinor: escrow.amount,
+            commissionRateBps: postReleaseAdjustment.commissionRateBps,
+          })
+          if (commissionDeltaMinor > 0n) {
+            await recordCashPlatformReceivable(tx, {
+              jobId,
+              escrowId: escrow.id,
+              providerId: quote.providerId,
+              providerType: quote.providerType as FinancialProviderType,
+              countryCode: market.countryCode,
+              currency: escrow.currency,
+              platformDueMinor: commissionDeltaMinor,
+              collectionEventId: confirmationEvent.id,
+              createdBy: actor.id,
+            })
+            await recordJobLifecycleEvent(tx, {
+              jobId, actorId: actor.id, actorType: 'SYSTEM',
+              action: 'CASH_COMMISSION_ADJUSTED', fromState: 'RECONCILED', toState: 'RECEIVABLE_INCREASED',
+              metadata: {
+                escrowId: escrow.id, collectionEventId: confirmationEvent.id,
+                commissionDeltaMinor: commissionDeltaMinor.toString(), currency: escrow.currency,
+              },
+            })
+            commissionAdjustmentMinor = commissionDeltaMinor
+          }
+        }
       }
 
       return tx.jobEscrow.findUniqueOrThrow({ where: { id: escrow.id } })
@@ -164,16 +269,25 @@ export async function POST(
       amountMinor: updated.cashCollectedMinor?.toString() ?? null,
       amount: updated.cashCollectedMinor == null ? null : minorUnitsToMajorUnits(updated.cashCollectedMinor, currency),
       currency,
-      commissionRecorded: false,
+      commissionRecorded: commissionAdjustmentMinor > 0n,
+      commissionAdjustmentMinor: commissionAdjustmentMinor.toString(),
       message: action === 'REPORT'
         ? 'Cumulative cash received to date was reported. It is not treated as paid until you confirm it.'
         : action === 'CONFIRM'
-          ? 'Cash amount confirmed. Commission is recorded only after work is accepted.'
-          : 'Cash amount contested. No commission was recorded; raise a dispute if needed.',
+          ? commissionAdjustmentMinor > 0n
+            ? 'Later cash collection confirmed. The incremental commission is recorded as provider debt.'
+            : 'Cash amount confirmed. Commission is recorded after accepted work and is not treated as platform-held cash.'
+          : 'Cash amount contested. No commission was recorded; a review case has been opened.',
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Cash collection update failed'
     if (message.startsWith('CASH_COLLECTION_')) {
+      if (message === 'CASH_COLLECTION_REVERSAL_REQUIRES_FINANCIAL_CASE') {
+        return NextResponse.json({
+          error: 'A lower post-completion cash total requires financial review. No commission adjustment was posted.',
+          code: message,
+        }, { status: 409 })
+      }
       return NextResponse.json({ error: message, code: message }, { status: 409 })
     }
     logger.error('Cash collection update failed unexpectedly', { err: error, route: '/api/mobile/v2/jobs/[id]/cash-collection', method: 'POST' })

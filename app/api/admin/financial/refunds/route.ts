@@ -142,10 +142,6 @@ export async function PATCH(request: NextRequest) {
       ? body.paymentIntentId.trim().slice(0, 128)
       : ''
     const action = typeof body?.action === 'string' ? body.action.trim().toUpperCase() : ''
-    const manualReference = typeof body?.manualReference === 'string'
-      ? body.manualReference.trim().slice(0, 200)
-      : ''
-    const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 500) : ''
     const idempotencyKey = typeof body?.idempotencyKey === 'string'
       ? body.idempotencyKey.trim().slice(0, 200)
       : ''
@@ -156,13 +152,6 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       )
     }
-    if (action === 'CONFIRM_MANUAL' && manualReference.length < 4) {
-      return NextResponse.json(
-        { error: 'manualReference is required to confirm an external refund' },
-        { status: 400 }
-      )
-    }
-
     const intent = await prisma.paymentIntent.findUnique({
       where: { id: paymentIntentId },
       select: {
@@ -191,6 +180,17 @@ export async function PATCH(request: NextRequest) {
     if (isLegacyReadOnlyProvider(intent.gateway)) {
       return NextResponse.json(
         { error: 'Legacy payment records are read-only; PayPal and PayHere refund actions are retired', code: 'PAYMENT_PROVIDER_RETIRED' },
+        { status: 409 }
+      )
+    }
+
+    if (action === 'CONFIRM_MANUAL') {
+      return NextResponse.json(
+        {
+          error: 'A typed refund reference is not evidence. Reconcile an independent bank or PSP result before completing the refund.',
+          code: 'REFUND_EXTERNAL_EVIDENCE_REQUIRED',
+          status: 'WAITING_BANK',
+        },
         { status: 409 }
       )
     }
@@ -259,25 +259,10 @@ export async function PATCH(request: NextRequest) {
       targetId: intent.id,
       amountMinor: intent.amount,
       currency: intent.currency,
-      reasonCode:
-        action === 'CONFIRM_MANUAL'
-          ? 'MANUAL_EXTERNAL_REFUND_CONFIRMATION'
-          : 'GATEWAY_REFUND_REQUEST',
-      note:
-        action === 'CONFIRM_MANUAL'
-          ? (note || 'Manual external refund confirmation requested')
-          : `${intent.gateway} refund request submitted for approval`,
+      reasonCode: 'GATEWAY_REFUND_REQUEST',
+      note: `${intent.gateway} refund request submitted for approval`,
       idempotencyKey,
-      actionPayload:
-        action === 'CONFIRM_MANUAL'
-          ? {
-              mode: 'CONFIRM_MANUAL',
-              manualReference,
-              note,
-            }
-          : {
-              mode: 'REQUEST_GATEWAY_REFUND',
-            },
+      actionPayload: { mode: 'REQUEST_GATEWAY_REFUND' },
       risk: currentRisk.risk,
     })
 

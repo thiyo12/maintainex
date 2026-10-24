@@ -2081,7 +2081,7 @@ export async function confirmManualExternalRefund(
 
   const intent = await prisma.paymentIntent.findUnique({
     where: { id: paymentIntentId },
-    select: { id: true, status: true, gateway: true },
+    select: { id: true, gateway: true },
   })
   if (!intent) {
     return {
@@ -2099,25 +2099,14 @@ export async function confirmManualExternalRefund(
       code: 'PAYMENT_PROVIDER_RETIRED',
     }
   }
-  if (intent.status === 'REFUNDED') {
-    return { success: true, status: 'REFUNDED', refundReference: reference }
+  // A staff-entered reference proves only that somebody supplied a string. A
+  // separate verified bank/PSP result must be reconciled before refund state
+  // or the canonical ledger can change.
+  return {
+    success: false,
+    status: 'REFUND_REQUIRED',
+    error: 'Independent bank or PSP refund evidence is required',
+    code: 'REFUND_EXTERNAL_EVIDENCE_REQUIRED',
   }
-  if (!['REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(intent.status)) {
-    return {
-      success: false,
-      status: 'REFUND_REQUIRED',
-      error: `Payment is not awaiting refund (status=${intent.status})`,
-      code: 'PAYMENT_NOT_IN_REFUND_QUEUE',
-    }
-  }
-
-  return finalizeExternalProviderRefund(paymentIntentId, {
-    provider: 'MANUAL',
-    gatewayStatus: 'MANUAL_REFUND_CONFIRMED',
-    refundReference: reference,
-    message: input.note?.trim().slice(0, 500) || 'Manual external refund confirmed by finance',
-    actorId: input.actorId,
-    source: 'MANUAL',
-  })
 }
 

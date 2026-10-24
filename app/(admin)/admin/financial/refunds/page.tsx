@@ -29,7 +29,6 @@ import {
   crmThClass,
   type CrmTone,
 } from '@/components/crm/v2/CrmPrimitives'
-import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 import { CrmPagination } from '@/components/crm/v2/CrmOperational'
 import { crmApiError } from '@/lib/crm/api-error'
 
@@ -74,7 +73,7 @@ interface Payload {
   }
 }
 
-type RefundAction = 'RETRY' | 'RECONCILE' | 'CONFIRM_MANUAL'
+type RefundAction = 'RETRY' | 'RECONCILE'
 
 function money(minor: string, currency: string) {
   const amount = Number(minor || 0) / 100
@@ -115,9 +114,6 @@ export default function RefundQueuePage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string | null>(null)
-  const [manualTarget, setManualTarget] = useState<RefundItem | null>(null)
-  const [manualReference, setManualReference] = useState('')
-  const [manualNote, setManualNote] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -189,8 +185,7 @@ export default function RefundQueuePage() {
 
   async function submitAction(
     item: RefundItem,
-    action: RefundAction,
-    input?: { manualReference?: string; note?: string }
+    action: RefundAction
   ) {
     if (acting) return
     if (!payload?.actions?.refund) {
@@ -208,11 +203,6 @@ export default function RefundQueuePage() {
       if (action !== 'RECONCILE') {
         body.idempotencyKey = newIdempotencyKey(item, action)
       }
-      if (action === 'CONFIRM_MANUAL') {
-        body.manualReference = input?.manualReference
-        body.note = input?.note
-      }
-
       const response = await fetch('/api/admin/financial/refunds', {
         method: 'PATCH',
         credentials: 'include',
@@ -237,9 +227,6 @@ export default function RefundQueuePage() {
         )
       }
 
-      setManualTarget(null)
-      setManualReference('')
-      setManualNote('')
       await load()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Refund action failed')
@@ -248,31 +235,12 @@ export default function RefundQueuePage() {
     }
   }
 
-  function openManual(item: RefundItem) {
-    setManualTarget(item)
-    setManualReference('')
-    setManualNote('')
-  }
-
-  async function submitManual() {
-    if (!manualTarget) return
-    if (manualReference.trim().length < 4) {
-      toast.error('Enter the external refund reference')
-      return
-    }
-
-    await submitAction(manualTarget, 'CONFIRM_MANUAL', {
-      manualReference: manualReference.trim(),
-      note: manualNote.trim(),
-    })
-  }
-
   return (
     <div className="space-y-4">
       <CrmPageHeader
         eyebrow="Finance · Payment recovery"
         title="Refund Queue"
-        description="Reconcile external gateway truth or submit refund execution for maker-checker approval. CRM never directly edits payment status."
+        description="Review existing refund records and request eligible refunds. Completion requires an independently verified bank or provider result."
         actions={
           <>
             <Link href="/admin/approvals">
@@ -490,14 +458,9 @@ export default function RefundQueuePage() {
                           )}
 
                           {item.status !== 'REFUNDED' && (
-                            <CrmButton
-                              variant="primary"
-                              size="sm"
-                              onClick={() => openManual(item)}
-                              disabled={acting === item.id}
-                            >
-                              Confirm external
-                            </CrmButton>
+                            <span className="text-xs text-slate-500">
+                              Waiting for independently verified refund evidence
+                            </span>
                           )}
                         </>
                       ) : (
@@ -534,69 +497,6 @@ export default function RefundQueuePage() {
         </div>
       </div>
 
-      <CrmModal
-        open={Boolean(manualTarget)}
-        onClose={() => {
-          if (!acting) setManualTarget(null)
-        }}
-        title="Confirm external refund"
-        description={
-          manualTarget
-            ? `${manualTarget.merchantOrderId} · ${money(manualTarget.amount, manualTarget.currency)}`
-            : undefined
-        }
-        maxWidth="max-w-lg"
-        footer={
-          <>
-            <CrmButton
-              variant="secondary"
-              onClick={() => setManualTarget(null)}
-              disabled={Boolean(acting)}
-            >
-              Cancel
-            </CrmButton>
-            <CrmButton
-              variant="primary"
-              onClick={submitManual}
-              disabled={Boolean(acting)}
-            >
-              {acting ? 'Submitting…' : 'Submit for approval'}
-            </CrmButton>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-              External refund reference
-            </label>
-            <input
-              value={manualReference}
-              onChange={event => setManualReference(event.target.value.slice(0, 200))}
-              className={crmInputClass}
-              placeholder="Bank / provider dashboard refund reference"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-              Finance note
-            </label>
-            <textarea
-              value={manualNote}
-              onChange={event => setManualNote(event.target.value.slice(0, 500))}
-              rows={4}
-              className="w-full resize-none rounded-[11px] border border-[var(--crm-border)] bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-amber-300 focus:ring-2 focus:ring-amber-100"
-              placeholder="Evidence or reconciliation note…"
-            />
-          </div>
-
-          <div className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-3 text-xs leading-5 text-slate-500">
-            This does not mark the payment refunded immediately. It creates a finance approval request.
-            The external reference is executed only after the required approval slots and live risk checks pass.
-          </div>
-        </div>
-      </CrmModal>
     </div>
   )
 }

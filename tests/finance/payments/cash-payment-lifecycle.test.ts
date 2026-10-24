@@ -97,7 +97,11 @@ describe('cash payment lifecycle contract', () => {
     expect(collectionRoute).toContain('Only the customer can confirm or contest')
     expect(collectionRoute).toContain('decideCashCollectionReport')
     expect(collectionRoute).toContain('cashCollectedMinor: currentEscrow.cashCollectedMinor')
-    expect(collectionRoute).toContain('CASH_COLLECTION_AFTER_RELEASE_REQUIRES_RECONCILIATION')
+    expect(collectionRoute).toContain("currentEscrow.status === 'RELEASED' && job.status !== 'COMPLETED'")
+    expect(collectionRoute).toContain('calculateIncrementalCashCommission')
+    expect(collectionRoute).toContain('collectionEventId: confirmationEvent.id')
+    expect(collectionRoute).toContain("action: 'CASH_COMMISSION_ADJUSTED'")
+    expect(collectionRoute).toContain("type: 'dispute', severity: 'high'")
     expect(collectionRoute).not.toContain('amountMinor <= 0n')
   })
 

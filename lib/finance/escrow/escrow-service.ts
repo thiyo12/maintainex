@@ -1101,6 +1101,7 @@ export async function completeAndReleaseEscrow(
           workspaceToState: 'COMPLETED',
           cashCollectedMinor,
           providerCommissionMinor: commissionCents,
+          commissionRateBps: rateBps,
           serviceFeeMinor: escrow.serviceFee,
           platformDueMinor: platformDueCents,
           providerNetMinor: netCents,

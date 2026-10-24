@@ -5,7 +5,7 @@ import {
   inspectCrmJobCancellation,
 } from '@/lib/crm/jobs/cancellation'
 import { buildApprovalPlan } from './approval-engine'
-import { confirmManualExternalRefund, requestRequiredProviderRefund } from '@/lib/finance/payments/payment-service'
+import { requestRequiredProviderRefund } from '@/lib/finance/payments/payment-service'
 import { releaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { tierAtLeast } from './action-registry'
 import { resolveCurrentApprovalRisk } from './current-risk'
@@ -32,7 +32,7 @@ function higherTier(current: ApprovalTier, stored: ApprovalTier): boolean {
 
 type RefundExecutionPayload =
   | { mode: 'REQUEST_GATEWAY_REFUND' }
-  | { mode: 'CONFIRM_MANUAL'; manualReference: string; note?: string }
+  | { mode: 'CONFIRM_MANUAL' }
 
 function parseRefundExecutionPayload(raw: string | null): RefundExecutionPayload {
   if (!raw) throw new Error('APPROVAL_ACTION_PAYLOAD_MISSING')
@@ -54,15 +54,7 @@ function parseRefundExecutionPayload(raw: string | null): RefundExecutionPayload
   }
 
   if (value.mode === 'CONFIRM_MANUAL') {
-    const manualReference =
-      typeof value.manualReference === 'string' ? value.manualReference.trim() : ''
-    const note = typeof value.note === 'string' ? value.note.trim().slice(0, 500) : undefined
-
-    if (manualReference.length < 4 || manualReference.length > 200) {
-      throw new Error('APPROVAL_MANUAL_REFUND_REFERENCE_INVALID')
-    }
-
-    return { mode: 'CONFIRM_MANUAL', manualReference, note }
+    return { mode: 'CONFIRM_MANUAL' }
   }
 
   throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
@@ -204,14 +196,10 @@ export async function executeApprovedCrmRequest(
       }
 
       const payload = parseRefundExecutionPayload(request.actionPayload)
-      const result =
-        payload.mode === 'REQUEST_GATEWAY_REFUND'
-          ? await requestRequiredProviderRefund(request.targetId, request.id)
-          : await confirmManualExternalRefund(request.targetId, {
-              actorId: actor.adminId,
-              reference: payload.manualReference,
-              note: payload.note,
-            })
+      if (payload.mode !== 'REQUEST_GATEWAY_REFUND') {
+        throw new Error('REFUND_EXTERNAL_EVIDENCE_REQUIRED')
+      }
+      const result = await requestRequiredProviderRefund(request.targetId, request.id)
 
       if (!result.success) {
         throw new Error(`REFUND_EXECUTION_FAILED:${result.code || result.error || 'UNKNOWN'}`)
@@ -230,10 +218,7 @@ export async function executeApprovedCrmRequest(
         entityType: 'PaymentIntent',
         entityId: request.targetId,
         entityName: request.targetId,
-        description:
-          payload.mode === 'CONFIRM_MANUAL'
-            ? 'Approved manual external refund confirmation executed'
-            : 'Approved provider refund request executed',
+        description: 'Approved provider refund request executed',
         oldValue: {
           approvalRequestId: request.id,
         },

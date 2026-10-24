@@ -18,7 +18,7 @@ export type WorkspaceStatus = 'ACCEPTED' | 'IN_PROGRESS' | 'WAITING_CUSTOMER' | 
 export type EscrowStatus = 'PENDING_PAYMENT' | 'PROTECTED' | 'ON_HOLD' | 'RELEASED' | 'REFUNDED' | 'CANCELLED'
 export type ActorType = 'CUSTOMER' | 'PROVIDER' | 'COMPANY' | 'STAFF' | 'SYSTEM'
 
-async function hasCompanyJobManagement(
+export async function hasCompanyJobManagement(
   db: PrismaClient | Prisma.TransactionClient,
   companyId: string,
   userId: string,
@@ -32,7 +32,7 @@ async function hasCompanyJobManagement(
     hasCompanyPermission(member.role, 'jobs:manage')
 }
 
-async function isAssignedCompanyWorker(
+export async function isAssignedCompanyWorker(
   db: PrismaClient | Prisma.TransactionClient,
   companyId: string,
   jobId: string,

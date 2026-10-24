@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
+import { allocateCommissionRemittance } from '@/lib/finance/commissions/commission-reconciliation'
 import type { Currency } from '@/lib/shared/money/money'
 import {
   calculateOnlineDebtOffset,
@@ -402,6 +403,7 @@ export async function recordCashPlatformReceivable(
     currency: string
     platformDueMinor: bigint
     weeklySettlementId?: string | null
+    collectionEventId?: string | null
     createdBy: string
   },
 ) {
@@ -418,7 +420,9 @@ export async function recordCashPlatformReceivable(
 
   const identity = await ensureProviderIdentity(tx, input)
   const currency = input.currency.trim().toUpperCase()
-  const idempotencyKey = `cash-platform-receivable:${input.escrowId}`
+  const idempotencyKey = input.collectionEventId
+    ? `cash-platform-receivable:${input.escrowId}:event:${input.collectionEventId}`
+    : `cash-platform-receivable:${input.escrowId}`
 
   const existing = await tx.idempotencyRecord.findUnique({
     where: { idempotencyKey },
@@ -472,6 +476,7 @@ export async function recordCashPlatformReceivable(
     metadata: JSON.stringify({
       jobId: input.jobId,
       escrowId: input.escrowId,
+      collectionEventId: input.collectionEventId || null,
       providerIdentityId: identity.id,
       providerId: input.providerId,
       providerType: input.providerType,
@@ -480,8 +485,20 @@ export async function recordCashPlatformReceivable(
     }),
   }, tx)
 
-  await tx.providerCommissionReceivable.create({
-    data: {
+  const existingReceivable = await tx.providerCommissionReceivable.findUnique({ where: { escrowId: input.escrowId } })
+  if (existingReceivable) {
+    await tx.providerCommissionReceivable.update({
+      where: { id: existingReceivable.id },
+      data: {
+        amountOriginal: { increment: input.platformDueMinor },
+        amountRemaining: { increment: input.platformDueMinor },
+        status: 'OPEN',
+        settledAt: null,
+      },
+    })
+  } else {
+    await tx.providerCommissionReceivable.create({
+      data: {
       providerIdentityId: identity.id,
       weeklySettlementId: input.weeklySettlementId || null,
       jobId: input.jobId,
@@ -491,8 +508,9 @@ export async function recordCashPlatformReceivable(
       amountRemaining: input.platformDueMinor,
       status: 'OPEN',
       dueAt,
-    },
-  })
+      },
+    })
+  }
 
   const updatedAccount = await tx.providerFinancialAccount.update({
     where: { id: account.id },
@@ -1102,9 +1120,10 @@ export async function settleProviderReceivablesFromDirectPayment(
     (sum, item) => sum + item.amountRemaining,
     0n,
   )
-  if (outstandingMinor !== input.amountPaidMinor) {
+  if (input.amountPaidMinor > outstandingMinor) {
     throw new Error('DIRECT_COMMISSION_PAYMENT_AMOUNT_MISMATCH')
   }
+  const allocations = allocateCommissionRemittance(receivables, input.amountPaidMinor)
 
   const identity = receivables[0].providerIdentity
   const account = await tx.providerFinancialAccount.findUnique({
@@ -1148,33 +1167,32 @@ export async function settleProviderReceivablesFromDirectPayment(
   }, tx)
 
   const settledAt = new Date()
-  for (const receivable of receivables) {
+  for (const allocation of allocations) {
     await tx.providerCommissionReceivable.update({
-      where: { id: receivable.id },
+      where: { id: allocation.receivableId },
       data: {
-        amountRemaining: 0n,
-        status: 'SETTLED',
-        settledAt,
+        amountRemaining: allocation.remainingMinor,
+        status: allocation.remainingMinor === 0n ? 'SETTLED' : 'PARTIAL',
+        ...(allocation.remainingMinor === 0n ? { settledAt } : { settledAt: null }),
       },
     })
 
     await tx.providerCommissionRecovery.create({
       data: {
-        receivableId: receivable.id,
+        receivableId: allocation.receivableId,
         providerIdentityId: identity.id,
-        amount: receivable.amountRemaining,
+        amount: allocation.amountMinor,
         currency,
         method: 'DIRECT_SETTLEMENT',
-        idempotencyKey: `direct-settlement:${input.commissionPaymentId}:${receivable.id}`,
+        idempotencyKey: `direct-settlement:${input.commissionPaymentId}:${allocation.receivableId}`,
         createdBy: input.createdBy,
       },
     })
   }
 
   const previousDue = account.commissionDue
-  const remainingDue = previousDue > input.amountPaidMinor
-    ? previousDue - input.amountPaidMinor
-    : 0n
+  if (previousDue < input.amountPaidMinor) throw new Error('PROVIDER_COMMISSION_ACCOUNT_BALANCE_MISMATCH')
+  const remainingDue = previousDue - input.amountPaidMinor
 
   const oldestRemaining = await tx.providerCommissionReceivable.findFirst({
     where: {
