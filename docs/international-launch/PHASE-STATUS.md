@@ -361,4 +361,7 @@ remain **PENDING**.
 - The first follow-up Fast Gates run exposed one stale test assertion that required the former
   production-only audit command. Updated that regression to require full-graph high-severity audit
   commands; the targeted assertion and signature-hardening tests pass. Security Exposure Audit and
-  mobile typecheck passed on the first follow-up SHA; CI for the corrected head is pending.
+  mobile typecheck passed on the first follow-up SHA. The next full run found one additional stale
+  path in the supply-chain test after the audit script rename; updated that assertion and its
+  security-gate reference. The two focused supply-chain/HTTP audit tests pass (9/9); corrected-head
+  CI is pending.
