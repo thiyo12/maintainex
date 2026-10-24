@@ -363,5 +363,6 @@ remain **PENDING**.
   commands; the targeted assertion and signature-hardening tests pass. Security Exposure Audit and
   mobile typecheck passed on the first follow-up SHA. The next full run found one additional stale
   path in the supply-chain test after the audit script rename; updated that assertion and its
-  security-gate reference. The two focused supply-chain/HTTP audit tests pass (9/9); corrected-head
-  CI is pending.
+  security-gate reference, including the separately invoked mobile dependency-review workflow.
+  Focused supply-chain/HTTP audit tests pass (9/9), and the workflow-reference test passes (8/8);
+  corrected-head CI is pending.

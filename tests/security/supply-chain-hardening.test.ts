@@ -49,9 +49,11 @@ describe('dependency and CI supply-chain hardening', () => {
 
   it('keeps mobile HIGH exceptions exact, indirect and self-expiring', () => {
     const release = source('.github/workflows/phase0-7-validation.yml')
+    const mobileResolver = source('.github/workflows/security-mobile-dependency-review.yml')
     const mobileAudit = source('scripts/mobile-dependency-audit.mjs')
 
     expect(release).toContain('node scripts/mobile-dependency-audit.mjs')
+    expect(mobileResolver).toContain('node scripts/mobile-dependency-audit.mjs')
     expect(mobileAudit).not.toContain('--omit=dev')
     expect(mobileAudit).toContain("'--audit-level=high'")
     expect(mobileAudit).toContain('Critical vulnerabilities are never exception-eligible')

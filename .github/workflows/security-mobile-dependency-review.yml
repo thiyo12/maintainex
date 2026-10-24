@@ -41,8 +41,8 @@ jobs:
           npm pkg set overrides.image-size=2.0.4
           npm audit fix --package-lock-only --omit=dev || true
 
-      - name: Verify controlled mobile production audit
-        run: node scripts/mobile-production-audit.mjs
+      - name: Verify controlled full mobile dependency audit
+        run: node scripts/mobile-dependency-audit.mjs
 
       - name: Install resolved mobile graph
         run: npm ci --prefix apps/mobile
