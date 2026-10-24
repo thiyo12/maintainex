@@ -3,6 +3,7 @@ import {
   canSubmitPayment,
   createStaleResponseGuard,
   derivePaymentPresentation,
+  deriveReceiptPaymentState,
   resolveDisplayCurrency,
   type PaymentFetchState,
   type PaymentOptionsLike,
@@ -31,6 +32,27 @@ describe('Sri Lanka job — cash-only deployment', () => {
     expect(p.canPayCash).toBe(true)
     expect(p.canPayOnline).toBe(false)
     expect(p.notice).toBe('ONLINE_UNAVAILABLE')
+  })
+})
+
+describe('receipt financial state', () => {
+  it('never treats cash selection or completion as proof of cash collection', () => {
+    expect(deriveReceiptPaymentState({ paymentMethod: 'CASH', escrowStatus: 'CASH_CONFIRMED' })).toBe('CASH_SELECTED')
+    expect(deriveReceiptPaymentState({ paymentMethod: 'CASH', escrowStatus: 'RELEASED' })).toBe('UNVERIFIED')
+  })
+
+  it('keeps cash unverified until the customer confirms the provider-reported amount', () => {
+    expect(deriveReceiptPaymentState({ paymentMethod: 'CASH', escrowStatus: 'RELEASED' })).toBe('UNVERIFIED')
+    expect(deriveReceiptPaymentState({ paymentMethod: 'CASH', escrowStatus: 'RELEASED', cashCollectionStatus: 'CUSTOMER_CONFIRMED', cashCollectedMinor: '50000', escrowTotalAmount: 500 })).toBe('PAID')
+    expect(deriveReceiptPaymentState({ paymentMethod: 'CASH', escrowStatus: 'RELEASED', cashCollectionStatus: 'CUSTOMER_CONFIRMED', cashCollectedMinor: '25000', escrowTotalAmount: 500 })).toBe('PARTIAL')
+  })
+
+  it('uses the payment provider state for captured, refunded, disputed and failed online payments', () => {
+    expect(deriveReceiptPaymentState({ paymentStatus: 'SUCCESS' })).toBe('PAID')
+    expect(deriveReceiptPaymentState({ paymentStatus: 'REFUNDED' })).toBe('REFUNDED')
+    expect(deriveReceiptPaymentState({ paymentStatus: 'CHARGEDBACK' })).toBe('DISPUTED')
+    expect(deriveReceiptPaymentState({ paymentStatus: 'FAILED' })).toBe('FAILED')
+    expect(deriveReceiptPaymentState({ paymentStatus: 'PENDING' })).toBe('PENDING')
   })
 })
 

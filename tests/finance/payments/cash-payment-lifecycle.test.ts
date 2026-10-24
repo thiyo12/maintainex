@@ -13,6 +13,7 @@ describe('cash payment lifecycle contract', () => {
   const cashRoute = read('app/api/mobile/v2/jobs/[id]/cash-payment/route.ts')
   const completeRoute = read('app/api/mobile/v2/jobs/[id]/complete/route.ts')
   const refundRoute = read('app/api/mobile/v2/jobs/[id]/escrow/refund/route.ts')
+  const collectionRoute = read('app/api/mobile/v2/jobs/[id]/cash-collection/route.ts')
   const customer = read('apps/mobile/features/jobs/screens/customer/v2/[id].tsx')
   const customerPayment = read('apps/mobile/features/jobs/screens/customer/v2/confirm/[id].tsx')
   const tasker = read('apps/mobile/features/jobs/screens/tasker/v2/manage/[id].tsx')
@@ -21,10 +22,10 @@ describe('cash payment lifecycle contract', () => {
   it('selects cash from pending payment without creating funded escrow money', () => {
     expect(cashRoute).toContain('confirmCashPayment')
     expect(cashRoute).toContain("paymentMethod: 'CASH'")
-    expect(cashRoute).toContain("status: 'CASH_CONFIRMED'")
+    expect(cashRoute).toContain("status: 'CASH_SELECTED'")
     expect(escrow).toContain("status: 'PENDING_PAYMENT'")
     expect(escrow).toContain("paymentMethod: 'CASH'")
-    expect(escrow).toContain("status: 'CASH_CONFIRMED'")
+    expect(escrow).toContain("status: 'CASH_SELECTED'")
     expect(escrow).toContain('heldAt: null')
 
     const start = escrow.indexOf('export async function confirmCashPayment')
@@ -35,10 +36,10 @@ describe('cash payment lifecycle contract', () => {
   })
 
   it('accepts cash confirmation as a valid PIN and address-sharing payment state', () => {
-    expect(pin).toContain("status: { in: ['PROTECTED', 'CASH_CONFIRMED'] }")
+    expect(pin).toContain("status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] }")
     expect(
       read('app/api/mobile/v2/jobs/[id]/share-address/route.ts'),
-    ).toContain("status: { in: ['PROTECTED', 'CASH_CONFIRMED'] }")
+    ).toContain("status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] }")
   })
 
   it('keeps work start behind the same one-time PIN state machine for cash', () => {
@@ -67,30 +68,33 @@ describe('cash payment lifecycle contract', () => {
   })
 
   it('cancels pre-start cash with zero ledger refund and supports cash disputes', () => {
-    expect(escrow).toContain("['CASH_CONFIRMED', 'ON_HOLD'].includes(escrow.status)")
+    expect(escrow).toContain("['CASH_CONFIRMED', 'CASH_SELECTED', 'ON_HOLD'].includes(escrow.status)")
     expect(escrow).toContain('cashNoPlatformFunds: true')
     expect(escrow).toContain('refundAmount: 0')
-    expect(lifecycle).toContain("status: { in: ['PROTECTED', 'CASH_CONFIRMED'] }")
+    expect(lifecycle).toContain("status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] }")
     expect(lifecycle).toContain("data: { status: 'ON_HOLD' }")
     expect(refundRoute).toContain("const cashCancelled = 'cashCancelled' in result")
     expect(refundRoute).toContain("refundStatus: pendingExternal ? 'REFUND_REQUIRED' : cashCancelled ? 'CANCELLED' : 'REFUNDED'")
   })
 
   it('requires explicit customer confirmation that cash was paid before completion', () => {
-    expect(completeRoute).toContain('CASH_PAYMENT_CONFIRMATION_REQUIRED')
-    expect(completeRoute).toContain('body.cashPaidConfirmed !== true')
+    expect(completeRoute).toContain('CASH_COLLECTION_CONFIRMATION_REQUIRED')
+    expect(completeRoute).toContain("paymentState.cashCollectionStatus !== 'CUSTOMER_CONFIRMED'")
     expect(completeRoute).toContain("requireFinancialRateLimit(request, 'complete-job')")
 
     const releaseRoute = read('app/api/mobile/v2/jobs/[id]/release-escrow/route.ts')
-    expect(releaseRoute).toContain('CASH_PAYMENT_CONFIRMATION_REQUIRED')
-    expect(releaseRoute).toContain('body.cashPaidConfirmed !== true')
+    expect(releaseRoute).toContain('CASH_COLLECTION_CONFIRMATION_REQUIRED')
+    expect(releaseRoute).toContain("paymentState.cashCollectionStatus !== 'CUSTOMER_CONFIRMED'")
 
     const completionScreen = read(
       'apps/mobile/features/payments/screens/customer/payment/confirm-complete.tsx',
     )
-    expect(completionScreen).toContain('Cash Paid · Complete Job')
+    expect(completionScreen).toContain('Confirm cash amount first')
     expect(completionScreen).toContain("v2JobActions.complete(")
-    expect(completionScreen).toContain('cashPaidConfirmed')
+    expect(read('apps/mobile/api/v2-jobs.ts')).not.toContain('cashPaidConfirmed')
+    expect(collectionRoute).toContain("'REPORT', 'CONFIRM', 'CONTEST'")
+    expect(collectionRoute).toContain("action === 'CONFIRM' ? 'CUSTOMER_CONFIRMED' : 'CONTESTED'")
+    expect(collectionRoute).toContain('Only the customer can confirm or contest')
   })
 
   it('does not auto-release cash jobs without explicit customer/admin approval', () => {
@@ -107,9 +111,10 @@ describe('cash payment lifecycle contract', () => {
     expect(customerPayment).toContain('handleCash')
     expect(customerPayment).toContain("canSubmitPayment(paymentPresentation, 'cash')")
     expect(customerPayment).toContain('v2JobActions.confirmCashPayment(id)')
-    expect(customerPayment).toContain("escrow?.status === 'CASH_CONFIRMED'")
-    expect(customer).toContain("['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status)")
-    expect(tasker).toContain("['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status)")
-    expect(company).toContain("['PROTECTED', 'CASH_CONFIRMED'].includes(job.escrow?.status)")
+    expect(customerPayment).toContain("['CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow?.status)")
+    expect(customer).toContain("['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow.status)")
+    expect(tasker).toContain("['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow?.status)")
+    expect(company).toContain("['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(job.escrow?.status)")
+    expect(read('apps/mobile/features/jobs/components/CashCollectionPanel.tsx')).toContain('Report cash collected')
   })
 })

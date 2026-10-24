@@ -44,7 +44,7 @@ describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {
 
   it('cash lifecycle records no fake escrow/wallet money and delegates to canonical receivable accounting', () => {
     expect(cash).toContain('confirmCashPayment')
-    expect(cash).toContain("status: 'CASH_CONFIRMED'")
+    expect(cash).toContain("status: 'CASH_SELECTED'")
     expect(cash).not.toContain('providerWallet.upsert(')
     expect(lifecycle).toContain('recordCashPlatformReceivable')
     expect(lifecycle).toContain("paymentMethod === 'CASH'")

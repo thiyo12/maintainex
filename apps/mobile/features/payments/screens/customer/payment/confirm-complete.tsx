@@ -6,6 +6,7 @@ import { CaretLeft, CheckCircle, Star, ShieldCheck } from 'phosphor-react-native
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { v2Jobs, v2JobActions } from '@/api/v2-jobs'
+import CashCollectionPanel from '@/features/jobs/components/CashCollectionPanel'
 
 export default function ConfirmCompleteScreen() {
   const colors = useColors()
@@ -20,6 +21,11 @@ export default function ConfirmCompleteScreen() {
   const [loading, setLoading] = useState(true)
   const [releasing, setReleasing] = useState(false)
   const styles = makeStyles(colors)
+
+  const refreshJob = async () => {
+    const res = await v2Jobs.get(bookingId)
+    setJob(res.job)
+  }
 
   useEffect(() => {
     if (!bookingId) return
@@ -55,24 +61,21 @@ export default function ConfirmCompleteScreen() {
     }
 
     if (isCash) {
-      Alert.alert(
-        'Confirm Cash Paid',
-        `Confirm only after you paid ${currency} ${totalAmount.toLocaleString()} directly to ${taskerName || 'the provider'}.`,
-        [
-          { text: 'Not yet', style: 'cancel' },
-          { text: 'Cash Paid · Complete Job', onPress: () => { void submitCompletion(true) } },
-        ],
-      )
+      if (escrow?.cashCollectionStatus !== 'CUSTOMER_CONFIRMED') {
+        Alert.alert('Confirm cash amount first', 'Review the provider reported amount and confirm it below before completing the job.')
+        return
+      }
+      void submitCompletion()
       return
     }
 
-    void submitCompletion(false)
+    void submitCompletion()
   }
 
-  const submitCompletion = async (cashPaidConfirmed: boolean) => {
+  const submitCompletion = async () => {
     setReleasing(true)
     try {
-      const result = await v2JobActions.complete(bookingId, 'APPROVE_COMPLETION', undefined, cashPaidConfirmed)
+      const result = await v2JobActions.complete(bookingId, 'APPROVE_COMPLETION')
       await v2JobActions.createReview(bookingId, {
         reviewType: 'CUSTOMER_REVIEWS_PROVIDER',
         quality: rating,
@@ -138,6 +141,8 @@ export default function ConfirmCompleteScreen() {
           </Text>
         </View>
 
+        <CashCollectionPanel jobId={bookingId} role="customer" jobStatus={job.status} escrow={escrow} onUpdated={() => { void refreshJob() }} />
+
         <View style={styles.card}>
           <Text style={styles.rateLabel}>
             How was {taskerName || 'the provider'}'s work?
@@ -166,7 +171,7 @@ export default function ConfirmCompleteScreen() {
           <Text style={styles.btnTxt}>
             {releasing
               ? (isCash ? 'Completing...' : 'Releasing...')
-              : (isCash ? 'Confirm Work + Cash Paid' : 'Confirm Work & Release Payment')}
+              : (isCash && escrow?.cashCollectionStatus !== 'CUSTOMER_CONFIRMED' ? 'Confirm cash amount first' : isCash ? 'Confirm Work' : 'Confirm Work & Release Payment')}
           </Text>
         </TouchableOpacity>
 

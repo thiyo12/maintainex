@@ -207,7 +207,7 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
   // location metadata has since become inconsistent. This runs BEFORE any market
   // gate so an already-settled cash payment never becomes inaccessible, and it
   // never relaxes the restriction on a NEW selection below.
-  if (escrow.paymentMethod === 'CASH' && escrow.status === 'CASH_CONFIRMED') {
+  if (escrow.paymentMethod === 'CASH' && ['CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow.status)) {
     return {
       success: true,
       amountDue: escrow.totalAmount,
@@ -220,7 +220,6 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
     throw new Error('Payment method can no longer be changed')
   }
 
-  const confirmedAt = new Date()
   await prisma.$transaction(async tx => {
     const lockedJobs = await tx.$queryRaw<
       Array<{
@@ -279,8 +278,8 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
       },
       data: {
         paymentMethod: 'CASH',
-        status: 'CASH_CONFIRMED',
-        cashConfirmedAt: confirmedAt,
+        status: 'CASH_SELECTED',
+        cashConfirmedAt: null,
         heldAt: null,
       },
     })
@@ -297,7 +296,7 @@ export async function confirmCashPayment(ctx: TransitionContext, jobId: string) 
       actorType: ctx.actorType,
       action: 'CASH_PAYMENT_SELECTED',
       fromState: 'PENDING_PAYMENT',
-      toState: 'CASH_CONFIRMED',
+      toState: 'CASH_SELECTED',
       metadata: {
         escrowId: escrow.id,
         cashDueMinor: totalAmount,
@@ -555,7 +554,7 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   }
 
   const escrow = await prisma.jobEscrow.findFirst({
-    where: { jobId, status: { in: ['PROTECTED', 'PENDING_PAYMENT', 'ON_HOLD', 'CASH_CONFIRMED'] } },
+    where: { jobId, status: { in: ['PROTECTED', 'PENDING_PAYMENT', 'ON_HOLD', 'CASH_CONFIRMED', 'CASH_SELECTED'] } },
   })
   if (!escrow) throw new Error('No refundable escrow found')
 
@@ -625,7 +624,7 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
 
   if (
     escrow.paymentMethod === 'CASH' &&
-    ['CASH_CONFIRMED', 'ON_HOLD'].includes(escrow.status)
+    ['CASH_CONFIRMED', 'CASH_SELECTED', 'ON_HOLD'].includes(escrow.status)
   ) {
     const cashResolutionStatus = escrow.status === 'ON_HOLD' ? 'REFUNDED' : 'CANCELLED'
 
@@ -673,10 +672,11 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   const refundMajor = bigIntToSafeNumber(refundCents) / 100
   const fundingSource = await resolveEscrowFundingSource(prisma, escrow.id)
 
-  if (fundingSource === 'PAYHERE') {
+  if (fundingSource === 'PAYHERE' || fundingSource === 'PAYPAL') {
     const paymentIntent = await prisma.paymentIntent.findFirst({
       where: {
         escrowId: escrow.id,
+        gateway: fundingSource,
         status: {
           in: ['SUCCESS', 'REFUND_REQUIRED', 'REFUND_PROCESSING', 'REFUNDED'],
         },
@@ -685,7 +685,7 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
     })
 
     if (!paymentIntent || !paymentIntent.paymentId) {
-      throw new Error('PAYHERE_REFUND_PAYMENT_NOT_FOUND')
+      throw new Error('EXTERNAL_REFUND_PAYMENT_NOT_FOUND')
     }
 
     if (paymentIntent.status === 'REFUNDED') {
@@ -911,10 +911,14 @@ export async function completeAndReleaseEscrow(
           if (releasedEscrow.paymentMethod === 'CASH') {
             const defaultRate = await getCommissionRate()
             const rate = Math.max(0, Math.min(100, identity.commissionRate ?? defaultRate))
+            const cashCollectedMinor = releasedEscrow.cashCollectedMinor ?? 0n
+            const chargeableCashMinor = cashCollectedMinor > releasedEscrow.amount
+              ? releasedEscrow.amount
+              : cashCollectedMinor
             const commissionCents =
-              (releasedEscrow.amount * BigInt(Math.round(rate * 100))) / 10000n
-            const platformDueCents = commissionCents + releasedEscrow.serviceFee
-            const netCents = releasedEscrow.amount - commissionCents
+              (chargeableCashMinor * BigInt(Math.round(rate * 100))) / 10000n
+            const platformDueCents = commissionCents
+            const netCents = chargeableCashMinor - commissionCents
             return {
               commission: bigIntToSafeNumber(commissionCents) / 100,
               netAmount: bigIntToSafeNumber(netCents) / 100,
@@ -979,8 +983,8 @@ export async function completeAndReleaseEscrow(
       releaseMode === 'AUTO_RELEASE'
         ? ['PROTECTED']
         : releaseMode === 'ADMIN_RESOLUTION'
-          ? ['PROTECTED', 'ON_HOLD', 'CASH_CONFIRMED']
-          : ['PROTECTED', 'CASH_CONFIRMED']
+          ? ['PROTECTED', 'ON_HOLD', 'CASH_CONFIRMED', 'CASH_SELECTED']
+          : ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED']
 
     const escrow = await tx.jobEscrow.findFirst({
       where: { jobId, status: { in: allowedEscrowStatuses as any } },
@@ -1012,22 +1016,27 @@ export async function completeAndReleaseEscrow(
     const rawRate = identity.commissionRate ?? defaultRate
     const rate = Math.max(0, Math.min(100, rawRate))
     const rateBps = BigInt(Math.round(rate * 100))
-    const commissionCents = (escrow.amount * rateBps) / 10000n
-    const netCents = escrow.amount - commissionCents
-    const platformDueCents = commissionCents + escrow.serviceFee
-    const commissionMajor = bigIntToSafeNumber(commissionCents) / 100
-    const netMajor = bigIntToSafeNumber(netCents) / 100
-    const platformDueMajor = bigIntToSafeNumber(platformDueCents) / 100
     const escrowCurrency = escrow.currency as Currency
     // Attribution market for provider financial policy and commission records.
     const settlementMarket = resolveSettlementMarket(job, escrowCurrency)
 
 
     if (escrow.paymentMethod === 'CASH') {
+      if (escrow.cashCollectionStatus !== 'CUSTOMER_CONFIRMED' || escrow.cashCollectedMinor == null) {
+        throw new Error('CASH_COLLECTION_CONFIRMATION_REQUIRED')
+      }
+      const cashCollectedMinor = escrow.cashCollectedMinor
+      const chargeableCashMinor = cashCollectedMinor > escrow.amount ? escrow.amount : cashCollectedMinor
+      const commissionCents = (chargeableCashMinor * rateBps) / 10000n
+      const netCents = chargeableCashMinor - commissionCents
+      const platformDueCents = commissionCents
+      const commissionMajor = bigIntToSafeNumber(commissionCents) / 100
+      const netMajor = bigIntToSafeNumber(netCents) / 100
+      const platformDueMajor = bigIntToSafeNumber(platformDueCents) / 100
       const cashAllowedStatuses =
         releaseMode === 'ADMIN_RESOLUTION'
-          ? ['CASH_CONFIRMED', 'ON_HOLD']
-          : ['CASH_CONFIRMED']
+          ? ['CASH_CONFIRMED', 'CASH_SELECTED', 'ON_HOLD']
+          : ['CASH_CONFIRMED', 'CASH_SELECTED']
       const claimed = await tx.jobEscrow.updateMany({
         where: {
           id: escrow.id,
@@ -1053,17 +1062,12 @@ export async function completeAndReleaseEscrow(
         })
       }
 
-      const effectivePlatformRate =
-        escrow.amount > 0n
-          ? (bigIntToSafeNumber(platformDueCents) * 100) / bigIntToSafeNumber(escrow.amount)
-          : 0
-
       if (platformDueCents > 0n) {
         const weeklySettlement = await recordWeeklySettlement(tx, {
           providerId: identity.payoutUserId,
           providerType: quote.providerType,
-          jobAmountCents: escrow.amount,
-          commissionRate: effectivePlatformRate,
+          jobAmountCents: chargeableCashMinor,
+          commissionRate: rate,
           commissionCents: platformDueCents,
           currency: escrowCurrency,
           countryCode: settlementMarket,
@@ -1095,7 +1099,7 @@ export async function completeAndReleaseEscrow(
           escrowId: escrow.id,
           workspaceFromState: workspace.progressStatus,
           workspaceToState: 'COMPLETED',
-          cashCollectedMinor: escrow.totalAmount,
+          cashCollectedMinor,
           providerCommissionMinor: commissionCents,
           serviceFeeMinor: escrow.serviceFee,
           platformDueMinor: platformDueCents,
@@ -1117,6 +1121,13 @@ export async function completeAndReleaseEscrow(
         paymentMethod: 'CASH' as const,
       }
     }
+
+    const commissionCents = (escrow.amount * rateBps) / 10000n
+    const netCents = escrow.amount - commissionCents
+    const platformDueCents = commissionCents + escrow.serviceFee
+    const commissionMajor = bigIntToSafeNumber(commissionCents) / 100
+    const netMajor = bigIntToSafeNumber(netCents) / 100
+    const platformDueMajor = bigIntToSafeNumber(platformDueCents) / 100
 
     const claimed = await tx.jobEscrow.updateMany({
       where: {

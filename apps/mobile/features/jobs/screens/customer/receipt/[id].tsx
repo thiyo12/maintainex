@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, ActivityIndicator } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, ActivityIndicator, Share } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { FileText, CheckCircle, Lock, CreditCard, ShareNetwork, Star } from 'phosphor-react-native'
@@ -7,7 +7,9 @@ import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { useTranslation } from 'react-i18next'
 import { v2Jobs } from '@/api/v2-jobs'
+import { v2Payments } from '@/api/v2-payments'
 import type { V2Job } from '@/api/v2-types'
+import { deriveReceiptPaymentState } from '../v2/confirm/payment-presentation'
 
 export default function ReceiptScreen() {
   const { t } = useTranslation()
@@ -16,6 +18,8 @@ export default function ReceiptScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams()
   const [job, setJob] = useState<(V2Job & { quotes: any[]; escrow?: any }) | null>(null)
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null)
+  const [paidAt, setPaidAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fadeAnim = useRef(new Animated.Value(0)).current
@@ -31,8 +35,15 @@ export default function ReceiptScreen() {
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    v2Jobs.get(id as string)
-      .then((res) => setJob(res.job))
+    Promise.all([
+      v2Jobs.get(id as string),
+      v2Payments.status(id as string).catch(() => null),
+    ])
+      .then(([res, payment]) => {
+        setJob(res.job)
+        setPaymentStatus(payment?.payment?.status ?? null)
+        setPaidAt(payment?.payment?.paidAt ?? res.job.escrow?.cashCollectionConfirmedAt ?? null)
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [id])
@@ -57,10 +68,32 @@ export default function ReceiptScreen() {
 
   const acceptedQuote = job?.quotes?.find((q: any) => q.status === 'ACCEPTED')
   const currency = job?.escrow?.currency || 'LKR'
-  const subtotal = acceptedQuote?.price || job?.budgetAmount || 0
-  const fee = job?.escrow ? Number(job.escrow.serviceFee) : Math.round(subtotal * 0.1)
-  const total = subtotal + fee
-  const paymentMethodLabel = job?.escrow?.paymentMethod === 'CASH' ? 'Cash payment' : 'Online payment'
+  const subtotal = Number(job?.escrow?.amount ?? acceptedQuote?.price ?? 0)
+  const fee = Number(job?.escrow?.serviceFee ?? 0)
+  const total = Number(job?.escrow?.totalAmount ?? subtotal + fee)
+  const paymentState = deriveReceiptPaymentState({
+    paymentStatus,
+    paymentMethod: job?.escrow?.paymentMethod,
+    escrowStatus: job?.escrow?.status,
+    cashCollectionStatus: job?.escrow?.cashCollectionStatus,
+    cashCollectedMinor: job?.escrow?.cashCollectedMinor,
+    escrowTotalAmount: job?.escrow?.totalAmount,
+  })
+  const paymentStateLabel: Record<string, string> = {
+    PAID: 'Paid', PARTIAL: 'Partially paid', REFUNDED: 'Refunded', DISPUTED: 'Disputed', FAILED: 'Failed',
+    PENDING: 'Payment pending', CASH_SELECTED: 'Cash selected · collection not verified',
+    UNVERIFIED: 'Payment status unavailable',
+  }
+  const paymentMethodLabel = job?.escrow?.paymentMethod === 'CASH'
+    ? 'Cash'
+    : paymentStatus
+      ? 'Online payment'
+      : 'Not confirmed'
+  const reportedCash = job?.escrow?.cashCollectedMinor != null ? Number(job.escrow.cashCollectedMinor) / 100 : 0
+  const amountPaid = job?.escrow?.paymentMethod === 'CASH' && job.escrow.cashCollectionStatus === 'CUSTOMER_CONFIRMED'
+    ? Math.min(total, reportedCash)
+    : paymentState === 'PAID' ? total : 0
+  const amountDue = Math.max(0, total - amountPaid)
   const serviceDate = job?.preferredDate
     ? new Date(job.preferredDate).toLocaleDateString('en-US', {
         weekday: 'short',
@@ -81,9 +114,11 @@ export default function ReceiptScreen() {
             <FileText size={40} color={colors.ink} weight="regular" style={{ marginBottom: 8 }} />
             <Text style={styles.receiptTitle}>{t('receipt.title')}</Text>
             <Text style={styles.receiptId}>{t('receipt.invoice', { id })}</Text>
-            <View style={styles.paidBadge}>
-              <CheckCircle size={14} color={colors.success} weight="fill" />
-              <Text style={styles.paidText}>{t('receipt.paid')}</Text>
+            <View style={[styles.paidBadge, paymentState !== 'PAID' && styles.pendingBadge]}>
+              {paymentState === 'PAID' && <CheckCircle size={14} color={colors.success} weight="fill" />}
+              <Text style={[styles.paidText, paymentState !== 'PAID' && styles.pendingText]}>
+                {paymentStateLabel[paymentState]}
+              </Text>
             </View>
           </View>
 
@@ -105,13 +140,17 @@ export default function ReceiptScreen() {
             <Text style={styles.lineLabel}>{t('receipt.platformFee')}</Text>
             <Text style={styles.lineValue}>{currency} {fee.toLocaleString()}</Text>
           </View>
-          <View style={styles.lineItem}>
-            <Text style={styles.lineLabel}>{t('receipt.discount')}</Text>
-            <Text style={[styles.lineValue, { color: colors.success }]}>- {currency} 0</Text>
-          </View>
           <View style={[styles.lineItem, styles.totalRow]}>
-            <Text style={styles.totalLabel}>{t('receipt.totalCharged')}</Text>
+            <Text style={styles.totalLabel}>Invoice total</Text>
             <Text style={styles.totalValue}>{currency} {total.toLocaleString()}</Text>
+          </View>
+          <View style={styles.lineItem}>
+            <Text style={styles.lineLabel}>Paid</Text>
+            <Text style={styles.lineValue}>{currency} {amountPaid.toLocaleString()}</Text>
+          </View>
+          <View style={styles.lineItem}>
+            <Text style={styles.lineLabel}>Due</Text>
+            <Text style={styles.lineValue}>{currency} {amountDue.toLocaleString()}</Text>
           </View>
 
           <View style={styles.divider} />
@@ -126,20 +165,24 @@ export default function ReceiptScreen() {
           <View style={styles.paymentSection}>
             <Text style={styles.paymentLabel}>{t('receipt.paidOn')}</Text>
             <Text style={styles.paymentValue}>
-              {job?.createdAt
-                ? new Date(job.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-                : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              {paidAt ? new Date(paidAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}
             </Text>
           </View>
 
           <View style={styles.escrowNote}>
             <Lock size={16} color={colors.amber} weight="regular" />
-            <Text style={styles.escrowText}>{t('receipt.escrowInfo')}</Text>
+            <Text style={styles.escrowText}>
+              {paymentState === 'CASH_SELECTED'
+                ? 'Selecting cash does not confirm collection. The provider must report what was received.'
+              : job?.escrow?.paymentMethod === 'CASH' && ['PAID', 'PARTIAL'].includes(paymentState)
+                  ? 'Cash amount was reported by the provider and confirmed by you. MaintainEX did not hold these funds.'
+                  : 'Payment totals and status are shown only when confirmed by the payment record.'}
+            </Text>
           </View>
         </Animated.View>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.shareBtn}>
+          <TouchableOpacity style={styles.shareBtn} onPress={() => Share.share({ message: `${job?.title || 'MaintainEX invoice'} · ${currency} ${total.toLocaleString()} · ${paymentStateLabel[paymentState]}` })}>
             <ShareNetwork size={16} color={colors.ink} weight="regular" />
             <Text style={styles.shareBtnText}>{t('receipt.shareReceipt')}</Text>
           </TouchableOpacity>
@@ -180,7 +223,9 @@ const makeStyles = (colors: any) => StyleSheet.create({
   receiptTitle: { fontSize: 20, fontFamily: fonts.heading, color: colors.ink, marginBottom: 4 },
   receiptId: { fontSize: 12, color: colors.muted, marginBottom: 8 },
   paidBadge: { backgroundColor: colors.successSoft || '#E7F8EF', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  pendingBadge: { backgroundColor: colors.amberBg },
   paidText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.success },
+  pendingText: { color: colors.amberDark },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 12 },
   serviceSection: { marginBottom: 4 },
   serviceTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 6 },

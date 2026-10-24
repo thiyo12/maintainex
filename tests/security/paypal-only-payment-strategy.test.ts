@@ -6,8 +6,8 @@ function source(path: string) {
   return readFileSync(resolve(process.cwd(), path), 'utf8')
 }
 
-describe('PayPal-only launch strategy', () => {
-  it('does not expose PayHere as a new customer checkout choice', () => {
+describe('Payment-provider launch safety', () => {
+  it('does not expose legacy PayPal or PayHere as an unapproved new customer checkout choice', () => {
     const confirm = source(
       'apps/mobile/features/jobs/screens/customer/v2/confirm/[id].tsx'
     )
@@ -15,9 +15,12 @@ describe('PayPal-only launch strategy', () => {
       'apps/mobile/features/customer/screens/settings/payment/index.tsx'
     )
 
-    expect(confirm).toContain('Pay Securely with PayPal')
+    expect(confirm).toContain('Continue to secure checkout')
+    expect(confirm).not.toContain('Pay Securely with PayPal')
     expect(confirm).not.toContain('Pay Securely with PayHere')
-    expect(paymentSettings).toContain('PayPal online checkout')
+    expect(paymentSettings).toContain('Not enabled for this deployment')
+    expect(paymentSettings).not.toContain('PayPal online checkout')
+    expect(paymentSettings).not.toContain('PayHere online checkout')
     expect(paymentSettings).not.toContain('methodPayHere')
     expect(paymentSettings).not.toContain('methodStripe')
   })

@@ -16,6 +16,7 @@ import { emit, removedJobs } from '@/lib/events'
 import NewChatModal from '@/features/messaging/components/NewChatModal'
 import JobSafetyCentre from '@/features/safety/components/JobSafetyCentre'
 import CustomerCrewIdentityPanel from '@/features/jobs/components/CustomerCrewIdentityPanel'
+import CashCollectionPanel from '@/features/jobs/components/CashCollectionPanel'
 import { currencyForJobCountry, parseCounterofferAmount, quoteMatchesJobCurrency } from '@/lib/market-currency'
 
 function usePulse() {
@@ -523,7 +524,7 @@ export default function V2JobDetailScreen() {
           </View>
         ) : null}
 
-        {escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) && !job.addressSharedAt && (
+        {escrow && ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow.status) && !job.addressSharedAt && (
           <View style={styles.actionCard}>
             <View style={styles.actionIconCircle}>
               <MapPin size={28} color={colors.amber} weight="fill" />
@@ -544,7 +545,7 @@ export default function V2JobDetailScreen() {
           </View>
         )}
 
-        {(job.workersCount ?? 1) === 1 && workspace?.progressStatus === 'ACCEPTED' && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) && (
+        {(job.workersCount ?? 1) === 1 && workspace?.progressStatus === 'ACCEPTED' && ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow?.status) && (
           <TouchableOpacity
             style={styles.actionCard}
             onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
@@ -565,16 +566,18 @@ export default function V2JobDetailScreen() {
             </View>
             <Text style={styles.actionCardTitle}>Job Complete?</Text>
             <Text style={styles.actionCardDesc}>
-              {escrow?.status === 'CASH_CONFIRMED'
+              {['CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow?.status)
                 ? 'Your provider says the work is complete. Approve completion to close the job and record the provider platform settlement.'
                 : "Your hero says they're done. Check the work and release payment"}
             </Text>
-            <ActionBtn label={escrow?.status === 'CASH_CONFIRMED' ? 'Approve Completion' : 'Approve & Release'} loadingKey="approve" onPress={handleApproveCompletion} color="#06C167" />
+            <ActionBtn label={['CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow?.status) ? 'Approve Completion' : 'Approve & Release'} loadingKey="approve" onPress={handleApproveCompletion} color="#06C167" />
           </View>
         )}
 
+        <CashCollectionPanel jobId={id} role="customer" jobStatus={job.status} escrow={escrow} onUpdated={loadJob} />
+
         {/* ─── Escrow Status Card ─── */}
-        {escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) && (
+        {escrow && ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow.status) && (
           <View style={styles.escrowCard}>
             <View style={styles.escrowHeader}>
               <Text style={styles.escrowTitle}>Escrow</Text>

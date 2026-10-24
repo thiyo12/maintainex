@@ -35,14 +35,10 @@ describe('CRM V2 commission control boundary', () => {
     expect(route).toContain("request.headers.get('x-crm-step-up')")
 
     expect(payments).toContain("guardCrmAction(request, 'finance.commission.reconcile')")
-    expect(payments).toContain("actionId: 'finance.commission.reconcile'")
-    expect(payments).toContain("request.headers.get('x-crm-step-up')")
-    expect(payments).toContain("status: 'PENDING'")
-    expect(payments).toContain('COMMISSION_PAYMENT_CONCURRENTLY_PROCESSED')
-    expect(payments).toContain('remainingReceivableMinor')
-    expect(payments).toContain('expectedPaymentAmount')
-    expect(payments).toContain('Payment amount does not match the remaining commission due')
-    expect(payments).toContain('settleProviderReceivablesFromDirectPayment')
+    expect(payments).toContain('BANK_CREDIT_EVIDENCE_REQUIRED')
+    expect(payments).toContain("status: 'WAITING_BANK'")
+    expect(payments).not.toContain('commissionPayment.updateMany')
+    expect(payments).not.toContain("status: 'CONFIRMED'")
   })
 
   it('does not allow commission enforcement before the due date', () => {

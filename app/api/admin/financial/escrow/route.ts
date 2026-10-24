@@ -26,6 +26,7 @@ const VALID_STATUSES = new Set([
   'REFUNDED',
   'CANCELLED',
   'CASH_CONFIRMED',
+  'CASH_SELECTED',
 ])
 
 type EscrowRow = {

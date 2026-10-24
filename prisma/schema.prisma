@@ -2316,6 +2316,11 @@ model JobEscrow {
   releasedAt      DateTime?
   refundedAt      DateTime?
   cashConfirmedAt DateTime?
+  cashCollectedMinor BigInt?
+  cashCollectionStatus String @default("NOT_REPORTED") // NOT_REPORTED, PROVIDER_REPORTED, CUSTOMER_CONFIRMED, CONTESTED
+  cashReportedAt DateTime?
+  cashReportedBy String?
+  cashCollectionConfirmedAt DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

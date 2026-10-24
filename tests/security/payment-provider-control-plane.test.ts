@@ -51,12 +51,12 @@ describe('payment provider control plane', () => {
     expect(starter).toContain('npx prisma migrate deploy')
   })
 
-  it('restricts new online checkout to PayPal with market verification', () => {
+  it('keeps new online checkout disabled until an approved marketplace processor exists', () => {
     const registry = source('lib/finance/payments/provider-registry.ts')
     const service = source('lib/finance/payments/payment-service.ts')
     const providersApi = source('app/api/admin/financial/providers/route.ts')
 
-    expect(registry).toContain("NEW_ONLINE_CHECKOUT_PROVIDER_CODES = ['PAYPAL']")
+    expect(registry).toContain('NEW_ONLINE_CHECKOUT_PROVIDER_CODES = []')
     expect(registry).toContain("LEGACY_READ_ONLY_PROVIDER_CODES = ['PAYHERE']")
     expect(registry).toContain('PAYPAL_MARKET_CHECKOUT_VERIFIED')
     expect(registry).toContain("PAYPAL_SANDBOX_FIXTURE_COUNTRY = 'CA'")

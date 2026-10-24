@@ -78,7 +78,7 @@ export default function CompanyEarnings() {
               </View>
               <Text style={styles.commissionAmount}>{displayCurrency} {cp.amountDue.toLocaleString()}</Text>
               <Text style={styles.commissionInstruction}>
-                Pay this amount to any MΛINTΛINEX agent using reference: {cp.referenceNumber}
+                Status: waiting for verified bank instructions. Do not pay an agent or use a screenshot as payment confirmation.
               </Text>
               <Text style={styles.commissionWeek}>
                 Week: {new Date(cp.weekStart).toLocaleDateString()} - {new Date(cp.weekEnd).toLocaleDateString()}

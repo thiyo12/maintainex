@@ -1,75 +1,77 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native'
+import { useEffect, useState } from 'react'
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
-import { useColors } from '@/lib/ThemeContext'
-import { fonts } from '@/lib/fonts'
-import { fontSizes } from '@/lib/tokens'
+import { CreditCard, Money } from 'phosphor-react-native'
+import V3PageHeader from '@/components/v3/V3PageHeader'
+import { V3SectionLabel, V3SettingsCard, V3SettingsRow } from '@/components/v3/V3SettingsUI'
+import { v2Payments } from '@/api/v2-payments'
+import { v3 } from '@/theme/v3/tokens'
 
-export default function PaymentSettingsScreen() {
-  const router = useRouter()
-  const colors = useColors()
-  const styles = makeStyles(colors)
+export default function PaymentScreen() {
+  const [availability, setAvailability] = useState<{
+    onlinePaymentAvailable: boolean
+  } | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    v2Payments.availability()
+      .then(result => {
+        if (active) setAvailability(result)
+      })
+      .catch(() => {
+        if (active) setFailed(true)
+      })
+    return () => { active = false }
+  }, [])
+
+  const methodsUnavailable = failed || !availability
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Payment Methods</Text>
-        <View style={{ width: 24 }} />
-      </View>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionTitle}>Saved Payment Methods</Text>
-        <View style={styles.card}>
-          <View style={styles.cardRow}>
-            <Ionicons name="card-outline" size={20} color={colors.ink} />
-            <View style={styles.cardInfo}>
-              <Text style={styles.cardName}>Visa ending in 4242</Text>
-              <Text style={styles.cardExpiry}>Expires 12/28</Text>
-            </View>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <V3PageHeader title="Payments" subtitle="Payment options are confirmed for each booking." />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <V3SectionLabel>Available at checkout</V3SectionLabel>
+        <V3SettingsCard>
+          <V3SettingsRow
+            icon={CreditCard}
+            title="Online payment"
+            subtitle={methodsUnavailable
+              ? failed ? 'Could not verify payment availability. Check again at checkout.' : 'Checking current availability…'
+              : availability.onlinePaymentAvailable ? 'Shown only for supported bookings and currencies' : 'Online checkout is not enabled for this account or market'}
+            value={methodsUnavailable ? 'Unknown' : availability.onlinePaymentAvailable ? 'Available where eligible' : 'Unavailable'}
+          />
+          <V3SettingsRow
+            icon={Money}
+            title="Cash"
+            subtitle="Eligibility depends on the booking market and provider. Selecting cash does not confirm payment."
+            value="Check booking"
+            last
+          />
+        </V3SettingsCard>
+
+        {methodsUnavailable && !failed && (
+          <View style={styles.loading} accessibilityRole="progressbar">
+            <ActivityIndicator color={v3.colors.ink} />
           </View>
-        </View>
-        <View style={styles.card}>
-          <View style={styles.cardRow}>
-            <Ionicons name="card-outline" size={20} color={colors.ink} />
-            <View style={styles.cardInfo}>
-              <Text style={styles.cardName}>Mastercard ending in 8888</Text>
-              <Text style={styles.cardExpiry}>Expires 06/27</Text>
-            </View>
-          </View>
-        </View>
-        <TouchableOpacity style={styles.addButton}>
-          <Ionicons name="add-circle-outline" size={20} color={colors.amber} />
-          <Text style={styles.addButtonText}>Add Payment Method</Text>
-        </TouchableOpacity>
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Bank Account</Text>
-        <View style={styles.card}>
-          <View style={styles.cardRow}>
-            <Ionicons name="business-outline" size={20} color={colors.ink} />
-            <View style={styles.cardInfo}>
-              <Text style={styles.cardName}>Bank of Ceylon</Text>
-              <Text style={styles.cardExpiry}>Account ending in 1234</Text>
-            </View>
-          </View>
+        )}
+
+        <View style={styles.note}>
+          <Text style={styles.noteTitle}>No saved methods</Text>
+          <Text style={styles.noteText}>
+            MaintainEX does not have a connected saved-card or bank-account manager. Never enter payment details outside an enabled checkout. Your final amount and payment status are shown on the booking.
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 16 },
-  title: { fontSize: fontSizes.h3, fontFamily: fonts.heading, color: colors.ink },
-  content: { padding: 24 },
-  sectionTitle: { fontSize: fontSizes.h3, fontFamily: fonts.heading, color: colors.ink, marginBottom: 16 },
-  card: { backgroundColor: colors.white, borderRadius: 12, padding: 16, marginBottom: 12 },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cardInfo: { flex: 1 },
-  cardName: { fontSize: fontSizes.body, fontFamily: fonts.bodyMedium, color: colors.ink },
-  cardExpiry: { fontSize: fontSizes.bodySmall, color: colors.muted, marginTop: 2 },
-  addButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
-  addButtonText: { fontSize: fontSizes.body, fontFamily: fonts.bodyMedium, color: colors.amber },
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  content: { paddingHorizontal: 18, paddingBottom: 36 },
+  loading: { alignItems: 'center', padding: 16 },
+  note: { marginTop: 16, padding: 16, borderRadius: 18, backgroundColor: v3.colors.amberSoft },
+  noteTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 14, color: v3.colors.ink },
+  noteText: { marginTop: 4, fontFamily: 'Outfit_400Regular', fontSize: 12, lineHeight: 18, color: v3.colors.textSecondary },
 })

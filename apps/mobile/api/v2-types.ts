@@ -13,6 +13,10 @@ export interface V2Escrow {
   heldAt?: string | null
   releasedAt?: string | null
   refundedAt?: string | null
+  cashCollectionStatus?: string
+  cashCollectedMinor?: string | null
+  cashReportedAt?: string | null
+  cashCollectionConfirmedAt?: string | null
   createdAt?: string
   updatedAt?: string
 }

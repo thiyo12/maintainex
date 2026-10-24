@@ -40,6 +40,38 @@ export interface PaymentPresentation {
   marketError: string | null
 }
 
+export type ReceiptPaymentState = 'PAID' | 'PARTIAL' | 'REFUNDED' | 'DISPUTED' | 'FAILED' | 'PENDING' | 'CASH_SELECTED' | 'UNVERIFIED'
+
+/** Derive receipt truth from provider status, never from booking completion. */
+export function deriveReceiptPaymentState(input: {
+  paymentStatus?: string | null
+  paymentMethod?: string | null
+  escrowStatus?: string | null
+  cashCollectionStatus?: string | null
+  cashCollectedMinor?: string | null
+  escrowTotalAmount?: number | null
+}): ReceiptPaymentState {
+  const paymentStatus = input.paymentStatus?.toUpperCase()
+  if (paymentStatus === 'SUCCESS') return 'PAID'
+  if (paymentStatus === 'REFUNDED') return 'REFUNDED'
+  if (paymentStatus === 'CHARGEDBACK') return 'DISPUTED'
+  if (paymentStatus === 'FAILED') return 'FAILED'
+  if (paymentStatus && ['CREATED', 'PENDING', 'REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(paymentStatus)) return 'PENDING'
+
+  // CASH_CONFIRMED is retained for history; CASH_SELECTED is the new state.
+  // Neither proves that the provider received physical cash.
+  if (input.paymentMethod?.toUpperCase() === 'CASH') {
+    if (input.cashCollectionStatus === 'CUSTOMER_CONFIRMED' && input.cashCollectedMinor) {
+      const collected = Number(input.cashCollectedMinor) / 100
+      if (collected > 0) return input.escrowTotalAmount != null && collected < input.escrowTotalAmount ? 'PARTIAL' : 'PAID'
+      return 'PENDING'
+    }
+    return ['CASH_CONFIRMED', 'CASH_SELECTED'].includes(input.escrowStatus || '') ? 'CASH_SELECTED' : 'UNVERIFIED'
+  }
+
+  return 'UNVERIFIED'
+}
+
 const NON_ACTIONABLE_STATUSES = ['REFUND_REQUIRED', 'CHARGEDBACK']
 
 export function derivePaymentPresentation(input: {

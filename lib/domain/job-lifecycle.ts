@@ -257,7 +257,7 @@ export async function cancelJob(
 
     if (lockedJob.status === 'QUOTE_ACCEPTED') {
       const paymentCommitment = await tx.jobEscrow.findFirst({
-        where: { jobId: ctx.jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+        where: { jobId: ctx.jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] } },
         select: { id: true },
       })
       if (paymentCommitment) {
@@ -553,7 +553,7 @@ export async function raiseJobDispute(
     }
 
     const escrow = await tx.jobEscrow.findFirst({
-      where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+      where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] } },
     })
     if (!escrow) throw new Error('No payment commitment available for dispute')
 
