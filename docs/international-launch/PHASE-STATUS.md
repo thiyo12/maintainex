@@ -365,4 +365,7 @@ remain **PENDING**.
   path in the supply-chain test after the audit script rename; updated that assertion and its
   security-gate reference, including the separately invoked mobile dependency-review workflow.
   Focused supply-chain/HTTP audit tests pass (9/9), and the workflow-reference test passes (8/8);
-  corrected-head CI is pending.
+  the follow-up was then verified on exact SHA `9c7c1eb607ae04380548700b156d97ce30636762`.
+  Security Exposure Audit, International Fast Gates, and CRM V2 Release Validation all passed;
+  CRM ran the full isolated-PostgreSQL and local-HTTP suite (**4,620 passed, 0 failed, 0 skipped**
+  across 472 files) and passed build, Docker start/health and market-isolation smoke checks.
