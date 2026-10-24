@@ -69,7 +69,7 @@ export default function EscrowConfirmScreen() {
       await v2JobActions.selectQuote(bookingId, quoteId)
       // Canonical confirmation screen presents actual payment methods and fees.
       // Quote acceptance itself never funds an escrow or charges the user.
-      router.replace('/(customer)/jobs/v2/confirm/' + bookingId)
+      router.replace({ pathname: '/(customer)/jobs/v2/confirm/[id]', params: { id: bookingId } })
     } catch (e: any) {
       Alert.alert('Could not accept quote', e?.message || 'Review the current quote and retry.')
     } finally {

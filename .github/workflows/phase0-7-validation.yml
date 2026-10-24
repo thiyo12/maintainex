@@ -47,6 +47,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://maintainex:maintainex_ci@localhost:5432/maintainex_test_phase07_ci
+      TEST_DB_URL: postgresql://maintainex:maintainex_ci@localhost:5432/maintainex_test_phase07_ci
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: phase07-ci-nextauth-secret-0123456789
       MARKETPLACE_JWT_SECRET: phase07-ci-marketplace-jwt-secret-01234567890123456789
@@ -226,6 +227,9 @@ jobs:
           path: /tmp/phase11-coverage-sql-test.txt
           if-no-files-found: ignore
           retention-days: 3
+      - name: Lint
+        run: npm run lint
+
       - name: TypeScript
         run: npx tsc --noEmit 2>&1 | tee /tmp/tsc.txt
 
@@ -424,10 +428,37 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-      - name: Historical full regression baseline (non-blocking)
-        continue-on-error: true
-        run: npx vitest run tests --reporter=verbose 2>&1 | tee /tmp/regression-tests.txt
+      - name: Production build
+        env:
+          NODE_ENV: production
+          ALLOW_TEST_OTP: "false"
+        run: npm run build 2>&1 | tee /tmp/build-output.txt
         if: always()
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: build-diagnostics
+          path: /tmp/build-output.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Full regression suite including local HTTP security (blocking)
+        if: always()
+        run: |
+          set -euo pipefail
+          NODE_ENV=production ALLOW_TEST_OTP=false node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3198 > /tmp/http-test-server.txt 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3198/api/health > /dev/null; then ready=true; break; fi
+            kill -0 "$server_pid" || { cat /tmp/http-test-server.txt; exit 1; }
+            sleep 1
+          done
+          [ "$ready" = true ] || { cat /tmp/http-test-server.txt; exit 1; }
+          PHASE10_TEST_API_BASE=http://127.0.0.1:3198 npx vitest run --no-file-parallelism --reporter=verbose 2>&1 | tee /tmp/regression-tests.txt
 
       - name: Upload regression test diagnostics
         if: always()
@@ -438,11 +469,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-      # Full regression files share an isolated PostgreSQL service and run
-      # concurrently. A mid-suite FK audit can observe another file's fixture
-      # between cleanup statements. Run the exact orphan checks again after
-      # all test-file cleanup has completed; unlike the historical baseline,
-      # this final audit is a blocking launch invariant.
+      # Audit persisted integrity after every fixture teardown. The full suite
+      # is serialized above so database snapshots cannot observe partial cleanup.
       - name: Final PostgreSQL orphan audit after regression cleanup (blocking)
         if: always()
         run: |
@@ -492,22 +520,6 @@ jobs:
           grep -q 'APP_RELEASE_SHA' deploy-rsync.sh
           ! grep -q 'sed -i.*provider' deploy-rsync.sh
           ! grep -q 'docker cp.*CONTAINER:/app' deploy-rsync.sh
-
-      - name: Production build
-        env:
-          NODE_ENV: production
-          ALLOW_TEST_OTP: "false"
-        run: npm run build 2>&1 | tee /tmp/build-output.txt
-        if: always()
-
-      - name: Upload build diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: build-diagnostics
-          path: /tmp/build-output.txt
-          if-no-files-found: ignore
-          retention-days: 3
 
       - name: Docker build
         run: |

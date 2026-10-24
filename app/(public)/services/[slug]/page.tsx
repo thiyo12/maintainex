@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { REGIONS } from '@/lib/regions'
-import { serviceSchema, breadcrumbSchema, faqSchema } from '@/lib/seo'
+import { getRegionFromHost, REGIONS } from '@/lib/regions'
+import { serializeStructuredData, serviceSchema, breadcrumbSchema, faqSchema } from '@/lib/seo'
 import { getServiceFaqs } from '@/lib/faq'
 import { headers } from 'next/headers'
 import type { Metadata } from 'next'
@@ -9,7 +9,7 @@ import ServiceDetailClient from './ServiceDetailClient'
 async function getRegionFromRequest(): Promise<'LK' | 'CA'> {
   const headersList = await headers()
   const host = headersList.get('host') || ''
-  return host.includes('ca.') ? 'CA' : 'LK'
+  return getRegionFromHost(host) === 'CA' ? 'CA' : 'LK'
 }
 
 async function getHostname(): Promise<string> {
@@ -25,14 +25,14 @@ const DEFAULT_HOST = 'maintainex.lk'
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   try {
     const { slug } = await params
-    const regionKey = DEFAULT_REGION
+    const regionKey = await getRegionFromRequest()
     const host = DEFAULT_HOST
     const c = REGIONS[regionKey].countryName
     const isCA = regionKey === 'CA'
     const baseUrl = isCA ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
 
     const service = await prisma.service.findFirst({
-      where: { slug, isActive: true },
+      where: { slug, isActive: true, countryCode: regionKey },
       include: { category: true }
     })
     if (!service) return { title: 'Service Not Found' }
@@ -45,11 +45,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     const catName = service.category?.name?.toLowerCase().replace(/ & /g, ' & ') || 'home'
 
     const title = isCA
-      ? `${service.name} in Toronto & Canada | ${catName} Service | ${priceStr} | Maintainex`
+      ? `${service.name} in Vancouver, Canada | ${catName} Service | ${priceStr} | Maintainex`
       : `${service.name} in Sri Lanka | ${catName} Service | ${priceStr} | Maintainex`
 
     const description = isCA
-      ? `Professional ${service.name.toLowerCase()} in Toronto & across Canada. Trusted ${catName} providers. Free quotes, vetted professionals. ${priceStr}. Book online.`
+      ? `Professional ${service.name.toLowerCase()} in Vancouver, Canada. Trusted ${catName} providers. Free quotes, vetted professionals. ${priceStr}. Book online.`
       : `Book professional ${service.name.toLowerCase()} in Jaffna, Colombo, Kandy & Galle. Trusted ${catName} providers. Free quotes in minutes. ${priceStr}. Book on Maintainex.`
 
     return {
@@ -72,13 +72,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
-async function fetchService(slug: string) {
+async function fetchService(slug: string, countryCode: 'LK' | 'CA') {
   try {
     const service = await prisma.service.findFirst({
-      where: { slug, isActive: true },
+      where: { slug, isActive: true, countryCode },
       include: {
         category: true,
-        reviews: { where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' } },
+        reviews: { where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' },
+          select: { id: true, rating: true, comment: true, customerName: true, createdAt: true } },
       }
     })
     return service
@@ -88,11 +89,12 @@ async function fetchService(slug: string) {
   }
 }
 
-async function fetchRelatedServices(categoryId: string, excludeId: string) {
+async function fetchRelatedServices(categoryId: string, excludeId: string, countryCode: 'LK' | 'CA') {
   try {
     return await prisma.service.findMany({
       where: {
         categoryId,
+        countryCode,
         id: { not: excludeId },
         isActive: true,
       },
@@ -113,7 +115,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
     const host = await getHostname()
     const baseUrl = regionKey === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
 
-    const service = await fetchService(slug)
+    const service = await fetchService(slug, regionKey)
     if (!service) {
       return <ServiceDetailClient service={null} relatedServices={[]} region={regionKey} />
     }
@@ -127,7 +129,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
       })),
     }
 
-    const relatedServices = await fetchRelatedServices(service.categoryId, service.id)
+    const relatedServices = await fetchRelatedServices(service.categoryId, service.id, regionKey)
 
     const avgRating = service.reviews.length > 0
       ? service.reviews.reduce((s, r) => s + r.rating, 0) / service.reviews.length
@@ -157,9 +159,9 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
 
     return (
       <>
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJson) }} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJson) }} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJson) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(serviceJson) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(breadcrumbJson) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(faqJson) }} />
         <ServiceDetailClient service={serialized} relatedServices={relatedServices} region={regionKey} faqs={faqs} />
       </>
     )

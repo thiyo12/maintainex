@@ -162,7 +162,7 @@ export default function V2JobDetailScreen() {
     if (!job) return
     // The canonical payment screen queries server market eligibility, offers
     // available methods, and never confuses selected cash with protected escrow.
-    router.push('/(customer)/jobs/v2/confirm/' + id)
+    router.push({ pathname: '/(customer)/jobs/v2/confirm/[id]', params: { id } })
   }
 
   const handleShareAddress = async () => {

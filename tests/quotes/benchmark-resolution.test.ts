@@ -262,7 +262,9 @@ describe('Phase 10.3 — Benchmark Resolution', () => {
       const low = await resolveBenchmark(makeClientWithSample(3), {
         serviceTemplateId: 'st-1', countryCode: 'LK', currency: 'LKR', pricingMode: 'SMART_QUOTE',
       })
-      expect(low?.confidence).toBe('LOW')
+      // Three samples fall below the publication threshold; do not present
+      // inadequate evidence as even a low-confidence market benchmark.
+      expect(low).toBeNull()
 
       const medium = await resolveBenchmark(makeClientWithSample(15), {
         serviceTemplateId: 'st-1', countryCode: 'LK', currency: 'LKR', pricingMode: 'SMART_QUOTE',

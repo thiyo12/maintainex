@@ -1,12 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: __dirname,
   poweredByHeader: false,
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
+      ...['res.cloudinary.com', 'images.unsplash.com', 'placehold.co', 'i.pravatar.cc'].map(hostname => ({
+        protocol: 'https',
+        hostname,
+        port: '',
+      })),
     ],
   },
   async redirects() {

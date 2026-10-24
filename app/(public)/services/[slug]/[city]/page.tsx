@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { REGIONS } from '@/lib/regions'
-import { serviceSchema, breadcrumbSchema, localBusinessSchema, faqSchema } from '@/lib/seo'
+import { getRegionFromHost, REGIONS } from '@/lib/regions'
+import { serializeStructuredData, serviceSchema, breadcrumbSchema, localBusinessSchema, faqSchema } from '@/lib/seo'
 import { getServiceFaqs } from '@/lib/faq'
 import { getCityBySlug, slugifyCity } from '@/lib/cities'
 import { headers } from 'next/headers'
@@ -11,7 +11,7 @@ import ServiceDetailClient from '../ServiceDetailClient'
 async function getRegionFromRequest(): Promise<'LK' | 'CA'> {
   const headersList = await headers()
   const host = headersList.get('host') || ''
-  return host.includes('ca.') ? 'CA' : 'LK'
+  return getRegionFromHost(host) === 'CA' ? 'CA' : 'LK'
 }
 
 async function getHostname(): Promise<string> {
@@ -26,7 +26,7 @@ const DEFAULT_REGION: 'LK' | 'CA' = 'LK'
 export async function generateMetadata({ params }: { params: Promise<{ slug: string; city: string }> }): Promise<Metadata> {
   try {
     const { slug, city } = await params
-    const regionKey = DEFAULT_REGION
+    const regionKey = await getRegionFromRequest()
     const c = REGIONS[regionKey].countryName
     const isCA = regionKey === 'CA'
     const baseUrl = isCA ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     if (!cityName) return { title: 'City Not Found' }
 
     const service = await prisma.service.findFirst({
-      where: { slug, isActive: true },
+      where: { slug, isActive: true, countryCode: regionKey },
       include: { category: true }
     })
     if (!service) return { title: 'Service Not Found' }
@@ -64,13 +64,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
-async function fetchService(slug: string) {
+async function fetchService(slug: string, countryCode: 'LK' | 'CA') {
   try {
     return await prisma.service.findFirst({
-      where: { slug, isActive: true },
+      where: { slug, isActive: true, countryCode },
       include: {
         category: true,
-        reviews: { where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' } },
+        reviews: { where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' },
+          select: { id: true, rating: true, comment: true, customerName: true, createdAt: true } },
       }
     })
   } catch (error) {
@@ -79,11 +80,12 @@ async function fetchService(slug: string) {
   }
 }
 
-async function fetchRelatedServices(categoryId: string, excludeId: string) {
+async function fetchRelatedServices(categoryId: string, excludeId: string, countryCode: 'LK' | 'CA') {
   try {
     return await prisma.service.findMany({
       where: {
         categoryId,
+        countryCode,
         id: { not: excludeId },
         isActive: true,
       },
@@ -106,7 +108,7 @@ export default async function CityServicePage({ params }: { params: Promise<{ sl
     const cityName = getCityBySlug(city, regionKey)
     if (!cityName) notFound()
 
-    const service = await fetchService(slug)
+    const service = await fetchService(slug, regionKey)
     if (!service) {
       return <ServiceDetailClient service={null} relatedServices={[]} region={regionKey} />
     }
@@ -120,7 +122,7 @@ export default async function CityServicePage({ params }: { params: Promise<{ sl
       })),
     }
 
-    const relatedServices = await fetchRelatedServices(service.categoryId, service.id)
+    const relatedServices = await fetchRelatedServices(service.categoryId, service.id, regionKey)
 
     const avgRating = service.reviews.length > 0
       ? service.reviews.reduce((s, r) => s + r.rating, 0) / service.reviews.length
@@ -152,10 +154,10 @@ export default async function CityServicePage({ params }: { params: Promise<{ sl
 
     return (
       <>
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJson) }} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJson) }} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJson) }} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJson) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(serviceJson) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(breadcrumbJson) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(localBusinessJson) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeStructuredData(faqJson) }} />
         <ServiceDetailClient service={serialized} relatedServices={relatedServices} region={regionKey} city={cityName} citySlug={city} faqs={faqs} />
       </>
     )

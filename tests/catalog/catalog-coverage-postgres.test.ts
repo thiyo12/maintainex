@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { randomUUID } from 'node:crypto'
 
 import {
   parseCountryList,
@@ -12,15 +13,37 @@ const DATABASE_URL = process.env.DATABASE_URL || ''
 const isPostgres = DATABASE_URL.includes('postgresql')
 
 let prisma: any
+const fixtureCategoryIds: string[] = []
 
 beforeAll(async () => {
   if (!isPostgres) return
   const { PrismaClient } = require('@prisma/client')
   prisma = new PrismaClient({ datasources: { db: { url: DATABASE_URL } } })
+  // A fresh isolated schema has no catalogue. Supply explicit local fixtures;
+  // never invoke historical seeders that publish real or cross-market entries.
+  for (const [market, currency] of [['LK', 'LKR'], ['CA', 'CAD']]) {
+    const id = `coverage-${randomUUID()}`
+    await prisma.jobCategory.create({ data: {
+      id, name: id, slug: id, iconName: 'wrench', colorHex: '#123456',
+      countries: JSON.stringify([market]), isActive: true,
+    } })
+    fixtureCategoryIds.push(id)
+    await prisma.templateJob.create({ data: {
+      id: `${id}-job`, categoryId: id, name: `${id} service`,
+      description: 'Isolated database integrity fixture', whatIsIncluded: '["Inspection"]',
+      typicalDurationMinutes: 60, priceMin: 0, priceMax: 0, currency,
+      countries: JSON.stringify([market]), isActive: true,
+    } })
+  }
 })
 
 afterAll(async () => {
-  if (prisma) await prisma.$disconnect()
+  if (prisma) {
+    try {
+      await prisma.templateJob.deleteMany({ where: { categoryId: { in: fixtureCategoryIds } } })
+      await prisma.jobCategory.deleteMany({ where: { id: { in: fixtureCategoryIds } } })
+    } finally { await prisma.$disconnect() }
+  }
 })
 
 describe.skipIf(!isPostgres)('service catalogue integrity (database-backed)', () => {

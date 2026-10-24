@@ -18,7 +18,7 @@ describe('Phase 06/10 — acceptance must not invent fees or initiate payment', 
   })
   it('leaves payment options to the canonical screen after acceptance', () => {
     const accept = review.indexOf('await v2JobActions.selectQuote(bookingId, quoteId)')
-    const next = review.indexOf("router.replace('/(customer)/jobs/v2/confirm/' + bookingId)")
+    const next = review.indexOf("router.replace({ pathname: '/(customer)/jobs/v2/confirm/[id]', params: { id: bookingId } })")
     expect(accept).toBeGreaterThan(0)
     expect(next).toBeGreaterThan(accept)
     expect(review).not.toContain('v2JobActions.depositEscrow(')

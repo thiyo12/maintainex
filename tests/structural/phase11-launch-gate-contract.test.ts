@@ -11,12 +11,14 @@ const target = workflow.split('      - name: International launch Phases 04-11 b
   ?.split('      - name: Upload international launch acceptance diagnostics')[0] || ''
 
 describe('Phase 11 — international release gates are blocking and observable', () => {
-  it('has a dedicated launch acceptance stage, separate from the historic nonblocking baseline', () => {
+  it('blocks release on both dedicated launch gates and the full HTTP/database regression suite', () => {
     expect(target).toContain('set -euo pipefail')
     expect(target).toContain('npx vitest run')
     expect(target).toContain('--reporter=verbose')
     expect(target).not.toContain('continue-on-error: true')
-    expect(workflow).toContain('name: Historical full regression baseline (non-blocking)')
+    expect(workflow).toContain('name: Full regression suite including local HTTP security (blocking)')
+    expect(workflow).not.toContain('continue-on-error: true')
+    expect(workflow).toContain('PHASE10_TEST_API_BASE=http://127.0.0.1:3198 npx vitest run --no-file-parallelism')
   })
 
   it('checks independent LK and CA pricing plus revision integrity', () => {

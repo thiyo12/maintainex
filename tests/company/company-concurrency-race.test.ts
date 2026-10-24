@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 
 const TEST_DB_URL = process.env.TEST_DB_URL
@@ -20,6 +20,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   afterAll(async () => {
     for (const jid of jobIds) {
       await prisma.commissionSettlement.deleteMany({ where: { jobId: jid } })
+      await prisma.companyJobAssignment.deleteMany({ where: { jobId: jid } })
       await prisma.financialLedger.deleteMany({ where: { referenceId: jid } })
       await prisma.jobEscrow.deleteMany({ where: { jobId: jid } })
       await prisma.jobVerificationPin.deleteMany({ where: { jobId: jid } })
@@ -38,12 +39,21 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
     await prisma.$disconnect()
   })
 
+  afterEach(async () => {
+    // Each race/authorization case owns its synthetic active-work fixture.
+    // Release that fixture's worker capacity before the next independent case.
+    await prisma.companyJobAssignment.updateMany({
+      where: { jobId: { in: jobIds }, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
+      data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: 'Isolated test teardown' },
+    })
+  })
+
   beforeAll(async () => {
     await prisma.jobCategory.create({
-      data: { id: categoryId, name: `${prefix} Services`, slug: prefix, iconName: 'wrench', colorHex: '#FF0000', countries: 'LK', isActive: true },
+      data: { id: categoryId, name: `${prefix} Services`, slug: prefix, iconName: 'wrench', colorHex: '#FF0000', countries: '["LK"]', isActive: true },
     })
     await prisma.templateJob.create({
-      data: { id: templateJobId, name: 'Race Test Service', description: 'Concurrency test', categoryId, priceMin: 1000, priceMax: 5000, whatIsIncluded: 'Everything', typicalDurationMinutes: 60, countries: 'LK' },
+      data: { id: templateJobId, name: 'Race Test Service', description: 'Concurrency test', categoryId, priceMin: 1000, priceMax: 5000, whatIsIncluded: 'Everything', typicalDurationMinutes: 60, countries: '["LK"]' },
     })
 
     await prisma.user.createMany({
@@ -90,7 +100,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES ($1, $1, 'CUSTOMER', 100000000, 100000000, 0, 1, NOW(), NOW())
-       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = 100000000, "availableBalance" = 100000000`,
+       ON CONFLICT ("walletType", "walletId", "currency") DO UPDATE SET "balance" = 100000000, "availableBalance" = 100000000`,
       custWallet.id
     )
 
@@ -108,24 +118,38 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
 
   async function createReadyJob(label: string, providerId: string, providerType: 'INDIVIDUAL' | 'COMPANY') {
     const { createBookNowJob } = await import('@/lib/domain/book-now')
-    const { acceptJobQuote, transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+    const { acceptJobQuote } = await import('@/lib/domain/job-lifecycle')
     const { fundEscrow } = await import('@/lib/finance/escrow/escrow-service')
     const bookResult = await createBookNowJob({
       customerId: customerUserId,
       templateJobId,
       providerId,
       providerType,
-      scheduledDate: new Date(),
+      scheduledDate: new Date(Date.now() + (jobIds.length + 1) * 86400000),
       timeSlot: `${prefix}-${label}`,
       address: `${label} St`,
       district: 'Colombo',
+      countryCode: 'LK',
     })
     jobIds.push(bookResult.job.id)
 
     const quote = await prisma.jobQuote.findFirst({ where: { jobId: bookResult.job.id } })
     await acceptJobQuote({ jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' }, quote!.id)
     await fundEscrow({ jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' }, bookResult.job.id)
-    await transitionJobWorkspace({ jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' }, 'IN_PROGRESS')
+    let worker = providerId
+    if (providerType === 'COMPANY') {
+      const { createAssignment, workerAcceptAssignment } = await import('@/lib/domain/company-job-assignment')
+      const assigned = await createAssignment({ companyId: providerId, jobId: bookResult.job.id,
+        workerUserId: companyWorkerId, assignedByUserId: companyOwnerId, actorRole: 'COMPANY_OWNER' })
+      expect(assigned.success, JSON.stringify(assigned)).toBe(true)
+      expect((await workerAcceptAssignment(assigned.assignmentId!, companyWorkerId)).success).toBe(true)
+      worker = companyWorkerId
+    }
+    const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
+    const arrival = await generateJobPin(bookResult.job.id, customerUserId)
+    expect((await verifyJobPin(bookResult.job.id, worker, arrival.pin, 'ARRIVAL')).valid).toBe(true)
+    const start = await generateJobPin(bookResult.job.id, customerUserId)
+    expect((await verifyJobPin(bookResult.job.id, worker, start.pin, 'WORK_START')).valid).toBe(true)
 
     return { jobId: bookResult.job.id, quoteId: quote!.id }
   }
@@ -217,7 +241,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES ($1, $2, 'CUSTOMER', $3, $3, 0, 1, now(), now())
-       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = $3, "availableBalance" = $3, "version" = 1`,
+       ON CONFLICT ("walletType", "walletId", "currency") DO UPDATE SET "balance" = $3, "availableBalance" = $3, "version" = 1`,
       walletId, walletId, initialBalance
     )
 
@@ -259,7 +283,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES ($1, $2, 'CUSTOMER', $3, $3, 0, 1, now(), now())
-       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = $3, "availableBalance" = $3, "version" = 1`,
+       ON CONFLICT ("walletType", "walletId", "currency") DO UPDATE SET "balance" = $3, "availableBalance" = $3, "version" = 1`,
       walletId, walletId, initialBalance
     )
 
@@ -403,7 +427,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
 
     await expect(
       transitionJobWorkspace({ jobId, actorId: providerUserId, actorType: 'COMPANY' }, 'COMPLETION_REQUESTED')
-    ).rejects.toThrow('does not match provider identity')
+    ).rejects.toThrow('Unauthorized: not the accepted provider for this job')
   })
 
   it('multi-quote job: only ACCEPTED quote controls authorization', async () => {

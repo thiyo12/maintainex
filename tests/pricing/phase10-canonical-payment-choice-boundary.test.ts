@@ -11,7 +11,7 @@ describe('Phase 10 — only canonical payment chooser can initiate funding from 
   it('does not directly initiate escrow or cash on the booking detail screen', () => {
     expect(screen).not.toContain('v2JobActions.depositEscrow(')
     expect(screen).not.toContain('v2JobActions.confirmCashPayment(')
-    expect(screen).toContain("router.push('/(customer)/jobs/v2/confirm/' + id)")
+    expect(screen).toContain("router.push({ pathname: '/(customer)/jobs/v2/confirm/[id]', params: { id } })")
     expect(screen).toContain('Review Payment Options')
   })
 

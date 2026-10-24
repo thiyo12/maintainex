@@ -103,7 +103,7 @@ describe('cash payment lifecycle contract', () => {
     // cash selection, requires server-approved market/method availability,
     // and never silently treats cash as funded escrow.
     expect(customer).toContain('handleReviewPayment')
-    expect(customer).toContain("router.push('/(customer)/jobs/v2/confirm/' + id)")
+    expect(customer).toContain("router.push({ pathname: '/(customer)/jobs/v2/confirm/[id]', params: { id } })")
     expect(customerPayment).toContain('handleCash')
     expect(customerPayment).toContain("canSubmitPayment(paymentPresentation, 'cash')")
     expect(customerPayment).toContain('v2JobActions.confirmCashPayment(id)')
