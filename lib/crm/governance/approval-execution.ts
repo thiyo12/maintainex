@@ -317,28 +317,12 @@ export async function executeApprovedCrmRequest(
       ) {
         throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
       }
-      const result = await postApprovedCommissionBankReconciliation({
+      await postApprovedCommissionBankReconciliation({
         bankTransactionId: request.targetId,
         actorAdminId: actor.adminId,
         approvalRequestId: request.id,
       })
       executionRef = `CommissionBankTransaction:${request.targetId}:POSTED`
-      await createAuditLog({
-        action: 'UPDATE',
-        category: 'FINANCE',
-        userId: actor.adminId,
-        userEmail: actor.email,
-        userRole: actor.role,
-        entityType: 'CommissionBankTransaction',
-        entityId: request.targetId,
-        entityName: request.targetId,
-        description: 'Approved independently verified commission bank credit and posted ledger recovery',
-        oldValue: { status: 'MATCHED', approvalRequestId: request.id },
-        newValue: { status: 'RECONCILED', approvalRequestId: request.id, replayed: result.replayed },
-        ipAddress: actor.ipAddress,
-        userAgent: actor.userAgent || undefined,
-        riskLevel: 'CRITICAL',
-      })
     } else if (request.actionId === 'jobs.cancel') {
       const source =
         request.targetType === 'MarketplaceJob'
