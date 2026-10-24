@@ -12,10 +12,12 @@ Starting head: `956fd471fdcbafdf3d2c4494005598d73b48d3a7`
 - Removed the unsafe `SKIP_BASELINE_SQL` bypass and avoided modifying the developer's Prisma schema during bootstrap.
 - Moved the CI baseline setup to the same checked-in bootstrap procedure and recorded the migration compatibility policy in `docs/architecture/database-migrations.md`.
 - Added structural regression checks for the empty-database guard, invariant ordering, error propagation, and CI reuse.
+- Cash collection contests now create or link the canonical `MarketplaceDispute` for the job and route the Support alert to that case. No commission is posted on contest; the immutable lifecycle event remains the dispute evidence.
 
 ## Test evidence
 
 - Focused bootstrap and raw-invariant regression tests: 9 passed.
+- Cash collection and lifecycle regression tests after case linking: 12 passed.
 - `npx prisma validate`: passed.
 - Prisma baseline SQL generation: passed (5,329 lines generated from the current schema).
 - Root TypeScript check: passed.

@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => {
       findFirst: vi.fn(),
       findMany: vi.fn(),
     },
+    marketplaceDispute: {
+      upsert: vi.fn(async () => ({ id: 'marketplace-dispute-1' })),
+    },
     adminAlert: { findFirst: vi.fn(), create: vi.fn() },
   }
   return {
@@ -115,8 +118,20 @@ describe('post-completion cash collection', () => {
     const response = await POST(request('CONTEST'), { params: Promise.resolve({ id: 'job-1' }) })
     expect(response.status).toBe(200)
     expect(mocks.receivable).not.toHaveBeenCalled()
+    expect(mocks.tx.marketplaceDispute.upsert).toHaveBeenCalledWith({
+      where: { jobId: 'job-1' },
+      create: expect.objectContaining({
+        escrowId: 'escrow-1',
+        raisedById: 'customer-1',
+        reason: 'CASH_COLLECTION_CONTESTED',
+        status: 'OPEN',
+        countryCode: 'LK',
+      }),
+      update: {},
+      select: { id: true },
+    })
     expect(mocks.tx.adminAlert.create).toHaveBeenCalledWith({ data: expect.objectContaining({
-      assignedRole: 'SUPPORT', targetTable: 'JobEscrow', targetId: 'escrow-1',
+      assignedRole: 'SUPPORT', targetTable: 'MarketplaceDispute', targetId: 'marketplace-dispute-1',
     }) })
   })
 

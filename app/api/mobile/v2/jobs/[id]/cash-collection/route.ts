@@ -211,8 +211,26 @@ export async function POST(
           },
         })
         if (action === 'CONTEST') {
+          const financialCase = await tx.marketplaceDispute.upsert({
+            where: { jobId },
+            create: {
+              jobId,
+              escrowId: escrow.id,
+              raisedById: actor.id,
+              actorType: 'CUSTOMER',
+              reason: 'CASH_COLLECTION_CONTESTED',
+              description: 'Customer contested the provider-reported cash collection. Review both parties evidence and preserve the cash ledger history.',
+              status: 'OPEN',
+              countryCode: market.countryCode,
+            },
+            // A job has one canonical marketplace dispute. Preserve an
+            // existing case and its resolution; the new lifecycle event below
+            // remains the append-only evidence for this contest.
+            update: {},
+            select: { id: true },
+          })
           const openCase = await tx.adminAlert.findFirst({
-            where: { targetTable: 'JobEscrow', targetId: escrow.id, status: { in: ['open', 'in_progress'] } },
+            where: { targetTable: 'MarketplaceDispute', targetId: financialCase.id, status: { in: ['open', 'in_progress'] } },
             select: { id: true },
           })
           if (!openCase) {
@@ -221,7 +239,7 @@ export async function POST(
                 type: 'dispute', severity: 'high', priority: 'high',
                 title: 'Cash collection amount contested',
                 description: `Customer contested the reported cash collection for job ${jobId}. Verify both parties’ evidence; no MaintainEX funds are implied.`,
-                targetTable: 'JobEscrow', targetId: escrow.id,
+                targetTable: 'MarketplaceDispute', targetId: financialCase.id,
                 assignedRole: 'SUPPORT', status: 'open', slaMinutes: 2880,
               },
             })
