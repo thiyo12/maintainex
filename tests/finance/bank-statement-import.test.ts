@@ -39,7 +39,7 @@ describe('commission bank statement import normalization', () => {
 
   it('authenticates provider-neutral source callbacks with constant-time HMAC verification', () => {
     const rawBody = '{"sourceSystem":"synthetic-bank","statementId":"SYN-1"}'
-    const secret = 'synthetic-bank-evidence-secret-32-bytes'
+    const secret = Buffer.alloc(32, 'x').toString('hex')
     const signature = createHmac('sha256', secret).update(rawBody).digest('hex')
     expect(verifyBankEvidenceSignature({ rawBody, signature: `sha256=${signature}`, secret })).toBe(true)
     expect(verifyBankEvidenceSignature({ rawBody: `${rawBody} `, signature: `sha256=${signature}`, secret })).toBe(false)

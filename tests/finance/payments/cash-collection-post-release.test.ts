@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
   }
   const job = { id: 'job-1', customerId: 'customer-1', status: 'COMPLETED', countryCode: 'LK' }
   const quote = { id: 'quote-1', providerId: 'provider-1', providerType: 'INDIVIDUAL', status: 'ACCEPTED' }
+  const dispute = { id: 'marketplace-dispute-1', status: 'OPEN', resolution: null, resolutionAction: null, resolvedAt: null }
   const tx = {
     jobEscrow: {
       findUnique: vi.fn(async () => escrow),
@@ -21,12 +22,17 @@ const mocks = vi.hoisted(() => {
       findMany: vi.fn(),
     },
     marketplaceDispute: {
-      upsert: vi.fn(async () => ({ id: 'marketplace-dispute-1' })),
+      upsert: vi.fn(async () => ({ ...dispute })),
+      updateMany: vi.fn(async ({ where, data }: any) => {
+        if (dispute.id !== where.id || dispute.status !== where.status) return { count: 0 }
+        Object.assign(dispute, data)
+        return { count: 1 }
+      }),
     },
     adminAlert: { findFirst: vi.fn(), create: vi.fn() },
   }
   return {
-    escrow, job, quote, tx,
+    escrow, job, quote, dispute, tx,
     prisma: {
       marketplaceJob: { findUnique: vi.fn(async () => job) },
       jobEscrow: { findFirst: vi.fn(async () => escrow) },
@@ -71,6 +77,7 @@ describe('post-completion cash collection', () => {
       status: 'RELEASED', cashCollectionStatus: 'CUSTOMER_CONFIRMED', cashCollectedMinor: 4000n,
       cashReportedBy: 'provider-1',
     })
+    Object.assign(mocks.dispute, { status: 'OPEN', resolution: null, resolutionAction: null, resolvedAt: null })
     mocks.actor.mockResolvedValue({ id: 'provider-1' })
     mocks.tx.jobEscrow.updateMany.mockImplementation(async ({ data }: any) => {
       Object.assign(mocks.escrow, data)
@@ -128,10 +135,38 @@ describe('post-completion cash collection', () => {
         countryCode: 'LK',
       }),
       update: {},
-      select: { id: true },
+      select: { id: true, status: true, resolution: true, resolutionAction: true, resolvedAt: true },
     })
     expect(mocks.tx.adminAlert.create).toHaveBeenCalledWith({ data: expect.objectContaining({
       assignedRole: 'SUPPORT', targetTable: 'MarketplaceDispute', targetId: 'marketplace-dispute-1',
+    }) })
+  })
+
+  it('explicitly reopens a resolved financial case for a new cash contest and preserves the prior resolution in history', async () => {
+    mocks.actor.mockResolvedValue({ id: 'customer-1' })
+    Object.assign(mocks.escrow, { cashCollectionStatus: 'PROVIDER_REPORTED', cashCollectedMinor: 7000n })
+    Object.assign(mocks.dispute, {
+      status: 'RESOLVED', resolution: 'Earlier evidence reviewed', resolutionAction: 'RELEASE_PROVIDER',
+      resolvedAt: new Date('2026-10-20T00:00:00.000Z'),
+    })
+    mocks.tx.adminAlert.findFirst.mockResolvedValue(null)
+
+    const response = await POST(request('CONTEST'), { params: Promise.resolve({ id: 'job-1' }) })
+
+    expect(response.status).toBe(200)
+    expect(mocks.tx.marketplaceDispute.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'marketplace-dispute-1', status: 'RESOLVED' },
+      data: expect.objectContaining({ status: 'OPEN', resolution: null, resolvedAt: null }),
+    }))
+    expect(mocks.lifecycleEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: 'FINANCIAL_DISPUTE_REOPENED', fromState: 'RESOLVED', toState: 'OPEN',
+      metadata: expect.objectContaining({
+        disputeId: 'marketplace-dispute-1', previousResolution: 'Earlier evidence reviewed',
+        previousResolutionAction: 'RELEASE_PROVIDER',
+      }),
+    }))
+    expect(mocks.tx.adminAlert.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      title: 'Cash collection dispute reopened', targetId: 'marketplace-dispute-1',
     }) })
   })
 

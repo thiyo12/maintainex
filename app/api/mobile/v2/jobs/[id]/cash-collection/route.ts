@@ -227,8 +227,41 @@ export async function POST(
             // existing case and its resolution; the new lifecycle event below
             // remains the append-only evidence for this contest.
             update: {},
-            select: { id: true },
+            select: { id: true, status: true, resolution: true, resolutionAction: true, resolvedAt: true },
           })
+          let reopened = false
+          if (financialCase.status === 'RESOLVED' || financialCase.status === 'DISMISSED') {
+            const changed = await tx.marketplaceDispute.updateMany({
+              where: { id: financialCase.id, status: financialCase.status },
+              data: {
+                status: 'OPEN',
+                reason: 'CASH_COLLECTION_CONTESTED',
+                description: 'A new cash collection contest was submitted after the earlier case closed. Review this new evidence as an explicit case reopening.',
+                resolution: null,
+                resolutionAction: null,
+                resolvedBy: null,
+                resolvedAt: null,
+              },
+            })
+            reopened = changed.count === 1
+            if (reopened) {
+              await recordJobLifecycleEvent(tx, {
+                jobId,
+                actorId: actor.id,
+                actorType: 'CUSTOMER',
+                action: 'FINANCIAL_DISPUTE_REOPENED',
+                fromState: financialCase.status,
+                toState: 'OPEN',
+                metadata: {
+                  disputeId: financialCase.id,
+                  previousResolution: financialCase.resolution,
+                  previousResolutionAction: financialCase.resolutionAction,
+                  previousResolvedAt: financialCase.resolvedAt?.toISOString() || null,
+                  reason: 'NEW_CASH_COLLECTION_CONTEST',
+                },
+              })
+            }
+          }
           const openCase = await tx.adminAlert.findFirst({
             where: { targetTable: 'MarketplaceDispute', targetId: financialCase.id, status: { in: ['open', 'in_progress'] } },
             select: { id: true },
@@ -237,7 +270,7 @@ export async function POST(
             await tx.adminAlert.create({
               data: {
                 type: 'dispute', severity: 'high', priority: 'high',
-                title: 'Cash collection amount contested',
+                title: reopened ? 'Cash collection dispute reopened' : 'Cash collection amount contested',
                 description: `Customer contested the reported cash collection for job ${jobId}. Verify both parties’ evidence; no MaintainEX funds are implied.`,
                 targetTable: 'MarketplaceDispute', targetId: financialCase.id,
                 assignedRole: 'SUPPORT', status: 'open', slaMinutes: 2880,
