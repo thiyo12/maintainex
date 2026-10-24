@@ -92,7 +92,7 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Audit mobile dependency graph
-        run: node scripts/mobile-production-audit.mjs
+        run: node scripts/mobile-dependency-audit.mjs
 
       - name: Generate Prisma client
         run: npx prisma generate

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-describe('Phase04 blocking release CI: production HTTP redirects dependency advisory',()=>{
-  it('pins an integrity-verified patched follow-redirects version without disabling npm audit',()=>{
+describe('Phase04 blocking release CI: HTTP redirects dependency advisory',()=>{
+  it('pins an integrity-verified patched follow-redirects version and audits full dependency graphs',()=>{
     const read=(p:string)=>JSON.parse(readFileSync(resolve(process.cwd(),p),'utf8'))
     const manifest=read('package.json')
     const lock=read('package-lock.json')
@@ -20,7 +20,12 @@ describe('Phase04 blocking release CI: production HTTP redirects dependency advi
       .toEqual(['node_modules/follow-redirects'])
     const workflow=readFileSync(resolve(process.cwd(),
       '.github/workflows/phase0-7-validation.yml'),'utf8')
-    expect(workflow).toContain('npm audit --omit=dev --audit-level=high')
+    expect(workflow).toContain('npm audit --audit-level=high')
+    expect(workflow).toContain('Audit mobile dependency graph')
+    const mobileAudit=readFileSync(resolve(process.cwd(),
+      'scripts/mobile-dependency-audit.mjs'),'utf8')
+    expect(mobileAudit).toContain("['audit', '--audit-level=high', '--json']")
+    expect(mobileAudit).not.toContain('--omit=dev')
     expect(workflow).not.toContain('audit-level=none')
   })
 })

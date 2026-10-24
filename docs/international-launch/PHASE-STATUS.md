@@ -358,5 +358,7 @@ remain **PENDING**.
   geocoder configuration, PSP sandbox, human approval, devices, crew/physical testing and signed
   market decisions remain pending. Do not start payment-plan architecture review until these
   software requirements are verified complete.
-- The dependency/workflow changes in this follow-up have not yet received exact-head GitHub CI;
-  rerun and record CI against their pushed SHA before treating them as verified.
+- The first follow-up Fast Gates run exposed one stale test assertion that required the former
+  production-only audit command. Updated that regression to require full-graph high-severity audit
+  commands; the targeted assertion and signature-hardening tests pass. Security Exposure Audit and
+  mobile typecheck passed on the first follow-up SHA; CI for the corrected head is pending.
