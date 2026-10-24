@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createHmac } from 'node:crypto'
-import { hashBankStatement, normalizeBankStatementEntries, verifyBankEvidenceSignature } from '@/lib/finance/commissions/bank-statement-import'
+import { commissionPaymentRemainingMinor, hashBankStatement, isCommissionPaymentFullyReconciled, normalizeBankStatementEntries, verifyBankEvidenceSignature } from '@/lib/finance/commissions/bank-statement-import'
 
 const rows = [
   {
@@ -44,5 +44,13 @@ describe('commission bank statement import normalization', () => {
     expect(verifyBankEvidenceSignature({ rawBody, signature: `sha256=${signature}`, secret })).toBe(true)
     expect(verifyBankEvidenceSignature({ rawBody: `${rawBody} `, signature: `sha256=${signature}`, secret })).toBe(false)
     expect(verifyBankEvidenceSignature({ rawBody, signature, secret: 'too-short' })).toBe(false)
+  })
+
+  it('keeps partial commission receipts pending and closes only when cumulative bank credits cover the due', () => {
+    expect(isCommissionPaymentFullyReconciled({ amountDueMajor: 250, previouslyPostedMinor: 10000n, currentCreditMinor: 14999n })).toBe(false)
+    expect(isCommissionPaymentFullyReconciled({ amountDueMajor: 250, previouslyPostedMinor: 10000n, currentCreditMinor: 15000n })).toBe(true)
+    expect(isCommissionPaymentFullyReconciled({ amountDueMajor: Number.NaN, previouslyPostedMinor: 0n, currentCreditMinor: 25000n })).toBe(false)
+    expect(commissionPaymentRemainingMinor(250, 10000n)).toBe(15000n)
+    expect(commissionPaymentRemainingMinor(250, 25000n)).toBe(0n)
   })
 })

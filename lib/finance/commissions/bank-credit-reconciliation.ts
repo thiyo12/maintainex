@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { ensureProviderIdentity, settleProviderReceivablesFromBankCredit } from './provider-balance-service'
+import { commissionPaymentRemainingMinor, isCommissionPaymentFullyReconciled } from './bank-statement-import'
 
 async function withSerializableRetry<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -62,11 +63,19 @@ export async function prepareCommissionBankReconciliation(input: {
     if (!account || account.commissionDue <= 0n || row.amountMinor > account.commissionDue) {
       throw new Error('BANK_COMMISSION_AMOUNT_MISMATCH')
     }
+    const postedForReference = await tx.commissionBankReconciliation.aggregate({
+      where: { commissionPaymentId: payment.id, status: 'POSTED' },
+      _sum: { totalAmountMinor: true },
+    })
+    if (row.amountMinor > commissionPaymentRemainingMinor(payment.amountDue, postedForReference._sum?.totalAmountMinor || 0n)) {
+      throw new Error('BANK_COMMISSION_AMOUNT_MISMATCH')
+    }
 
     const reconciliation = await tx.commissionBankReconciliation.create({
       data: {
         bankTransactionId: row.id,
         providerIdentityId: identity.id,
+        commissionPaymentId: payment.id,
         initiatedByAdminId: input.actorAdminId,
         status: 'PENDING_REVIEW',
         totalAmountMinor: row.amountMinor,
@@ -118,6 +127,14 @@ export async function postApprovedCommissionBankReconciliation(input: {
         reconciliation.bankTransaction.bankAccountRef !== reconciliation.bankTransaction.statementImport.accountRef) {
       throw new Error('BANK_REFERENCE_NOT_AN_OPEN_COMMISSION')
     }
+    if (reconciliation.commissionPaymentId !== payment.id) throw new Error('BANK_COMMISSION_REFERENCE_CHANGED')
+    const previousPosted = await tx.commissionBankReconciliation.aggregate({
+      where: { commissionPaymentId: payment.id, status: 'POSTED', id: { not: reconciliation.id } },
+      _sum: { totalAmountMinor: true },
+    })
+    if (reconciliation.totalAmountMinor > commissionPaymentRemainingMinor(payment.amountDue, previousPosted._sum?.totalAmountMinor || 0n)) {
+      throw new Error('BANK_COMMISSION_AMOUNT_MISMATCH')
+    }
     if (payment.providerId !== payment.weeklySettlement.providerId) throw new Error('BANK_COMMISSION_DEBTOR_MISMATCH')
     const settlement = payment.weeklySettlement
     const providerType = settlement.providerType === 'COMPANY' ? 'COMPANY' : settlement.providerType === 'TASKER' ? 'INDIVIDUAL' : null
@@ -134,6 +151,7 @@ export async function postApprovedCommissionBankReconciliation(input: {
       bankTransactionId: reconciliation.bankTransactionId,
       reconciliationId: reconciliation.id,
       providerIdentityId: reconciliation.providerIdentityId,
+      weeklySettlementId: payment.weeklySettlementId,
       amountMinor: reconciliation.totalAmountMinor,
       currency: reconciliation.currency,
       createdBy: input.actorAdminId,
@@ -147,6 +165,24 @@ export async function postApprovedCommissionBankReconciliation(input: {
           amountMinor: allocation.amountMinor,
         },
       })
+    }
+    const allocationReceivableIds = (result.allocations || []).map((allocation) => allocation.receivableId)
+    const allocatedReceivables = allocationReceivableIds.length
+      ? await tx.providerCommissionReceivable.findMany({
+          where: { id: { in: allocationReceivableIds } },
+          select: { weeklySettlementId: true },
+        })
+      : []
+    for (const weeklySettlementId of [...new Set(allocatedReceivables.map((item) => item.weeklySettlementId).filter((value): value is string => Boolean(value)))]) {
+      const unresolved = await tx.providerCommissionReceivable.count({
+        where: { weeklySettlementId, status: { in: ['OPEN', 'PARTIAL'] }, amountRemaining: { gt: 0 } },
+      })
+      if (unresolved === 0) {
+        await tx.weeklySettlement.updateMany({
+          where: { id: weeklySettlementId, commissionPaid: false },
+          data: { commissionPaid: true, paidAt: new Date(), status: 'PAID', suspendedAt: null, notes: 'Commission receivables reconciled from verified bank credits' },
+        })
+      }
     }
     await tx.commissionBankReconciliation.update({
       where: { id: reconciliation.id },
@@ -164,6 +200,16 @@ export async function postApprovedCommissionBankReconciliation(input: {
         metadata: JSON.stringify({ approvalRequestId: input.approvalRequestId, amountMinor: reconciliation.totalAmountMinor.toString() }),
       },
     })
+    if (isCommissionPaymentFullyReconciled({
+      amountDueMajor: payment.amountDue,
+      previouslyPostedMinor: previousPosted._sum?.totalAmountMinor || 0n,
+      currentCreditMinor: reconciliation.totalAmountMinor,
+    }) && payment.status !== 'CONFIRMED') {
+      await tx.commissionPayment.update({
+        where: { id: payment.id },
+        data: { status: 'CONFIRMED', confirmedAt: new Date(), confirmedById: input.actorAdminId, method: 'BANK' },
+      })
+    }
     return { replayed: false, reconciliationId: reconciliation.id, amountMinor: reconciliation.totalAmountMinor }
   })
 }

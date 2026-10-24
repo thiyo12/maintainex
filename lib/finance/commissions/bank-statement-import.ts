@@ -10,6 +10,25 @@ export interface NormalizedBankStatementEntry {
   reversalOfTransactionId: string | null
 }
 
+export function isCommissionPaymentFullyReconciled(input: {
+  amountDueMajor: number
+  previouslyPostedMinor: bigint
+  currentCreditMinor: bigint
+}): boolean {
+  if (!Number.isFinite(input.amountDueMajor) || input.amountDueMajor <= 0 || input.previouslyPostedMinor < 0n || input.currentCreditMinor <= 0n) {
+    return false
+  }
+  return input.previouslyPostedMinor + input.currentCreditMinor >= BigInt(Math.round(input.amountDueMajor * 100))
+}
+
+export function commissionPaymentRemainingMinor(amountDueMajor: number, previouslyPostedMinor: bigint): bigint {
+  if (!Number.isFinite(amountDueMajor) || amountDueMajor <= 0 || previouslyPostedMinor < 0n) {
+    throw new Error('COMMISSION_PAYMENT_AMOUNT_INVALID')
+  }
+  const dueMinor = BigInt(Math.round(amountDueMajor * 100))
+  return dueMinor > previouslyPostedMinor ? dueMinor - previouslyPostedMinor : 0n
+}
+
 export function normalizeBankStatementEntries(input: unknown): NormalizedBankStatementEntry[] {
   if (!Array.isArray(input) || input.length === 0 || input.length > 10_000) {
     throw new Error('BANK_STATEMENT_ROW_COUNT_INVALID')

@@ -3266,6 +3266,7 @@ model CommissionPayment {
   countryCode        String           @default("LK")
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
+  bankReconciliations CommissionBankReconciliation[]
 
   @@index([providerId])
   @@index([referenceNumber])
@@ -3975,6 +3976,8 @@ model CommissionBankReconciliation {
   bankTransactionId      String   @unique
   bankTransaction        CommissionBankTransaction @relation(fields: [bankTransactionId], references: [id], onDelete: Restrict)
   providerIdentityId     String
+  commissionPaymentId    String?
+  commissionPayment      CommissionPayment? @relation(fields: [commissionPaymentId], references: [id], onDelete: SetNull)
   approvalRequestId      String?  @unique
   initiatedByAdminId     String
   status                 String   @default("PENDING_REVIEW") // PENDING_REVIEW, APPROVED, POSTED, REJECTED, REVERSED
@@ -3987,6 +3990,7 @@ model CommissionBankReconciliation {
   events                 CommissionBankReconciliationEvent[]
 
   @@index([providerIdentityId, status, createdAt])
+  @@index([commissionPaymentId, status, createdAt])
   @@index([countryCode, status, createdAt])
 }
 

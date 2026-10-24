@@ -1258,6 +1258,7 @@ export async function settleProviderReceivablesFromBankCredit(
     bankTransactionId: string
     reconciliationId: string
     providerIdentityId: string
+    weeklySettlementId: string
     amountMinor: bigint
     currency: string
     createdBy: string
@@ -1281,6 +1282,7 @@ export async function settleProviderReceivablesFromBankCredit(
   const receivables = await tx.providerCommissionReceivable.findMany({
     where: {
       providerIdentityId: identity.id,
+      weeklySettlementId: input.weeklySettlementId,
       currency,
       status: { in: ['OPEN', 'PARTIAL'] },
       amountRemaining: { gt: 0 },

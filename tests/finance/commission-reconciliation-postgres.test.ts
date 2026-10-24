@@ -99,6 +99,7 @@ describe.skipIf(!requiresPostgres())('commission remittance PostgreSQL integrati
     const providerId = `${runId}-bank-provider`
     const identityId = `${runId}-bank-identity`
     const accountId = `${runId}-bank-account`
+    const bankSettlementId = `${runId}-bank-week`
     const firstReceivableId = `${runId}-bank-r1`
     const secondReceivableId = `${runId}-bank-r2`
     const firstTxn = `${runId}-bank-txn-1`
@@ -114,42 +115,51 @@ describe.skipIf(!requiresPostgres())('commission remittance PostgreSQL integrati
       await prisma.providerIdentity.create({
         data: { id: identityId, identityType: 'TASKER', subjectId: providerId, currentUserId: providerId, countryCode: 'LK', kycStatus: 'VERIFIED', standingStatus: 'ACTIVE' },
       })
+      await prisma.weeklySettlement.create({
+        data: {
+          id: bankSettlementId, providerId, providerType: 'TASKER', weekStart: new Date('2026-10-19T00:00:00.000Z'),
+          weekEnd: new Date('2026-10-25T23:59:59.999Z'), totalEarnings: 100, commissionRate: 10,
+          commissionOwed: 10, dueAt: new Date('2026-11-01T00:00:00.000Z'), currency, countryCode: 'LK',
+        },
+      })
       await prisma.providerFinancialAccount.create({
         data: { id: accountId, providerIdentityId: identityId, currency, commissionDue: 1000n, adjustmentDue: 0n },
       })
       await prisma.providerCommissionReceivable.createMany({
         data: [
-          { id: firstReceivableId, providerIdentityId: identityId, jobId: `${runId}-bank-job1`, escrowId: `${runId}-bank-escrow1`, currency, amountOriginal: 600n, amountRemaining: 600n, dueAt: new Date('2026-10-20T00:00:00.000Z') },
-          { id: secondReceivableId, providerIdentityId: identityId, jobId: `${runId}-bank-job2`, escrowId: `${runId}-bank-escrow2`, currency, amountOriginal: 400n, amountRemaining: 400n, dueAt: new Date('2026-10-21T00:00:00.000Z') },
+          { id: firstReceivableId, providerIdentityId: identityId, weeklySettlementId: bankSettlementId, jobId: `${runId}-bank-job1`, escrowId: `${runId}-bank-escrow1`, currency, amountOriginal: 600n, amountRemaining: 600n, dueAt: new Date('2026-10-20T00:00:00.000Z') },
+          { id: secondReceivableId, providerIdentityId: identityId, weeklySettlementId: bankSettlementId, jobId: `${runId}-bank-job2`, escrowId: `${runId}-bank-escrow2`, currency, amountOriginal: 400n, amountRemaining: 400n, dueAt: new Date('2026-10-21T00:00:00.000Z') },
         ],
       })
 
       const first = await prisma.$transaction(tx => settleProviderReceivablesFromBankCredit(tx, {
-        bankTransactionId: firstTxn, reconciliationId: firstReconciliationId, providerIdentityId: identityId,
+        bankTransactionId: firstTxn, reconciliationId: firstReconciliationId, providerIdentityId: identityId, weeklySettlementId: bankSettlementId,
         amountMinor: 800n, currency, createdBy: 'test-bank-reconciliation',
       }), { isolationLevel: 'Serializable' })
       const replay = await prisma.$transaction(tx => settleProviderReceivablesFromBankCredit(tx, {
-        bankTransactionId: firstTxn, reconciliationId: firstReconciliationId, providerIdentityId: identityId,
+        bankTransactionId: firstTxn, reconciliationId: firstReconciliationId, providerIdentityId: identityId, weeklySettlementId: bankSettlementId,
         amountMinor: 800n, currency, createdBy: 'test-bank-reconciliation',
       }), { isolationLevel: 'Serializable' })
       const later = await prisma.$transaction(tx => settleProviderReceivablesFromBankCredit(tx, {
-        bankTransactionId: secondTxn, reconciliationId: secondReconciliationId, providerIdentityId: identityId,
+        bankTransactionId: secondTxn, reconciliationId: secondReconciliationId, providerIdentityId: identityId, weeklySettlementId: bankSettlementId,
         amountMinor: 200n, currency, createdBy: 'test-bank-reconciliation',
       }), { isolationLevel: 'Serializable' })
 
       expect(first).toMatchObject({ replayed: false, recoveredMinor: 800n })
       expect(replay).toMatchObject({ replayed: true, recoveredMinor: 800n })
       expect(later).toMatchObject({ replayed: false, recoveredMinor: 200n })
-      const [firstReceivable, secondReceivable, account, recoveries, ledger] = await Promise.all([
+      const [firstReceivable, secondReceivable, account, settlement, recoveries, ledger] = await Promise.all([
         prisma.providerCommissionReceivable.findUniqueOrThrow({ where: { id: firstReceivableId } }),
         prisma.providerCommissionReceivable.findUniqueOrThrow({ where: { id: secondReceivableId } }),
         prisma.providerFinancialAccount.findUniqueOrThrow({ where: { id: accountId } }),
+        prisma.weeklySettlement.findUniqueOrThrow({ where: { id: bankSettlementId } }),
         prisma.providerCommissionRecovery.findMany({ where: { idempotencyKey: { startsWith: `bank-credit:${firstTxn}:` } } }),
         prisma.financialLedger.findMany({ where: { referenceType: 'COMMISSION_BANK_RECONCILIATION', referenceId: { in: [firstReconciliationId, secondReconciliationId] } } }),
       ])
       expect(firstReceivable).toMatchObject({ amountRemaining: 0n, status: 'SETTLED' })
       expect(secondReceivable).toMatchObject({ amountRemaining: 0n, status: 'SETTLED' })
       expect(account.commissionDue).toBe(0n)
+      expect(settlement).toMatchObject({ commissionPaid: true, status: 'PAID' })
       expect(recoveries.reduce((sum, item) => sum + item.amount, 0n)).toBe(800n)
       expect(ledger.reduce((sum, row) => sum + (row.entryType === 'DEBIT' ? row.amount : -row.amount), 0n)).toBe(0n)
       expect(ledger.filter(row => row.accountType === 'PLATFORM_CASH_CLEARING').reduce((sum, row) => sum + row.amount, 0n)).toBe(1000n)
@@ -159,6 +169,7 @@ describe.skipIf(!requiresPostgres())('commission remittance PostgreSQL integrati
       await prisma.financialLedger.deleteMany({ where: { referenceId: { in: [firstReconciliationId, secondReconciliationId] } } })
       await prisma.providerCommissionReceivable.deleteMany({ where: { id: { in: [firstReceivableId, secondReceivableId] } } })
       await prisma.providerFinancialAccount.deleteMany({ where: { id: accountId } })
+      await prisma.weeklySettlement.deleteMany({ where: { id: bankSettlementId } })
       await prisma.providerIdentity.deleteMany({ where: { id: identityId } })
       await prisma.user.deleteMany({ where: { id: providerId } })
     }

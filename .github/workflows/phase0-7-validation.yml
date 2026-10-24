@@ -106,6 +106,9 @@ jobs:
       - name: Verify migration deploy is no-op
         run: npx prisma migrate deploy
 
+      - name: Verify additive commission bank migration on isolated prior-schema fixture
+        run: bash scripts/test-commission-bank-migration.sh
+
       - name: Verify Phase 8 migration columns exist in PostgreSQL
         run: |
           psql "$DATABASE_URL" -c "SELECT \"countryCode\" FROM \"User\" LIMIT 1;"
