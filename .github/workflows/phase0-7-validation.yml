@@ -88,10 +88,10 @@ jobs:
       - name: Install mobile dependencies
         run: npm ci --prefix apps/mobile
 
-      - name: Audit web production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      - name: Audit web dependency graph
+        run: npm audit --audit-level=high
 
-      - name: Audit mobile production dependencies
+      - name: Audit mobile dependency graph
         run: node scripts/mobile-production-audit.mjs
 
       - name: Generate Prisma client

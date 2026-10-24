@@ -337,3 +337,26 @@ workflow results and links are recorded in PR #80. This does not substitute for 
 audit or the still-pending release workflow.
 No production or payment actions were performed. Physical/device, crew and other operational tests
 remain **PENDING**.
+
+## 2026-10-24 dependency and CI follow-up
+
+- On SHA `2207969da393edd07e649453c1368aa5ae722294`, Security Exposure Audit, International Fast
+  Gates and CRM V2 Release Validation all passed. CRM's blocking full run used isolated PostgreSQL,
+  `VPS_INTEGRATION=true`, and a local HTTP server: **4,620 passed, 0 failed, 0 skipped** across 472
+  files. This exercised the database/HTTP-gated tests omitted by the earlier local run's 60 skips.
+- Full web `npm audit` found **0 critical / 0 high** (1 low, 2 moderate). The mobile full audit
+  found **0 critical / 4 high / 11 moderate**; all four high package entries resolve to the single
+  upstream node-forge advisory. No upstream fix exists. A fresh mobile `npm ci` applied the
+  guarded patch; the malformed-signature test passed. Updated the mobile tooling overrides to
+  Vite 8.3.5 and http-cache-semantics 4.3.0, clearing their fixable high advisories. The mobile
+  audit gate now checks the full dependency graph and permits only version-checked upstream
+  exceptions; node-forge is the sole high exception currently present.
+- **12-phase coding verification is not complete.** Earlier phase table entries remain
+  unaccepted: catalogue/live-state inventory, provider onboarding and lifecycle acceptance,
+  evidence-backed Canadian pricing, full customer/provider safety scenarios, native-language
+  review, and complete cross-market end-to-end certification still have open items. External
+  geocoder configuration, PSP sandbox, human approval, devices, crew/physical testing and signed
+  market decisions remain pending. Do not start payment-plan architecture review until these
+  software requirements are verified complete.
+- The dependency/workflow changes in this follow-up have not yet received exact-head GitHub CI;
+  rerun and record CI against their pushed SHA before treating them as verified.
