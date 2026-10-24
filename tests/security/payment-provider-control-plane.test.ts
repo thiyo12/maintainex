@@ -30,7 +30,7 @@ describe('payment provider control plane', () => {
     expect(events).toContain('signatureVerified: true')
   })
 
-  it('preserves PayHere history but disables it for new checkout at boot', () => {
+  it('preserves retired-gateway history while boot disables existing PayHere configs', () => {
     const schema = source('prisma/schema.prisma')
     const bootstrap = source('scripts/bootstrap-payment-providers.cjs')
     const docker = source('Dockerfile')
@@ -57,7 +57,7 @@ describe('payment provider control plane', () => {
     const providersApi = source('app/api/admin/financial/providers/route.ts')
 
     expect(registry).toContain('NEW_ONLINE_CHECKOUT_PROVIDER_CODES = []')
-    expect(registry).toContain("LEGACY_READ_ONLY_PROVIDER_CODES = ['PAYHERE']")
+    expect(registry).toContain("LEGACY_READ_ONLY_PROVIDER_CODES = ['PAYPAL', 'PAYHERE']")
     expect(registry).toContain('PAYPAL_MARKET_CHECKOUT_VERIFIED')
     expect(registry).toContain("PAYPAL_SANDBOX_FIXTURE_COUNTRY = 'CA'")
     expect(registry).toContain("PAYPAL_SANDBOX_FIXTURE_CURRENCY = 'CAD'")
@@ -66,13 +66,25 @@ describe('payment provider control plane', () => {
     expect(service).toContain('PAYMENT_PROVIDER_NOT_AVAILABLE')
     expect(service).toContain("if (provider.provider !== 'PAYPAL')")
     expect(providersApi).toContain('isLegacyReadOnlyProvider(provider)')
-    expect(providersApi).toContain('isPayPalMarketVerified(countryCode')
+    expect(providersApi).toContain('isLegacyReadOnlyProvider(provider)')
+    expect(providersApi).toContain('is retired; historical records remain read-only')
+  })
+
+  it('keeps retired gateways read-only in CRM and removes their configuration secrets from the control plane', () => {
+    const providersApi = source('app/api/admin/financial/providers/route.ts')
+    const providersPage = source('app/(admin)/admin/financial/providers/page.tsx')
+
+    expect(providersApi).not.toContain('getPayPalConfig')
+    expect(providersApi).not.toContain('getPayHereConfig')
+    expect(providersPage).toContain('Retired · read only')
+    expect(providersPage).not.toContain('<option value="PAYPAL">')
+    expect(providersPage).toContain('Neither provider can be configured for new checkout')
   })
 
   it('blocks the legacy PayHere hosted checkout route', () => {
     const route = source('app/api/payments/payhere/[intentId]/route.ts')
 
-    expect(route).toContain('PAYHERE_DISABLED_FOR_NEW_CHECKOUT')
+    expect(route).toContain('PAYMENT_PROVIDER_RETIRED')
     expect(route).toContain('status: 410')
     expect(route).not.toContain('getPaymentCheckoutForm')
     expect(route).not.toContain('checkout.actionUrl')

@@ -64,7 +64,7 @@ describe('trusted payment public origin', () => {
       resolve(process.cwd(), 'app/api/payments/payhere/[intentId]/route.ts'),
       'utf-8'
     )
-    expect(source).toContain('PAYHERE_DISABLED_FOR_NEW_CHECKOUT')
+    expect(source).toContain('PAYMENT_PROVIDER_RETIRED')
     expect(source).toContain('status: 410')
     expect(source).not.toContain('resolvePaymentPublicOrigin')
   })

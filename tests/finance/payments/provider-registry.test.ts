@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   isPayPalMarketVerified,
+  isLegacyReadOnlyProvider,
   parseProviderCapabilities,
   parseProviderList,
   selectProviderFromConfigs,
@@ -112,6 +113,8 @@ describe('payment provider registry', () => {
     )
 
     expect(selected).toBeNull()
+    expect(isLegacyReadOnlyProvider('paypal')).toBe(true)
+    expect(isLegacyReadOnlyProvider('PayHere')).toBe(true)
   })
 
   it('restricts sandbox PayPal checkout to the controlled CA fixture', () => {

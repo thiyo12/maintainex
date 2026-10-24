@@ -5,7 +5,9 @@ export type PaymentProviderCode = (typeof PAYMENT_PROVIDER_CODES)[number]
 
 /** No replacement marketplace processor has been approved for new checkout. */
 export const NEW_ONLINE_CHECKOUT_PROVIDER_CODES = [] as const
-export const LEGACY_READ_ONLY_PROVIDER_CODES = ['PAYHERE'] as const
+// PayPal and PayHere are retired. Keep their codes recognizable so existing
+// database rows and reports remain readable, but never allow new activation.
+export const LEGACY_READ_ONLY_PROVIDER_CODES = ['PAYPAL', 'PAYHERE'] as const
 export const PAYMENT_PROVIDER_NOT_AVAILABLE = 'PAYMENT_PROVIDER_NOT_AVAILABLE' as const
 
 /**

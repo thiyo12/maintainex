@@ -96,8 +96,6 @@ describe('Redaction', () => {
       'app/api/mobile/v2/jobs/[id]/escrow/route.ts',
       'app/api/mobile/v2/jobs/[id]/payment/route.ts',
       'app/api/mobile/v2/jobs/[id]/release-escrow/route.ts',
-      'app/api/webhooks/payhere/route.ts',
-      'app/api/webhooks/paypal/route.ts',
       'app/api/cron/escrow-release/route.ts',
     ]
 
@@ -116,8 +114,8 @@ describe('Redaction', () => {
 
     const payHere = readFileSync(resolve(process.cwd(), 'app/api/webhooks/payhere/route.ts'), 'utf8')
     const payPal = readFileSync(resolve(process.cwd(), 'app/api/webhooks/paypal/route.ts'), 'utf8')
-    expect(payHere).not.toContain("NextResponse.json({ error: result.error }")
-    expect(payPal).not.toContain("result.error || 'Webhook processing failed'")
+    expect(payHere).toContain('PAYMENT_PROVIDER_RETIRED')
+    expect(payPal).toContain('PAYMENT_PROVIDER_RETIRED')
   })
 
   it('keeps admin finance routes on structured redacted logging', () => {
@@ -204,7 +202,6 @@ describe('Redaction', () => {
       'app/api/cron/job-response-escalation/route.ts',
       'app/api/cron/matching-waves/route.ts',
       'app/api/cron/offer-timeouts/route.ts',
-      'app/api/cron/payhere-refunds/route.ts',
       'app/api/cron/re-engagement/route.ts',
       'app/api/cron/reputation/route.ts',
       'app/api/internal/security/seed/route.ts',
