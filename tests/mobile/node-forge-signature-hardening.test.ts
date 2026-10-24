@@ -3,11 +3,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
 
-const testRequire = createRequire(import.meta.url)
-const { patchNodeForge } = testRequire('../scripts/apply-node-forge-security-patch.cjs')
-const mobileRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const mobileRequire = createRequire(path.resolve(process.cwd(), 'apps/mobile/package.json'))
+const { patchNodeForge } = mobileRequire('./scripts/apply-node-forge-security-patch.cjs')
+const nodeForgePackage = mobileRequire.resolve('node-forge/package.json')
+const mobileRoot = path.resolve(process.cwd(), 'apps/mobile')
 
 let fixtureRoot: string | undefined
 
@@ -41,11 +41,11 @@ afterEach(() => {
 
 describe('node-forge CVE-2026-85393 install patch', () => {
   it('continues to accept valid signatures and rejects DigestAlgorithm with an extra child', () => {
-    const sourceRoot = path.join(mobileRoot, 'node_modules/node-forge')
+    const sourceRoot = path.dirname(nodeForgePackage)
     fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'maintainex-node-forge-'))
     fs.cpSync(sourceRoot, fixtureRoot, { recursive: true })
     patchNodeForge(fixtureRoot)
-    const forge = testRequire(fixtureRoot)
+    const forge = mobileRequire(fixtureRoot)
     const keys = forge.pki.rsa.generateKeyPair({ bits: 1024, e: 65537 })
     const validDigest = forge.md.sha256.create()
     validDigest.update('maintainex signature verification control')
