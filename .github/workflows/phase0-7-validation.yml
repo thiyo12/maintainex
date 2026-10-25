@@ -321,6 +321,7 @@ jobs:
         run: >-
           npx vitest run
           tests/finance/payments/cash-payment-lifecycle.test.ts
+          tests/finance/payments/marketplace-dispute-appeal-postgres.test.ts
           tests/finance/payments/payment-work-start-lifecycle.test.ts
           tests/finance/payments/cancellation-payment-postgres.test.ts
           tests/finance/payments/payment-intent-concurrency-postgres.test.ts

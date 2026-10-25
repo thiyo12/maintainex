@@ -56,6 +56,12 @@ interface DisputeEvidence {
   createdAt: string
 }
 
+interface DisputeAssignee {
+  id: string
+  name: string
+  role: string
+}
+
 const TABS = [
   { key: 'ALL', label: 'All' },
   { key: 'OPEN', label: 'Open' },
@@ -85,6 +91,8 @@ export default function DisputesPage() {
   const [resolveNotes, setResolveNotes] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
   const [caseEvidence, setCaseEvidence] = useState<DisputeEvidence[]>([])
+  const [caseAssignees, setCaseAssignees] = useState<DisputeAssignee[]>([])
+  const [selectedAssignee, setSelectedAssignee] = useState('')
   const [evidenceLoading, setEvidenceLoading] = useState(false)
   const [evidenceError, setEvidenceError] = useState<string | null>(null)
   const evidenceRequestId = useRef(0)
@@ -222,6 +230,27 @@ export default function DisputesPage() {
     }
   }
 
+  const handleReassign = async (dispute: Dispute) => {
+    if (!canResolveDisputes || dispute.source !== 'MARKETPLACE' || !selectedAssignee) return
+    setActionLoading(true)
+    try {
+      const response = await fetch('/api/admin/disputes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disputeId: dispute.id, action: 'REASSIGN', targetAdminId: selectedAssignee }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error || 'Unable to reassign case')
+      toast.success('Case reassigned')
+      await fetchDisputes()
+      setDetailModal(current => current ? { ...current, status: 'UNDER_REVIEW', assignedTo: selectedAssignee } : current)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to reassign case')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
@@ -230,19 +259,30 @@ export default function DisputesPage() {
     setDetailModal(dispute)
     setResolveNotes('')
     setCaseEvidence([])
+    setCaseAssignees([])
+    setSelectedAssignee(dispute.assignedTo || '')
     setEvidenceError(null)
     if (dispute.source !== 'MARKETPLACE') return
 
     setEvidenceLoading(true)
     try {
-      const response = await fetch(
-        `/api/admin/disputes?evidenceDisputeId=${encodeURIComponent(dispute.id)}`,
-        { cache: 'no-store' },
-      )
+      const [response, assigneeResponse] = await Promise.all([
+        fetch(`/api/admin/disputes?evidenceDisputeId=${encodeURIComponent(dispute.id)}`, { cache: 'no-store' }),
+        canResolveDisputes
+          ? fetch(`/api/admin/disputes?assigneesFor=${encodeURIComponent(dispute.id)}`, { cache: 'no-store' })
+          : Promise.resolve(null),
+      ])
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data?.error || 'Unable to load dispute evidence')
       if (requestId === evidenceRequestId.current) {
         setCaseEvidence(Array.isArray(data.evidence) ? data.evidence : [])
+      }
+      if (assigneeResponse) {
+        const assigneeData = await assigneeResponse.json().catch(() => ({}))
+        if (!assigneeResponse.ok) throw new Error(assigneeData?.error || 'Unable to load eligible assignees')
+        if (requestId === evidenceRequestId.current) {
+          setCaseAssignees(Array.isArray(assigneeData.assignees) ? assigneeData.assignees : [])
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to load dispute evidence'
@@ -441,6 +481,33 @@ export default function DisputesPage() {
                         <p className="mt-2 text-[11px] text-slate-400">Submitted {new Date(item.createdAt).toLocaleString()}</p>
                       </article>
                     ))}
+                  </section>
+                )}
+
+                {canResolveDisputes && detailModal.source === 'MARKETPLACE' &&
+                  ['OPEN', 'UNDER_REVIEW'].includes(detailModal.status) && caseAssignees.length > 0 && (
+                  <section aria-label="Case assignment" className="space-y-2 rounded-lg border border-[var(--crm-border)] p-3">
+                    <label htmlFor="dispute-assignee" className="text-xs font-semibold text-slate-600">Assigned finance/support staff</label>
+                    <div className="flex flex-wrap gap-2">
+                      <select
+                        id="dispute-assignee"
+                        value={selectedAssignee}
+                        onChange={event => setSelectedAssignee(event.target.value)}
+                        className={`${crmInputClass} min-w-[220px] flex-1`}
+                      >
+                        <option value="">Select eligible staff</option>
+                        {caseAssignees.map(assignee => (
+                          <option key={assignee.id} value={assignee.id}>{assignee.name} · {assignee.role}</option>
+                        ))}
+                      </select>
+                      <CrmButton
+                        variant="secondary"
+                        disabled={actionLoading || !selectedAssignee || selectedAssignee === admin?.id}
+                        onClick={() => { void handleReassign(detailModal) }}
+                      >
+                        Reassign
+                      </CrmButton>
+                    </div>
                   </section>
                 )}
 

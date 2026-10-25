@@ -12,6 +12,9 @@ import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/mone
 import { notifyDisputeResolved, notifyPaymentReleased, notifyCashJobCompleted, notifyCashDisputeResolved } from '@/lib/notifications'
 import { claimMarketplaceDisputeInTransaction } from '@/lib/crm/disputes/claim-marketplace-dispute'
 import { finalizeMarketplaceDisputeInTransaction } from '@/lib/crm/disputes/finalize-marketplace-dispute'
+import { reassignMarketplaceDisputeInTransaction } from '@/lib/crm/disputes/reassign-marketplace-dispute'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import { evaluateEffectivePermission } from '@/lib/crm/governance/permissions'
 
 const VALID_STATUSES = new Set(['OPEN', 'UNDER_REVIEW', 'RESOLVING', 'RESOLVED', 'DISMISSED'])
 const MARKETPLACE_RESOLUTION_ACTIONS = new Set(['RELEASE_PROVIDER', 'REFUND_CUSTOMER'])
@@ -75,6 +78,62 @@ export async function GET(request: NextRequest) {
     const security = guard.context
 
     const { searchParams } = new URL(request.url)
+    const assigneesFor = searchParams.get('assigneesFor')?.trim()
+    if (assigneesFor) {
+      const canResolve = evaluateEffectivePermission({
+        role: security.role,
+        permission: 'disputes:resolve',
+        overrides: security.permissionOverrides as Array<{ permission: string; effect: 'ALLOW' | 'DENY' }>,
+      }).allowed
+      if (!canResolve) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      if (assigneesFor.length > 128) return NextResponse.json({ error: 'Invalid dispute id' }, { status: 400 })
+      const dispute = await prisma.marketplaceDispute.findUnique({
+        where: { id: assigneesFor },
+        select: { countryCode: true, job: { select: { countryCode: true } } },
+      })
+      if (!dispute) return NextResponse.json({ error: 'Marketplace dispute not found' }, { status: 404 })
+      const countryCode = (dispute.countryCode || dispute.job.countryCode).toUpperCase()
+      if (!assertCrmCountryAllowed(security, countryCode)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+      const staff = await prisma.adminUser.findMany({
+        where: {
+          isActive: true,
+          deletedAt: null,
+          id: { not: security.adminId },
+          OR: [
+            { role: { not: 'SUPER_ADMIN' } },
+            { role: 'SUPER_ADMIN', totpEnabled: true, totpSecret: { not: null } },
+          ],
+        },
+        select: {
+          id: true, role: true, firstName: true, lastName: true, assignedCountries: true,
+          lockedUntil: true, totpEnabled: true,
+          permissionOverrides: { select: { permission: true, effect: true } },
+        },
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      })
+      const assignees = staff.filter(candidate => {
+        if (candidate.lockedUntil && candidate.lockedUntil > new Date()) return false
+        if (!Object.hasOwn(ROLE_PERMISSIONS, candidate.role)) return false
+        if (candidate.role === 'SUPER_ADMIN' && !candidate.totpEnabled) return false
+        const permission = evaluateEffectivePermission({
+          role: candidate.role as AdminRole,
+          permission: 'disputes:resolve',
+          overrides: candidate.permissionOverrides
+            .filter(item => item.effect === 'ALLOW' || item.effect === 'DENY')
+            .map(item => ({ permission: item.permission, effect: item.effect as 'ALLOW' | 'DENY' })),
+        })
+        if (!permission.allowed) return false
+        if (candidate.role === 'SUPER_ADMIN') return true
+        let countries: unknown = candidate.assignedCountries
+        try { countries = JSON.parse(candidate.assignedCountries) } catch {}
+        const assigned = Array.isArray(countries) ? countries : String(countries).split(',')
+        return assigned.some(value => typeof value === 'string' && value.trim().toUpperCase() === countryCode)
+      }).map(({ id, role, firstName, lastName }) => ({ id, role, name: `${firstName} ${lastName}`.trim() }))
+      return NextResponse.json({ assignees }, { headers: { 'Cache-Control': 'no-store' } })
+    }
     const evidenceDisputeId = searchParams.get('evidenceDisputeId')?.trim()
     if (evidenceDisputeId) {
       if (evidenceDisputeId.length > 128) {
@@ -342,6 +401,39 @@ export async function PATCH(request: NextRequest) {
         riskLevel: 'LOW',
       })
       return NextResponse.json({ claim }, { headers: { 'Cache-Control': 'no-store' } })
+    }
+
+    if (action === 'REASSIGN') {
+      const targetAdminId = typeof body?.targetAdminId === 'string' ? body.targetAdminId.trim() : ''
+      if (!disputeId || disputeId.length > 128 || !targetAdminId || targetAdminId.length > 128) {
+        return NextResponse.json({ error: 'A valid dispute and staff assignee are required' }, { status: 400 })
+      }
+      const item = await prisma.marketplaceDispute.findUnique({
+        where: { id: disputeId },
+        select: { countryCode: true, job: { select: { countryCode: true } } },
+      })
+      if (!item) return NextResponse.json({ error: 'Marketplace dispute not found' }, { status: 404 })
+      const countryCode = item.countryCode || item.job.countryCode
+      if (!assertCrmCountryAllowed(security, countryCode)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      const result = await prisma.$transaction(tx => reassignMarketplaceDisputeInTransaction(tx, {
+        disputeId,
+        actorAdminId: security.adminId,
+        actorEmail: security.email,
+        actorRole: security.role,
+        targetAdminId,
+        countryCode,
+        ipAddress: security.ipAddress,
+        userAgent: security.userAgent,
+      }))
+      if (!result.ok) {
+        const statusCode = result.code === 'NOT_FOUND' ? 404
+          : result.code === 'TARGET_OUT_OF_SCOPE' || result.code === 'TARGET_LACKS_PERMISSION' ? 403
+            : result.code === 'SELF_ASSIGNMENT' ? 400 : 409
+        return NextResponse.json({ error: result.code, code: result.code }, { status: statusCode })
+      }
+      return NextResponse.json({ assignment: result }, { headers: { 'Cache-Control': 'no-store' } })
     }
 
     if (!disputeId || !VALID_STATUSES.has(status)) {

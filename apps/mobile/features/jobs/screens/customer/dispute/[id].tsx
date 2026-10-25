@@ -146,9 +146,11 @@ export default function DisputeScreen() {
           </View>
           <TouchableOpacity
             style={styles.homeBtn}
-            onPress={() => router.replace('/(customer)')}
+            onPress={() => submittedSafety
+              ? router.replace('/(customer)')
+              : router.replace(`/disputes/${encodeURIComponent(disputeId)}` as any)}
           >
-            <Text style={styles.homeBtnText}>{t('dispute.backToHome')}</Text>
+            <Text style={styles.homeBtnText}>{submittedSafety ? t('dispute.backToHome') : t('dispute.viewCase')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

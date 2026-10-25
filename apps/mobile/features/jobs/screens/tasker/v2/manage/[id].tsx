@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native'
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Calendar, MapPin, ChatCircleDots, NavigationArrow, Radio, ShieldCheck, Hourglass, Flag, CheckCircle, ArrowCircleRight, MagnifyingGlass, Camera, FileText, CaretLeft, Wrench, Play } from 'phosphor-react-native'
+import { Calendar, MapPin, ChatCircleDots, NavigationArrow, Radio, ShieldCheck, Hourglass, Flag, CheckCircle, ArrowCircleRight, MagnifyingGlass, Camera, FileText, CaretLeft, Wrench, Play, WarningCircle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '@/lib/i18n'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { v3 } from '@/theme/v3/tokens'
 import { v2Jobs, v2JobActions } from '@/api/v2-jobs'
+import { disputes } from '@/api/disputes'
 import type { V2Job } from '@/api/v2-types'
 import { getAuthToken } from '@/api/token'
 import NewChatModal from '@/features/messaging/components/NewChatModal'
@@ -233,6 +234,15 @@ export default function V2ProviderManageJobScreen() {
     </TouchableOpacity>
   )
 
+  const openDisputeCase = async () => {
+    try {
+      const dispute = await disputes.getByJob(id)
+      router.push(`/disputes/${encodeURIComponent(dispute.id)}` as any)
+    } catch (error) {
+      Alert.alert('Case unavailable', error instanceof Error ? error.message : 'Unable to open the financial case.')
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.topBar}>
@@ -254,6 +264,18 @@ export default function V2ProviderManageJobScreen() {
         {['QUOTE_ACCEPTED', 'ESCROW_DEPOSITED', 'IN_PROGRESS', 'COMPLETION_PENDING',
           'COMPLETED', 'DISPUTED', 'CANCELLED'].includes(job.status) ? (
           <JobSafetyCentre jobId={id} countryCode={job.countryCode} />
+        ) : null}
+        {job.status === 'DISPUTED' ? (
+          <View style={styles.pinNotice}>
+            <WarningCircle size={18} color={v3.colors.amber} weight="fill" />
+            <View style={styles.pinCopy}>
+              <Text style={styles.pinTitle}>Financial case under review</Text>
+              <Text style={styles.pinText}>Review the case and submit an appeal if the decision is complete.</Text>
+            </View>
+            <TouchableOpacity style={styles.secondaryAction} onPress={() => { void openDisputeCase() }}>
+              <Text style={styles.secondaryActionText}>View case</Text>
+            </TouchableOpacity>
+          </View>
         ) : null}
         {isAccepted ? (
           <>

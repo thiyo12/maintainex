@@ -2,6 +2,19 @@ import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
+import { resolveMarketplaceDisputeParticipant } from '@/lib/domain/marketplace-dispute-participants'
+
+function parseEventMetadata(value: string | null) {
+  if (!value) return null
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null
+  } catch {
+    return null
+  }
+}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -11,12 +24,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const marketplaceDispute = await prisma.marketplaceDispute.findFirst({
-      where: { id, raisedById: user.id },
+    const marketplaceDispute = await prisma.marketplaceDispute.findUnique({
+      where: { id },
       include: {
         job: {
           select: {
             id: true,
+            customerId: true,
             title: true,
             description: true,
             status: true,
@@ -29,9 +43,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     })
 
     if (marketplaceDispute) {
+      const participant = await resolveMarketplaceDisputeParticipant(prisma, marketplaceDispute.jobId, user.id)
+      if (!participant) {
+        return NextResponse.json({ error: 'Dispute not found' }, { status: 404 })
+      }
+
       const raisedBy = await prisma.user.findUnique({
         where: { id: marketplaceDispute.raisedById },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true },
+      })
+      const events = await prisma.jobLifecycleEvent.findMany({
+        where: {
+          jobId: marketplaceDispute.jobId,
+          action: { in: ['FINANCIAL_DISPUTE_RESOLVED', 'FINANCIAL_DISPUTE_REOPENED', 'FINANCIAL_DISPUTE_APPEALED'] },
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, action: true, fromState: true, toState: true, metadata: true, createdAt: true },
       })
       const budgetMinor =
         marketplaceDispute.job.finalAuthorizedAmountCents ??
@@ -56,10 +83,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         resolution: marketplaceDispute.resolution,
         resolutionAction: marketplaceDispute.resolutionAction,
         status: marketplaceDispute.status,
+        caseHistory: events.flatMap(event => {
+          const metadata = parseEventMetadata(event.metadata)
+          if (metadata?.disputeId !== marketplaceDispute.id) return []
+          return [{
+            id: event.id,
+            action: event.action,
+            fromState: event.fromState,
+            toState: event.toState,
+            appeal: typeof metadata.appeal === 'string' ? metadata.appeal : null,
+            resolution: typeof metadata.resolution === 'string' ? metadata.resolution : null,
+            resolutionAction: typeof metadata.resolutionAction === 'string' ? metadata.resolutionAction : null,
+            createdAt: event.createdAt.toISOString(),
+          }]
+        }),
         raisedBy: raisedBy || {
           id: marketplaceDispute.raisedById,
           name: null,
-          email: null,
         },
         createdAt: marketplaceDispute.createdAt.toISOString(),
         updatedAt: marketplaceDispute.updatedAt.toISOString(),
