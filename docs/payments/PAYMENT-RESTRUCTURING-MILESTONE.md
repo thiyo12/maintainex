@@ -4,9 +4,9 @@ Updated: 2026-10-25
 
 Branch: `feature/payment-restructuring`
 
-Latest local and remote payment branch head: `bf2f074cc892842178e13fe4121bafa20a84c73a`
+Latest fully tested payment implementation: `4ea90f70827274f32d2f4ed60548d8ecae484843` (milestone documentation follow-up; no application code changed since `bf2f074cc892842178e13fe4121bafa20a84c73a`).
 
-PR #152 remains open and draft at that exact head. GitHub Actions for the PR merge result `e4937991b86925014bcda5d895a6a3be5984546f` completed successfully after testing this head with its base.
+PR #152 remains open, draft and unmerged. Exact-head CI for `4ea90f70827274f32d2f4ed60548d8ecae484843` completed successfully.
 
 Previously verified implementation head: `6b0d84edda7892f304fdf56f23f468acd273d05b`
 
@@ -45,7 +45,7 @@ The verification callback body is `{ "sourceSystem": "…", "statementId": "…"
 - Earlier CI at `9ebfeee8e031e5f8c0352dd1b6176f62110902b5` had one regression failure: fully paid bank receivables left `WeeklySettlement` pending. The shared recovery service was fixed in `c8fadc0cfd284845e81b6ad0e2e892f9da4bad6e`; the later passing run verifies the repair.
 - Latest local focused checks: API attack-surface, bank import and cash contest tests 21 passed; Prisma validation, TypeScript, targeted ESLint and `git diff --check` passed. The full PostgreSQL bank integration cannot run locally because the isolated PostgreSQL service is unavailable in this sandbox.
 - A local run of the blocking security suite could not substitute for PostgreSQL CI: 2,070 passed, 238 skipped, and 20 tests failed because the database at `localhost:5432` was unreachable. No CI failure is represented as a local pass.
-- Exact PR-head GitHub Actions completed successfully for `bf2f074cc892842178e13fe4121bafa20a84c73a` (tested on merge result `e4937991b86925014bcda5d895a6a3be5984546f`): Security Exposure Audit, International Fast Gates, and CRM V2 Release Validation all passed. CRM validation reported 4,663 regression tests passed; security suite 2,288 passed and 40 skipped; local HTTP security 8 passed and 18 skipped. PostgreSQL bootstrap, both additive migration checks, lint, web/mobile TypeScript, financial lifecycle gates, production build, Docker build/start/health, market-isolation smoke, and non-root verification passed.
+- Exact-head GitHub Actions completed successfully for `4ea90f70827274f32d2f4ed60548d8ecae484843`: Security Exposure Audit (run `40188323376`), International Fast Gates (`40188323383`), and CRM V2 Release Validation (`40188323375`). CRM validation reported 4,663 regression tests passed; security suite 2,288 passed and 40 skipped; local HTTP security 8 passed and 18 skipped. PostgreSQL bootstrap, both additive migration checks, lint, web/mobile TypeScript, financial lifecycle gates, production build, full regression, final PostgreSQL orphan audit, Docker build/start/health, market-isolation smoke, and non-root verification passed.
 
 Previously verified at `956fd471fdcbafdf3d2c4494005598d73b48d3a7`: full regression 4,547 passed / 100 environment-gated skips, financial suite 402 passed / 4 skipped, and production build passed.
 
