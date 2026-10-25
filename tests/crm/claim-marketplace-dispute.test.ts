@@ -6,9 +6,9 @@ function fakeTx(status = 'OPEN', existingAlert?: { id: string; assignedTo: strin
     $queryRawUnsafe: vi.fn(async () => [{ id: 'case-1', status }]),
     marketplaceDispute: { updateMany: vi.fn(async () => ({ count: 1 })) },
     adminAlert: {
-      findFirst: vi.fn(async () => existingAlert ?? null),
+      findMany: vi.fn(async () => existingAlert ? [existingAlert] : []),
       create: vi.fn(async ({ data }: any) => ({ id: 'alert-1', ...data })),
-      update: vi.fn(async () => undefined),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
   }
 }
@@ -40,7 +40,7 @@ describe('marketplace financial case assignment', () => {
     })
 
     expect(result).toEqual({ ok: false, code: 'ASSIGNED_TO_OTHER' })
-    expect(tx.adminAlert.update).not.toHaveBeenCalled()
+    expect(tx.adminAlert.updateMany).not.toHaveBeenCalled()
     expect(tx.adminAlert.create).not.toHaveBeenCalled()
     expect(tx.marketplaceDispute.updateMany).not.toHaveBeenCalled()
   })
@@ -51,6 +51,6 @@ describe('marketplace financial case assignment', () => {
       disputeId: 'case-1', adminId: 'finance-1', adminRole: 'FINANCE',
     })
     expect(result).toEqual({ ok: false, code: 'CLOSED' })
-    expect(tx.adminAlert.findFirst).not.toHaveBeenCalled()
+    expect(tx.adminAlert.findMany).not.toHaveBeenCalled()
   })
 })

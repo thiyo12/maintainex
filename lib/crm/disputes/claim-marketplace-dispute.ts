@@ -17,7 +17,7 @@ export async function claimMarketplaceDisputeInTransaction(
     return { ok: false, code: 'CLOSED' }
   }
 
-  let alert = await tx.adminAlert.findFirst({
+  const alerts = await tx.adminAlert.findMany({
     where: {
       targetTable: 'MarketplaceDispute',
       targetId: input.disputeId,
@@ -26,12 +26,16 @@ export async function claimMarketplaceDisputeInTransaction(
     orderBy: { createdAt: 'asc' },
   })
 
-  if (alert?.assignedTo && alert.assignedTo !== input.adminId) {
+  if (alerts.some((alert: { assignedTo: string | null }) =>
+    alert.assignedTo && alert.assignedTo !== input.adminId
+  )) {
     return { ok: false, code: 'ASSIGNED_TO_OTHER' }
   }
 
+  const alert = alerts[0]
+  let alertId: string
   if (!alert) {
-    alert = await tx.adminAlert.create({
+    const createdAlert = await tx.adminAlert.create({
       data: {
         type: 'dispute',
         severity: 'high',
@@ -45,9 +49,15 @@ export async function claimMarketplaceDisputeInTransaction(
         status: 'in_progress',
       },
     })
+    alertId = createdAlert.id
   } else {
-    await tx.adminAlert.update({
-      where: { id: alert.id },
+    alertId = alert.id
+    await tx.adminAlert.updateMany({
+      where: {
+        targetTable: 'MarketplaceDispute',
+        targetId: input.disputeId,
+        status: { in: ['open', 'in_progress'] },
+      },
       data: {
         assignedTo: input.adminId,
         assignedRole: input.adminRole,
@@ -66,7 +76,7 @@ export async function claimMarketplaceDisputeInTransaction(
   return {
     ok: true,
     status: 'UNDER_REVIEW',
-    alertId: alert.id,
+    alertId,
     claimedBy: input.adminId,
   }
 }
