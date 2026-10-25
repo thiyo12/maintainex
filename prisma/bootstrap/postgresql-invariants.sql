@@ -101,6 +101,20 @@ BEGIN
 END;
 $commission_immutable$ LANGUAGE plpgsql;
 
+ALTER TABLE "ProviderCommissionReceivable"
+  ADD CONSTRAINT "ProviderCommissionReceivable_amountWaived_check"
+  CHECK ("amountWaived" >= 0 AND "amountWaived" <= "amountOriginal");
+
+ALTER TABLE "MarketplaceDisputeEvidence"
+  ADD CONSTRAINT "MarketplaceDisputeEvidence_participant_check"
+    CHECK ("participantType" IN ('CUSTOMER','PROVIDER','COMPANY')),
+  ADD CONSTRAINT "MarketplaceDisputeEvidence_text_check"
+    CHECK (length("description") BETWEEN 1 AND 4000);
+
+ALTER TABLE "MarketplaceDisputeCorrection"
+  ADD CONSTRAINT "MarketplaceDisputeCorrection_amount_check" CHECK ("amountMinor" > 0),
+  ADD CONSTRAINT "MarketplaceDisputeCorrection_status_check" CHECK ("status" = 'APPLIED');
+
 CREATE TRIGGER trg_commission_bank_allocation_append_only
   BEFORE UPDATE OR DELETE ON "CommissionBankAllocation"
   FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();
@@ -119,4 +133,20 @@ CREATE TRIGGER trg_commission_bank_reversal_allocation_append_only
 
 CREATE TRIGGER trg_commission_bank_reversal_event_append_only
   BEFORE UPDATE OR DELETE ON "CommissionBankReversalEvent"
+  FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();
+
+CREATE TRIGGER trg_marketplace_dispute_evidence_immutable
+  BEFORE UPDATE OR DELETE ON "MarketplaceDisputeEvidence"
+  FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();
+
+CREATE TRIGGER trg_marketplace_dispute_evidence_event_immutable
+  BEFORE UPDATE OR DELETE ON "MarketplaceDisputeEvidenceEvent"
+  FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();
+
+CREATE TRIGGER trg_marketplace_dispute_correction_immutable
+  BEFORE UPDATE OR DELETE ON "MarketplaceDisputeCorrection"
+  FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();
+
+CREATE TRIGGER trg_marketplace_dispute_correction_event_immutable
+  BEFORE UPDATE OR DELETE ON "MarketplaceDisputeCorrectionEvent"
   FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();

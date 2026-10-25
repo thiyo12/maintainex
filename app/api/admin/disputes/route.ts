@@ -148,30 +148,31 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
 
-      const evidence = await prisma.jobEvidence.findMany({
-        where: { jobId: dispute.jobId },
+      const [evidence, corrections] = await Promise.all([prisma.marketplaceDisputeEvidence.findMany({
+        where: { disputeId: dispute.id },
         select: {
           id: true,
-          uploaderType: true,
+          participantType: true,
           evidenceType: true,
-          url: true,
           description: true,
-          mimeType: true,
           createdAt: true,
         },
         orderBy: { createdAt: 'asc' },
         take: 100,
-      })
+      }), prisma.marketplaceDisputeCorrection.findMany({
+        where: { disputeId: dispute.id },
+        select: { id: true, amountMinor: true, currency: true, reason: true, status: true, createdAt: true, events: { select: { eventType: true, createdAt: true } } },
+        orderBy: { createdAt: 'asc' }, take: 50,
+      })])
       return NextResponse.json({
         evidence: evidence.map(item => ({
           id: item.id,
-          uploaderType: item.uploaderType,
+          uploaderType: item.participantType,
           evidenceType: item.evidenceType,
-          url: item.url,
           description: item.description,
-          mimeType: item.mimeType,
           createdAt: item.createdAt,
         })),
+        corrections: corrections.map(item => ({ ...item, amountMinor: item.amountMinor.toString() })),
       }, { headers: { 'Cache-Control': 'no-store' } })
     }
 

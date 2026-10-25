@@ -60,6 +60,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         orderBy: { createdAt: 'asc' },
         select: { id: true, action: true, fromState: true, toState: true, metadata: true, createdAt: true },
       })
+      const evidence = await prisma.marketplaceDisputeEvidence.findMany({
+        where: { disputeId: marketplaceDispute.id, submittedById: user.id },
+        select: { id: true, participantType: true, evidenceType: true, description: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+        take: 100,
+      })
       const budgetMinor =
         marketplaceDispute.job.finalAuthorizedAmountCents ??
         marketplaceDispute.job.budgetAmount ??
@@ -82,6 +88,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         description: marketplaceDispute.description,
         resolution: marketplaceDispute.resolution,
         resolutionAction: marketplaceDispute.resolutionAction,
+        evidence,
         status: marketplaceDispute.status,
         caseHistory: events.flatMap(event => {
           const metadata = parseEventMetadata(event.metadata)

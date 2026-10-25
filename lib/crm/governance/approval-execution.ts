@@ -11,6 +11,7 @@ import { tierAtLeast } from './action-registry'
 import { resolveCurrentApprovalRisk } from './current-risk'
 import { postApprovedCommissionBankReconciliation } from '@/lib/finance/commissions/bank-credit-reconciliation'
 import { postApprovedCommissionBankReversal } from '@/lib/finance/commissions/bank-credit-reversal'
+import { applyMarketplaceDisputeCorrectionInTransaction } from '@/lib/crm/disputes/apply-marketplace-dispute-correction'
 import type { ApprovalTier } from './types'
 import type { AdminRole } from '@/lib/admin-types'
 
@@ -333,6 +334,26 @@ export async function executeApprovedCrmRequest(
       } else {
         throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
       }
+    } else if (request.actionId === 'disputes.financial_resolution') {
+      if (request.targetType !== 'MarketplaceDispute' || !request.actionPayload || !request.amountMinor || !request.currency) {
+        throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+      }
+      let payload: unknown
+      try { payload = JSON.parse(request.actionPayload) } catch { throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID') }
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+      const value = payload as Record<string, unknown>
+      if (value.mode !== 'COMMISSION_WAIVER' || value.disputeId !== request.targetId || typeof value.receivableId !== 'string' || typeof value.reason !== 'string') {
+        throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+      }
+      await prisma.$transaction(tx => applyMarketplaceDisputeCorrectionInTransaction(tx, {
+        disputeId: request.targetId,
+        receivableId: value.receivableId as string,
+        amountMinor: request.amountMinor!,
+        reason: value.reason as string,
+        approvalRequestId: request.id,
+        adminId: actor.adminId,
+      }))
+      executionRef = `MarketplaceDispute:${request.targetId}:COMMISSION_WAIVED`
     } else if (request.actionId === 'jobs.cancel') {
       const source =
         request.targetType === 'MarketplaceJob'

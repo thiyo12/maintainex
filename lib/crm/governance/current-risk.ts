@@ -21,7 +21,44 @@ export async function resolveCurrentApprovalRisk(request: {
   currency: string | null
   actionPayload?: string | null
   id?: string
+  initiatorAdminId?: string
 }): Promise<ApprovalRiskResolution> {
+  if (request.actionId === 'disputes.financial_resolution') {
+    if (request.targetType !== 'MarketplaceDispute' || !request.actionPayload) throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+    let payload: unknown
+    try { payload = JSON.parse(request.actionPayload) } catch { throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID') }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+    const value = payload as Record<string, unknown>
+    if (value.mode !== 'COMMISSION_WAIVER' || value.disputeId !== request.targetId || typeof value.receivableId !== 'string' || typeof value.reason !== 'string') {
+      throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+    }
+    const [dispute, receivable] = await Promise.all([
+      prisma.marketplaceDispute.findUnique({ where: { id: request.targetId }, select: { id: true, status: true, countryCode: true, job: { select: { id: true, countryCode: true } } } }),
+      prisma.providerCommissionReceivable.findUnique({ where: { id: value.receivableId }, select: { id: true, jobId: true, currency: true, amountRemaining: true, status: true, providerIdentity: { select: { countryCode: true } } } }),
+    ])
+    if (!dispute || !receivable) throw new Error('APPROVAL_TARGET_NOT_FOUND')
+    const market = (dispute.countryCode || dispute.job.countryCode).toUpperCase()
+    if (dispute.job.id !== receivable.jobId || market !== dispute.job.countryCode.toUpperCase() || market !== receivable.providerIdentity.countryCode.toUpperCase() || market !== request.market.toUpperCase()) {
+      throw new Error('APPROVAL_MARKET_CHANGED')
+    }
+    if (!['OPEN', 'UNDER_REVIEW', 'RESOLVING'].includes(dispute.status)) throw new Error('APPROVAL_DISPUTE_STATE_INVALID')
+    if (request.initiatorAdminId) {
+      const [initiator, assignment] = await Promise.all([
+        prisma.adminUser.findUnique({ where: { id: request.initiatorAdminId }, select: { role: true, isActive: true, deletedAt: true } }),
+        prisma.adminAlert.findFirst({ where: { targetTable: 'MarketplaceDispute', targetId: dispute.id, status: { in: ['open', 'in_progress'] } }, select: { assignedTo: true }, orderBy: { createdAt: 'asc' } }),
+      ])
+      if (!initiator?.isActive || initiator.deletedAt ||
+          (!['MANAGER', 'SUPER_ADMIN'].includes(initiator.role) && assignment?.assignedTo !== request.initiatorAdminId)) {
+        throw new Error('APPROVAL_CASE_ASSIGNMENT_CHANGED')
+      }
+    }
+    if (!['OPEN', 'PARTIAL'].includes(receivable.status)) throw new Error('APPROVAL_RECEIVABLE_STATE_INVALID')
+    if (request.amountMinor === null || request.amountMinor <= 0n || request.amountMinor > receivable.amountRemaining) throw new Error('APPROVAL_AMOUNT_CHANGED')
+    if (request.currency?.toUpperCase() !== receivable.currency.toUpperCase()) throw new Error('APPROVAL_CURRENCY_CHANGED')
+    if (value.reason.trim().length < 10 || value.reason.length > 1000) throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+    return { actionId: 'disputes.financial_resolution', market, amountMinor: request.amountMinor, currency: receivable.currency, risk: {} }
+  }
+
   if (request.actionId === 'finance.refund') {
     if (request.targetType !== 'PaymentIntent') {
       throw new Error('APPROVAL_TARGET_TYPE_INVALID')

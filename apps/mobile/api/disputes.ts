@@ -15,6 +15,7 @@ export const disputes = {
       description: string | null
       resolution: string | null
       resolutionAction: string | null
+      evidence: Array<{ id: string; participantType: string; evidenceType: string; description: string; createdAt: string }>
       caseHistory: Array<{
         id: string
         action: string
@@ -27,6 +28,11 @@ export const disputes = {
       }>
       job: { id: string; title: string; status: string; countryCode: string; budgetMinor: string }
     }>(`/api/mobile/disputes/${encodeURIComponent(id)}`),
+  addEvidence: (id: string, description: string, idempotencyKey: string) =>
+    request<{ evidence: { id: string; description: string }; reused: boolean }>(
+      `/api/mobile/disputes/${encodeURIComponent(id)}/evidence`,
+      { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify({ description }) },
+    ),
   appeal: (id: string, data: { appeal: string; idempotencyKey: string }) =>
     request<{ disputeId: string; status: string; replayed: boolean; financialEffect: 'NONE'; message: string }>(
       `/api/mobile/disputes/${encodeURIComponent(id)}/appeal`,

@@ -2293,11 +2293,75 @@ model MarketplaceDispute {
   countryCode      String         @default("LK")
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  evidence         MarketplaceDisputeEvidence[]
+  corrections      MarketplaceDisputeCorrection[]
 
   @@index([status, createdAt])
   @@index([countryCode, status])
   @@index([raisedById])
   @@index([escrowId])
+}
+
+model MarketplaceDisputeEvidence {
+  id              String   @id @default(cuid())
+  disputeId       String
+  dispute         MarketplaceDispute @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+  submittedById   String
+  participantType String
+  evidenceType    String   @default("NOTE")
+  description     String
+  contentSha256   String
+  idempotencyKey  String
+  createdAt       DateTime @default(now())
+  events          MarketplaceDisputeEvidenceEvent[]
+
+  @@index([disputeId, createdAt])
+  @@index([submittedById, createdAt])
+  @@unique([disputeId, submittedById, idempotencyKey])
+}
+
+model MarketplaceDisputeEvidenceEvent {
+  id         String   @id @default(cuid())
+  evidenceId String
+  evidence   MarketplaceDisputeEvidence @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  eventType  String
+  actorId    String
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([evidenceId, createdAt])
+}
+
+model MarketplaceDisputeCorrection {
+  id                String   @id @default(cuid())
+  disputeId         String
+  dispute           MarketplaceDispute @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+  receivableId      String
+  receivable        ProviderCommissionReceivable @relation(fields: [receivableId], references: [id], onDelete: Restrict)
+  approvalRequestId String   @unique
+  approvalRequest   CrmApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Restrict)
+  amountMinor       BigInt
+  currency          String
+  reason            String
+  status            String   @default("APPLIED")
+  appliedByAdminId  String
+  createdAt         DateTime @default(now())
+  events            MarketplaceDisputeCorrectionEvent[]
+
+  @@index([disputeId, createdAt])
+  @@index([receivableId, createdAt])
+}
+
+model MarketplaceDisputeCorrectionEvent {
+  id           String   @id @default(cuid())
+  correctionId String
+  correction   MarketplaceDisputeCorrection @relation(fields: [correctionId], references: [id], onDelete: Restrict)
+  eventType    String
+  actorAdminId String
+  metadata     String?
+  createdAt    DateTime @default(now())
+
+  @@index([correctionId, createdAt])
 }
 
 model JobEscrow {
@@ -2560,6 +2624,7 @@ model CrmApprovalRequest {
 
   decisions CrmApprovalDecision[]
   events    CrmApprovalEvent[]
+  disputeCorrection MarketplaceDisputeCorrection?
 
   @@index([status, createdAt])
   @@index([actionId, status])
@@ -3893,6 +3958,7 @@ model ProviderCommissionReceivable {
   currency           String
   amountOriginal     BigInt
   amountRemaining    BigInt
+  amountWaived       BigInt           @default(0)
   status             String           @default("OPEN") // OPEN, PARTIAL, SETTLED, WAIVED
   dueAt              DateTime
   settledAt          DateTime?
@@ -3901,6 +3967,7 @@ model ProviderCommissionReceivable {
 
   recoveries ProviderCommissionRecovery[]
   bankAllocations CommissionBankAllocation[]
+  disputeCorrections MarketplaceDisputeCorrection[]
 
   @@index([providerIdentityId, currency, status, dueAt])
   @@index([jobId])

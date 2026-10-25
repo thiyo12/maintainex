@@ -19,6 +19,7 @@ export default function DisputeCaseScreen() {
   const id = Array.isArray(routeId) ? routeId[0] : routeId
   const [caseFile, setCaseFile] = useState<DisputeCase | null>(null)
   const [appealText, setAppealText] = useState('')
+  const [evidenceText, setEvidenceText] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -56,6 +57,22 @@ export default function DisputeCaseScreen() {
     }
   }
 
+  const submitEvidence = async () => {
+    if (!id || !caseFile || evidenceText.trim().length < 1 || evidenceText.trim().length > 4000) return
+    setSubmitting(true)
+    requestKey.current ||= `evidence-${Date.now()}-${Math.random().toString(36).slice(2, 14)}`
+    try {
+      await disputes.addEvidence(id, evidenceText.trim(), requestKey.current)
+      requestKey.current = null
+      setEvidenceText('')
+      await loadCase()
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : t('dispute.evidenceError'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} style={styles.backButton}>
@@ -87,6 +104,38 @@ export default function DisputeCaseScreen() {
             <Text style={styles.body}>{caseFile.reason}</Text>
             <Text style={[styles.label, styles.spaced]}>{t('dispute.description')}</Text>
             <Text style={styles.body}>{caseFile.description || t('dispute.noDescription')}</Text>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>{t('dispute.evidenceTitle')}</Text>
+            <Text style={styles.muted}>{t('dispute.evidencePrivacy')}</Text>
+            {caseFile.evidence.map(item => (
+              <View key={item.id} style={styles.historyItem}>
+                <Text style={styles.status}>{item.participantType}</Text>
+                <Text style={styles.body}>{item.description}</Text>
+                <Text style={styles.muted}>{new Date(item.createdAt).toLocaleString()}</Text>
+              </View>
+            ))}
+            <TextInput
+              accessibilityLabel={t('dispute.evidenceTitle')}
+              value={evidenceText}
+              onChangeText={value => { setEvidenceText(value.slice(0, 4000)); setError('') }}
+              placeholder={t('dispute.evidencePlaceholder')}
+              placeholderTextColor={colors.muted}
+              multiline
+              maxLength={4000}
+              textAlignVertical="top"
+              style={styles.input}
+            />
+            {error ? <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
+            <TouchableOpacity
+              accessibilityRole="button"
+              disabled={submitting || !evidenceText.trim()}
+              onPress={() => { void submitEvidence() }}
+              style={[styles.primaryButton, (submitting || !evidenceText.trim()) && styles.disabledButton]}
+            >
+              {submitting ? <ActivityIndicator color="#111" /> : <Text style={styles.buttonText}>{t('dispute.submitEvidence')}</Text>}
+            </TouchableOpacity>
           </View>
 
           {caseFile.caseHistory.length > 0 && (
