@@ -169,7 +169,9 @@ export default function DisputesPage() {
       } else if (resolutionAction === 'RELEASE_PROVIDER') {
         toast.success('Dispute resolved — escrow released to provider')
       } else if (resolutionAction === 'REFUND_CUSTOMER') {
-        toast.success('Dispute resolved — customer refund completed')
+        toast.success(data?.refundStatus === 'NO_FUNDS_TO_REFUND'
+          ? 'Dispute resolved — no collected funds required a refund'
+          : 'Dispute resolved — customer refund completed')
       } else {
         toast.success('Dispute resolved')
       }

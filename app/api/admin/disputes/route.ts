@@ -645,6 +645,7 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({
               dispute: updated,
               financialAction: canonicalAction,
+              refundStatus: recoveredRefund.refundCents === 0n ? 'NO_FUNDS_TO_REFUND' : 'REFUNDED',
               recovered: true,
             })
           }
@@ -860,6 +861,7 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({
           dispute: updated,
           financialAction: canonicalAction,
+          refundStatus: refund.refundCents === 0n ? 'NO_FUNDS_TO_REFUND' : 'REFUNDED',
         })
       } catch (error) {
         if (!moneyApplied) {

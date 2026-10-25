@@ -55,6 +55,15 @@ describe('marketplace dispute resolution contract', () => {
     expect(paymentService).toContain("targetTable: 'MarketplaceDispute'")
   })
 
+  it('does not report a completed refund when a dispute had no collected funds', () => {
+    const adminRoute = read('app/api/admin/disputes/route.ts')
+    const adminPage = read('app/(admin)/admin/jobs/disputes/page.tsx')
+
+    expect(adminRoute.match(/refundStatus: (?:recoveredRefund|refund)\.refundCents === 0n \? 'NO_FUNDS_TO_REFUND' : 'REFUNDED'/g)).toHaveLength(2)
+    expect(adminPage).toContain("data?.refundStatus === 'NO_FUNDS_TO_REFUND'")
+    expect(adminPage).toContain('no collected funds required a refund')
+  })
+
   it('routes the customer dispute screen through V2 instead of the legacy JobPosting client', () => {
     const screen = read('apps/mobile/features/jobs/screens/customer/dispute/[id].tsx')
 
