@@ -65,6 +65,7 @@ const SECURITY_BOUNDARY_MARKERS = [
   'verifyPayPalWebhook',
   'verifyPayHere',
   'verifyNotificationSignature',
+  'verifyBankEvidenceSignature(',
   'signatureVerified',
   "process.env.NODE_ENV === 'production'",
 ] as const
@@ -116,6 +117,7 @@ const ROUTE_LOCAL_PRIVILEGED_MARKERS = [
   'requireInternal',
   'INTERNAL_SYNC_SECRET',
   'CRON_SECRET',
+  'verifyBankEvidenceSignature(',
 ] as const
 
 describe('API attack-surface inventory', () => {

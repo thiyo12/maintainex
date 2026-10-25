@@ -167,6 +167,7 @@ describe.skipIf(!requiresPostgres())('commission remittance PostgreSQL integrati
       await prisma.providerCommissionRecovery.deleteMany({ where: { idempotencyKey: { startsWith: `bank-credit:${firstTxn}:` } } })
       await prisma.providerCommissionRecovery.deleteMany({ where: { idempotencyKey: { startsWith: `bank-credit:${secondTxn}:` } } })
       await prisma.financialLedger.deleteMany({ where: { referenceId: { in: [firstReconciliationId, secondReconciliationId] } } })
+      await prisma.idempotencyRecord.deleteMany({ where: { idempotencyKey: { in: [`commission-bank-credit:${firstTxn}`, `commission-bank-credit:${secondTxn}`] } } })
       await prisma.providerCommissionReceivable.deleteMany({ where: { id: { in: [firstReceivableId, secondReceivableId] } } })
       await prisma.providerFinancialAccount.deleteMany({ where: { id: accountId } })
       await prisma.weeklySettlement.deleteMany({ where: { id: bankSettlementId } })

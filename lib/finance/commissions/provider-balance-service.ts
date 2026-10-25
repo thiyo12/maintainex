@@ -1274,10 +1274,14 @@ export async function settleProviderReceivablesFromBankCredit(
     throw new Error('BANK_COMMISSION_DEBTOR_INVALID')
   }
   const ledgerKey = `commission-bank-credit:${input.bankTransactionId}`
-  const existingLedger = await tx.financialLedger.findUnique({ where: { idempotencyKey: ledgerKey } })
-  if (existingLedger) {
+  const existingLedgerPost = await tx.idempotencyRecord.findUnique({
+    where: { idempotencyKey: ledgerKey },
+    select: { status: true, resultPayload: true },
+  })
+  if (existingLedgerPost?.status === 'COMPLETED' && existingLedgerPost.resultPayload) {
     return { replayed: true, recoveredMinor: input.amountMinor, providerIdentityId: identity.id }
   }
+  if (existingLedgerPost) throw new Error('BANK_CREDIT_RECONCILIATION_INCOMPLETE')
 
   const receivables = await tx.providerCommissionReceivable.findMany({
     where: {
