@@ -4,7 +4,7 @@ Updated: 2026-10-25
 
 Branch: `feature/payment-restructuring`
 
-Latest payment implementation: `e107153197833ba9c18d1ce8aa1d8d8a584f4bb6`. Exact-head GitHub CI is pending; see the verification entry below after workflows finish.
+Latest payment implementation: `e107153197833ba9c18d1ce8aa1d8d8a584f4bb6`. Verified branch head: `3a07d29870ca4df27b7d30e6654ee35adf505624` (documentation-only commit after the implementation). All three exact-head GitHub workflows passed.
 
 PR #152 remains open, draft and unmerged. Exact-head CI for `4ea90f70827274f32d2f4ed60548d8ecae484843` completed successfully.
 
@@ -74,7 +74,7 @@ The verification callback body is `{ "sourceSystem": "…", "statementId": "…"
 - After case claim and resolution-history changes, local focused dispute/security tests passed: 14 tests across 4 files. Root TypeScript, targeted ESLint, `git diff --check`, and production build passed. Build/lint reported existing repository warnings only.
 - Exact-head GitHub CI for `2a3fbe745e93ef902b3b421487ac35db31c32575` passed: International Fast Gates (`40196317688`), Security Exposure Audit (`40196317731`), and CRM V2 Release Validation (`40196317767`). CRM reported 484 regression files and 4,681 tests passed, no regression skips; bootstrap, forward-migration checks, lint, web/mobile TypeScript, production build, financial lifecycle, Docker build/start/health, market-isolation smoke, and non-root checks passed.
 - In the separate blocking-security invocation, 40 Phase 10.6 tests remain environment-gated because that invocation does not start the local HTTP test API. The full regression job does start the API and ran both those fixtures successfully; the regression report had no skipped tests. The 40 remain reported as skips in the standalone security artifact, not counted as passing there.
-- Exact-head GitHub CI for `e107153197833ba9c18d1ce8aa1d8d8a584f4bb6`: pending after duplicate-alert consistency hardening; verify its workflows before treating this SHA as CI-verified.
+- Exact-head GitHub CI for `3a07d29870ca4df27b7d30e6654ee35adf505624` passed: Security Exposure Audit (`40198096626`), International Fast Gates (`40198096629`), and CRM V2 Release Validation (`40198096847`). CRM reported 4,681 regression tests passing across 484 files with no regression skips; standalone blocking security reported 2,292 passed and 40 environment-gated skips. PostgreSQL bootstrap and forward-migration fixtures, lint, web/mobile TypeScript, production build, full regression, orphan audit, Docker build/start/health, market-isolation smoke, and non-root checks passed. The 40 skipped tests ran in the full regression suite, which reported no skips.
 - A local run of the blocking security suite could not substitute for PostgreSQL CI: 2,070 passed, 238 skipped, and 20 tests failed because the database at `localhost:5432` was unreachable. No CI failure is represented as a local pass.
 - Exact-head GitHub Actions completed successfully for `4ea90f70827274f32d2f4ed60548d8ecae484843`: Security Exposure Audit (run `40188323376`), International Fast Gates (`40188323383`), and CRM V2 Release Validation (`40188323375`). CRM validation reported 4,663 regression tests passed; security suite 2,288 passed and 40 skipped; local HTTP security 8 passed and 18 skipped. PostgreSQL bootstrap, both additive migration checks, lint, web/mobile TypeScript, financial lifecycle gates, production build, full regression, final PostgreSQL orphan audit, Docker build/start/health, market-isolation smoke, and non-root verification passed.
 
