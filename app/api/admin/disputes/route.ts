@@ -11,6 +11,7 @@ import { completeAndReleaseEscrow, refundEscrow } from '@/lib/finance/escrow/esc
 import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
 import { notifyDisputeResolved, notifyPaymentReleased, notifyCashJobCompleted, notifyCashDisputeResolved } from '@/lib/notifications'
 import { claimMarketplaceDisputeInTransaction } from '@/lib/crm/disputes/claim-marketplace-dispute'
+import { finalizeMarketplaceDisputeInTransaction } from '@/lib/crm/disputes/finalize-marketplace-dispute'
 
 const VALID_STATUSES = new Set(['OPEN', 'UNDER_REVIEW', 'RESOLVING', 'RESOLVED', 'DISMISSED'])
 const MARKETPLACE_RESOLUTION_ACTIONS = new Set(['RELEASE_PROVIDER', 'REFUND_CUSTOMER'])
@@ -60,32 +61,7 @@ async function finalizeMarketplaceDisputeRecord(params: {
   resolution: string
   resolutionAction: 'RELEASE_PROVIDER' | 'REFUND_CUSTOMER'
 }) {
-  const updated = await prisma.marketplaceDispute.update({
-    where: { id: params.disputeId },
-    data: {
-      status: 'RESOLVED',
-      resolution: params.resolution,
-      resolutionAction: params.resolutionAction,
-      resolvedBy: params.adminId,
-      resolvedAt: new Date(),
-    },
-  })
-
-  await prisma.adminAlert.updateMany({
-    where: {
-      targetTable: 'MarketplaceDispute',
-      targetId: params.disputeId,
-      status: { in: ['open', 'in_progress'] },
-    },
-    data: {
-      status: 'resolved',
-      resolvedAt: new Date(),
-      resolvedBy: params.adminId,
-      notes: params.resolution,
-    },
-  })
-
-  return updated
+  return prisma.$transaction(tx => finalizeMarketplaceDisputeInTransaction(tx, params))
 }
 
 export async function GET(request: NextRequest) {

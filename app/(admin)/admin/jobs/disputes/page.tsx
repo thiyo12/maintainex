@@ -340,7 +340,8 @@ export default function DisputesPage() {
                       </td>
                       <td className={`${crmTdClass} whitespace-nowrap text-xs text-slate-500`}>{formatDate(dispute.createdAt)}</td>
                       <td className={crmTdClass}>
-                        {dispute.source === 'MARKETPLACE' && canResolveDisputes && !dispute.assignedTo && (
+                        {dispute.source === 'MARKETPLACE' && canResolveDisputes &&
+                          ['OPEN', 'UNDER_REVIEW'].includes(dispute.status) && !dispute.assignedTo && (
                           <CrmButton
                             size="sm"
                             variant="secondary"
