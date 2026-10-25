@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiEye, FiX, FiSearch } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
@@ -44,6 +44,16 @@ interface Dispute {
   }
 }
 
+interface DisputeEvidence {
+  id: string
+  uploaderType: string
+  evidenceType: string
+  url: string | null
+  description: string | null
+  mimeType: string | null
+  createdAt: string
+}
+
 const TABS = [
   { key: 'ALL', label: 'All' },
   { key: 'OPEN', label: 'Open' },
@@ -72,12 +82,12 @@ export default function DisputesPage() {
   const [detailModal, setDetailModal] = useState<Dispute | null>(null)
   const [resolveNotes, setResolveNotes] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [caseEvidence, setCaseEvidence] = useState<DisputeEvidence[]>([])
+  const [evidenceLoading, setEvidenceLoading] = useState(false)
+  const [evidenceError, setEvidenceError] = useState<string | null>(null)
+  const evidenceRequestId = useRef(0)
 
-  useEffect(() => {
-    fetchDisputes()
-  }, [activeTab])
-
-  const fetchDisputes = async () => {
+  const fetchDisputes = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch(`/api/admin/disputes?status=${activeTab === 'ALL' ? '' : activeTab}`, {
@@ -91,7 +101,11 @@ export default function DisputesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeTab])
+
+  useEffect(() => {
+    void fetchDisputes()
+  }, [fetchDisputes])
 
   const handleResolve = async (
     disputeId: string,
@@ -189,6 +203,36 @@ export default function DisputesPage() {
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
+  const openReview = async (dispute: Dispute) => {
+    const requestId = ++evidenceRequestId.current
+    setDetailModal(dispute)
+    setResolveNotes('')
+    setCaseEvidence([])
+    setEvidenceError(null)
+    if (dispute.source !== 'MARKETPLACE') return
+
+    setEvidenceLoading(true)
+    try {
+      const response = await fetch(
+        `/api/admin/disputes?evidenceDisputeId=${encodeURIComponent(dispute.id)}`,
+        { cache: 'no-store' },
+      )
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error || 'Unable to load dispute evidence')
+      if (requestId === evidenceRequestId.current) {
+        setCaseEvidence(Array.isArray(data.evidence) ? data.evidence : [])
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load dispute evidence'
+      if (requestId === evidenceRequestId.current) {
+        setEvidenceError(message)
+        toast.error(message)
+      }
+    } finally {
+      if (requestId === evidenceRequestId.current) setEvidenceLoading(false)
+    }
+  }
+
   return (
     <>
       <div className="space-y-4">
@@ -271,7 +315,7 @@ export default function DisputesPage() {
                         <CrmButton
                           size="sm"
                           variant="secondary"
-                          onClick={() => { setDetailModal(dispute); setResolveNotes('') }}
+                          onClick={() => { void openReview(dispute) }}
                         >
                           <FiEye size={13} />
                           Review
@@ -330,6 +374,36 @@ export default function DisputesPage() {
                   <div className="text-xs text-slate-400 mb-1">Description</div>
                   <div className="text-slate-700 text-sm bg-[var(--crm-surface-soft)] rounded-lg p-3">{detailModal.description}</div>
                 </div>
+
+                {detailModal.source === 'MARKETPLACE' && (
+                  <section aria-label="Job evidence" className="space-y-2">
+                    <div className="text-xs font-semibold text-slate-500">Job evidence</div>
+                    {evidenceLoading ? (
+                      <CrmState type="loading" title="Loading evidence" description="Loading evidence permitted for this market-scoped case." />
+                    ) : evidenceError ? (
+                      <CrmState type="error" title="Evidence could not be loaded" description={evidenceError} />
+                    ) : caseEvidence.length === 0 ? (
+                      <CrmState type="empty" title="No evidence submitted" description="Participants have not attached job evidence to this case yet." />
+                    ) : caseEvidence.map(item => (
+                      <article key={item.id} className="rounded-lg border border-[var(--crm-border)] bg-white p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-sm font-semibold text-slate-800">{item.evidenceType.replaceAll('_', ' ')}</div>
+                          <CrmBadge tone={item.uploaderType === 'CUSTOMER' ? 'info' : 'neutral'}>{item.uploaderType}</CrmBadge>
+                        </div>
+                        {item.description && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700">{item.description}</p>}
+                        {item.mimeType && <p className="mt-1 text-xs text-slate-500">{item.mimeType}</p>}
+                        {item.url && (
+                          !item.url.includes('..') && (item.url.startsWith('/api/mobile/files/') || item.url.startsWith('/uploads/')) ? (
+                            <a href={item.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block break-all text-xs font-medium text-amber-800 underline">Open uploaded evidence</a>
+                          ) : (
+                            <p className="mt-2 break-all font-mono text-xs text-slate-500">External reference: {item.url}</p>
+                          )
+                        )}
+                        <p className="mt-2 text-[11px] text-slate-400">Submitted {new Date(item.createdAt).toLocaleString()}</p>
+                      </article>
+                    ))}
+                  </section>
+                )}
 
                 {detailModal.resolution && (
                   <div>

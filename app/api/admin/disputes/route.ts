@@ -98,6 +98,47 @@ export async function GET(request: NextRequest) {
     const security = guard.context
 
     const { searchParams } = new URL(request.url)
+    const evidenceDisputeId = searchParams.get('evidenceDisputeId')?.trim()
+    if (evidenceDisputeId) {
+      if (evidenceDisputeId.length > 128) {
+        return NextResponse.json({ error: 'Invalid dispute id' }, { status: 400 })
+      }
+      const dispute = await prisma.marketplaceDispute.findUnique({
+        where: { id: evidenceDisputeId },
+        select: { id: true, jobId: true, countryCode: true, job: { select: { countryCode: true } } },
+      })
+      if (!dispute) return NextResponse.json({ error: 'Dispute not found' }, { status: 404 })
+      if (!assertCrmCountryAllowed(security, dispute.countryCode || dispute.job.countryCode)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+
+      const evidence = await prisma.jobEvidence.findMany({
+        where: { jobId: dispute.jobId },
+        select: {
+          id: true,
+          uploaderType: true,
+          evidenceType: true,
+          url: true,
+          description: true,
+          mimeType: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 100,
+      })
+      return NextResponse.json({
+        evidence: evidence.map(item => ({
+          id: item.id,
+          uploaderType: item.uploaderType,
+          evidenceType: item.evidenceType,
+          url: item.url,
+          description: item.description,
+          mimeType: item.mimeType,
+          createdAt: item.createdAt,
+        })),
+      }, { headers: { 'Cache-Control': 'no-store' } })
+    }
+
     const status = (searchParams.get('status') || '').toUpperCase()
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50))
