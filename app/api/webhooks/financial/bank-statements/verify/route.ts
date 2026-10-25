@@ -6,8 +6,10 @@ import { verifyBankEvidenceSignature } from '@/lib/finance/commissions/bank-stat
 export async function POST(request: NextRequest) {
   const secret = process.env.MAINTAINEX_BANK_EVIDENCE_HMAC_SECRET || ''
   const configuredSource = process.env.MAINTAINEX_BANK_EVIDENCE_SOURCE || ''
-  if (secret.length < 32 || !configuredSource) {
-    return NextResponse.json({ error: 'Bank evidence source is not configured' }, { status: 503 })
+  const trustedSources = new Set((process.env.MAINTAINEX_TRUSTED_BANK_EVIDENCE_SOURCES || '')
+    .split(',').map(value => value.trim()).filter(Boolean))
+  if (secret.length < 32 || !configuredSource || !trustedSources.has(configuredSource)) {
+    return NextResponse.json({ error: 'No approved bank evidence source is configured' }, { status: 503 })
   }
   const rawBody = await request.text()
   if (rawBody.length > 16_384) return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
@@ -40,7 +42,13 @@ export async function POST(request: NextRequest) {
 
     const verified = await prisma.$transaction(async (tx) => {
       const statement = await tx.commissionBankStatementImport.findFirst({
-        where: { statementId, contentSha256, provenanceStatus: 'UNVERIFIED' },
+        where: {
+          sourceSystem,
+          statementId,
+          contentSha256,
+          provenanceType: 'BANK_FEED',
+          provenanceStatus: 'UNVERIFIED',
+        },
         select: { id: true, countryCode: true, currency: true },
       })
       if (!statement) return null

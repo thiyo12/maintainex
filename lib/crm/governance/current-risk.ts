@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getActiveEmergencyControl } from '@/lib/crm/emergency-controls'
 import { inspectCrmJobCancellation } from '@/lib/crm/jobs/cancellation'
 import type { CrmActionId, RiskPolicyContext } from './types'
+import { assertTrustedBankEvidenceSource } from '@/lib/finance/commissions/bank-credit-reconciliation'
 
 export interface ApprovalRiskResolution {
   actionId: CrmActionId
@@ -18,6 +19,8 @@ export async function resolveCurrentApprovalRisk(request: {
   targetId: string
   amountMinor: bigint | null
   currency: string | null
+  actionPayload?: string | null
+  id?: string
 }): Promise<ApprovalRiskResolution> {
   if (request.actionId === 'finance.refund') {
     if (request.targetType !== 'PaymentIntent') {
@@ -271,6 +274,51 @@ export async function resolveCurrentApprovalRisk(request: {
     if (request.targetType !== 'CommissionBankTransaction') {
       throw new Error('APPROVAL_TARGET_TYPE_INVALID')
     }
+    let mode = 'BANK_CREDIT'
+    if (request.actionPayload) {
+      try {
+        const payload = JSON.parse(request.actionPayload)
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('invalid')
+        mode = typeof payload.mode === 'string' ? payload.mode : ''
+        if (payload.bankTransactionId !== request.targetId) throw new Error('invalid')
+      } catch {
+        throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+      }
+    }
+    if (mode === 'BANK_REVERSAL') {
+      const reversal = await prisma.commissionBankReversal.findUnique({
+        where: { bankTransactionId: request.targetId },
+        include: {
+          bankTransaction: { include: { statementImport: true } },
+          originalBankTransaction: { include: { statementImport: true, reconciliation: true } },
+        },
+      })
+      if (!reversal) throw new Error('APPROVAL_TARGET_NOT_FOUND')
+      const debit = reversal.bankTransaction
+      const original = reversal.originalBankTransaction
+      if (
+        reversal.status !== 'PENDING_REVIEW' || debit.direction !== 'DEBIT' ||
+        debit.reversalOfTransactionId !== original.transactionId || original.direction !== 'CREDIT' ||
+        !original.reconciliation || original.reconciliation.status !== 'POSTED' ||
+        reversal.originalReconciliationId !== original.reconciliation.id ||
+        request.id && reversal.approvalRequestId !== request.id ||
+        debit.bankAccountRef !== original.bankAccountRef || debit.sourceSystem !== original.sourceSystem ||
+        debit.countryCode.toUpperCase() !== original.countryCode.toUpperCase() || debit.countryCode.toUpperCase() !== request.market.toUpperCase() ||
+        debit.currency !== original.currency || reversal.amountMinor !== debit.amountMinor ||
+        request.amountMinor !== null && request.amountMinor !== debit.amountMinor ||
+        request.currency && request.currency.toUpperCase() !== debit.currency.toUpperCase()
+      ) throw new Error('BANK_REVERSAL_NO_LONGER_ELIGIBLE')
+      assertTrustedBankEvidenceSource(debit.statementImport)
+      assertTrustedBankEvidenceSource(original.statementImport)
+      return {
+        actionId: 'finance.commission.reconcile',
+        market: debit.countryCode,
+        amountMinor: debit.amountMinor,
+        currency: debit.currency,
+        risk: { currencyMismatch: false, countryOrRecipientMismatch: false },
+      }
+    }
+    if (mode !== 'BANK_CREDIT') throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
     const bankTransaction = await prisma.commissionBankTransaction.findUnique({
       where: { id: request.targetId },
       include: { statementImport: true, reconciliation: true },
@@ -286,7 +334,12 @@ export async function resolveCurrentApprovalRisk(request: {
     if (request.currency && request.currency.toUpperCase() !== bankTransaction.currency.toUpperCase()) {
       throw new Error('APPROVAL_CURRENCY_CHANGED')
     }
-    if (bankTransaction.statementImport.provenanceStatus !== 'VERIFIED' ||
+    try {
+      assertTrustedBankEvidenceSource(bankTransaction.statementImport)
+    } catch {
+      throw new Error('BANK_RECONCILIATION_NO_LONGER_ELIGIBLE')
+    }
+    if (
         bankTransaction.reconciliation.status !== 'PENDING_REVIEW' ||
         bankTransaction.direction !== 'CREDIT' || bankTransaction.reversalOfTransactionId) {
       throw new Error('BANK_RECONCILIATION_NO_LONGER_ELIGIBLE')

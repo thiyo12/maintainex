@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
           amountMinor: true, currency: true, countryCode: true, reference: true,
           reversalOfTransactionId: true, status: true, mismatchCode: true,
           reconciliation: { select: { id: true, status: true, providerIdentityId: true, approvalRequestId: true } },
+          reversalEvidence: { select: { id: true, status: true, approvalRequestId: true, originalBankTransactionId: true } },
         },
         orderBy: { createdAt: 'asc' },
       },

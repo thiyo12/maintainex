@@ -10,6 +10,7 @@ import { releaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { tierAtLeast } from './action-registry'
 import { resolveCurrentApprovalRisk } from './current-risk'
 import { postApprovedCommissionBankReconciliation } from '@/lib/finance/commissions/bank-credit-reconciliation'
+import { postApprovedCommissionBankReversal } from '@/lib/finance/commissions/bank-credit-reversal'
 import type { ApprovalTier } from './types'
 import type { AdminRole } from '@/lib/admin-types'
 
@@ -310,19 +311,28 @@ export async function executeApprovedCrmRequest(
       } catch {
         throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
       }
-      if (
-        !payload || typeof payload !== 'object' || Array.isArray(payload) ||
-        (payload as Record<string, unknown>).mode !== 'BANK_CREDIT' ||
-        (payload as Record<string, unknown>).bankTransactionId !== request.targetId
-      ) {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
+          (payload as Record<string, unknown>).bankTransactionId !== request.targetId) {
         throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
       }
-      await postApprovedCommissionBankReconciliation({
-        bankTransactionId: request.targetId,
-        actorAdminId: actor.adminId,
-        approvalRequestId: request.id,
-      })
-      executionRef = `CommissionBankTransaction:${request.targetId}:POSTED`
+      const mode = (payload as Record<string, unknown>).mode
+      if (mode === 'BANK_CREDIT') {
+        await postApprovedCommissionBankReconciliation({
+          bankTransactionId: request.targetId,
+          actorAdminId: actor.adminId,
+          approvalRequestId: request.id,
+        })
+        executionRef = `CommissionBankTransaction:${request.targetId}:POSTED`
+      } else if (mode === 'BANK_REVERSAL') {
+        await postApprovedCommissionBankReversal({
+          bankTransactionId: request.targetId,
+          actorAdminId: actor.adminId,
+          approvalRequestId: request.id,
+        })
+        executionRef = `CommissionBankReversal:${request.targetId}:POSTED`
+      } else {
+        throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+      }
     } else if (request.actionId === 'jobs.cancel') {
       const source =
         request.targetType === 'MarketplaceJob'

@@ -17,6 +17,33 @@ async function withSerializableRetry<T>(work: (tx: Prisma.TransactionClient) => 
   throw new Error('BANK_RECONCILIATION_RETRY_EXHAUSTED')
 }
 
+export function assertTrustedBankEvidenceSource(statement: {
+  provenanceStatus: string
+  provenanceType: string
+  sourceSystem: string
+  verificationSource: string | null
+  verificationRef: string | null
+  verifiedAt: Date | null
+}) {
+  if (statement.provenanceStatus !== 'VERIFIED') throw new Error('BANK_PROVENANCE_NOT_VERIFIED')
+  if (!statement.verificationRef || !statement.verifiedAt || statement.verificationSource !== statement.sourceSystem) {
+    throw new Error('BANK_VERIFICATION_PROVENANCE_MISMATCH')
+  }
+  if (statement.provenanceType === 'SIMULATED') {
+    if (process.env.NODE_ENV === 'production') throw new Error('SIMULATED_BANK_EVIDENCE_DISABLED')
+    return
+  }
+  // HMAC confirms callback authenticity only. The independently approved
+  // source allowlist is the trust boundary for any live ledger posting.
+  if (process.env.NODE_ENV !== 'test') {
+    const trustedSources = new Set((process.env.MAINTAINEX_TRUSTED_BANK_EVIDENCE_SOURCES || '')
+      .split(',').map(value => value.trim()).filter(Boolean))
+    if (statement.provenanceType !== 'BANK_FEED' || !trustedSources.has(statement.sourceSystem)) {
+      throw new Error('BANK_SOURCE_NOT_TRUSTED')
+    }
+  }
+}
+
 export async function prepareCommissionBankReconciliation(input: {
   bankTransactionId: string
   actorAdminId: string
@@ -28,10 +55,7 @@ export async function prepareCommissionBankReconciliation(input: {
     })
     if (!row) throw new Error('BANK_TRANSACTION_NOT_FOUND')
     if (row.reconciliation) return row.reconciliation
-    if (row.statementImport.provenanceStatus !== 'VERIFIED') throw new Error('BANK_PROVENANCE_NOT_VERIFIED')
-    if (row.statementImport.provenanceType === 'SIMULATED' && process.env.NODE_ENV === 'production') {
-      throw new Error('SIMULATED_BANK_EVIDENCE_DISABLED')
-    }
+    assertTrustedBankEvidenceSource(row.statementImport)
     if (row.direction !== 'CREDIT') throw new Error('BANK_ENTRY_NOT_CREDIT')
     if (row.reversalOfTransactionId) throw new Error('BANK_REVERSAL_REQUIRES_REVIEW')
     if (row.status === 'RECONCILED' || row.status === 'DUPLICATE') throw new Error('BANK_TRANSACTION_ALREADY_USED')
@@ -109,9 +133,7 @@ export async function postApprovedCommissionBankReconciliation(input: {
     if (reconciliation.status === 'POSTED') return { replayed: true, reconciliationId: reconciliation.id }
     if (reconciliation.status !== 'PENDING_REVIEW') throw new Error('BANK_RECONCILIATION_NOT_POSTABLE')
     if (reconciliation.initiatedByAdminId === input.actorAdminId) throw new Error('BANK_RECONCILIATION_SELF_APPROVAL')
-    if (reconciliation.bankTransaction.statementImport.provenanceStatus !== 'VERIFIED') {
-      throw new Error('BANK_PROVENANCE_NOT_VERIFIED')
-    }
+    assertTrustedBankEvidenceSource(reconciliation.bankTransaction.statementImport)
     if (reconciliation.bankTransaction.direction !== 'CREDIT' || reconciliation.bankTransaction.reversalOfTransactionId) {
       throw new Error('BANK_CREDIT_NOT_POSTABLE')
     }

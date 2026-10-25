@@ -3960,10 +3960,12 @@ model CommissionBankTransaction {
   countryCode           String
   reference             String
   reversalOfTransactionId String?
-  status                String   @default("UNREVIEWED") // UNREVIEWED, MATCHED, MISMATCH, DUPLICATE, REVERSED, RECONCILED
+  status                String   @default("UNREVIEWED") // UNREVIEWED, MATCHED, MISMATCH, DUPLICATE, RECONCILED, PARTIALLY_REVERSED, REVERSED
   mismatchCode          String?
   createdAt             DateTime @default(now())
   reconciliation        CommissionBankReconciliation?
+  reversalEvidence      CommissionBankReversal? @relation("ReversalBankTransaction")
+  reversals             CommissionBankReversal[] @relation("OriginalBankTransaction")
 
   @@unique([sourceSystem, bankAccountRef, transactionId])
   @@index([countryCode, status, createdAt])
@@ -3988,6 +3990,7 @@ model CommissionBankReconciliation {
   updatedAt              DateTime @updatedAt
   allocations            CommissionBankAllocation[]
   events                 CommissionBankReconciliationEvent[]
+  reversals              CommissionBankReversal[]
 
   @@index([providerIdentityId, status, createdAt])
   @@index([commissionPaymentId, status, createdAt])
@@ -4014,9 +4017,67 @@ model CommissionBankAllocation {
   receivable       ProviderCommissionReceivable @relation(fields: [receivableId], references: [id], onDelete: Restrict)
   amountMinor      BigInt
   createdAt        DateTime @default(now())
+  reversals        CommissionBankReversalAllocation[]
 
   @@unique([reconciliationId, receivableId])
   @@index([receivableId, createdAt])
+}
+
+/// Append-only compensating bank reversal records. The debit transaction must
+/// identify the original posted bank credit; approvals and allocations retain
+/// the exact recovery amounts that were reversed.
+model CommissionBankReversal {
+  id                       String   @id @default(cuid())
+  bankTransactionId        String   @unique
+  bankTransaction          CommissionBankTransaction @relation("ReversalBankTransaction", fields: [bankTransactionId], references: [id], onDelete: Restrict)
+  originalBankTransactionId String
+  originalBankTransaction  CommissionBankTransaction @relation("OriginalBankTransaction", fields: [originalBankTransactionId], references: [id], onDelete: Restrict)
+  originalReconciliationId String
+  originalReconciliation   CommissionBankReconciliation @relation(fields: [originalReconciliationId], references: [id], onDelete: Restrict)
+  providerIdentityId       String
+  initiatedByAdminId       String
+  approvalRequestId        String?  @unique
+  status                   String   @default("PENDING_REVIEW") // PENDING_REVIEW, POSTED, REJECTED
+  amountMinor              BigInt
+  currency                 String
+  countryCode              String
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  allocations              CommissionBankReversalAllocation[]
+  events                   CommissionBankReversalEvent[]
+
+  @@index([originalReconciliationId, status, createdAt])
+  @@index([providerIdentityId, countryCode, status])
+}
+
+/// Allocation reversal links one compensating amount to the exact original
+/// bank allocation. These rows are append-only; rejection state is on parent.
+model CommissionBankReversalAllocation {
+  id                   String   @id @default(cuid())
+  reversalId           String
+  reversal             CommissionBankReversal @relation(fields: [reversalId], references: [id], onDelete: Restrict)
+  originalAllocationId String
+  originalAllocation   CommissionBankAllocation @relation(fields: [originalAllocationId], references: [id], onDelete: Restrict)
+  recoveryId           String
+  recovery             ProviderCommissionRecovery @relation(fields: [recoveryId], references: [id], onDelete: Restrict)
+  amountMinor          BigInt
+  createdAt            DateTime @default(now())
+
+  @@unique([reversalId, originalAllocationId])
+  @@index([originalAllocationId])
+  @@index([recoveryId])
+}
+
+model CommissionBankReversalEvent {
+  id               String   @id @default(cuid())
+  reversalId       String
+  reversal         CommissionBankReversal @relation(fields: [reversalId], references: [id], onDelete: Restrict)
+  eventType        String
+  actorAdminId     String
+  metadata         String?
+  createdAt        DateTime @default(now())
+
+  @@index([reversalId, createdAt])
 }
 
 model ProviderCommissionRecovery {
@@ -4033,6 +4094,7 @@ model ProviderCommissionRecovery {
   idempotencyKey     String                       @unique
   createdBy          String
   createdAt          DateTime                     @default(now())
+  bankReversalAllocations CommissionBankReversalAllocation[]
 
   @@index([providerIdentityId, createdAt])
   @@index([receivableId])

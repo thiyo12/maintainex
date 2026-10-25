@@ -87,6 +87,13 @@ ALTER TABLE "CommissionBankReconciliation"
 ALTER TABLE "CommissionBankAllocation"
   ADD CONSTRAINT "CommissionBankAllocation_amount_check" CHECK ("amountMinor" > 0);
 
+ALTER TABLE "CommissionBankReversal"
+  ADD CONSTRAINT "CommissionBankReversal_amount_check" CHECK ("amountMinor" > 0),
+  ADD CONSTRAINT "CommissionBankReversal_status_check" CHECK ("status" IN ('PENDING_REVIEW','POSTED','REJECTED'));
+
+ALTER TABLE "CommissionBankReversalAllocation"
+  ADD CONSTRAINT "CommissionBankReversalAllocation_amount_check" CHECK ("amountMinor" > 0);
+
 CREATE OR REPLACE FUNCTION reject_immutable_commission_finance_row()
 RETURNS TRIGGER AS $commission_immutable$
 BEGIN
@@ -104,4 +111,12 @@ CREATE TRIGGER trg_commission_bank_event_append_only
 
 CREATE TRIGGER trg_commission_bank_statement_event_append_only
   BEFORE UPDATE OR DELETE ON "CommissionBankStatementEvent"
+  FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();
+
+CREATE TRIGGER trg_commission_bank_reversal_allocation_append_only
+  BEFORE UPDATE OR DELETE ON "CommissionBankReversalAllocation"
+  FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();
+
+CREATE TRIGGER trg_commission_bank_reversal_event_append_only
+  BEFORE UPDATE OR DELETE ON "CommissionBankReversalEvent"
   FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();

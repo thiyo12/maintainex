@@ -15,9 +15,11 @@ interface BankTransaction {
   currency: string
   countryCode: string
   reference: string
+  reversalOfTransactionId?: string | null
   status: string
   mismatchCode?: string | null
   reconciliation?: { id: string; status: string; providerIdentityId: string; approvalRequestId?: string | null } | null
+  reversalEvidence?: { id: string; status: string; approvalRequestId?: string | null; originalBankTransactionId: string } | null
 }
 
 interface BankStatementImport {
@@ -27,6 +29,7 @@ interface BankStatementImport {
   countryCode: string
   currency: string
   rowCount: number
+  provenanceType: string
   provenanceStatus: string
   verificationSource?: string | null
   verifiedAt?: string | null
@@ -99,14 +102,16 @@ export default function CommissionBankReconciliationPage() {
   async function requestReconciliation(transaction: BankTransaction) {
     setActing(transaction.id)
     try {
-      const response = await fetch(`/api/admin/financial/commission/bank-transactions/${encodeURIComponent(transaction.id)}/reconcile`, {
+      const isReversal = transaction.direction === 'DEBIT' && Boolean(transaction.reversalOfTransactionId)
+      const actionPath = isReversal ? 'reverse' : 'reconcile'
+      const response = await fetch(`/api/admin/financial/commission/bank-transactions/${encodeURIComponent(transaction.id)}/${actionPath}`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
         body: JSON.stringify({}),
       })
       const body = await response.json().catch(() => ({}))
       if (!response.ok) crmApiError(body, 'Unable to request reconciliation')
-      toast.success('Maker-checker approval requested')
+      toast.success(isReversal ? 'Bank reversal sent for maker-checker review' : 'Maker-checker approval requested')
       await load()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to request reconciliation')
@@ -149,11 +154,12 @@ export default function CommissionBankReconciliationPage() {
       ) : imports.map(statement => (
         <CrmTableFrame key={statement.id} title={`Statement ${statement.statementId}`} description={`${statement.accountRef} · ${statement.rowCount} rows · imported ${new Date(statement.createdAt).toLocaleString()}`}>
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-            <CrmBadge tone={statement.provenanceStatus === 'VERIFIED' ? 'success' : 'warning'}>{statement.provenanceStatus}</CrmBadge>
+            <CrmBadge tone={statement.provenanceStatus === 'VERIFIED' && statement.provenanceType === 'BANK_FEED' ? 'success' : 'warning'}>{statement.provenanceStatus === 'VERIFIED' && statement.provenanceType !== 'BANK_FEED' ? 'CALLBACK AUTHENTICATED ONLY' : statement.provenanceStatus}</CrmBadge>
             <span className="text-xs text-slate-500">{statement.countryCode} · {statement.currency}</span>
             {statement.verificationSource && <span className="text-xs text-slate-500">Source: {statement.verificationSource}</span>}
             {statement.verifiedAt && <span className="text-xs text-slate-500">Verified {new Date(statement.verifiedAt).toLocaleString()}</span>}
           </div>
+          {statement.provenanceType !== 'BANK_FEED' && <p className="px-4 pb-3 text-xs text-amber-800">An HMAC-authenticated callback proves who sent the callback, not that funds moved. Only an approved bank-feed source can be used to reconcile.</p>}
           <div className="overflow-x-auto">
             <table className="min-w-[900px] w-full text-left text-sm">
               <thead><tr><th className={crmThClass}>Bank transaction</th><th className={crmThClass}>Direction</th><th className={crmThClass}>Reference</th><th className={crmThClass}>Amount</th><th className={crmThClass}>State</th><th className={`${crmThClass} text-right`}>Action</th></tr></thead>
@@ -161,8 +167,8 @@ export default function CommissionBankReconciliationPage() {
                 <td className={crmTdClass}><div className="font-medium">{transaction.transactionId}</div><div className="text-xs text-slate-500">{transaction.id}</div></td>
                 <td className={crmTdClass}>{transaction.direction}</td><td className={crmTdClass}>{transaction.reference}</td>
                 <td className={crmTdClass}>{formatMinor(transaction.amountMinor, transaction.currency)}</td>
-                <td className={crmTdClass}><span className="inline-flex items-center gap-1">{transaction.status === 'RECONCILED' ? <FiCheckCircle /> : <FiClock />}{transaction.reconciliation?.status || transaction.status}{transaction.mismatchCode ? ` · ${transaction.mismatchCode}` : ''}</span></td>
-                <td className={`${crmTdClass} text-right`}>{transaction.status === 'UNREVIEWED' && statement.provenanceStatus === 'VERIFIED' ? <CrmButton size="sm" variant="secondary" disabled={acting === transaction.id} onClick={() => void requestReconciliation(transaction)}>{acting === transaction.id ? 'Submitting…' : 'Request approval'}</CrmButton> : transaction.status === 'UNREVIEWED' ? <span className="text-xs text-amber-700">Awaiting source verification</span> : transaction.reconciliation?.approvalRequestId ? <Link className="text-xs font-semibold text-amber-800 hover:underline" href="/admin/approvals">Open approval request</Link> : null}</td>
+                <td className={crmTdClass}><span className="inline-flex items-center gap-1">{transaction.status === 'RECONCILED' ? <FiCheckCircle /> : <FiClock />}{transaction.reconciliation?.status || transaction.reversalEvidence?.status || transaction.status}{transaction.mismatchCode ? ` · ${transaction.mismatchCode}` : ''}</span>{transaction.direction === 'DEBIT' && transaction.reversalOfTransactionId && <div className="mt-1 text-[11px] text-slate-500">Reverses {transaction.reversalOfTransactionId}</div>}</td>
+                <td className={`${crmTdClass} text-right`}>{transaction.status === 'UNREVIEWED' && statement.provenanceStatus === 'VERIFIED' && statement.provenanceType === 'BANK_FEED' && (transaction.direction === 'CREDIT' || Boolean(transaction.reversalOfTransactionId)) ? <CrmButton size="sm" variant="secondary" disabled={acting === transaction.id} onClick={() => void requestReconciliation(transaction)}>{acting === transaction.id ? 'Submitting…' : transaction.direction === 'DEBIT' ? 'Review reversal' : 'Request approval'}</CrmButton> : transaction.status === 'UNREVIEWED' && (statement.provenanceStatus !== 'VERIFIED' || statement.provenanceType !== 'BANK_FEED') ? <span className="text-xs text-amber-700">Awaiting approved bank-feed evidence</span> : transaction.direction === 'DEBIT' && !transaction.reversalOfTransactionId && transaction.status === 'UNREVIEWED' ? <span className="text-xs text-amber-700">Debit requires investigation</span> : transaction.reconciliation?.approvalRequestId || transaction.reversalEvidence?.approvalRequestId ? <Link className="text-xs font-semibold text-amber-800 hover:underline" href="/admin/approvals">Open approval request</Link> : null}</td>
               </tr>)}</tbody>
             </table>
           </div>
