@@ -1,4 +1,5 @@
 import { resolveMarketplaceDisputeParticipant } from '@/lib/domain/marketplace-dispute-participants'
+import { createHash } from 'node:crypto'
 
 type AppealResult =
   | { ok: true; status: string; replayed: boolean }
@@ -44,18 +45,19 @@ export async function appealMarketplaceDisputeInTransaction(
   const actorType = await resolveMarketplaceDisputeParticipant(tx, current.jobId, input.actorId)
   if (!actorType) return { ok: false, code: 'NOT_PARTICIPANT' }
 
-  const priorAppeals = await tx.jobLifecycleEvent.findMany({
-    where: { jobId: current.jobId, action: 'FINANCIAL_DISPUTE_APPEALED' },
-    orderBy: { createdAt: 'desc' },
-    select: { metadata: true },
-  }) as Array<{ metadata: string | null }>
-  const prior = priorAppeals.find(event => {
-    const metadata = readMetadata(event.metadata)
-    return metadata?.disputeId === input.disputeId &&
-      metadata?.actorId === input.actorId &&
-      metadata?.idempotencyKey === input.idempotencyKey
-  })
-  if (prior) return { ok: true, status: current.status, replayed: true }
+  const idempotencyKeyHash = createHash('sha256').update(input.idempotencyKey).digest('hex')
+  const prior = await tx.jobLifecycleEvent.findFirst({
+    where: {
+      jobId: current.jobId,
+      action: 'FINANCIAL_DISPUTE_APPEALED',
+      metadata: { contains: `"idempotencyKeyHash":"${idempotencyKeyHash}"` },
+    },
+    select: { actorId: true, metadata: true },
+  }) as { actorId: string | null; metadata: string | null } | null
+  const priorMetadata = readMetadata(prior?.metadata ?? null)
+  if (prior?.actorId === input.actorId && priorMetadata?.disputeId === input.disputeId) {
+    return { ok: true, status: current.status, replayed: true }
+  }
 
   if (current.status !== 'RESOLVED') {
     return { ok: false, code: current.status === 'OPEN' ? 'IDEMPOTENCY_CONFLICT' : 'NOT_RESOLVED' }
@@ -83,12 +85,10 @@ export async function appealMarketplaceDisputeInTransaction(
       toState: 'OPEN',
       metadata: JSON.stringify({
         disputeId: input.disputeId,
-        actorId: input.actorId,
-        idempotencyKey: input.idempotencyKey,
+        idempotencyKeyHash,
         appeal: input.appeal,
         previousResolution: current.resolution,
         previousResolutionAction: current.resolutionAction,
-        previousResolvedBy: current.resolvedBy,
         previousResolvedAt: current.resolvedAt?.toISOString() ?? null,
         financialEffect: 'NONE',
       }),

@@ -21,6 +21,14 @@ function parseMetadata(value: string | null): Record<string, unknown> | null {
   }
 }
 
+function publicLifecycleMetadata(action: string, value: string | null): Record<string, unknown> | null {
+  const metadata = parseMetadata(value)
+  if (metadata && action === 'FINANCIAL_DISPUTE_APPEALED') {
+    delete metadata.idempotencyKeyHash
+  }
+  return metadata
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -93,7 +101,7 @@ export async function GET(
         action: event.action,
         fromState: event.fromState,
         toState: event.toState,
-        metadata: parseMetadata(event.metadata),
+        metadata: publicLifecycleMetadata(event.action, event.metadata),
         createdAt: event.createdAt.toISOString(),
       })),
     })

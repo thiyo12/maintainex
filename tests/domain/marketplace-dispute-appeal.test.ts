@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createHash } from 'node:crypto'
 import { appealMarketplaceDisputeInTransaction } from '@/lib/domain/marketplace-dispute-appeal'
 
 function txFixture(status = 'RESOLVED', customerId = 'customer-1') {
-  const events: Array<{ metadata: string }> = []
+  const events: Array<{ actorId: string; metadata: string }> = []
   const alerts: Array<{ id: string }> = []
   const tx = {
     $queryRawUnsafe: vi.fn(async () => [{
@@ -13,9 +14,10 @@ function txFixture(status = 'RESOLVED', customerId = 'customer-1') {
     marketplaceJob: { findUnique: vi.fn(async () => ({ id: 'job-1', customerId })) },
     jobQuote: { findFirst: vi.fn(async () => null) },
     jobLifecycleEvent: {
-      findMany: vi.fn(async () => events.map(event => ({ metadata: event.metadata }))),
-      create: vi.fn(async ({ data }: { data: { metadata: string } }) => {
-        events.push({ metadata: data.metadata })
+      findFirst: vi.fn(async ({ where }: { where: { metadata: { contains: string } } }) =>
+        events.find(event => event.metadata.includes(where.metadata.contains)) || null),
+      create: vi.fn(async ({ data }: { data: { actorId: string; metadata: string } }) => {
+        events.push({ actorId: data.actorId, metadata: data.metadata })
         return data
       }),
     },
@@ -59,6 +61,7 @@ describe('marketplace dispute appeals', () => {
       previousResolutionAction: 'RELEASE_PROVIDER',
       financialEffect: 'NONE',
     })
+    expect(JSON.parse(events[0].metadata)).not.toHaveProperty('idempotencyKey')
     expect(alerts).toHaveLength(1)
     expect(tx.adminAlert.create).toHaveBeenCalledWith({ data: expect.objectContaining({
       targetTable: 'MarketplaceDispute', targetId: 'dispute-1', assignedRole: 'SUPPORT', status: 'open',
@@ -67,9 +70,8 @@ describe('marketplace dispute appeals', () => {
 
   it('returns an idempotent replay without duplicating the alert or history event', async () => {
     const { tx, events } = txFixture('OPEN')
-    events.push({ metadata: JSON.stringify({
-      disputeId: input.disputeId, actorId: input.actorId, idempotencyKey: input.idempotencyKey,
-    }) })
+    const idempotencyKeyHash = createHash('sha256').update(input.idempotencyKey).digest('hex')
+    events.push({ actorId: input.actorId, metadata: JSON.stringify({ disputeId: input.disputeId, idempotencyKeyHash }) })
 
     const result = await appealMarketplaceDisputeInTransaction(tx, input)
 
