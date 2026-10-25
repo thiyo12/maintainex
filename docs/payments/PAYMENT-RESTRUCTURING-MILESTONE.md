@@ -6,7 +6,7 @@ Branch: `feature/payment-restructuring`
 
 Latest payment implementation and test evidence: `101836c03517abc5f851426529456a6408e87b35`. All three exact-head GitHub workflows passed on this code head. The documentation refresh is committed separately afterward.
 
-PR #152 remains open, draft and unmerged. Exact-head CI for `4ea90f70827274f32d2f4ed60548d8ecae484843` completed successfully.
+PR #152 remains open, draft and unmerged. Exact-head CI for documentation head `729bd6c948c4af59d333ba90249fd486714ddda9` passed in all three workflows; the current tested implementation is `101836c03517abc5f851426529456a6408e87b35`.
 
 Previously verified implementation head: `6b0d84edda7892f304fdf56f23f468acd273d05b`
 
