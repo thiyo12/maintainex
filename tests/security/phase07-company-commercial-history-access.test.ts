@@ -81,6 +81,23 @@ describe('Phase 07 — company commercial history is private to management and a
     expect(body.finalAuthorizedAmountCents).toBe('1200')
   })
 
+  it('does not expose dispute appeal idempotency hashes in lifecycle history', async () => {
+    mocks.events.mockResolvedValue([{
+      id: 'event',
+      actorId: 'customer',
+      actorType: 'CUSTOMER',
+      action: 'FINANCIAL_DISPUTE_APPEALED',
+      fromState: 'RESOLVED',
+      toState: 'OPEN',
+      metadata: JSON.stringify({ disputeId: 'dispute', idempotencyKeyHash: 'private-hash', appeal: 'Please review' }),
+      createdAt: new Date('2026-10-25T00:00:00.000Z'),
+    }])
+
+    const body = await (await get()).json()
+
+    expect(body.lifecycleEvents[0].metadata).toEqual({ disputeId: 'dispute', appeal: 'Please review' })
+  })
+
   it('allows the accepted individual provider to read their own history', async () => {
     mocks.user = 'provider'
     mocks.quote = { providerType: 'INDIVIDUAL', providerId: 'provider' }
