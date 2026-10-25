@@ -4,7 +4,7 @@ Updated: 2026-10-25
 
 Branch: `feature/payment-restructuring`
 
-Latest payment implementation: `e107153197833ba9c18d1ce8aa1d8d8a584f4bb6`. Verified branch head: `3a07d29870ca4df27b7d30e6654ee35adf505624` (documentation-only commit after the implementation). All three exact-head GitHub workflows passed.
+Latest payment implementation and test evidence: `101836c03517abc5f851426529456a6408e87b35`. All three exact-head GitHub workflows passed on this code head. The documentation refresh is committed separately afterward.
 
 PR #152 remains open, draft and unmerged. Exact-head CI for `4ea90f70827274f32d2f4ed60548d8ecae484843` completed successfully.
 
@@ -46,6 +46,15 @@ The verification callback body is `{ "sourceSystem": "…", "statementId": "…"
 
 - Claiming a case now checks every active queue alert under the locked dispute row. Any conflicting assignee blocks the claim, and all duplicate active alerts for that same case are assigned consistently, preventing different staff from appearing to own duplicate queue entries.
 
+## Dispute appeals and staff reassignment (implementation at `99213cfb`, privacy follow-up at `50c21e75`)
+
+- Added an authenticated participant appeal route for customers, accepted individual providers, and currently authorized company managers/assigned workers. Participant authority is resolved again inside the row-locked transaction.
+- Appeals reopen resolved cases while preserving the prior resolution and append-only case history. A Support queue alert is created or reopened atomically; an appeal does not post or move funds. Same-key retries are idempotent and competing appeals conflict.
+- Added a participant-scoped case lookup and case detail view for mobile, including customer/provider/company navigation, localized English/Sinhala/Tamil strings, and case history. The case response no longer exposes the submitter email.
+- Added Admin reassignment for active disputes using existing `disputes:resolve` permissions, country scoping, target staff validation, SUPER_ADMIN MFA, self-assignment protection, and transactional audit records. Active queue alerts and the case assignee are updated together; closed cases cannot be reassigned.
+- Appeals store only a SHA-256 digest of the idempotency key. The mobile commercial-history response removes that digest from appeal metadata. A regression test verifies the digest is not returned.
+- This extends assignment, resolution history, appeal, and reopening. A complete case-specific evidence lifecycle, partial financial correction/adjustment, and repeat dispute reconciliation remain open.
+
 ## Verified in this milestone
 
 - Hardened `scripts/bootstrap-fresh-database.sh`: it now refuses existing public relations and Prisma migration history, installs the current Prisma schema and versioned PostgreSQL-only invariants before resolving historical migration records, fails on any resolution error, verifies deploy/status, and checks the successful migration count.
@@ -77,6 +86,8 @@ The verification callback body is `{ "sourceSystem": "…", "statementId": "…"
 - Exact-head GitHub CI for `3a07d29870ca4df27b7d30e6654ee35adf505624` passed: Security Exposure Audit (`40198096626`), International Fast Gates (`40198096629`), and CRM V2 Release Validation (`40198096847`). CRM reported 4,681 regression tests passing across 484 files with no regression skips; standalone blocking security reported 2,292 passed and 40 environment-gated skips. PostgreSQL bootstrap and forward-migration fixtures, lint, web/mobile TypeScript, production build, full regression, orphan audit, Docker build/start/health, market-isolation smoke, and non-root checks passed. The 40 skipped tests ran in the full regression suite, which reported no skips.
 - A local run of the blocking security suite could not substitute for PostgreSQL CI: 2,070 passed, 238 skipped, and 20 tests failed because the database at `localhost:5432` was unreachable. No CI failure is represented as a local pass.
 - Exact-head GitHub Actions completed successfully for `4ea90f70827274f32d2f4ed60548d8ecae484843`: Security Exposure Audit (run `40188323376`), International Fast Gates (`40188323383`), and CRM V2 Release Validation (`40188323375`). CRM validation reported 4,663 regression tests passed; security suite 2,288 passed and 40 skipped; local HTTP security 8 passed and 18 skipped. PostgreSQL bootstrap, both additive migration checks, lint, web/mobile TypeScript, financial lifecycle gates, production build, full regression, final PostgreSQL orphan audit, Docker build/start/health, market-isolation smoke, and non-root verification passed.
+- Appeal/reassignment focused local suite: 26 tests passed across 5 files; root TypeScript, targeted ESLint, and `git diff --check` passed.
+- Exact-head GitHub CI on `101836c03517abc5f851426529456a6408e87b35` passed all three workflows: CRM V2 Release Validation (`40214836740`), Security Exposure Audit (`40214836786`), and International Fast Gates (`40214836745`). CRM reported 4,696 regression tests passed across 489 files with no skips, 136 financial flow tests passed, and 2,295 standalone blocking-security tests passed with 40 environment-gated skips across 2 files. PostgreSQL bootstrap and migration checks, root/mobile TypeScript, lint, production build, final PostgreSQL orphan audit, Docker build/start/health, market-isolation smoke, non-root verification, and cleanup passed. The standalone security invocation does not start the test HTTP API for the 40 gated tests; they ran in the full regression suite, which reported zero skips.
 
 Previously verified at `956fd471fdcbafdf3d2c4494005598d73b48d3a7`: full regression 4,547 passed / 100 environment-gated skips, financial suite 402 passed / 4 skipped, and production build passed.
 
