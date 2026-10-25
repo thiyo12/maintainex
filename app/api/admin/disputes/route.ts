@@ -10,6 +10,7 @@ import { createAuditLog } from '@/lib/crm/audit'
 import { completeAndReleaseEscrow, refundEscrow } from '@/lib/finance/escrow/escrow-service'
 import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
 import { notifyDisputeResolved, notifyPaymentReleased, notifyCashJobCompleted, notifyCashDisputeResolved } from '@/lib/notifications'
+import { claimMarketplaceDisputeInTransaction } from '@/lib/crm/disputes/claim-marketplace-dispute'
 
 const VALID_STATUSES = new Set(['OPEN', 'UNDER_REVIEW', 'RESOLVING', 'RESOLVED', 'DISMISSED'])
 const MARKETPLACE_RESOLUTION_ACTIONS = new Set(['RELEASE_PROVIDER', 'REFUND_CUSTOMER'])
@@ -203,7 +204,24 @@ export async function GET(request: NextRequest) {
           select: { id: true, mxId: true, name: true, email: true },
         })
       : []
+    const marketplaceAlerts = marketplaceDisputes.length
+      ? await prisma.adminAlert.findMany({
+          where: {
+            targetTable: 'MarketplaceDispute',
+            targetId: { in: marketplaceDisputes.map(item => item.id) },
+            status: { in: ['open', 'in_progress'] },
+          },
+          select: { id: true, targetId: true, assignedTo: true, assignedRole: true },
+          orderBy: { createdAt: 'asc' },
+        })
+      : []
     const userById = new Map(marketplaceUsers.map(user => [user.id, user]))
+    const alertByDisputeId = new Map<string, (typeof marketplaceAlerts)[number]>()
+    for (const alert of marketplaceAlerts) {
+      if (alert.targetId && !alertByDisputeId.has(alert.targetId)) {
+        alertByDisputeId.set(alert.targetId, alert)
+      }
+    }
 
     const normalizedLegacy = legacyDisputes.map(dispute => ({
       ...dispute,
@@ -225,6 +243,7 @@ export async function GET(request: NextRequest) {
         dispute.job.budgetAmount ??
         0n
       const raisedBy = userById.get(dispute.raisedById)
+      const assignment = alertByDisputeId.get(dispute.id)
 
       return {
         id: dispute.id,
@@ -238,6 +257,9 @@ export async function GET(request: NextRequest) {
         resolution: dispute.resolution,
         resolutionAction: dispute.resolutionAction,
         status: dispute.status,
+        assignedTo: assignment?.assignedTo ?? null,
+        assignedRole: assignment?.assignedRole ?? null,
+        assignmentId: assignment?.id ?? null,
         countryCode: dispute.countryCode,
         createdAt: dispute.createdAt,
         updatedAt: dispute.updatedAt,
@@ -291,12 +313,60 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
     const disputeId = typeof body?.disputeId === 'string' ? body.disputeId.trim() : ''
+    const action = typeof body?.action === 'string' ? body.action.trim().toUpperCase() : ''
     const status = typeof body?.status === 'string' ? body.status.trim().toUpperCase() : ''
     const resolution = typeof body?.resolution === 'string' ? body.resolution.trim().slice(0, 5000) : ''
     const resolutionAction =
       typeof body?.resolutionAction === 'string'
         ? body.resolutionAction.trim().toUpperCase()
         : ''
+
+    if (action === 'CLAIM') {
+      if (!disputeId || disputeId.length > 128) {
+        return NextResponse.json({ error: 'A valid dispute id is required' }, { status: 400 })
+      }
+      const claimable = await prisma.marketplaceDispute.findUnique({
+        where: { id: disputeId },
+        include: { job: { select: { countryCode: true } } },
+      })
+      if (!claimable) return NextResponse.json({ error: 'Marketplace dispute not found' }, { status: 404 })
+      if (!assertCrmCountryAllowed(security, claimable.countryCode || claimable.job.countryCode)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+
+      const claim = await prisma.$transaction(tx => claimMarketplaceDisputeInTransaction(tx, {
+        disputeId,
+        adminId: security.adminId,
+        adminRole: security.role,
+      }))
+      if (!claim.ok) {
+        const statusCode = claim.code === 'NOT_FOUND' ? 404 : 409
+        return NextResponse.json({
+          error: claim.code === 'ASSIGNED_TO_OTHER'
+            ? 'This case is assigned to another staff member'
+            : claim.code === 'CLOSED'
+              ? 'Resolved cases cannot be claimed'
+              : 'Marketplace dispute not found',
+          code: claim.code,
+        }, { status: statusCode })
+      }
+
+      await createAuditLog({
+        action: 'UPDATE',
+        category: 'DISPUTE',
+        userId: security.adminId,
+        userEmail: security.email,
+        userRole: security.role,
+        entityType: 'MarketplaceDispute',
+        entityId: disputeId,
+        description: 'Marketplace financial dispute claimed by assigned-market staff',
+        newValue: { assignedTo: security.adminId, assignedRole: security.role, status: claim.status },
+        ipAddress: security.ipAddress,
+        userAgent: security.userAgent || undefined,
+        riskLevel: 'LOW',
+      })
+      return NextResponse.json({ claim }, { headers: { 'Cache-Control': 'no-store' } })
+    }
 
     if (!disputeId || !VALID_STATUSES.has(status)) {
       return NextResponse.json({ error: 'Invalid dispute update payload' }, { status: 400 })

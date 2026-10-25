@@ -29,6 +29,8 @@ interface Dispute {
   description: string
   resolution?: string
   status: string
+  assignedTo?: string | null
+  assignedRole?: string | null
   createdAt: string
   job: {
     id: string
@@ -200,6 +202,26 @@ export default function DisputesPage() {
     }
   }
 
+  const handleClaim = async (dispute: Dispute) => {
+    if (!canResolveDisputes || dispute.source !== 'MARKETPLACE') return
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/admin/disputes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disputeId: dispute.id, action: 'CLAIM' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Unable to claim case')
+      toast.success('Case assigned to you')
+      await fetchDisputes()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to claim case')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
@@ -309,9 +331,25 @@ export default function DisputesPage() {
                         <CrmBadge tone={disputeTone(dispute.status)} dot>
                           {dispute.status.replaceAll('_', ' ')}
                         </CrmBadge>
+                        {dispute.assignedTo && (
+                          <div className="mt-1 text-[10px] text-slate-500">
+                            Assigned · {dispute.assignedRole || 'staff'}
+                            {dispute.assignedTo === admin?.id ? ' · you' : ''}
+                          </div>
+                        )}
                       </td>
                       <td className={`${crmTdClass} whitespace-nowrap text-xs text-slate-500`}>{formatDate(dispute.createdAt)}</td>
                       <td className={crmTdClass}>
+                        {dispute.source === 'MARKETPLACE' && canResolveDisputes && !dispute.assignedTo && (
+                          <CrmButton
+                            size="sm"
+                            variant="secondary"
+                            disabled={actionLoading}
+                            onClick={() => { void handleClaim(dispute) }}
+                          >
+                            Claim case
+                          </CrmButton>
+                        )}
                         <CrmButton
                           size="sm"
                           variant="secondary"
