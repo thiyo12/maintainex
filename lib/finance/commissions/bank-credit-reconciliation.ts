@@ -166,24 +166,6 @@ export async function postApprovedCommissionBankReconciliation(input: {
         },
       })
     }
-    const allocationReceivableIds = (result.allocations || []).map((allocation) => allocation.receivableId)
-    const allocatedReceivables = allocationReceivableIds.length
-      ? await tx.providerCommissionReceivable.findMany({
-          where: { id: { in: allocationReceivableIds } },
-          select: { weeklySettlementId: true },
-        })
-      : []
-    for (const weeklySettlementId of [...new Set(allocatedReceivables.map((item) => item.weeklySettlementId).filter((value): value is string => Boolean(value)))]) {
-      const unresolved = await tx.providerCommissionReceivable.count({
-        where: { weeklySettlementId, status: { in: ['OPEN', 'PARTIAL'] }, amountRemaining: { gt: 0 } },
-      })
-      if (unresolved === 0) {
-        await tx.weeklySettlement.updateMany({
-          where: { id: weeklySettlementId, commissionPaid: false },
-          data: { commissionPaid: true, paidAt: new Date(), status: 'PAID', suspendedAt: null, notes: 'Commission receivables reconciled from verified bank credits' },
-        })
-      }
-    }
     await tx.commissionBankReconciliation.update({
       where: { id: reconciliation.id },
       data: { status: 'POSTED', approvalRequestId: input.approvalRequestId },

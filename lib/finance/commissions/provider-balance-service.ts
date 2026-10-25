@@ -1341,6 +1341,26 @@ export async function settleProviderReceivablesFromBankCredit(
     })
   }
 
+  const unresolvedWeeklyReceivables = await tx.providerCommissionReceivable.count({
+    where: {
+      weeklySettlementId: input.weeklySettlementId,
+      status: { in: ['OPEN', 'PARTIAL'] },
+      amountRemaining: { gt: 0 },
+    },
+  })
+  if (unresolvedWeeklyReceivables === 0) {
+    await tx.weeklySettlement.updateMany({
+      where: { id: input.weeklySettlementId, commissionPaid: false },
+      data: {
+        commissionPaid: true,
+        paidAt: settledAt,
+        status: 'PAID',
+        suspendedAt: null,
+        notes: 'Commission receivables reconciled from verified bank credits',
+      },
+    })
+  }
+
   const remainingDue = account.commissionDue - input.amountMinor
   const oldestRemaining = await tx.providerCommissionReceivable.findFirst({
     where: { providerIdentityId: identity.id, currency, status: { in: ['OPEN', 'PARTIAL'] }, amountRemaining: { gt: 0 } },
