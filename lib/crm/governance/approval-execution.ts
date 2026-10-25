@@ -5,7 +5,7 @@ import {
   inspectCrmJobCancellation,
 } from '@/lib/crm/jobs/cancellation'
 import { buildApprovalPlan } from './approval-engine'
-import { requestRequiredProviderRefund } from '@/lib/finance/payments/payment-service'
+import { markProcessing } from '@/lib/finance/payouts/payout-engine'
 import { releaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { tierAtLeast } from './action-registry'
 import { resolveCurrentApprovalRisk } from './current-risk'
@@ -34,7 +34,7 @@ function higherTier(current: ApprovalTier, stored: ApprovalTier): boolean {
 }
 
 type RefundExecutionPayload =
-  | { mode: 'REQUEST_GATEWAY_REFUND' }
+  | { mode: 'STAGE_PROVIDER_NEUTRAL_REFUND' }
   | { mode: 'CONFIRM_MANUAL' }
 
 function parseRefundExecutionPayload(raw: string | null): RefundExecutionPayload {
@@ -52,8 +52,8 @@ function parseRefundExecutionPayload(raw: string | null): RefundExecutionPayload
   }
 
   const value = parsed as Record<string, unknown>
-  if (value.mode === 'REQUEST_GATEWAY_REFUND') {
-    return { mode: 'REQUEST_GATEWAY_REFUND' }
+  if (value.mode === 'STAGE_PROVIDER_NEUTRAL_REFUND') {
+    return { mode: 'STAGE_PROVIDER_NEUTRAL_REFUND' }
   }
 
   if (value.mode === 'CONFIRM_MANUAL') {
@@ -199,18 +199,30 @@ export async function executeApprovedCrmRequest(
       }
 
       const payload = parseRefundExecutionPayload(request.actionPayload)
-      if (payload.mode !== 'REQUEST_GATEWAY_REFUND') {
+      if (payload.mode !== 'STAGE_PROVIDER_NEUTRAL_REFUND') {
         throw new Error('REFUND_EXTERNAL_EVIDENCE_REQUIRED')
       }
-      const result = await requestRequiredProviderRefund(request.targetId, request.id)
-
-      if (!result.success) {
-        throw new Error(`REFUND_EXECUTION_FAILED:${result.code || result.error || 'UNKNOWN'}`)
+      if (request.amountMinor === null || !request.currency || request.targetType !== 'PaymentIntent') {
+        throw new Error('APPROVAL_TARGET_TYPE_INVALID')
       }
-
-      executionRef =
-        result.refundReference ||
-        `PaymentIntent:${request.targetId}:${result.status}`
+      const intent = await prisma.paymentIntent.findUnique({ where: { id: request.targetId } })
+      if (!intent || intent.amount !== request.amountMinor || intent.currency !== request.currency || !['REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(intent.status)) {
+        throw new Error('REFUND_TARGET_MISMATCH')
+      }
+      const job = await prisma.marketplaceJob.findUnique({ where: { id: intent.jobId }, select: { countryCode: true } })
+      if (!job || job.countryCode !== request.market) throw new Error('REFUND_MARKET_MISMATCH')
+      const refund = await prisma.paymentProviderRefund.create({ data: {
+        paymentIntentId: intent.id,
+        countryCode: job.countryCode,
+        provider: 'UNSELECTED',
+        amount: request.amountMinor,
+        currency: request.currency,
+        status: 'REQUESTED',
+        reason: request.note || request.reasonCode || 'Approved refund request',
+        initiatedByAdminId: request.initiatorAdminId,
+        approvalRequestId: request.id,
+      } })
+      executionRef = `PaymentProviderRefund:${refund.id}:REQUESTED_PROVIDER_UNSELECTED`
 
       await createAuditLog({
         action: 'UPDATE',
@@ -221,14 +233,14 @@ export async function executeApprovedCrmRequest(
         entityType: 'PaymentIntent',
         entityId: request.targetId,
         entityName: request.targetId,
-        description: 'Approved provider refund request executed',
+        description: 'Approved provider-neutral refund request staged; no transfer initiated',
         oldValue: {
           approvalRequestId: request.id,
         },
         newValue: {
-          status: result.status,
+          status: refund.status,
           approvalRequestId: request.id,
-          refundReferencePresent: Boolean(result.refundReference),
+          externalTransferInitiated: false,
           mode: payload.mode,
         },
         ipAddress: actor.ipAddress,
@@ -299,9 +311,27 @@ export async function executeApprovedCrmRequest(
         riskLevel: 'CRITICAL',
       })
     } else if (request.actionId === 'finance.payout') {
-      // Old approval requests only carry a user-entered reference. That is not
-      // independent PSP/bank evidence, so they must not create a paid payout.
-      throw new Error('PAYOUT_EXTERNAL_EVIDENCE_REQUIRED')
+      if (request.targetType !== 'Payout' || request.amountMinor === null || !request.currency) {
+        throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+      }
+      const payout = await prisma.payout.findUnique({ where: { id: request.targetId }, select: {
+        id: true, amount: true, currency: true, countryCode: true, status: true,
+      } })
+      if (!payout || payout.amount !== request.amountMinor || payout.currency !== request.currency || payout.countryCode !== request.market) {
+        throw new Error('PAYOUT_TARGET_MISMATCH')
+      }
+      if (payout.status !== 'RESERVED') throw new Error(`PAYOUT_STATUS_NOT_EXECUTABLE:${payout.status}`)
+      const started = await markProcessing(payout.id, actor.adminId, `approval-payout-processing:${request.id}`)
+      if (!started.ok) throw new Error(`PAYOUT_PROCESSING_FAILED:${started.code}`)
+      executionRef = `Payout:${payout.id}:PROCESSING_AWAITING_EXTERNAL_EVIDENCE`
+      await createAuditLog({
+        action: 'UPDATE', category: 'FINANCE', userId: actor.adminId, userEmail: actor.email,
+        userRole: actor.role, entityType: 'Payout', entityId: payout.id,
+        description: 'Approved payout staged for external transfer; no transfer initiated',
+        oldValue: { status: payout.status },
+        newValue: { status: started.status, amountMinor: payout.amount.toString(), currency: payout.currency, countryCode: payout.countryCode, externalTransferInitiated: false },
+        ipAddress: actor.ipAddress, userAgent: actor.userAgent || undefined, riskLevel: 'CRITICAL',
+      })
     } else if (request.actionId === 'finance.commission.reconcile') {
       if (request.targetType !== 'CommissionBankTransaction' || !request.actionPayload) {
         throw new Error('APPROVAL_TARGET_TYPE_INVALID')

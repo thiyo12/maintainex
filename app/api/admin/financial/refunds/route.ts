@@ -97,12 +97,46 @@ export async function GET(request: NextRequest) {
 
     const jobMap = new Map(jobs.map(job => [job.id, job]))
     const customerMap = new Map(customers.map(customer => [customer.id, customer]))
+    const refundAttempts = intents.length
+      ? await prisma.paymentProviderRefund.findMany({
+          where: { paymentIntentId: { in: intents.map(intent => intent.id) } },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, paymentIntentId: true, provider: true, amount: true, currency: true, status: true, reason: true, createdAt: true, completedAt: true },
+        })
+      : []
+    const refundEvidence = refundAttempts.length
+      ? await prisma.financialTransferEvidence.findMany({
+          where: { transferType: 'REFUND', targetId: { in: refundAttempts.map(refund => refund.id) } },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, targetId: true, sourceId: true, outcome: true, amount: true, currency: true, countryCode: true, verificationMethod: true, verifiedAt: true, observedAt: true, createdAt: true },
+        })
+      : []
+    const attemptsByIntent = new Map<string, typeof refundAttempts>()
+    for (const attempt of refundAttempts) {
+      const entries = attemptsByIntent.get(attempt.paymentIntentId) || []
+      if (entries.length < 10) entries.push(attempt)
+      attemptsByIntent.set(attempt.paymentIntentId, entries)
+    }
+    const evidenceByRefund = new Map<string, typeof refundEvidence>()
+    for (const evidence of refundEvidence) {
+      const entries = evidenceByRefund.get(evidence.targetId) || []
+      if (entries.length < 10) entries.push(evidence)
+      evidenceByRefund.set(evidence.targetId, entries)
+    }
 
     return NextResponse.json(
       {
         refunds: intents.map(intent => ({
           ...intent,
           amount: intent.amount.toString(),
+          refundAttempts: (attemptsByIntent.get(intent.id) || []).map(attempt => ({
+            ...attempt,
+            amount: attempt.amount.toString(),
+            transferEvidence: (evidenceByRefund.get(attempt.id) || []).map(evidence => ({
+              ...evidence,
+              amount: evidence.amount.toString(),
+            })),
+          })),
           job: jobMap.get(intent.jobId) || null,
           customer: customerMap.get(intent.customerId) || null,
         })),
@@ -262,7 +296,7 @@ export async function PATCH(request: NextRequest) {
       reasonCode: 'GATEWAY_REFUND_REQUEST',
       note: `${intent.gateway} refund request submitted for approval`,
       idempotencyKey,
-      actionPayload: { mode: 'REQUEST_GATEWAY_REFUND' },
+      actionPayload: { mode: 'STAGE_PROVIDER_NEUTRAL_REFUND' },
       risk: currentRisk.risk,
     })
 

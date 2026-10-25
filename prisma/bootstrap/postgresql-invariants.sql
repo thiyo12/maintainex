@@ -115,6 +115,26 @@ ALTER TABLE "MarketplaceDisputeCorrection"
   ADD CONSTRAINT "MarketplaceDisputeCorrection_amount_check" CHECK ("amountMinor" > 0),
   ADD CONSTRAINT "MarketplaceDisputeCorrection_status_check" CHECK ("status" = 'APPLIED');
 
+ALTER TABLE "FinancialTransferEvidence"
+  ADD CONSTRAINT "FinancialTransferEvidence_type_check"
+    CHECK ("transferType" IN ('REFUND','PAYOUT')),
+  ADD CONSTRAINT "FinancialTransferEvidence_outcome_check"
+    CHECK ("outcome" IN ('PENDING','SUCCEEDED','FAILED','REVERSED')),
+  ADD CONSTRAINT "FinancialTransferEvidence_amount_check" CHECK ("amount" > 0),
+  ADD CONSTRAINT "FinancialTransferEvidence_ids_check"
+    CHECK (length("targetId") BETWEEN 1 AND 200 AND length("sourceId") BETWEEN 1 AND 100 AND "sourceId" ~ '^[A-Za-z0-9][A-Za-z0-9._:-]*$'),
+  ADD CONSTRAINT "FinancialTransferEvidence_event_reference_check"
+    CHECK (length("externalEventId") BETWEEN 1 AND 200 AND length("externalReference") BETWEEN 1 AND 200),
+  ADD CONSTRAINT "FinancialTransferEvidence_payload_hash_check"
+    CHECK ("payloadHash" ~ '^[a-f0-9]{64}$'),
+  ADD CONSTRAINT "FinancialTransferEvidence_currency_check"
+    CHECK ("currency" IN ('LKR','CAD')),
+  ADD CONSTRAINT "FinancialTransferEvidence_country_currency_check"
+    CHECK (("countryCode" = 'LK' AND "currency" = 'LKR') OR
+           ("countryCode" = 'CA' AND "currency" = 'CAD')),
+  ADD CONSTRAINT "FinancialTransferEvidence_verification_method_check"
+    CHECK ("verificationMethod" IN ('INDEPENDENT_API_QUERY','AUTHENTICATED_STATEMENT'));
+
 CREATE TRIGGER trg_commission_bank_allocation_append_only
   BEFORE UPDATE OR DELETE ON "CommissionBankAllocation"
   FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();
@@ -150,3 +170,14 @@ CREATE TRIGGER trg_marketplace_dispute_correction_immutable
 CREATE TRIGGER trg_marketplace_dispute_correction_event_immutable
   BEFORE UPDATE OR DELETE ON "MarketplaceDisputeCorrectionEvent"
   FOR EACH ROW EXECUTE FUNCTION reject_immutable_commission_finance_row();
+
+CREATE OR REPLACE FUNCTION reject_immutable_financial_transfer_evidence()
+RETURNS TRIGGER AS $transfer_evidence_immutable$
+BEGIN
+  RAISE EXCEPTION 'Financial transfer evidence is immutable';
+END;
+$transfer_evidence_immutable$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "FinancialTransferEvidence_immutable"
+  BEFORE UPDATE OR DELETE ON "FinancialTransferEvidence"
+  FOR EACH ROW EXECUTE FUNCTION reject_immutable_financial_transfer_evidence();

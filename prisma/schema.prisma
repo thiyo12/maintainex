@@ -3813,6 +3813,7 @@ model PaymentProviderRefund {
   @@index([paymentIntentId, createdAt])
   @@index([providerTransactionId, createdAt])
   @@index([countryCode, provider, status])
+  @@unique([approvalRequestId])
 }
 
 model PaymentProviderEvent {
@@ -3839,6 +3840,31 @@ model PaymentProviderEvent {
   @@index([providerTransactionId, createdAt])
   @@index([countryCode, provider, eventType])
   @@index([processingStatus, createdAt])
+}
+
+/// Immutable, provider-neutral evidence accepted only after an independently
+/// trusted bank/PSP adapter has authenticated and reconciled the source result.
+/// This stores normalized provenance and a payload digest, never raw secrets.
+model FinancialTransferEvidence {
+  id                  String   @id @default(cuid())
+  transferType        String   // REFUND or PAYOUT
+  targetId            String   // PaymentProviderRefund.id or Payout.id
+  sourceId            String   // Stable allowlisted bank/PSP source identifier
+  externalEventId     String
+  externalReference   String
+  outcome             String   // PENDING, SUCCEEDED, FAILED, REVERSED
+  amount              BigInt
+  currency            String
+  countryCode         String
+  verificationMethod  String   // INDEPENDENT_API_QUERY or AUTHENTICATED_STATEMENT
+  payloadHash         String
+  verifiedAt          DateTime
+  observedAt          DateTime
+  createdAt           DateTime @default(now())
+
+  @@unique([sourceId, externalEventId])
+  @@index([transferType, targetId, createdAt])
+  @@index([countryCode, currency, outcome, createdAt], map: "financial_transfer_evidence_market_currency_status_idx")
 }
 
 model PaymentIntent {

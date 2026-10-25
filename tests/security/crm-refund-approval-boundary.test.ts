@@ -11,7 +11,7 @@ describe('CRM refund approval boundary', () => {
 
     expect(source).toContain("guardCrmAction(request, 'finance.refund')")
     expect(source).toContain('createCrmApprovalRequest')
-    expect(source).toContain("mode: 'REQUEST_GATEWAY_REFUND'")
+    expect(source).toContain("mode: 'STAGE_PROVIDER_NEUTRAL_REFUND'")
     expect(source).toContain('REFUND_EXTERNAL_EVIDENCE_REQUIRED')
     expect(source).not.toContain("mode: 'CONFIRM_MANUAL'")
     expect(source).not.toContain('await requestRequiredPayHereRefund(intent.id)')
@@ -43,10 +43,20 @@ describe('CRM refund approval boundary', () => {
     )
 
     expect(source).toContain("request.actionId === 'finance.refund'")
-    expect(source).toContain('requestRequiredProviderRefund(request.targetId, request.id)')
+    expect(source).toContain("provider: 'UNSELECTED'")
+    expect(source).toContain('externalTransferInitiated: false')
+    expect(source).not.toContain('requestRequiredProviderRefund')
     expect(source).toContain('REFUND_EXTERNAL_EVIDENCE_REQUIRED')
     expect(source).not.toContain('confirmManualExternalRefund(request.targetId')
     expect(source).toContain('parseRefundExecutionPayload')
+  })
+
+  it('stages approved payouts without transferring money and preserves maker-checker execution', () => {
+    const source = readFileSync(resolve(process.cwd(), 'lib/crm/governance/approval-execution.ts'), 'utf8')
+    expect(source).toContain("request.actionId === 'finance.payout'")
+    expect(source).toContain('markProcessing(payout.id, actor.adminId')
+    expect(source).toContain('PROCESSING_AWAITING_EXTERNAL_EVIDENCE')
+    expect(source).toContain('externalTransferInitiated: false')
   })
 
   it('revalidates refund amount, market, dispute and payment state before approval execution', () => {
