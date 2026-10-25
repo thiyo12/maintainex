@@ -114,6 +114,24 @@ describe('Phase 04 — company workforce suspension serializes with live dispatc
     expect(db.memberUpdate).not.toHaveBeenCalled()
   })
 
+  it.each(['CREW_RESERVED', 'CREW_ACCEPTED'])(
+    'refuses to deactivate one worker from an indivisible %s crew', async status => {
+      db.assignments.mockResolvedValue([{ id: 'crew-slot', jobId: 'job', status }])
+      const response = await suspend()
+      expect(response.status).toBe(409)
+      expect(response.body.error).toMatch(/Cancel the whole forming crew/)
+      expect(db.assignments).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({
+          status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
+        }),
+      }))
+      expect(db.memberUpdate).not.toHaveBeenCalled()
+      expect(db.revoke).not.toHaveBeenCalled()
+      expect(db.retarget).not.toHaveBeenCalled()
+      expect(db.audit).not.toHaveBeenCalled()
+    },
+  )
+
   it('atomically revokes only pre-start assignments before completing suspension', async () => {
     db.assignments.mockResolvedValue([
       { id: 'a', jobId: 'job', status: 'ASSIGNED' },

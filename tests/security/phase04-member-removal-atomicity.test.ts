@@ -87,7 +87,7 @@ describe('Phase 04 — member removal is serialized with workforce assignment an
     expect(db.assignmentCount).toHaveBeenCalledWith({
       where: {
         companyId: 'company', workerUserId: 'worker-user',
-        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
       },
     })
     expect(db.crewHeld).toHaveBeenCalledWith(expect.objectContaining({
@@ -112,6 +112,24 @@ describe('Phase 04 — member removal is serialized with workforce assignment an
     expect(db.remove).not.toHaveBeenCalled()
     expect(db.audit).not.toHaveBeenCalled()
   })
+
+  it.each(['CREW_RESERVED', 'CREW_ACCEPTED'])(
+    'denies team removal of a worker with an active %s reservation', async status => {
+      db.assignmentCount.mockResolvedValue(1)
+      const result = await removeMember()
+      expect(result.status).toBe(409)
+      expect(result.body.error).toMatch(/active job/i)
+      expect(db.assignmentCount).toHaveBeenCalledWith({
+        where: {
+          companyId: 'company',
+          workerUserId: 'worker-user',
+          status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
+        },
+      })
+      expect(db.remove).not.toHaveBeenCalled()
+      expect(db.audit).not.toHaveBeenCalled()
+    },
+  )
 
   it('rechecks actual owner authority under the membership lock', async () => {
     db.actor.mockResolvedValue({ role: 'WORKER', status: 'ACTIVE' })
