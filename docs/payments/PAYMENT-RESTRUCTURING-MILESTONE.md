@@ -1,12 +1,12 @@
 # Payment restructuring milestone
 
-Updated: 2026-10-25
+Updated: 2026-10-26
 
 Branch: `feature/payment-restructuring`
 
-Latest payment implementation and test evidence: `101836c03517abc5f851426529456a6408e87b35`. All three exact-head GitHub workflows passed on this code head. The documentation refresh is committed separately afterward.
+Latest payment implementation and test evidence: `a3b0bcc9d33d5223b81eba60c29fe4cf2991fea2`. All exact-head GitHub checks passed (57/57 steps, including regression and Docker build).
 
-PR #152 remains open, draft and unmerged. Exact-head CI for documentation head `729bd6c948c4af59d333ba90249fd486714ddda9` passed in all three workflows; the current tested implementation is `101836c03517abc5f851426529456a6408e87b35`.
+PR #152 remains open, draft and unmerged. Exact-head CI passed for `a3b0bcc9d33d5223b81eba60c29fe4cf2991fea2`; the previous verified code head was `101836c03517abc5f851426529456a6408e87b35`.
 
 Previously verified implementation head: `6b0d84edda7892f304fdf56f23f468acd273d05b`
 
@@ -53,7 +53,17 @@ The verification callback body is `{ "sourceSystem": "…", "statementId": "…"
 - Added a participant-scoped case lookup and case detail view for mobile, including customer/provider/company navigation, localized English/Sinhala/Tamil strings, and case history. The case response no longer exposes the submitter email.
 - Added Admin reassignment for active disputes using existing `disputes:resolve` permissions, country scoping, target staff validation, SUPER_ADMIN MFA, self-assignment protection, and transactional audit records. Active queue alerts and the case assignee are updated together; closed cases cannot be reassigned.
 - Appeals store only a SHA-256 digest of the idempotency key. The mobile commercial-history response removes that digest from appeal metadata. A regression test verifies the digest is not returned.
-- This extends assignment, resolution history, appeal, and reopening. A complete case-specific evidence lifecycle, partial financial correction/adjustment, and repeat dispute reconciliation remain open.
+- This record predates the acknowledged `b7c29d26` dispute-evidence and governed-commission-correction milestone; those earlier gaps are not part of the current refund/payout milestone.
+
+## Provider-neutral refund and payout reconciliation (implementation `a3b0bcc9`)
+
+- Added an additive PostgreSQL `FinancialTransferEvidence` record with source/event deduplication, market/currency/amount/provenance constraints, payload digests, and an update/delete-blocking trigger. No raw provider payload, credentials, or headers are stored.
+- Approved Admin refunds now create a provider-`UNSELECTED` request only. Approved payouts move to `PROCESSING_AWAITING_EXTERNAL_EVIDENCE`; neither action sends money. Reconciliation requires a successful matching maker-checker approval plus a trusted bank/PSP adapter result.
+- The provider-neutral reconciliation service checks exact target, country, currency, amount, source event and payload digest. Pending, succeeded, failed and reversed outcomes are idempotent; payout failures restore reserved funds, settlement/reversal and refund/reversal post compensating ledger transactions, and originals remain intact.
+- Finance refund and payout queues expose sanitized attempts/evidence. Legacy PayPal/PayHere history remains read-only; no provider is selected and no production source adapter is registered. Partial refunds are rejected until their ledger allocation model is implemented.
+- Forward-migration verification used a disposable PostgreSQL database created from the prior schema and preserved a synthetic pre-existing refund row. The new constraints and append-only evidence trigger were verified. Full isolated PostgreSQL Vitest regression: 4,608 passed, 100 existing skips, 0 failed. Focused transfer/approval tests: 45 passed; root/mobile TypeScript, Prisma validation/generation, lint (0 errors, 40 existing warnings), and production build passed. Build and tests used no production data.
+- npm audit of the root lockfile: 0 critical/high; moderate/low advisories are `nodemailer@10.0.14`, `postcss-selector-parser@6.1.2`, and `esbuild@0.27.7` (the latter is Expo/Vite development tooling). Mobile lockfile audit reports four high entries in one advisory chain: `expo@56.0.23` → `@expo/cli@56.1.26` → `@expo/code-signing-certificates@0.0.6` → `node-forge@1.4.0`, related to CVE-2026-85393 / GHSA-86w9-cpqp-85rv. The existing narrow install patch is now applied and its signature regression passes (1/1); npm audit still flags the unmodified upstream lockfile. Its suggested Expo 44 downgrade is a major breaking change and was not applied.
+- GitHub’s push notice reports 37 default-branch alerts (1 critical, 9 high, 23 moderate, 4 low). The connected GitHub integration cannot read the private Dependabot alert records (security endpoint returns 404/unsupported); exact default-branch affected-package details therefore remain unverified. Branch lockfile audits above are the available package-level evidence.
 
 ## Verified in this milestone
 
@@ -93,10 +103,12 @@ Previously verified at `956fd471fdcbafdf3d2c4494005598d73b48d3a7`: full regressi
 
 ## Still open
 
-- Verify the full reversal posting/concurrency path against the application PostgreSQL schema and authenticated bank callback fixtures; the local isolated upgrade fixture and mocked service tests passed, but this exact data-path test is pending CI/isolated financial integration coverage.
+- Verify the prior bank-reversal posting/concurrency path against its authenticated source fixtures; it is outside this refund/payout change and remains dependent on a selected trusted bank source.
 - Add a configured bank-source adapter only after source selection/approval; the HMAC contract is present but no external bank result is connected.
-- Full financial case evidence submission/protection, correction, appeal, and reopened-case resolution workflows; assignment and atomic resolution history are implemented, but those remaining case operations are not complete.
-- Provider-neutral external evidence state machines and reconciliation for refunds and payouts. Transfers remain disabled until bank/PSP arrangements are approved.
+- Register a real bank/PSP adapter only after provider/source approval. Until then the reconciler has synthetic test sources only; online payment, refund, and payout transfers remain disabled.
+- Partial external refunds are rejected; they require an approved split-allocation/ledger model.
+- Mobile Expo/node-forge advisory chain remains listed by npm audit despite the verified local install patch. A compatible upstream release or reviewed Expo-compatible remediation is still needed.
+- Exact package records for the default branch's 1 critical/9 high Dependabot alerts are not available through the connected GitHub integration; only the default-branch aggregate and current branch lockfile audits were verified.
 - Clean bootstrap execution on isolated PostgreSQL for this milestone's exact head; direct replay of historical migrations remains invalid because of the pre-baseline `User` reference. Existing databases must continue to use `prisma migrate deploy`.
 - Provider selection, human approvals, and physical/operational tests.
 
