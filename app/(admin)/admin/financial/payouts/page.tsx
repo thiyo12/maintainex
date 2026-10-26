@@ -356,7 +356,7 @@ export default function PayoutQueuePage() {
       ))}
 
       <CrmFilterBar>
-        <div className="relative min-w-0 flex-1">
+        <div className="relative w-full min-w-0 md:flex-1">
           <FiSearch
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
             size={15}
@@ -372,7 +372,7 @@ export default function PayoutQueuePage() {
         <select
           value={status}
           onChange={event => setStatus(event.target.value)}
-          className={crmInputClass}
+          className={`${crmInputClass} w-full min-w-0 md:w-auto md:min-w-[190px] md:flex-none`}
           aria-label="Payout status"
         >
           <option value="ALL">All payout states</option>
