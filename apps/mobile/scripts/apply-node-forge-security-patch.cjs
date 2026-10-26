@@ -11,13 +11,18 @@ function patchNodeForge(packageRoot = path.resolve(__dirname, '../node_modules/n
     throw new Error(`Expected node-forge 1.4.0, found ${manifest.name}@${manifest.version}`)
   }
   let source = fs.readFileSync(sourcePath, 'utf8')
-  if (source.includes(MARKER)) return
-
   const vulnerable = 'obj.value.length !== 2) {'
   const hardened = `obj.value.length !== 2 ||\n` +
     `            // ${MARKER}\n` +
     `            !Array.isArray(obj.value[0].value) ||\n` +
-    `            obj.value[0].value.length < 1 || obj.value[0].value.length > 2) {`
+    `            obj.value[0].value.length !== (('parameters' in capture) ? 2 : 1) ||\n` +
+    `            ('parameters' in capture && capture.parameters.length !== 0)) {`
+  if (source.includes(MARKER)) {
+    if (!source.includes(hardened)) {
+      throw new Error('node-forge security marker exists without the complete parameter-count guard')
+    }
+    return
+  }
   const matches = source.split(vulnerable).length - 1
   if (matches !== 1) throw new Error('node-forge RSA verification source changed; refusing an unsafe partial patch')
   source = source.replace(vulnerable, hardened)
