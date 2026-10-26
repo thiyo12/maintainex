@@ -71,6 +71,11 @@ export async function GET(
     const currency = getCurrencyForCountry(job.countryCode)
 
     const isOwner = job.customerId === user.id
+    // Customers may read only their own job record. Provider discovery uses
+    // the provider role and remains available for OPEN marketplace jobs.
+    if (!isOwner && user.role === 'CUSTOMER') {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    }
     const requestedContext = new URL(_request.url).searchParams.get('context')
 
     if (!isOwner && job.targetTaskerId) {

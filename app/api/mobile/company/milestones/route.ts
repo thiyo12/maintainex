@@ -18,6 +18,13 @@ export async function GET(request: NextRequest) {
     const { context, error } = await resolveCompanyContext(user.id, companyId, 'jobs:read')
     if (error) return error
 
+    // This legacy Contract model has no worker-assignment relation. WORKER
+    // access is limited to assigned work, so company-wide milestones cannot
+    // be safely exposed through this endpoint.
+    if (context!.role === 'WORKER') {
+      return NextResponse.json({ error: 'Milestone access is not available for this role' }, { status: 403 })
+    }
+
     const where: any = {
       contract: { companyId: context!.companyId },
     }

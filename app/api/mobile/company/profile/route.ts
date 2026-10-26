@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { hasCompanyPermission } from '@/lib/phase6/rbac'
 import { normalizeCompanyServiceAreas, normalizeCompanyServices, validateCompanyCatalogueServices } from '@/lib/phase6/company-profile-market'
 
 function safeParseJson(val: string | null | undefined): string[] {
@@ -29,20 +30,27 @@ export async function GET(request: NextRequest) {
     const { context, error } = await resolveCompanyContext(user.id, companyId, 'company:read')
     if (error) return error
 
+    const canReadCompanyFinance = hasCompanyPermission(context!.role, 'finance:read')
     const profile = await prisma.companyProfile.findUnique({
       where: { id: context!.companyId },
       include: {
         teamMembers: true,
-        contracts: {
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-        },
       },
     })
 
     if (!profile) {
       return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
     }
+
+    // This legacy profile response is also used by dispatchers and workers;
+    // keep contract values and client names behind the existing finance RBAC.
+    const contracts = canReadCompanyFinance
+      ? await prisma.contract.findMany({
+          where: { companyId: context!.companyId },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        })
+      : []
 
     return NextResponse.json({
       id: profile.id,
@@ -67,7 +75,7 @@ export async function GET(request: NextRequest) {
         completedJobs: t.completedJobs,
         joinedAt: t.joinedAt.toISOString(),
       })),
-      recentContracts: profile.contracts.map(c => ({
+      recentContracts: contracts.map(c => ({
         id: c.id,
         title: c.title,
         clientName: c.clientName,
