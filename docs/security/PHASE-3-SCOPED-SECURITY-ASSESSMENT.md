@@ -1,7 +1,8 @@
 # Phase 3 Scoped Security Assessment
 
-Date: 2026-10-26  
-Baseline inspected: `feature/payment-restructuring` at `ca6bda34680054397ecc4b51dd260f0de6ab8663`; scoped remediation is in the follow-up commit on the same branch.  
+Date: 2026-10-26
+
+Baseline inspected: `feature/payment-restructuring` at `ca6bda34680054397ecc4b51dd260f0de6ab8663`; scoped remediation is in the follow-up commit on the same branch.
 Scope: authentication, authorization, cross-account access, financial integrity, sensitive-data exposure, the named dependency advisories, and public claims. Synthetic data only; no external email, financial transfer, production or VPS access.
 
 ## Verified application finding
