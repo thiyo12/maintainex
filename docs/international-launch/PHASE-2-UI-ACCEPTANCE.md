@@ -1,30 +1,45 @@
-# Phase 2 UI Acceptance Snapshot
+# Phase 2 Synthetic UI Acceptance
 
 Date: 2026-10-26  
 Branch: `feature/payment-restructuring`  
-Base head inspected: `4dc0d14a99f740c1a8bf2c7fe747c7fb7ee70954`
+Starting head: `a9ff7a15288b768196b99052e840fc351d2c2f56`
 
-This is a scoped UI acceptance record, not launch approval. All data and financial fixtures were synthetic in a disposable local PostgreSQL database. No approval action, transfer, payment, customer communication, or production access occurred.
+Scope is synthetic acceptance only. The PostgreSQL instances were created solely under a temporary local cluster with the required `maintainex_test` database name. No production/VPS data, real OTP delivery, payment provider, transfer, or customer communication was used.
 
-| Journey / screen | API and database evidence | Expected transition | Result |
+## Admin Finance approval and rejection
+
+| Screen / action | API evidence | Database and audit evidence | Result |
 | --- | --- | --- | --- |
-| Finance → Payout Queue (`/admin/financial/payouts`) | Signed-in synthetic FINANCE session rendered the queue and its empty-state response. Search and status controls were present in the accessibility tree. No financial mutation was submitted. | Search/status filtering stays within the queue; viewing the screen creates no records. | Pass for screen rendering and filter layout at desktop width. Previously confirmed overlap fixed by responsive width constraints. Added `tests/admin/payout-queue-responsive-filters.test.ts` (1/1 pass). The displayed empty result is not evidence of a payout API status code. |
-| Finance → Approval Queue (`/admin/approvals`) | Signed-in synthetic FINANCE identity (CA scope, 2FA) saw one synthetic `finance.payout` approval for CAD 125. The isolated DB still showed `PENDING_APPROVAL`; `CrmApprovalDecision` count was 0 after inspection. | Authorized queue visibility without posting a decision; approval/rejection requires its intended governance and step-up controls. | Pass for authenticated screen and scoped synthetic fixture visibility. Approve/reject was intentionally not submitted. HTTP response status was not captured independently. No ledger or transfer effect was initiated. |
-| Customer, Tasker, Company/worker (native mobile, Expo 56) | No app-level API/database journey was executed from a simulator/device. | Register/sign in, browse, quote/book, progress jobs, confirm cash and inspect finance state with corresponding API/database assertions. | Blocked: iOS Simulator was booted, but the native UI controller failed to connect. Existing installed Expo package was 57.0.27; an isolated clean install from the project lockfile resolved 56.0.23, but this did not provide interactive native-device control. SecureStore was not replaced. |
+| FINANCE sign-in and step-up | Synthetic staff login and step-up completed; `POST /api/admin/auth/step-up` returned 200. UI showed FINANCE role and 2FA protection. | Step-up grant was consumed; `STEP_UP_VERIFIED` security audit recorded. | Pass in local production-mode build under the repository's unchanged production CSP. |
+| `/admin/approvals` queue | Synthetic LK/LKR `finance.payout` requests loaded; decision endpoints returned 200. | Separate maker/checker identities, Finance authorization, LK country scope, and fresh TOTP step-up. No transfer provider was configured. | Pass. |
+| Approve synthetic request | `POST /api/admin/approvals/{id}/decision` with APPROVE returned 200; UI displayed “Approved and executed successfully”. | Approval `SUCCEEDED`; payout moved `RESERVED → PROCESSING`; events `APPROVAL_GRANTED` and `EXECUTION_SUCCEEDED`; payout security audit recorded. `FinancialTransferEvidence=0`, `FinancialLedger=0`. | Pass. This records approval/staging only, not a payout or money movement. |
+| Reject synthetic request | Same decision endpoint with REJECT returned 200; UI displayed “Approval request rejected” and queue emptied. | Approval `REJECTED`; payout remained `RESERVED`; `APPROVAL_REJECTED` event recorded. No payout update, transfer evidence, or ledger entry. | Pass. |
 
-## Test and environment notes
+Fixtures were synthetic and used an isolated disposable PostgreSQL database. The approve/reject paths were repeated once in a strict-CSP production-mode local build after a Next dev-server worker-chunk failure; repository CSP was not relaxed. No financial transfer or ledger posting occurred.
 
-- Focused Vitest regression: 1 file, 1 test passed.
-- Full ESLint: 0 errors; 40 existing warnings.
-- `git diff --check`: passed.
-- A disposable development copy used a development-only CSP `unsafe-eval` allowance to let Next.js dev tooling execute. Repository production CSP, CORS, and authentication configuration were not weakened or changed. The temporary dev server also logged a missing Next worker chunk on some route loads, so broad Admin route coverage remains incomplete.
-- Previous synthetic API/PostgreSQL run reported by the project: 4,709 passed, 0 failed, 0 skipped. That is prior evidence and was not rerun as part of this UI snapshot.
-- The simulator itself was not a supported automated UI runner in this environment. No physical-device test is claimed.
+## Gated PostgreSQL tests
 
-## Public homepage claims
+Ran `tests/integration/real-postgresql-integration.test.ts` against a freshly initialized local PostgreSQL 16 cluster on a temporary port and an isolated `maintainex_test_phase2` database, after applying the current Prisma schema. Result: **26 passed, 0 failed, 0 skipped**. The cluster was not an existing development or production database. This verifies the gated integration file; it does not represent a historical migration-chain replay or full PostgreSQL suite.
 
-Proposed correction for owner review: remove “Trusted by 500+ users” and “join 500+ others” unless current verified customer or waitlist counts substantiate them. A development-status/waitlist statement is supportable from the project’s stated pre-launch status. Leave payment, insurance, guarantees, provider-vetting, market-size and performance claims unchanged pending direct evidence and business-policy approval. No homepage copy was edited.
+## Native mobile screen acceptance checklist
 
-## Acceptance status
+Expo 56 native UI automation was unavailable: the installed app dependency tree was Expo 57, a clean isolated lockfile install resolved Expo 56, but the simulator UI controller could not connect. No native journey below is claimed as passed. Use this checklist when a controllable supported simulator/device is available; capture screen, request/response, resulting DB transition, and screenshot for every interaction.
 
-The desktop Finance UI defect is fixed and covered by a focused regression test. Signed-in Finance approval visibility is verified with synthetic data, without exercising a financial decision. Customer/Tasker/Company mobile acceptance and the remaining end-to-end journeys are blocked pending a controllable Expo 56 simulator/device test environment. Phase 2 UI acceptance is incomplete; Phase 3 has not started.
+| Role | Screen-by-screen synthetic journey and assertions | Status |
+| --- | --- | --- |
+| Customer | Welcome → LK/CA phone selection → mocked OTP login/register → profile/onboarding → service discovery → service detail/quote → booking review/submit → booking detail/status → cancel or dispute/appeal → payment/receipt. Assert authenticated customer ownership, market/currency, booking/quote API responses, duplicate-submit behavior, dispute history, and no fabricated paid/refunded state. | Blocked: native controller unavailable. |
+| Individual Tasker | Welcome → mocked OTP login → profile/KYC status → assigned jobs → job detail/accept or decline → permitted work-start control → progress/evidence → completion → cash-collected/partial/contested state → commission balance/settlement → dispute/evidence/appeal. Assert only assigned jobs are visible/actionable and ledger/commission transitions are idempotent. | Blocked: native controller unavailable. |
+| Company manager | Welcome → mocked OTP login → company profile/authority → company job list → assignment → job detail/progress → completion → cash/commission state → dispute and reconciliation views. Assert current manager authority, legal company debtor/beneficiary, market isolation, and no employee access beyond granted scope. | Blocked: native controller unavailable. |
+| Company worker | Welcome → mocked OTP login → worker membership → assigned job → accept → permitted work-start/progress → completion submission → cash/dispute status. Assert membership and assignment checks, no authority to act as company manager or receive company funds, and no cross-company/customer data exposure. | Blocked: native controller unavailable. |
+
+## Other Phase 2 evidence and known limits
+
+- Finance → Payout Queue responsive search/filter overlap remains fixed; `tests/admin/payout-queue-responsive-filters.test.ts` passed (1/1) on the prior verified revision. This turn did not change application code.
+- Previous UI snapshot's 4,709 automated tests and exact-head CI were prior evidence, not rerun in this turn. Exact-head CI will be rerun for this documentation revision.
+- A development-mode route test encountered a missing Next worker chunk; approval/rejection was independently completed in production mode with the repository's original CSP and successful API/database assertions.
+- Public homepage claims finding preserved for security/content review: remove “Trusted by 500+ users” / “join 500+ others” unless verified counts support them. Leave payment, insurance, guarantees, vetting, market-size, and performance claims unchanged pending evidence and business approval. No homepage copy changed.
+- Physical device testing, all four mobile roles, full browser journeys beyond the Admin approval queue, and operational acceptance remain pending.
+
+## Acceptance decision
+
+Synthetic Admin approval/rejection and the gated PostgreSQL integration file passed. Phase 2 is **conditionally acceptable for these automated/database and Admin decision flows only**. Overall Phase 2 UI acceptance is **not closed** because native Customer, Tasker, Company, and worker journeys remain blocked. Phase 3 has not started.
