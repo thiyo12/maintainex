@@ -23,10 +23,7 @@ export const v2Quality = {
 }
 
 export const v2Trust = {
-  get: (customerId?: string) =>
-    v2Request<TrustResult>(
-      `/api/mobile/v2/trust${customerId ? `?customerId=${customerId}` : ''}`
-    ),
+  get: () => v2Request<TrustResult>('/api/mobile/v2/trust'),
 }
 
 export const v2Schedule = {

@@ -23,7 +23,17 @@ Ran `tests/integration/real-postgresql-integration.test.ts` against a freshly in
 
 ## Native mobile screen acceptance checklist
 
-Expo 56 native UI automation was unavailable: the installed app dependency tree was Expo 57, a clean isolated lockfile install resolved Expo 56, but the simulator UI controller could not connect. No native journey below is claimed as passed. Use this checklist when a controllable supported simulator/device is available; capture screen, request/response, resulting DB transition, and screenshot for every interaction.
+Expo 56 native UI automation was unavailable: the lockfile resolves Expo 56.0.23, while the current installed app dependency tree is Expo 57.0.27. On 2026-10-26, `xcrun simctl list devices available` failed because CoreSimulatorService was unavailable, and the simulator UI controller could not connect. No native journey below is claimed as passed. SecureStore was not replaced.
+
+### Reproducible native-device run when a controller is available
+
+1. Use a clean checkout/copy of the reviewed `feature/payment-restructuring` revision; do not reuse the mismatched `apps/mobile/node_modules`. In `apps/mobile`, run `npm ci` (not `npm install`) and verify `node -p "require('expo/package.json').version"` prints `56.0.23`. Do not change the SDK or lockfile.
+2. Start the web API against a disposable PostgreSQL database with only synthetic Customer, individual Tasker, Company manager/worker, and Admin identities. Use the test OTP/mock email delivery configuration; keep real SMTP, payment-provider keys, and financial transfers disabled.
+3. Configure `EXPO_PUBLIC_API_URL` to the isolated local API (`http://127.0.0.1:3000` for iOS Simulator; Android Emulator normally reaches the host at `http://10.0.2.2:3000`). Confirm requests cannot reach production before launching the app.
+4. Start an installed Xcode iOS runtime or Android Emulator and verify it is controllable (`xcrun simctl list devices available` / Android `adb devices`). Build and launch the native app with `npm run ios` or `npm run android`; do not use the web target as a substitute and retain native SecureStore.
+5. Run each role journey in the checklist below. For every screen action capture the screenshot, account/role, request and response status/body with secrets redacted, expected and actual database transition, and pass/fail. Repeat duplicate, retry, cancellation and dispute paths with synthetic data, then destroy the disposable database and test checkout.
+
+If CoreSimulatorService or device control is unavailable, record the affected role/screens as blocked and attach the exact simulator/ADB error. Do not mark browser/API coverage as native acceptance.
 
 | Role | Screen-by-screen synthetic journey and assertions | Status |
 | --- | --- | --- |
