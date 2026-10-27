@@ -30,7 +30,7 @@ export default function EvidenceScreen() {
     }
     const result = useCamera
       ? await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: true })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8, allowsEditing: true })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.8, preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible, allowsEditing: true })
 
     if (!result.canceled && result.assets[0]) {
       setUploading(true)

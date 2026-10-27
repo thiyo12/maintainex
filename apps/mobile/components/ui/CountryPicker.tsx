@@ -27,7 +27,7 @@ export default function CountryPicker({ selected, onChange }: Props) {
       <TouchableOpacity style={styles.trigger} onPress={() => setVisible(true)}>
         <Text style={styles.flag}>{selected.flag}</Text>
         <Text style={styles.dial}>{selected.dial}</Text>
-        <CaretDown size={14} color="#B3B3B3" weight="bold" />
+        <CaretDown size={14} color="#666666" weight="bold" />
       </TouchableOpacity>
 
       <Modal visible={visible} transparent animationType="fade">
@@ -61,12 +61,12 @@ const styles = StyleSheet.create({
   trigger: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 14, height: '100%',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(0,0,0,0.05)',
     borderTopLeftRadius: 16, borderBottomLeftRadius: 16,
     borderRightWidth: 1, borderRightColor: '#2E2E2E',
   },
   flag: { fontSize: 20 },
-  dial: { fontSize: 15, fontFamily: 'Outfit_500Medium', color: '#FFFFFF' },
+  dial: { fontSize: 15, fontFamily: 'Outfit_500Medium', color: '#000000' },
   backdrop: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center', alignItems: 'center', padding: 32,

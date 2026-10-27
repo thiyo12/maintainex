@@ -335,7 +335,8 @@ export default function CreateJobScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
       allowsMultipleSelection: true,
       selectionLimit: remaining,
       quality: 0.75,
