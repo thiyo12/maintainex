@@ -77,17 +77,7 @@ export default function ExploreScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); load() }}
-            tintColor={v3.colors.ink}
-          />
-        }
-      >
+      <View style={styles.searchFixed}>
         <View style={styles.header}>
           {showAll ? (
             <TouchableOpacity onPress={() => setShowAll(false)} style={styles.back}>
@@ -111,6 +101,19 @@ export default function ExploreScreen() {
             onPostJob={postCustom}
           />
         </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); load() }}
+            tintColor={v3.colors.ink}
+          />
+        }
+      >
 
         {!showAll ? (
           <View style={styles.flowCard}>
@@ -225,6 +228,7 @@ export default function ExploreScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  searchFixed: { paddingHorizontal: 0, zIndex: 100 },
   scroll: { paddingBottom: 12 },
   header: { paddingHorizontal: 18, paddingTop: 8, flexDirection: 'row', gap: 10 },
   back: { width: 36, height: 36, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
