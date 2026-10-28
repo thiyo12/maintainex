@@ -15,12 +15,22 @@ export async function GET(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const tasker = await prisma.taskerProfile.upsert({
+    // Do not create LK-labelled profiles for an unknown or foreign account.
+    const market = (user.countryCode || '').trim().toUpperCase()
+    if (market !== 'LK' && market !== 'CA') {
+      return NextResponse.json({
+        error: 'Provider market is not supported',
+        code: 'MARKET_NOT_SUPPORTED',
+      }, { status: 400 })
+    }
+
+    // Listing professions is read-only. Viewing the onboarding screen must
+    // not implicitly create a provider profile or change its market.
+    const tasker = await prisma.taskerProfile.findUnique({
       where: { userId: user.id },
-      update: {},
-      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
       select: { id: true },
     })
+    if (!tasker) return NextResponse.json({ professions: [] })
 
     const professions = await getTaskerProfessions(prisma, tasker.id)
     return NextResponse.json({ professions })
@@ -40,24 +50,48 @@ export async function POST(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
+    // Do not create LK-labelled profiles for an unknown or foreign account.
+    const market = (user.countryCode || '').trim().toUpperCase()
+    if (market !== 'LK' && market !== 'CA') {
+      return NextResponse.json({
+        error: 'Provider market is not supported',
+        code: 'MARKET_NOT_SUPPORTED',
+      }, { status: 400 })
+    }
+
+    // Validate the request BEFORE creating a profile. Objects, arrays and
+    // malformed JSON used to reach Prisma or trigger an avoidable 500.
+    const body = await request.json().catch(() => null)
+    const professionId = body?.professionId
+    if (typeof professionId !== 'string' || !professionId.trim()) {
+      return NextResponse.json({ error: 'professionId must be a nonempty string', code: 'INVALID_PROFESSION_ID' }, { status: 400 })
+    }
+
+    // Check the global profession exists and is active BEFORE creating an
+    // account profile. A forged or archived ID is not onboarding intent.
+    const validProfession = await prisma.profession.findUnique({
+      where: { id: professionId.trim() },
+      select: { id: true, isActive: true },
+    })
+    if (!validProfession) {
+      return NextResponse.json({ error: 'Profession not found' }, { status: 404 })
+    }
+    if (!validProfession.isActive) {
+      return NextResponse.json({ error: 'Cannot assign inactive profession' }, { status: 400 })
+    }
+
     const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
       update: {},
-      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
+      create: { userId: user.id, countryCode: market },
       select: { id: true },
     })
-
-    const body = await request.json()
-    const { professionId } = body
-    if (!professionId) {
-      return NextResponse.json({ error: 'professionId required' }, { status: 400 })
-    }
 
     const existing = await prisma.taskerProfession.findUnique({
       where: {
         taskerProfileId_professionId: {
           taskerProfileId: tasker.id,
-          professionId,
+          professionId: professionId.trim(),
         },
       },
       select: { id: true, status: true },
@@ -71,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     const result = await assignTaskerProfession(prisma, {
       taskerProfileId: tasker.id,
-      professionId,
+      professionId: professionId.trim(),
     })
 
     return NextResponse.json({ profession: result }, { status: 201 })

@@ -1800,6 +1800,7 @@ model CompanyProfile {
   subscriptions      CompanySubscription[]
   auditLogs          CompanyAuditLog[]
   jobAssignments     CompanyJobAssignment[]
+  crewDispatches     CompanyCrewDispatch[]
 
   @@index([isVerified])
   @@index([rating])
@@ -2207,8 +2208,10 @@ model MarketplaceJob {
   changeOrders      JobChangeOrder[]
   evidenceRecords   JobEvidence[]
   riskEvents        MarketplaceRiskEvent[]
+  trustedContactShares TrustedContactShare[]
   verificationPins  JobVerificationPin[]
   assignments       CompanyJobAssignment[]
+  crewDispatch      CompanyCrewDispatch?
   lifecycleEvents   JobLifecycleEvent[]
   marketplaceDisputes MarketplaceDispute[]
 
@@ -2218,6 +2221,25 @@ model MarketplaceJob {
   @@index([status])
   @@index([createdAt])
   @@index([countryCode])
+}
+
+/// Short-lived, user-authorized safety status access for a trusted contact.
+/// Only a token digest and booking ownership metadata are stored; the recipient
+/// sees a minimal status summary and never the service address or account PII.
+model TrustedContactShare {
+  id               String         @id @default(cuid())
+  jobId            String
+  job              MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  actorUserId      String
+  tokenHash        String         @unique
+  consentedAt      DateTime
+  consentVersion   String
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime       @default(now())
+
+  @@index([jobId, actorUserId, expiresAt])
+  @@index([expiresAt, revokedAt])
 }
 
 model JobQuote {
@@ -3534,6 +3556,26 @@ model JobVerificationPin {
 }
 
 // Phase 10.7 — Company Workforce: formal job assignment tracking
+// Phase 04: additive crew lifecycle scaffold. No crew writes/dispatch are enabled.
+model CompanyCrewDispatch {
+  id                   String   @id @default(cuid())
+  jobId                String   @unique
+  job                  MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  companyId            String
+  company              CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  requiredWorkersCount Int
+  status               String   @default("FORMING") // FORMING, READY, IN_PROGRESS, COMPLETED, BLOCKED, CANCELLED
+  leadWorkerUserId     String?
+  version              Int      @default(1)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  assignments          CompanyJobAssignment[]
+  crewPinChallenges    CompanyCrewPinChallenge[]
+  crewPresenceWitnesses CompanyCrewPresenceWitness[]
+
+  @@index([companyId, status])
+}
+
 model CompanyJobAssignment {
   id            String   @id @default(cuid())
   companyId     String
@@ -3542,8 +3584,14 @@ model CompanyJobAssignment {
   job           MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
   workerUserId  String
   worker        User     @relation(fields: [workerUserId], references: [id], onDelete: Cascade)
+  crewDispatchId String?
+  crewDispatch   CompanyCrewDispatch? @relation(fields: [crewDispatchId], references: [id], onDelete: Restrict)
+  crewSlot       Int?
+  crewRole       String? // LEAD, MEMBER; null for legacy single-worker assignments
+  crewArrivedAt  DateTime?
+  crewIdentityConfirmedAt DateTime?
   assignedBy    String   // userId of actor who made the assignment
-  status        String   @default("ASSIGNED") // ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED, REJECTED, REVOKED
+  status        String   @default("ASSIGNED") // CREW_RESERVED, CREW_ACCEPTED (no work authority); ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED, REJECTED, REVOKED
   assignedAt    DateTime @default(now())
   acceptedAt    DateTime?
   startedAt     DateTime?
@@ -3556,11 +3604,66 @@ model CompanyJobAssignment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  crewPinChallenges CompanyCrewPinChallenge[]
+  crewPresenceWitnesses CompanyCrewPresenceWitness[]
+
   @@unique([jobId, workerUserId])
+  @@unique([crewDispatchId, crewSlot])
+  @@index([crewDispatchId])
   @@index([companyId])
   @@index([workerUserId])
   @@index([jobId])
   @@index([status])
+}
+
+
+/// Phase 04 inert member/epoch/purpose crew PIN challenge storage.
+/// No application issuer or verifier; challenge does not authorize work.
+model CompanyCrewPinChallenge {
+  id                     String   @id @default(cuid())
+  crewDispatchId         String
+  crewDispatch           CompanyCrewDispatch @relation(fields: [crewDispatchId], references: [id], onDelete: Restrict)
+  assignmentId           String
+  assignment             CompanyJobAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  jobId                  String
+  crewVersion            Int
+  purpose                String   // ARRIVAL or WORK_START (DB check)
+  challengeVersion       Int      @default(1)
+  pinDigest              String   // scoped HMAC; NEVER plaintext
+  issuedByCustomerUserId String
+  expiresAt              DateTime
+  failedAttempts         Int      @default(0)
+  lockedUntil            DateTime?
+  consumedAt             DateTime?
+  revokedAt              DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([crewDispatchId, crewVersion, assignmentId, purpose, challengeVersion], map: "CrewPinChallenge_scope_version_key")
+  @@index([crewDispatchId, crewVersion, purpose], map: "CrewPinChallenge_crew_purpose_idx")
+  @@index([assignmentId, purpose, expiresAt], map: "CrewPinChallenge_assignment_expiry_idx")
+}
+
+/// Inert Phase 04 evidence scaffold: per-worker independently collected
+/// customer and worker acknowledgements. This does NOT establish actual
+/// physical co-presence or grant arrival/work-start authorization.
+model CompanyCrewPresenceWitness {
+  id                  String   @id @default(cuid())
+  crewDispatchId      String
+  crewDispatch        CompanyCrewDispatch @relation(fields: [crewDispatchId], references: [id], onDelete: Restrict)
+  assignmentId        String
+  assignment          CompanyJobAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  jobId               String
+  crewVersion         Int
+  workerUserId        String
+  customerUserId      String
+  workerAttestedAt    DateTime?
+  customerAttestedAt  DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([crewDispatchId, crewVersion, assignmentId], map: "CrewPresenceWitness_scope_key")
+  @@index([jobId, crewVersion], map: "CrewPresenceWitness_job_epoch_idx")
 }
 
 model PaymentProviderConfig {

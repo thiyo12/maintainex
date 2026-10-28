@@ -10,6 +10,8 @@ export const v2Search = {
     }>(
       `/api/mobile/v2/search?q=${encodeURIComponent(q)}${lang ? `&lang=${lang}` : ''}${countryCode ? `&country=${encodeURIComponent(countryCode)}` : ''}`
     ),
-  popular: () =>
-    v2Request<{ results: any[] }>('/api/mobile/v2/search?popular=true'),
+  popular: (countryCode?: string) =>
+    v2Request<{ results: { query: string; count: number }[] }>(
+      `/api/mobile/v2/search?popular=true${countryCode ? `&country=${encodeURIComponent(countryCode)}` : ''}`
+    ),
 }

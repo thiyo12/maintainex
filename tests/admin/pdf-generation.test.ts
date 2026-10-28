@@ -24,6 +24,10 @@ vi.mock('@/lib/crm/security', () => ({
   guardCrmRequest: vi.fn(),
 }))
 
+vi.mock('@/lib/reports/branch-scope', () => ({
+  resolveReportBranchScope: vi.fn(),
+}))
+
 vi.mock('@/lib/activity-log', () => ({
   getStatsForPeriod: vi.fn().mockResolvedValue({
     bookings: { total: 10, pending: 2, confirmed: 3, inProgress: 1, completed: 3, cancelled: 1 },
@@ -41,6 +45,7 @@ import { GET as reportGET } from '@/app/api/reports/export/route'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
 import { guardCrmRequest } from '@/lib/crm/security'
+import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
 import { NextRequest, NextResponse } from 'next/server'
 
 function makeRequest(url: string, headers?: Record<string, string>): NextRequest {
@@ -146,6 +151,13 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
   })
 
   describe('Invoice PDF route', () => {
+    // Invoice PDFs now use the canonical CRM guard, not getSession directly.
+    // Make authorization decisions explicit so denied scenarios remain covered
+    // and PDF formatting assertions run with a correctly authorized context.
+    beforeEach(() => {
+      mockedGuard.mockResolvedValue(superGuard())
+    })
+
     const mockInvoice = {
       id: 'inv-1',
       invoiceNumber: 'INV-001',
@@ -168,17 +180,25 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
     }
 
     it('returns 401 for unauthenticated request', async () => {
-      vi.mocked(getSession).mockResolvedValue(null)
+      mockedGuard.mockResolvedValue({
+        ok: false,
+        response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+      })
       const req = makeRequest('http://localhost:3000/api/invoices/inv-1/pdf')
       const res = await invoiceGET(req, { params: Promise.resolve({ id: 'inv-1' }) })
       expect(res.status).toBe(401)
     })
 
     it('returns 403 for unauthorized branch access', async () => {
-      vi.mocked(getSession).mockResolvedValue({
-        id: 'user-1', email: 'user@test.com', role: 'STAFF', branchId: 'other-branch',
-      } as any)
+      // An authorized CRM session still cannot export another branch's invoice.
+      mockedGuard.mockResolvedValue({
+        ...superGuard(),
+        context: { ...superGuard().context, isSuperAdmin: false },
+      })
       vi.mocked(prisma.invoice.findUnique).mockResolvedValue(mockInvoice as any)
+      vi.mocked(resolveReportBranchScope).mockResolvedValueOnce({
+        ok: false, status: 403, error: 'Branch access denied',
+      } as any)
       const req = makeRequest('http://localhost:3000/api/invoices/inv-1/pdf')
       const res = await invoiceGET(req, { params: Promise.resolve({ id: 'inv-1' }) })
       expect(res.status).toBe(403)
@@ -260,6 +280,16 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
   })
 
   describe('Reports PDF route', () => {
+    // The report endpoint requires a country-scoped branch decision before
+    // stats queries. Always give authorized tests the same explicit scoped
+    // result that resolveReportBranchScope returns in production.
+    beforeEach(() => {
+      vi.mocked(resolveReportBranchScope).mockResolvedValue({
+        ok: true,
+        scope: { branchIds: null, branchId: null, branchCountryFilter: {} },
+      })
+    })
+
     it('returns 401 for unauthenticated request', async () => {
       mockedGuard.mockResolvedValue({
         ok: false,

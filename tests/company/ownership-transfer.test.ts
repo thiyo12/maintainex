@@ -98,6 +98,31 @@ describe.skipIf(!requiresPostgres())('Phase 6.1 — Ownership Transfer', () => {
     expect(newRole).toBe('COMPANY_OWNER')
   })
 
+  it('rejects ownership transfer to a globally suspended member', async () => {
+    await prisma.user.update({ where: { id: ownerUserId }, data: { isSuspended: true } })
+    try {
+      const result = await transferOwnership(companyId, newOwnerUserId, ownerUserId)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('restricted')
+      expect(await getUserCompanyRole(companyId, newOwnerUserId)).toBe('COMPANY_OWNER')
+      expect(await getUserCompanyRole(companyId, ownerUserId)).toBe('MANAGER')
+    } finally {
+      await prisma.user.update({ where: { id: ownerUserId }, data: { isSuspended: false } })
+    }
+  })
+
+  it('rejects a suspended incumbent owner attempting to transfer control', async () => {
+    await prisma.user.update({ where: { id: newOwnerUserId }, data: { isSuspended: true } })
+    try {
+      const result = await transferOwnership(companyId, newOwnerUserId, ownerUserId)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('restricted')
+      expect(await getUserCompanyRole(companyId, newOwnerUserId)).toBe('COMPANY_OWNER')
+    } finally {
+      await prisma.user.update({ where: { id: newOwnerUserId }, data: { isSuspended: false } })
+    }
+  })
+
   it('rejects transfer to self', async () => {
     const result = await transferOwnership(companyId, newOwnerUserId, newOwnerUserId)
     expect(result.success).toBe(false)

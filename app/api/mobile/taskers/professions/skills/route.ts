@@ -14,22 +14,41 @@ export async function POST(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const body = await request.json()
-    const { taskerProfessionId, professionSkillId } = body
-    if (!taskerProfessionId || !professionSkillId) {
-      return NextResponse.json({ error: 'taskerProfessionId and professionSkillId required' }, { status: 400 })
+    // Do not create LK-labelled profiles for an unknown or foreign account.
+    const market = (user.countryCode || '').trim().toUpperCase()
+    if (market !== 'LK' && market !== 'CA') {
+      return NextResponse.json({
+        error: 'Provider market is not supported',
+        code: 'MARKET_NOT_SUPPORTED',
+      }, { status: 400 })
     }
 
-    // Verify ownership
-    const tasker = await prisma.taskerProfile.upsert({
+    const body = await request.json().catch(() => null)
+    const taskerProfessionId = body?.taskerProfessionId
+    const professionSkillId = body?.professionSkillId
+    if (typeof taskerProfessionId !== 'string' || !taskerProfessionId.trim() ||
+        typeof professionSkillId !== 'string' || !professionSkillId.trim()) {
+      return NextResponse.json({
+        error: 'taskerProfessionId and professionSkillId must be nonempty strings',
+        code: 'INVALID_PROFESSION_SKILL',
+      }, { status: 400 })
+    }
+
+    // Attaching a skill requires a pre-existing provider profile and owned
+    // profession. Never create a new profile while processing a guessed ID.
+    const tasker = await prisma.taskerProfile.findUnique({
       where: { userId: user.id },
-      update: {},
-      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
       select: { id: true },
     })
+    if (!tasker) {
+      return NextResponse.json({
+        error: 'Tasker profile not found',
+        code: 'TASKER_PROFILE_NOT_FOUND',
+      }, { status: 404 })
+    }
 
     const taskerProfession = await prisma.taskerProfession.findUnique({
-      where: { id: taskerProfessionId },
+      where: { id: taskerProfessionId.trim() },
       select: { id: true, taskerProfileId: true },
     })
     if (!taskerProfession) {
@@ -40,8 +59,8 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await addTaskerProfessionSkill(prisma, {
-      taskerProfessionId,
-      professionSkillId,
+      taskerProfessionId: taskerProfessionId.trim(),
+      professionSkillId: professionSkillId.trim(),
     })
 
     return NextResponse.json({ skill: result }, { status: 201 })

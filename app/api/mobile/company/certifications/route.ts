@@ -14,6 +14,10 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    // A suspended member must not retain read access to sensitive credential
+    // documents after losing access to the rest of their company account.
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { searchParams } = new URL(request.url)
     const companyId = searchParams.get('companyId')

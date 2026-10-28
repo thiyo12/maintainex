@@ -104,7 +104,7 @@ export async function acceptCompanyInvite(params: {
 }): Promise<{ success: boolean; memberName?: string; companyName?: string; error?: string }> {
   const invite = await prisma.teamInvite.findUnique({
     where: { token: params.token },
-    include: { company: { select: { id: true, companyName: true } } },
+    include: { company: { select: { id: true, companyName: true, countryCode: true } } },
   })
 
   if (!invite) {
@@ -149,6 +149,22 @@ export async function acceptCompanyInvite(params: {
         throw new Error('INVITE_ALREADY_CLAIMED')
       }
 
+      // Validating inside the transaction rolls back the invitation claim
+      // whenever the accepting account or company market is ineligible.
+      const acceptingUser = await tx.user.findUnique({
+        where: { id: params.userId },
+        select: { countryCode: true, isActive: true, isSuspended: true, isBanned: true },
+      })
+      if (!acceptingUser || !acceptingUser.isActive || acceptingUser.isSuspended || acceptingUser.isBanned) {
+        throw new Error('INVITEE_ACCOUNT_RESTRICTED')
+      }
+
+      const companyMarket = invite.company.countryCode.trim().toUpperCase()
+      const workerMarket = acceptingUser.countryCode.trim().toUpperCase()
+      if (!['LK', 'CA'].includes(companyMarket) || workerMarket !== companyMarket) {
+        throw new Error('INVITEE_MARKET_MISMATCH')
+      }
+
       const existingMember = await tx.teamMember.findFirst({
         where: {
           companyId: invite.companyId,
@@ -161,12 +177,16 @@ export async function acceptCompanyInvite(params: {
           throw new Error('ALREADY_ACTIVE_MEMBER')
         }
 
-        if (existingMember.status === 'REMOVED') {
-          await tx.teamMember.update({
-            where: { id: existingMember.id },
-            data: { status: 'ACTIVE', role: invite.role },
-          })
+        if (existingMember.status !== 'REMOVED') {
+          // Suspended members must use the authorized workforce reactivation
+          // flow rather than consume a new invite without changing status.
+          throw new Error('MEMBERSHIP_REQUIRES_REACTIVATION')
         }
+
+        await tx.teamMember.update({
+          where: { id: existingMember.id },
+          data: { status: 'ACTIVE', role: invite.role },
+        })
       } else {
         await tx.teamMember.create({
           data: {
@@ -187,6 +207,15 @@ export async function acceptCompanyInvite(params: {
     }
     if (err?.message === 'ALREADY_ACTIVE_MEMBER') {
       return { success: false, error: 'You are already a member of this company' }
+    }
+    if (err?.message === 'INVITEE_ACCOUNT_RESTRICTED') {
+      return { success: false, error: 'Your account must be active and unrestricted to join a company' }
+    }
+    if (err?.message === 'INVITEE_MARKET_MISMATCH') {
+      return { success: false, error: 'Your account market does not match this company' }
+    }
+    if (err?.message === 'MEMBERSHIP_REQUIRES_REACTIVATION') {
+      return { success: false, error: 'This membership requires company workforce reactivation' }
     }
     throw err
   }

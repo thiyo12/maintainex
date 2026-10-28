@@ -1,6 +1,8 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { isSupportedMarket, resolveMarketFromServiceAddress } from '@/lib/geography/market-engine'
+import { isBookNowCatalogueAvailableInMarket } from '@/lib/domain/catalog-market-eligibility'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { matchTaskerCandidates, resolveJobCategoryKeys } from '@/lib/job-matching'
 import { getSetting } from '@/lib/settings'
@@ -25,17 +27,20 @@ export async function GET(request: NextRequest) {
 
     const templateJob = await prisma.templateJob.findUnique({
       where: { id: jobId },
-      include: { category: { select: { id: true } } },
+      include: { category: { select: { id: true, isActive: true, countries: true } } },
     })
 
-    if (!templateJob) {
+    if (!templateJob || !templateJob.isActive) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    const { keys } = await resolveJobCategoryKeys(templateJob.category.id)
-
-    const lat = latParam ? Number(latParam) : null
-    const lng = lngParam ? Number(lngParam) : null
+    // A partial GPS pair is not proof of location; reject rather than
+    // silently dropping one coordinate and widening provider discovery.
+    if ((latParam === null) !== (lngParam === null)) {
+      return NextResponse.json({ error: 'Both coordinates are required', code: 'LOCATION_REQUIRES_VERIFICATION' }, { status: 400 })
+    }
+    const lat = latParam !== null ? Number(latParam) : null
+    const lng = lngParam !== null ? Number(lngParam) : null
     if (
       (lat !== null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) ||
       (lng !== null && (!Number.isFinite(lng) || lng < -180 || lng > 180))
@@ -50,11 +55,43 @@ export async function GET(request: NextRequest) {
     }
     const radiusKm = Math.min(requestedRadius, 100)
 
-    const requestedCountry =
-      typeof countryParam === 'string' && /^[A-Za-z]{2,3}$/.test(countryParam)
-        ? countryParam.toUpperCase()
-        : user.countryCode
+    // Phase 03: the browse market must be a supported launch market. A client
+    // cannot widen discovery by passing an arbitrary country code.
+    const requestedCountry = (countryParam ?? user.countryCode ?? '').trim().toUpperCase()
 
+    if (!isSupportedMarket(requestedCountry)) {
+      return NextResponse.json({ error: 'Provider browse is unavailable for this market', code: 'MARKET_NOT_SUPPORTED', candidates: [] }, { status: 200 })
+    }
+
+    // Browsing without GPS is a discovery hint, not permission to book.
+    // When coordinates are provided they MUST resolve inside the requested
+    // launch market (the municipal polygon is authoritative for Vancouver).
+    if (lat !== null && lng !== null) {
+      const location = resolveMarketFromServiceAddress({
+        latitude: lat, longitude: lng, claimedCountryCode: requestedCountry,
+      })
+      if (!location.ok || location.countryCode !== requestedCountry) {
+        return NextResponse.json({
+          error: 'Service location could not be verified for this market',
+          code: 'LOCATION_MARKET_MISMATCH',
+          candidates: [],
+        }, { status: 400 })
+      }
+    }
+
+    // TemplateJob IDs are not sufficient market authorization. Inactive,
+    // foreign-currency and dual-market single-price jobs cannot produce
+    // provider suggestions, even via this legacy browse compatibility route.
+    if (!templateJob.category ||
+        !isBookNowCatalogueAvailableInMarket(templateJob, templateJob.category, requestedCountry as 'LK' | 'CA')) {
+      return NextResponse.json({
+        error: 'Service is not available in this market',
+        code: 'SERVICE_MARKET_UNAVAILABLE',
+        candidates: [],
+      }, { status: 200 })
+    }
+
+    const { keys } = await resolveJobCategoryKeys(templateJob.category.id)
     const candidates = await matchTaskerCandidates({
       matchKeys: keys,
       lat,
@@ -74,8 +111,12 @@ export async function GET(request: NextRequest) {
         isVerified: c.profile.isVerified,
         isOnline: c.profile.isOnline,
         profileImage: c.profile.profileImage,
-        distance: c.distanceKm,
-        score: Math.round(c.score * 100),
+        // Exact distance and the distance-weighted score can be probed from
+        // multiple client-chosen coordinates to triangulate a provider's GPS.
+        // Keep the legacy keys nullable for mobile compatibility; candidate
+        // ordering is still calculated server-side.
+        distance: null,
+        score: null,
         skills: c.skills,
         hourlyRate: c.profile.hourlyRate,
         fixedRate: 0,

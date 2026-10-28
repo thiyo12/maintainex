@@ -155,6 +155,25 @@ describe('Phase 7.2 — Canonical Capability Eligibility', () => {
       )).toBe(false)
     })
 
+    it('does not allow a job-specific company grant to authorize a sibling in the same category', () => {
+      const reqs = makeJobReqs({
+        categoryId: plumbingCategoryId,
+        templateJobIds: [drainCleanTemplateJobId],
+      })
+      expect(hasCompanySpecialtyCapability(
+        [{ categoryId: plumbingCategoryId, jobId: unrelatedTemplateJobId }],
+        reqs,
+      )).toBe(false)
+    })
+
+    it('keeps historical category-only bookings compatible with existing job-specific specialties', () => {
+      const reqs = makeJobReqs({ categoryId: plumbingCategoryId, templateJobIds: [] })
+      expect(hasCompanySpecialtyCapability(
+        [{ categoryId: plumbingCategoryId, jobId: unrelatedTemplateJobId }],
+        reqs,
+      )).toBe(true)
+    })
+
     it('empty specialties = excluded', () => {
       const reqs = makeJobReqs()
       expect(hasCompanySpecialtyCapability([], reqs)).toBe(false)

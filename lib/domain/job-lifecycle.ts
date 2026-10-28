@@ -7,6 +7,8 @@ import { resolveProviderActor } from '@/lib/domain/job-actors'
 import { fundEscrow, releaseEscrow, refundEscrow, expirePendingEscrow, completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
 import { evaluateEligibility } from '@/lib/matching/eligibility'
+import { resolveJobRequirements } from '@/lib/matching'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 
 
@@ -330,6 +332,22 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
     throw new Error('Quote provider is no longer available')
   }
 
+  // Phase 03: the accepted quote is a financial commitment, so the job market is
+  // resolved from the validated service address before anything is priced or
+  // committed. A job whose market cannot be established must not be accepted.
+  const jobMarket = requireJobMarket(job)
+  if (!jobMarket.ok) {
+    throw new Error('JOB_MARKET_UNRESOLVED: ' + jobMarket.error)
+  }
+  const jobCountry = jobMarket.countryCode
+
+  const requirements = job.templateJobId || job.serviceTemplateId
+    ? await resolveJobRequirements(prisma, job.categoryId, job.serviceTemplateId, job.templateJobId)
+    : null
+  if ((job.templateJobId || job.serviceTemplateId) && !requirements) {
+    throw new Error('Quote provider is no longer available')
+  }
+
   const eligibility = await evaluateEligibility({
     providerType: quote.providerType,
     providerId: quote.providerId,
@@ -340,9 +358,10 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
       urgency: (job.urgency?.toUpperCase() || 'NORMAL') as 'NORMAL' | 'URGENT' | 'EMERGENCY',
       categoryId: job.categoryId,
       serviceTemplateId: job.serviceTemplateId || undefined,
+      templateJobId: requirements?.templateJobIds[0],
       latitude: job.latitude,
       longitude: job.longitude,
-      countryCode: job.countryCode || 'GLOBAL',
+      countryCode: jobCountry,
       preferredDate: job.preferredDate,
     },
     client: prisma,
@@ -351,10 +370,11 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
     throw new Error('Quote provider is no longer available')
   }
 
-  const jobCountry = job.countryCode || 'GLOBAL'
   const pricingConfig = await resolvePricingConfig(prisma, jobCountry)
 
-  if (jobCountry !== 'GLOBAL' && jobCountry !== pricingConfig.countryCode) {
+  // Previously this guard was skipped whenever the job country was GLOBAL, which
+  // let a marketless job accept a quote priced under another market's config.
+  if (jobCountry !== pricingConfig.countryCode) {
     throw new Error(
       `PRICING_COUNTRY_MISMATCH: job country=${jobCountry} but resolved pricing config country=${pricingConfig.countryCode}. Refusing to proceed.`
     )

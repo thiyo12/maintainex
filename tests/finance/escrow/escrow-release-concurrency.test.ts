@@ -28,6 +28,7 @@ describe.skipIf(!isVPS)('Phase 5E.2 — Escrow Release Concurrency', () => {
     }
     for (const uid of userIds) {
       await prisma.providerWallet.deleteMany({ where: { userId: uid } })
+      await prisma.taskerProfile.deleteMany({ where: { userId: uid } })
       await prisma.user.deleteMany({ where: { id: uid } })
     }
     await prisma.$disconnect()
@@ -45,6 +46,8 @@ describe.skipIf(!isVPS)('Phase 5E.2 — Escrow Release Concurrency', () => {
       ],
     })
 
+    await prisma.taskerProfile.create({ data: { userId: provId, skills: '[]', countryCode: 'LK' } })
+
     const custWallet = await prisma.providerWallet.create({ data: { userId: custId, availableBalance: 500 } })
     const provWallet = await prisma.providerWallet.create({ data: { userId: provId, availableBalance: 0 } })
     walletIds.push(custWallet.id, provWallet.id)
@@ -52,12 +55,12 @@ describe.skipIf(!isVPS)('Phase 5E.2 — Escrow Release Concurrency', () => {
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES (gen_random_uuid()::text, $1, 'PROVIDER', 500, 500, 0, 1, now(), now())
-       ON CONFLICT ("walletType", "walletId") DO NOTHING`, custWallet.id
+       ON CONFLICT ("walletType", "walletId", "currency") DO NOTHING`, custWallet.id
     )
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES (gen_random_uuid()::text, $1, 'PROVIDER', 0, 0, 0, 1, now(), now())
-       ON CONFLICT ("walletType", "walletId") DO NOTHING`, provWallet.id
+       ON CONFLICT ("walletType", "walletId", "currency") DO NOTHING`, provWallet.id
     )
 
     const job = await prisma.marketplaceJob.create({
@@ -122,7 +125,7 @@ describe.skipIf(!isVPS)('Phase 5E.2 — Escrow Release Concurrency', () => {
     const succeeded = results.filter(r => r.status === 'fulfilled')
     const failed = results.filter(r => r.status === 'rejected')
 
-    expect(succeeded.length).toBe(1)
+    expect(succeeded.length, results.map(r => r.status === 'rejected' ? String(r.reason) : 'fulfilled').join('; ')).toBe(1)
     expect(failed.length).toBe(1)
 
     const escrow = await prisma.jobEscrow.findUnique({ where: { id: f.escrow.id } })
@@ -172,7 +175,7 @@ describe.skipIf(!isVPS)('Phase 5E.2 — Escrow Release Concurrency', () => {
     ])
 
     const succeeded = results.filter(r => r.status === 'fulfilled')
-    expect(succeeded.length).toBeGreaterThanOrEqual(1)
+    expect(succeeded.length, results.map(r => r.status === 'rejected' ? String(r.reason) : 'fulfilled').join('; ')).toBeGreaterThanOrEqual(1)
     expect(succeeded.length).toBeLessThanOrEqual(2)
 
     const escrow = await prisma.jobEscrow.findUnique({ where: { id: f.escrow.id } })

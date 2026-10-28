@@ -32,6 +32,16 @@ function mockPrisma(overrides: Record<string, any> = {}) {
         return Promise.resolve(defaultInspection)
       }),
     },
+    companyJobAssignment: {
+      findFirst: vi.fn().mockResolvedValue(
+        overrides.assignment !== undefined ? overrides.assignment : null,
+      ),
+    },
+    user: {
+      findUnique: vi.fn().mockResolvedValue(overrides.actor ?? {
+        isActive: true, isSuspended: false, isBanned: false, identityStatus: 'VERIFIED',
+      }),
+    },
     teamMember: {
       findFirst: overrides.teamMember !== undefined
         ? vi.fn().mockResolvedValue(overrides.teamMember)
@@ -110,12 +120,54 @@ describe('Work-start authorization', () => {
     expect(result.reason).toBe('JOB_NOT_FOUND')
   })
 
-  it('authorizes company member as provider', async () => {
+  it('authorizes an active company member only with an accepted worker assignment', async () => {
     const prisma = mockPrisma({
       acceptedQuote: { id: 'quote-1', providerId: 'company-1', providerType: 'COMPANY' },
-      teamMember: { id: 'tm-1' }, // findFirst returns this truthy value
+      teamMember: { id: 'tm-1' },
+      assignment: { id: 'accepted-worker-assignment' },
     })
     const result = await checkWorkStartAuthorization(prisma, 'job-1', 'member-1')
     expect(result.authorized).toBe(true)
+    expect(prisma.teamMember.findFirst).toHaveBeenCalledWith({
+      where: { companyId: 'company-1', userId: 'member-1', status: 'ACTIVE', role: 'WORKER' },
+      select: { id: true },
+    })
+    expect(prisma.companyJobAssignment.findFirst).toHaveBeenCalledWith({
+      where: {
+        companyId: 'company-1',
+        jobId: 'job-1',
+        workerUserId: 'member-1',
+        status: 'ACCEPTED',
+      },
+      select: { id: true },
+    })
+  })
+
+  it('blocks a restricted or unverified assigned worker before work start', async () => {
+    for (const actor of [
+      { isActive: false, isSuspended: false, isBanned: false, identityStatus: 'VERIFIED' },
+      { isActive: true, isSuspended: true, isBanned: false, identityStatus: 'VERIFIED' },
+      { isActive: true, isSuspended: false, isBanned: true, identityStatus: 'VERIFIED' },
+      { isActive: true, isSuspended: false, isBanned: false, identityStatus: 'PENDING' },
+    ]) {
+      const prisma = mockPrisma({
+        acceptedQuote: { id: 'quote-1', providerId: 'company-1', providerType: 'COMPANY' },
+        teamMember: { id: 'tm-1' },
+        assignment: { id: 'assignment-1' },
+        actor,
+      })
+      expect(await checkWorkStartAuthorization(prisma, 'job-1', 'worker'))
+        .toEqual({ authorized: false, reason: 'NOT_PROVIDER' })
+    }
+  })
+
+  it('does not authorize an unrelated company member without accepted assignment', async () => {
+    const prisma = mockPrisma({
+      acceptedQuote: { id: 'quote-1', providerId: 'company-1', providerType: 'COMPANY' },
+      teamMember: { id: 'tm-1' },
+      assignment: null,
+    })
+    const result = await checkWorkStartAuthorization(prisma, 'job-1', 'member-1')
+    expect(result).toEqual({ authorized: false, reason: 'NOT_PROVIDER' })
   })
 })

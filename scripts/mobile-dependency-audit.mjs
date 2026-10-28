@@ -66,7 +66,7 @@ function npmLatestVersion(packageName) {
   }
 }
 
-const audit = spawnSync('npm', ['audit', '--omit=dev', '--audit-level=high', '--json'], {
+const audit = spawnSync('npm', ['audit', '--audit-level=high', '--json'], {
   cwd: mobileDir,
   encoding: 'utf8',
   env: process.env,

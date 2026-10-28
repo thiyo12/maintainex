@@ -1,0 +1,303 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { checkWorkerEligibility, checkCrewCandidateEligibility } from '@/lib/phase6/provider-eligibility'
+
+const db = vi.hoisted(() => ({
+  member: vi.fn(), user: vi.fn(), job: vi.fn(), profile: vi.fn(),
+  category: vi.fn(), service: vi.fn(), skill: vi.fn(), conflicts: vi.fn(), busy: vi.fn(),
+}))
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    teamMember: { findFirst: db.member },
+    user: { findUnique: db.user },
+    marketplaceJob: { findUnique: db.job },
+    taskerProfile: { findUnique: db.profile },
+    jobCategory: { findUnique: db.category },
+    serviceTemplate: { findUnique: db.service },
+    taskerSkill: { findFirst: db.skill },
+    companyJobAssignment: { findMany: db.conflicts, findFirst: db.busy },
+  },
+}))
+
+const validJob = {
+  categoryId: 'cat-plumbing',
+  serviceTemplateId: 'service-pipe-repair',
+  templateJobId: null,
+  countryCode: 'LK',
+  latitude: null,
+  longitude: null,
+  preferredDate: null,
+  preferredTimeSlot: null,
+  workerIdentityCheckRequired: false,
+}
+
+describe('Phase 04 — company worker assignment respects exact service selection', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    db.member.mockResolvedValue({
+      id: 'member', companyId: 'company', userId: 'worker',
+      status: 'ACTIVE', role: 'WORKER', skills: '[]',
+    })
+    db.user.mockResolvedValue({
+      id: 'worker', identityStatus: 'VERIFIED', isActive: true,
+      isSuspended: false, isBanned: false, countryCode: 'LK',
+    })
+    db.job.mockResolvedValue(validJob)
+    db.profile.mockResolvedValue({ id: 'profile', countryCode: 'LK', skills: '[]' })
+    db.category.mockResolvedValue({
+      id: 'cat-plumbing', name: 'Plumbing', slug: 'plumbing',
+    })
+    db.service.mockResolvedValue({
+      id: 'service-pipe-repair', jobCategoryId: 'cat-plumbing',
+      templateJobId: 'job-pipe-repair',
+    })
+    db.skill.mockResolvedValue({ id: 'tasker-skill' })
+    db.conflicts.mockResolvedValue([])
+    db.busy.mockResolvedValue(null)
+  })
+
+  it('preserves strict production dispatch blocking for a two-worker job', async () => {
+    db.job.mockResolvedValue({ ...validJob, workersCount: 2 })
+    const production = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(production.eligible).toBe(false)
+    expect(production.reasons).toContain(
+      'Job requires a multi-worker crew; one worker is insufficient',
+    )
+    const preview = await checkCrewCandidateEligibility('company', 'worker', 'booking')
+    expect(preview.eligible).toBe(true)
+    expect(preview.reasons).not.toContain(
+      'Job requires a multi-worker crew; one worker is insufficient',
+    )
+  })
+
+  it('keeps exact-service eligibility mandatory in crew-only preview', async () => {
+    db.job.mockResolvedValue({ ...validJob, workersCount: 3 })
+    db.skill.mockResolvedValue(null)
+    const preview = await checkCrewCandidateEligibility('company', 'worker', 'booking')
+    expect(preview.eligible).toBe(false)
+    expect(preview.reasons).toContain('Worker lacks required capability for this job')
+  })
+
+  it('still denies out-of-market crew candidates in the preview', async () => {
+    db.job.mockResolvedValue({ ...validJob, workersCount: 2 })
+    db.user.mockResolvedValue({
+      id: 'worker', identityStatus: 'VERIFIED', isActive: true,
+      isSuspended: false, isBanned: false, countryCode: 'CA',
+    })
+    db.profile.mockResolvedValue({ id: 'profile', countryCode: 'CA', skills: '[]' })
+    const result = await checkCrewCandidateEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Worker market does not match the job market')
+  })
+
+  it('allows the selected exact service and queries by its TemplateJob ID', async () => {
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(true)
+    expect(db.skill).toHaveBeenCalledWith({
+      where: { taskerId: 'profile', jobId: 'job-pipe-repair' },
+      select: { id: true },
+    })
+  })
+
+  it('rejects a worker who selected only a sibling job in the same department', async () => {
+    db.skill.mockResolvedValue(null)
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Worker lacks required capability for this job')
+    expect(db.skill.mock.calls[0][0].where).not.toHaveProperty('job')
+  })
+
+  it('does not turn a derived tasker-profile category into every sibling service', async () => {
+    db.skill.mockResolvedValue(null) // relational selection belongs to another TemplateJob
+    db.profile.mockResolvedValue({
+      id: 'profile', countryCode: 'LK', skills: '["plumbing","cat-plumbing"]',
+    })
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Worker lacks required capability for this job')
+  })
+
+  it('honors an exact job token on the profile without widening its category', async () => {
+    db.skill.mockResolvedValue(null)
+    db.profile.mockResolvedValue({
+      id: 'profile', countryCode: 'LK',
+      skills: '["cat-plumbing","job-pipe-repair"]',
+    })
+    expect((await checkWorkerEligibility('company', 'worker', 'booking')).eligible).toBe(true)
+  })
+
+  it('keeps historical category-only bookings compatible with profile category skills', async () => {
+    db.skill.mockResolvedValue(null)
+    db.job.mockResolvedValue({
+      ...validJob, serviceTemplateId: null, templateJobId: null,
+    })
+    db.profile.mockResolvedValue({
+      id: 'profile', countryCode: 'LK', skills: '["plumbing"]',
+    })
+    expect((await checkWorkerEligibility('company', 'worker', 'booking')).eligible).toBe(true)
+  })
+
+  it('preserves explicitly category-wide legacy membership skills', async () => {
+    db.skill.mockResolvedValue(null)
+    db.member.mockResolvedValue({ id: 'member', role: 'WORKER', skills: '["plumbing"]' })
+    expect((await checkWorkerEligibility('company', 'worker', 'booking')).eligible).toBe(true)
+  })
+
+  it('retains category capability for a historical booking without an exact service ID', async () => {
+    db.job.mockResolvedValue({ ...validJob, serviceTemplateId: null, templateJobId: null })
+    expect((await checkWorkerEligibility('company', 'worker', 'booking')).eligible).toBe(true)
+    expect(db.skill).toHaveBeenCalledWith({
+      where: { taskerId: 'profile', job: { categoryId: 'cat-plumbing' } },
+      select: { id: true },
+    })
+    expect(db.service).not.toHaveBeenCalled()
+  })
+
+  it('blocks tampered service-to-category links despite the worker having the job capability', async () => {
+    db.service.mockResolvedValue({
+      id: 'service-pipe-repair', jobCategoryId: 'cat-electrical',
+      templateJobId: 'job-pipe-repair',
+    })
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Job service category does not match its catalogue selection')
+  })
+
+  it('blocks a missing linked service template instead of silently falling back', async () => {
+    db.service.mockResolvedValue(null)
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Job service category does not match its catalogue selection')
+  })
+
+  it('blocks contradictory direct and linked TemplateJob IDs', async () => {
+    db.job.mockResolvedValue({ ...validJob, templateJobId: 'other-job' })
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Job service category does not match its catalogue selection')
+  })
+
+  it('refuses a finance-only company member even with exact job skills', async () => {
+    db.member.mockResolvedValue({ id: 'member', role: 'FINANCE', skills: '["plumbing"]' })
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Company member does not hold the worker role')
+  })
+
+  it('does not dispatch a single worker to a booking that requires a crew', async () => {
+    db.job.mockResolvedValue({ ...validJob, workersCount: 3 })
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Job requires a multi-worker crew; one worker is insufficient')
+  })
+
+  it('considers all in-progress worker jobs busy even when the booking is on a different day', async () => {
+    db.job.mockResolvedValue({
+      ...validJob, preferredDate: new Date('2026-11-02T09:00:00.000Z'),
+    })
+    db.conflicts.mockResolvedValue([{ id: 'active-on-prior-date' }])
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain(
+      'Worker has a scheduling conflict with another assignment on the same date/time',
+    )
+    const query = db.conflicts.mock.calls[0][0].where
+    expect(query.OR[0]).toEqual({ status: 'IN_PROGRESS' })
+    expect(query.OR[0]).not.toHaveProperty('job')
+    expect(query.OR[1].status).toEqual({ in: ['ASSIGNED', 'ACCEPTED', 'CREW_RESERVED', 'CREW_ACCEPTED'] })
+  })
+
+  it('blocks undated dispatch when the worker already has an active assignment', async () => {
+    db.busy.mockResolvedValue({ id: 'existing' })
+    // Another assignment blocks capacity even when neither job has a date.
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Worker has an active assignment and no date to prove capacity')
+    expect(db.busy).toHaveBeenCalledWith({
+      where: {
+        workerUserId: 'worker',
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
+        jobId: { not: 'booking' },
+      },
+      select: { id: true },
+    })
+  })
+
+
+  it.each(['CREW_RESERVED', 'CREW_ACCEPTED'] as const)(
+    'treats %s crew capacity as busy for undated single-worker booking eligibility',
+    async status => {
+      // The mock represents a committed crew slot in another booking. Verify
+      // the real eligibility query includes this status, not only the result
+      // of an unrelated source-string test.
+      db.busy.mockImplementation(async ({ where }: { where: {
+        jobId: { not: string }; status: { in: string[] }; workerUserId: string
+      } }) => {
+        expect(where.workerUserId).toBe('worker')
+        expect(where.jobId).toEqual({ not: 'booking' })
+        return where.status.in.includes(status) ? { id: `other-${status}` } : null
+      })
+      const result = await checkWorkerEligibility('company', 'worker', 'booking')
+      expect(result.eligible).toBe(false)
+      expect(result.reasons).toContain('Worker has an active assignment and no date to prove capacity')
+      expect(db.busy).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it.each(['CREW_RESERVED', 'CREW_ACCEPTED'] as const)(
+    'blocks a same-day %s crew booking without blocking the current job itself',
+    async status => {
+      db.job.mockResolvedValue({
+        ...validJob, preferredDate: new Date('2026-11-02T09:00:00.000Z'),
+        preferredTimeSlot: 'morning',
+      })
+      db.conflicts.mockImplementation(async ({ where }: { where: {
+        workerUserId: string; jobId: { not: string }
+        OR: Array<Record<string, any>>
+      } }) => {
+        expect(where.workerUserId).toBe('worker')
+        expect(where.jobId).toEqual({ not: 'booking' })
+        const scheduled = where.OR[1]
+        expect(scheduled.status.in).toContain(status)
+        expect(scheduled.job.OR[0]).toEqual({ preferredDate: null })
+        const appointment = scheduled.job.OR[1]
+        expect(appointment.preferredDate.gte).toBeInstanceOf(Date)
+        expect(appointment.preferredDate.lt).toBeInstanceOf(Date)
+        expect(appointment.OR).toEqual([
+          { preferredTimeSlot: 'morning' },
+          { preferredTimeSlot: 'anytime' },
+          { preferredTimeSlot: null },
+        ])
+        return [{ id: `other-${status}`, jobId: 'other-booking' }]
+      })
+      const result = await checkCrewCandidateEligibility('company', 'worker', 'booking')
+      expect(result.eligible).toBe(false)
+      expect(result.reasons).toContain(
+        'Worker has a scheduling conflict with another assignment on the same date/time',
+      )
+      expect(db.conflicts).toHaveBeenCalledTimes(1)
+    },
+  )
+
+  it('does not block on a terminal revoked crew slot after roster refusal', async () => {
+    // Only non-terminal assignment states are considered by the query.
+    // A released crew slot does not consume worker capacity.
+    db.busy.mockImplementation(async ({ where }: { where: { status: { in: string[] } } }) => {
+      expect(where.status.in).not.toContain('REVOKED')
+      expect(where.status.in).not.toContain('REJECTED')
+      return null
+    })
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(true)
+  })
+
+  it('refuses a qualified worker whose account belongs to a different market', async () => {
+    db.user.mockResolvedValue({
+      identityStatus: 'VERIFIED', isActive: true, isSuspended: false,
+      isBanned: false, countryCode: 'CA',
+    })
+    db.profile.mockResolvedValue({ id: 'profile', countryCode: 'CA', skills: '[]' })
+    const result = await checkWorkerEligibility('company', 'worker', 'booking')
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('Worker market does not match the job market')
+  })
+})

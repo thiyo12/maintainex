@@ -5,7 +5,15 @@ import { TaskerProfile, Review } from '../lib/types'
 export const taskers = {
   list: (params?: string) =>
     request<TaskerProfile[]>(`/api/mobile/taskers${params ? `?${params}` : ''}`),
-  get: (id: string) => request<TaskerProfile>(`/api/mobile/taskers/${id}`),
+  /**
+   * Pass the job being browsed. The server verifies the viewer's authorisation
+   * on it before trusting its market, so a same-market customer sees normal
+   * commercial information rather than a reduced profile.
+   */
+  get: (id: string, jobId?: string) =>
+    request<TaskerProfile>(
+      `/api/mobile/taskers/${id}${jobId ? `?jobId=${encodeURIComponent(jobId)}` : ''}`,
+    ),
   updateProfile: (data: any) =>
     request<TaskerProfile>('/api/mobile/taskers/profile', { method: 'PUT', body: JSON.stringify(data) }),
   getMyProfile: () =>

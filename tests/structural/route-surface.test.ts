@@ -105,6 +105,7 @@ describe('Route Surface — surface membership (Phase G structure)', () => {
       'api',
       'setup',
       'maintenance',
+      'safety-share',
     ])
     const allowedFiles = new Set([
       'layout.tsx',

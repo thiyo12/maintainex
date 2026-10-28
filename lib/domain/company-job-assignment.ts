@@ -31,23 +31,72 @@ export interface AssignmentResult {
   reasons?: string[]
 }
 
-async function lockAndAssertWorkerScheduleAvailable(
+export async function lockAndAssertWorkerScheduleAvailable(
   tx: PrismaClientOrTx,
   workerUserId: string,
   jobId: string,
   preferredDate: Date | null,
   preferredTimeSlot: string | null,
+  companyId: string,
+  photoCheckRequired: boolean,
 ): Promise<void> {
-  const lockedWorker = await tx.$queryRaw<Array<{ id: string }>>`
-    SELECT id
+  // Serialize competing dispatches and revalidate identity in the exact same
+  // transaction that changes the assignment, not just in HTTP preflight.
+  const lockedWorker = await tx.$queryRaw<Array<{
+    id: string
+    isActive: boolean
+    isSuspended: boolean
+    isBanned: boolean
+    identityStatus: string
+  }>>`
+    SELECT id, "isActive", "isSuspended", "isBanned", "identityStatus"
     FROM "User"
     WHERE id = ${workerUserId}
     FOR UPDATE
   `
-  if (lockedWorker.length !== 1) {
-    throw new Error('Worker account not found')
+  const worker = lockedWorker[0]
+  if (!worker) throw new Error('Worker account not found')
+  if (!worker.isActive || worker.isSuspended || worker.isBanned || worker.identityStatus !== 'VERIFIED') {
+    throw new Error('Worker identity or account status changed before assignment')
   }
-  if (!preferredDate) return
+
+  const memberships = await tx.$queryRaw<Array<{ role: string; status: string }>>`
+    SELECT role, status
+    FROM "TeamMember"
+    WHERE "companyId" = ${companyId} AND "userId" = ${workerUserId}
+    FOR UPDATE
+  `
+  if (memberships.length !== 1 || memberships[0].status !== 'ACTIVE' || memberships[0].role !== 'WORKER') {
+    throw new Error('Worker membership or role changed before assignment')
+  }
+
+  if (photoCheckRequired) {
+    const identities = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM "ProviderIdentity"
+      WHERE "currentUserId" = ${workerUserId}
+        AND "identityType" IN ('TASKER', 'COMPANY_WORKER')
+        AND "kycStatus" = 'VERIFIED'
+        AND "verifiedPhotoUrl" IS NOT NULL
+      FOR UPDATE
+    `
+    if (identities.length === 0) {
+      throw new Error('Worker verified photo is no longer approved')
+    }
+  }
+
+  if (!preferredDate) {
+    const ongoing = await tx.companyJobAssignment.findFirst({
+      where: {
+        workerUserId,
+        jobId: { not: jobId },
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
+      },
+      select: { id: true, jobId: true },
+    })
+    if (ongoing) throw new Error('Worker scheduling conflict changed concurrently')
+    return
+  }
 
   const dayStart = new Date(preferredDate)
   dayStart.setHours(0, 0, 0, 0)
@@ -69,16 +118,58 @@ async function lockAndAssertWorkerScheduleAvailable(
     where: {
       workerUserId,
       jobId: { not: jobId },
-      status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
-      job: {
-        preferredDate: { gte: dayStart, lt: dayEnd },
-        ...slotFilter,
-      },
+      OR: [
+        { status: 'IN_PROGRESS' },
+        {
+          status: { in: ['ASSIGNED', 'ACCEPTED', 'CREW_RESERVED', 'CREW_ACCEPTED'] },
+          job: {
+            OR: [
+              { preferredDate: null },
+              { preferredDate: { gte: dayStart, lt: dayEnd }, ...slotFilter },
+            ],
+          },
+        },
+      ],
     },
     select: { id: true, jobId: true },
   })
   if (conflict) {
     throw new Error('Worker scheduling conflict changed concurrently')
+  }
+}
+
+/** Recheck dispatcher authorization while holding the same membership
+ * lock as workforce role/suspension edits, before the assignment is written. */
+export async function lockAndAssertAssignmentActorAuthorized(
+  tx: PrismaClientOrTx,
+  companyId: string,
+  actorUserId: string,
+  actorRole: string,
+): Promise<void> {
+  const actors = await tx.$queryRaw<Array<{
+    isActive: boolean; isSuspended: boolean; isBanned: boolean
+  }>>`
+    SELECT "isActive", "isSuspended", "isBanned"
+    FROM "User" WHERE id = ${actorUserId} FOR UPDATE
+  `
+  const actor = actors[0]
+  if (!actor || !actor.isActive || actor.isSuspended || actor.isBanned) {
+    throw new Error('Assigning actor is no longer authorized')
+  }
+  const memberships = await tx.$queryRaw<Array<{ role: string; status: string }>>`
+    SELECT role, status
+    FROM "TeamMember"
+    WHERE "companyId" = ${companyId} AND "userId" = ${actorUserId}
+    FOR UPDATE
+  `
+  if (
+    memberships.length !== 1 ||
+    memberships[0].status !== 'ACTIVE' ||
+    memberships[0].role !== actorRole ||
+    !isValidCompanyRole(memberships[0].role) ||
+    !hasCompanyPermission(memberships[0].role, 'workers:assign')
+  ) {
+    throw new Error('Assigning actor is no longer authorized')
   }
 }
 
@@ -119,7 +210,7 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
   if (!companyIdentity) return { success: false, error: 'Company not found' }
 
   const existingAssignment = await prisma.companyJobAssignment.findFirst({
-    where: { jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
+    where: { jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREW_RESERVED', 'CREW_ACCEPTED'] } },
   })
   if (existingAssignment) {
     return { success: false, error: 'Job already has an active assignment. Revoke first.' }
@@ -138,18 +229,29 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
   let assignment: { id: string }
   try {
     assignment = await prisma.$transaction(async (tx) => {
+      // Lock the dispatcher's user/membership first, before the worker.
+      // Keeping a consistent lock order reduces cross-role dispatch deadlocks.
+      await lockAndAssertAssignmentActorAuthorized(tx, companyId, assignedByUserId, actorRole)
       await lockAndAssertWorkerScheduleAvailable(
         tx,
         workerUserId,
         jobId,
         job.preferredDate,
         job.preferredTimeSlot,
+        companyId,
+        job.workerIdentityCheckRequired,
       )
 
       const claimed = await tx.marketplaceJob.updateMany({
       where: {
         id: jobId,
         status: 'QUOTE_ACCEPTED',
+        // Do not staff a booking whose worker count, identity requirement
+        // or schedule changed since eligibility and availability preflight.
+        workersCount: 1,
+        workerIdentityCheckRequired: job.workerIdentityCheckRequired,
+        preferredDate: job.preferredDate,
+        preferredTimeSlot: job.preferredTimeSlot,
         OR: [
           { targetTaskerId: null },
           { targetTaskerId: companyId },
@@ -159,6 +261,27 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
       data: { targetTaskerId: workerUserId },
     })
     if (claimed.count !== 1) throw new Error('Job state changed concurrently')
+
+    // A new first assignment may follow an accepted worker being revoked.
+    // Never let the new worker inherit a previous worker's verified arrival.
+    const priorArrival = await tx.jobVerificationPin.findFirst({
+      where: { jobId, arrivalVerifiedAt: { not: null } },
+      select: { id: true },
+    })
+    if (priorArrival) throw new Error('Cannot assign after arrival PIN verification; contact support')
+
+    // A previous MATCHED photo must never authorize a later assignment of
+    // the same worker after they were revoked and selected again. Preserve
+    // MISMATCH_REPORTED/REVIEW_REQUIRED records for Trust & Safety.
+    await tx.jobWorkerIdentityCheck.updateMany({
+      where: { jobId, status: 'MATCHED' },
+      data: { status: 'PENDING', confirmedAt: null },
+    })
+    // Stale customer PINs must be rotated after worker selection changes.
+    await tx.jobVerificationPin.updateMany({
+      where: { jobId, status: 'ACTIVE' },
+      data: { status: 'REVOKED', revokedAt: new Date() },
+    })
 
     await tx.jobWorkspace.upsert({
       where: { jobId },
@@ -211,7 +334,12 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
       (
         error.message.includes('concurrently') ||
         error.message.includes('scheduling conflict') ||
-        error.message === 'Worker account not found'
+        error.message.includes('Cannot assign after arrival PIN verification') ||
+        error.message === 'Worker account not found' ||
+        error.message.includes('Worker identity or account status changed') ||
+        error.message.includes('Worker membership or role changed') ||
+        error.message.includes('Worker verified photo is no longer approved') ||
+        error.message.includes('Assigning actor is no longer authorized')
       )
     ) {
       return { success: false, error: error.message }
@@ -300,23 +428,51 @@ export async function reassignWorker(
   let assignment: { id: string }
   try {
     assignment = await prisma.$transaction(async (tx) => {
+      // Lock the dispatcher's user/membership first, before the worker.
+      // Keeping a consistent lock order reduces cross-role dispatch deadlocks.
+      await lockAndAssertAssignmentActorAuthorized(tx, companyId, actorUserId, actorRole)
       await lockAndAssertWorkerScheduleAvailable(
         tx,
         newWorkerUserId,
         jobId,
         job.preferredDate,
         job.preferredTimeSlot,
+        companyId,
+        job.workerIdentityCheckRequired,
       )
 
       const claimed = await tx.marketplaceJob.updateMany({
         where: {
           id: jobId,
           status: 'QUOTE_ACCEPTED',
+          workersCount: 1,
+          workerIdentityCheckRequired: job.workerIdentityCheckRequired,
+          preferredDate: job.preferredDate,
+          preferredTimeSlot: job.preferredTimeSlot,
           targetTaskerId: currentAssignment.workerUserId,
         },
         data: { targetTaskerId: newWorkerUserId },
       })
       if (claimed.count !== 1) throw new Error('Job target changed before reassignment')
+
+      // Arrival belongs to the person who attended, not a replacement worker.
+      // Before a crew-safe PIN generation model exists, refuse reassignment
+      // after any arrival verification instead of reusing the old PIN proof.
+      const priorArrival = await tx.jobVerificationPin.findFirst({
+        where: { jobId, arrivalVerifiedAt: { not: null } },
+        select: { id: true },
+      })
+      if (priorArrival) throw new Error('Cannot reassign after arrival PIN verification; contact support')
+
+      await tx.jobWorkerIdentityCheck.updateMany({
+        where: { jobId, status: 'MATCHED' },
+        data: { status: 'PENDING', confirmedAt: null },
+      })
+      // Stale customer PINs must be rotated after worker selection changes.
+      await tx.jobVerificationPin.updateMany({
+        where: { jobId, status: 'ACTIVE' },
+        data: { status: 'REVOKED', revokedAt: new Date() },
+      })
 
       const revoked = await tx.companyJobAssignment.updateMany({
         where: {
@@ -388,8 +544,13 @@ export async function reassignWorker(
       error instanceof Error &&
       (
         error.message.includes('reassignment') ||
+        error.message.includes('Cannot reassign after arrival PIN verification') ||
         error.message.includes('scheduling conflict') ||
-        error.message === 'Worker account not found'
+        error.message === 'Worker account not found' ||
+        error.message.includes('Worker identity or account status changed') ||
+        error.message.includes('Worker membership or role changed') ||
+        error.message.includes('Worker verified photo is no longer approved') ||
+        error.message.includes('Assigning actor is no longer authorized')
       )
     ) {
       return { success: false, error: error.message }
@@ -425,9 +586,67 @@ export async function workerAcceptAssignment(
     return { success: false, error: 'Worker is no longer eligible for this assignment', reasons: eligibility.reasons }
   }
 
-  const claimed = await prisma.companyJobAssignment.updateMany({
-    where: { id: assignmentId, workerUserId, status: 'ASSIGNED' },
-    data: { status: 'ACCEPTED', acceptedAt: new Date() },
+  const claimed = await prisma.$transaction(async tx => {
+    // Serialize acceptance with account restriction and membership edits.
+    // Dispatch and workforce transitions lock User before TeamMember.
+    const users = await tx.$queryRaw<Array<{
+      isActive: boolean; isSuspended: boolean; isBanned: boolean; identityStatus: string
+    }>>`
+      SELECT "isActive", "isSuspended", "isBanned", "identityStatus"
+      FROM "User" WHERE id = ${workerUserId} FOR UPDATE
+    `
+    if (
+      users.length !== 1 || !users[0].isActive ||
+      users[0].isSuspended || users[0].isBanned ||
+      users[0].identityStatus !== 'VERIFIED'
+    ) return { count: 0 }
+
+    const members = await tx.$queryRaw<Array<{ role: string; status: string }>>`
+      SELECT role, status FROM "TeamMember"
+      WHERE "companyId" = ${assignment.companyId} AND "userId" = ${workerUserId}
+      FOR UPDATE
+    `
+    if (members.length !== 1 || members[0].role !== 'WORKER' || members[0].status !== 'ACTIVE') {
+      return { count: 0 }
+    }
+
+    // Photo approval can be withdrawn after the eligibility preflight.
+    // Check the job's current identity requirement and lock its approved
+    // identity record before committing this acceptance.
+    const job = await tx.marketplaceJob.findUnique({
+      where: { id: assignment.jobId },
+      select: { workerIdentityCheckRequired: true, workersCount: true },
+    })
+    if (!job || job.workersCount !== 1) return { count: 0 }
+
+    if (job.workerIdentityCheckRequired) {
+      const photos = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM "ProviderIdentity"
+        WHERE "currentUserId" = ${workerUserId}
+          AND "identityType" IN ('TASKER', 'COMPANY_WORKER')
+          AND "kycStatus" = 'VERIFIED'
+          AND "verifiedPhotoUrl" IS NOT NULL
+        FOR UPDATE
+      `
+      if (photos.length === 0) return { count: 0 }
+    }
+
+    return tx.companyJobAssignment.updateMany({
+      where: {
+        id: assignmentId,
+        workerUserId,
+        companyId: assignment.companyId,
+        status: 'ASSIGNED',
+        job: { status: 'QUOTE_ACCEPTED', targetTaskerId: workerUserId, workersCount: 1 },
+        worker: {
+          isActive: true,
+          isSuspended: false,
+          isBanned: false,
+          identityStatus: 'VERIFIED',
+        },
+      },
+      data: { status: 'ACCEPTED', acceptedAt: new Date() },
+    })
   })
   if (claimed.count !== 1) {
     return { success: false, error: 'Assignment changed before it could be accepted' }
@@ -446,36 +665,53 @@ export async function workerRejectAssignment(
   if (assignment.workerUserId !== workerUserId) return { success: false, error: 'Not your assignment' }
   if (assignment.status !== 'ASSIGNED') return { success: false, error: `Cannot reject: current status is ${assignment.status}` }
 
-  await prisma.$transaction(async (tx) => {
-    const claimed = await tx.companyJobAssignment.updateMany({
-      where: { id: assignmentId, workerUserId, status: 'ASSIGNED' },
-      data: { status: 'REJECTED', rejectedAt: new Date(), rejectReason: reason || undefined },
-    })
-    if (claimed.count !== 1) throw new Error('Assignment changed before it could be rejected')
+  try {
+    await prisma.$transaction(async tx => {
+      // Refuse a stale decline when the customer cancelled or a dispatcher
+      // replaced this assignee. The target restoration must commit together
+      // with the rejection and its audit, or all three roll back.
+      const claimed = await tx.companyJobAssignment.updateMany({
+        where: {
+          id: assignmentId,
+          companyId: assignment.companyId,
+          workerUserId,
+          status: 'ASSIGNED',
+          job: { status: 'QUOTE_ACCEPTED', targetTaskerId: workerUserId },
+        },
+        data: { status: 'REJECTED', rejectedAt: new Date(), rejectReason: reason || undefined },
+      })
+      if (claimed.count !== 1) throw new Error('Assignment changed before it could be rejected')
 
-    const targetRestored = await tx.marketplaceJob.updateMany({
-      where: {
-        id: assignment.jobId,
-        status: 'QUOTE_ACCEPTED',
-        targetTaskerId: workerUserId,
-      },
-      data: { targetTaskerId: assignment.companyId },
+      const targetRestored = await tx.marketplaceJob.updateMany({
+        where: {
+          id: assignment.jobId,
+          status: 'QUOTE_ACCEPTED',
+          targetTaskerId: workerUserId,
+        },
+        data: { targetTaskerId: assignment.companyId },
+      })
+      if (targetRestored.count !== 1) throw new Error('Job target changed before assignment rejection')
+
+      await writeCompanyAuditLog({
+        companyId: assignment.companyId,
+        actorId: workerUserId,
+        actorRole: 'WORKER',
+        action: 'WORKER_ASSIGN',
+        targetType: 'CompanyJobAssignment',
+        targetId: assignmentId,
+        description: `Worker rejected assignment for job ${assignment.jobId}`,
+        metadata: { reason },
+      }, tx)
     })
-    if (targetRestored.count !== 1) {
-      throw new Error('Job target changed before assignment rejection')
+  } catch (error) {
+    if (error instanceof Error && (
+      error.message === 'Assignment changed before it could be rejected' ||
+      error.message === 'Job target changed before assignment rejection'
+    )) {
+      return { success: false, error: error.message }
     }
-
-    await writeCompanyAuditLog({
-      companyId: assignment.companyId,
-      actorId: workerUserId,
-      actorRole: 'WORKER',
-      action: 'WORKER_ASSIGN',
-      targetType: 'CompanyJobAssignment',
-      targetId: assignmentId,
-      description: `Worker rejected assignment for job ${assignment.jobId}`,
-      metadata: { reason },
-    }, tx)
-  })
+    throw error
+  }
 
   return { success: true, assignmentId }
 }
@@ -510,35 +746,47 @@ export async function revokeAssignment(
     return { success: false, error: `Cannot revoke: current status is ${assignment.status}` }
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.companyJobAssignment.update({
-      where: { id: assignmentId },
-      data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: reason || undefined },
-    })
+  try {
+    await prisma.$transaction(async tx => {
+      await lockAndAssertAssignmentActorAuthorized(tx, companyId, actorUserId, actorRole)
+      const claimed = await tx.companyJobAssignment.updateMany({
+        where: {
+          id: assignmentId, companyId, workerUserId: assignment.workerUserId,
+          status: { in: ['ASSIGNED', 'ACCEPTED'] },
+          job: { status: 'QUOTE_ACCEPTED', targetTaskerId: assignment.workerUserId },
+        },
+        data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: reason || undefined },
+      })
+      if (claimed.count !== 1) throw new Error('Assignment changed before it could be revoked')
 
-    const targetRestored = await tx.marketplaceJob.updateMany({
-      where: {
-        id: assignment.jobId,
-        status: 'QUOTE_ACCEPTED',
-        targetTaskerId: assignment.workerUserId,
-      },
-      data: { targetTaskerId: companyId },
+      const targetRestored = await tx.marketplaceJob.updateMany({
+        where: {
+          id: assignment.jobId, status: 'QUOTE_ACCEPTED',
+          targetTaskerId: assignment.workerUserId,
+        },
+        data: { targetTaskerId: companyId },
+      })
+      if (targetRestored.count !== 1) {
+        throw new Error('Job target changed before assignment revocation')
+      }
+
+      await writeCompanyAuditLog({
+        companyId, actorId: actorUserId, actorRole, action: 'WORKER_ASSIGN',
+        targetType: 'CompanyJobAssignment', targetId: assignmentId,
+        description: `Revoked assignment for job ${assignment.jobId}`,
+        metadata: { workerUserId: assignment.workerUserId, reason },
+      }, tx)
     })
-    if (targetRestored.count !== 1) {
-      throw new Error('Job target changed before assignment revocation')
+  } catch (error) {
+    if (error instanceof Error && (
+      error.message === 'Assigning actor is no longer authorized' ||
+      error.message === 'Assignment changed before it could be revoked' ||
+      error.message === 'Job target changed before assignment revocation'
+    )) {
+      return { success: false, error: error.message }
     }
-
-    await writeCompanyAuditLog({
-      companyId,
-      actorId: actorUserId,
-      actorRole,
-      action: 'WORKER_ASSIGN',
-      targetType: 'CompanyJobAssignment',
-      targetId: assignmentId,
-      description: `Revoked assignment for job ${assignment.jobId}`,
-      metadata: { workerUserId: assignment.workerUserId, reason },
-    }, tx)
-  })
+    throw error
+  }
 
   return { success: true, assignmentId }
 }
@@ -561,10 +809,16 @@ export async function completeAssignment(
     return { success: false, error: `Cannot complete: current status is ${assignment.status}` }
   }
 
-  await prisma.companyJobAssignment.updateMany({
-    where: { id: assignmentId, companyId, status: 'IN_PROGRESS' },
+  const claimed = await prisma.companyJobAssignment.updateMany({
+    where: {
+      id: assignmentId, companyId, status: 'IN_PROGRESS',
+      job: { status: 'COMPLETED' },
+    },
     data: { status: 'COMPLETED', completedAt: new Date() },
   })
+  if (claimed.count !== 1) {
+    return { success: false, error: 'Assignment state changed before completion' }
+  }
 
   return { success: true, assignmentId }
 }

@@ -11,6 +11,7 @@ const languages = [
   { code: 'en', name: 'English', flag: 'GB' },
   { code: 'ta', name: 'தமிழ்', flag: 'LK' },
   { code: 'si', name: 'සිංහල', flag: 'LK' },
+  { code: 'fr', name: 'Français (bêta)', flag: 'CA' },
 ]
 
 export default function LanguageSelector({ style }: { style?: any }) {

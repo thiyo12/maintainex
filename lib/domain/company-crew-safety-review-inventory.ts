@@ -1,0 +1,288 @@
+import { Prisma } from '@prisma/client'
+import { CrewCommitGateError } from '@/lib/domain/company-crew-commit-gate'
+import { lockAndAssertAssignmentActorAuthorized } from '@/lib/domain/company-job-assignment'
+
+const SAFETY_EVENT_TYPES = [
+  'CREW_CONSUMED_PIN_SAFETY_HOLD',
+  'CREW_WORKFORCE_PIN_SAFETY_HOLD',
+  'WORKER_IDENTITY_MISMATCH',
+] as const
+
+/**
+ * INTERNAL, read-only support evidence inventory for a safety-BLOCKED crew.
+ * The caller owns a SERIALIZABLE transaction and supplies the authenticated
+ * manager actor and current company context (never user-controlled identity).
+ * Job -> crew locks, current roster, all historical PIN claims, witnesses and
+ * the unreviewed HIGH risk queue must agree. Missing evidence DENIES review
+ * readiness; a valid inventory NEVER authorizes capacity release, arrival,
+ * workspace creation, work, payment or support-case resolution.
+ *
+ * Not wired to HTTP and deliberately has no mutation or approval operation.
+ */
+type CrewSafetyReviewScope = {
+  crewDispatchId: string
+  companyId: string
+  expectedVersion: number
+}
+type CrewSafetyReviewer =
+  | { kind: 'company'; actorUserId: string; actorRole: string }
+  | { kind: 'crm'; riskEventId: string; allowedCountries: string[] | null }
+
+async function inspectCore(
+  tx: Prisma.TransactionClient,
+  input: CrewSafetyReviewScope,
+  reviewer: CrewSafetyReviewer,
+): Promise<{
+  crewDispatchId: string
+  crewVersion: number
+  heldWorkerCount: number
+  consumedPinClaimsPreserved: number
+  witnessRecordsPreserved: number
+  unreviewedHighRiskEvents: number
+  manualSafetyReviewRequired: true
+  independentPhysicalPresenceVerified: false
+  capacityReleaseEnabled: false
+  crewArrivalEnabled: false
+  workStartEnabled: false
+  paymentsEnabled: false
+}> {
+  if (!input || typeof input.crewDispatchId !== 'string' ||
+      !input.crewDispatchId.trim() || input.crewDispatchId.length > 128 ||
+      typeof input.companyId !== 'string' || !input.companyId.trim() ||
+      input.companyId.length > 128 ||
+      !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1 ||
+      (reviewer.kind === 'company' && (
+        typeof reviewer.actorUserId !== 'string' || !reviewer.actorUserId.trim() ||
+        reviewer.actorUserId.length > 128 ||
+        typeof reviewer.actorRole !== 'string' || !reviewer.actorRole.trim()
+      )) ||
+      (reviewer.kind === 'crm' && (
+        typeof reviewer.riskEventId !== 'string' ||
+        !reviewer.riskEventId.trim() || reviewer.riskEventId.length > 128 ||
+        (reviewer.allowedCountries !== null && (
+          !Array.isArray(reviewer.allowedCountries) ||
+          reviewer.allowedCountries.some(country =>
+            typeof country !== 'string' || !/^[A-Z]{2}$/.test(country))
+        ))
+      ))) {
+    throw new CrewCommitGateError('Invalid crew safety inventory request', 400)
+  }
+
+  const key = await tx.companyCrewDispatch.findUnique({
+    where: { id: input.crewDispatchId },
+    select: { companyId: true, jobId: true },
+  })
+  if (!key || key.companyId !== input.companyId) {
+    throw new CrewCommitGateError('Crew safety inventory not found', 404)
+  }
+  if (reviewer.kind === 'company') {
+    await lockAndAssertAssignmentActorAuthorized(
+      tx, input.companyId, reviewer.actorUserId, reviewer.actorRole,
+    )
+  }
+  // CRM access is authenticated with guardCrmRequest(risk_events:read)
+  // BEFORE the caller enters this transaction. Unlike company managers, CRM
+  // reviewers must also pass the LIVE, country-scoped job check below.
+  // This function itself never authenticates a network request.
+
+  // Same job -> crew lock order as cancellation and safety containment.
+  const jobs = await tx.$queryRaw<Array<{
+    id: string; status: string; workersCount: number; countryCode: string
+  }>>`
+    SELECT id, status, "workersCount", "countryCode" FROM "MarketplaceJob"
+    WHERE id = ${key.jobId} FOR UPDATE
+  `
+  const crews = await tx.$queryRaw<Array<{
+    id: string; companyId: string; jobId: string; status: string
+    version: number; requiredWorkersCount: number; leadWorkerUserId: string | null
+  }>>`
+    SELECT id, "companyId", "jobId", status, version,
+      "requiredWorkersCount", "leadWorkerUserId"
+    FROM "CompanyCrewDispatch"
+    WHERE id = ${input.crewDispatchId} FOR UPDATE
+  `
+  const job = jobs[0], crew = crews[0]
+  // Do not accept a stale/out-of-market preflight: validate the locked
+  // authoritative job country again within the serializable transaction.
+  if (reviewer.kind === 'crm' && (!job?.countryCode ||
+      (reviewer.allowedCountries !== null &&
+        !reviewer.allowedCountries.includes(job.countryCode.toUpperCase())))) {
+    throw new CrewCommitGateError('Crew safety inventory not found', 404)
+  }
+  if (!job || !crew || crew.id !== input.crewDispatchId ||
+      crew.companyId !== input.companyId || crew.jobId !== job.id ||
+      crew.status !== 'BLOCKED' || crew.version !== input.expectedVersion ||
+      job.status !== 'QUOTE_ACCEPTED' ||
+      crew.requiredWorkersCount < 2 || crew.requiredWorkersCount > 12 ||
+      job.workersCount !== crew.requiredWorkersCount) {
+    throw new CrewCommitGateError('Crew safety review scope or epoch changed')
+  }
+
+  const [slots, pins, witnesses, events, workspace, legacyArrival] = await Promise.all([
+    tx.companyJobAssignment.findMany({
+      where: { crewDispatchId: crew.id },
+      select: {
+        id: true, workerUserId: true, companyId: true, jobId: true,
+        status: true, crewSlot: true, crewRole: true,
+        startedAt: true, crewArrivedAt: true,
+      },
+    }),
+    tx.companyCrewPinChallenge.findMany({
+      where: { crewDispatchId: crew.id },
+      select: {
+        id: true, assignmentId: true, jobId: true, crewVersion: true,
+        purpose: true, consumedAt: true, revokedAt: true,
+      },
+    }),
+    tx.companyCrewPresenceWitness.findMany({
+      where: { crewDispatchId: crew.id },
+      select: {
+        id: true, assignmentId: true, jobId: true, crewDispatchId: true,
+        crewVersion: true, workerUserId: true,
+      },
+    }),
+    tx.marketplaceRiskEvent.findMany({
+      where: {
+        jobId: job.id, severity: 'HIGH', reviewedAt: null,
+        eventType: { in: [...SAFETY_EVENT_TYPES] },
+      },
+      select: { id: true, eventType: true, metadata: true },
+    }),
+    tx.jobWorkspace.findUnique({
+      where: { jobId: job.id }, select: { id: true },
+    }),
+    tx.jobVerificationPin.findFirst({
+      where: { jobId: job.id, arrivalVerifiedAt: { not: null } },
+      select: { id: true },
+    }),
+  ])
+
+  const held = slots.length === crew.requiredWorkersCount &&
+    new Set(slots.map(s => s.id)).size === slots.length &&
+    new Set(slots.map(s => s.workerUserId)).size === slots.length &&
+    new Set(slots.map(s => s.crewSlot)).size === slots.length &&
+    slots.filter(s => s.crewRole === 'LEAD').length === 1 &&
+    slots.find(s => s.crewRole === 'LEAD')?.workerUserId === crew.leadWorkerUserId &&
+    slots.every(s => s.companyId === crew.companyId && s.jobId === job.id &&
+      s.status === 'CREW_ACCEPTED' && s.crewSlot !== null &&
+      s.startedAt === null && s.crewArrivedAt === null)
+  if (!held || workspace || legacyArrival) {
+    throw new CrewCommitGateError('Safety-held capacity or booking evidence changed')
+  }
+
+  const byAssignment = new Map(slots.map(s => [s.id, s]))
+  const consumed = pins.filter(p => p.consumedAt !== null)
+  if (consumed.length === 0 || pins.some(p =>
+    !byAssignment.has(p.assignmentId) || p.jobId !== job.id ||
+    p.purpose !== 'ARRIVAL' || p.crewVersion < 1 ||
+    p.crewVersion >= crew.version ||
+    (p.consumedAt !== null && p.revokedAt !== null) ||
+    (p.consumedAt === null && p.revokedAt === null))) {
+    throw new CrewCommitGateError('Historical arrival PIN evidence requires investigation')
+  }
+  const witnessScopes = new Set<string>()
+  if (witnesses.some(w => {
+    const slot = byAssignment.get(w.assignmentId)
+    const scope = w.assignmentId + ':' + w.crewVersion
+    if (witnessScopes.has(scope)) return true
+    witnessScopes.add(scope)
+    return !slot || w.jobId !== job.id || w.crewDispatchId !== crew.id ||
+      w.workerUserId !== slot.workerUserId ||
+      w.crewVersion < 1 || w.crewVersion >= crew.version
+  })) {
+    throw new CrewCommitGateError('Historical witness evidence requires investigation')
+  }
+
+  // Company/customer risk events use different scoped metadata keys.
+  // Never expose metadata, actor identities or old PIN content in receipt.
+  const linkedEvents = events.filter(event => {
+    // A CRM review opens ONE exact HIGH risk case. Do not substitute another
+    // event in the same job even if that event has a valid crew metadata scope.
+    if (reviewer.kind === 'crm' && event.id !== reviewer.riskEventId) return false
+    if (!event.metadata) return false
+    try {
+      const metadata: unknown = JSON.parse(event.metadata)
+      if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false
+      const m = metadata as Record<string, unknown>
+      // Never let a generic or stale job-level HIGH event stand in for this
+      // crew's exact blocked epoch. All three canonical paths now record the
+      // originating version, resulting version and held consumed-PIN evidence.
+      if (m.companyId !== crew.companyId ||
+          m.previousVersion !== crew.version - 1 ||
+          m.blockedVersion !== crew.version ||
+          !Number.isSafeInteger(m.consumedPinsPreserved) ||
+          m.consumedPinsPreserved !== consumed.length) {
+        return false
+      }
+      if (event.eventType === 'CREW_CONSUMED_PIN_SAFETY_HOLD') {
+        return m.crewDispatchId === crew.id &&
+          m.capacityHeld === slots.length
+      }
+      if (event.eventType === 'CREW_WORKFORCE_PIN_SAFETY_HOLD') {
+        return m.crewDispatchId === crew.id &&
+          m.capacityHeldForReview === slots.length &&
+          ['ROLE_CHANGED', 'SUSPENDED', 'REMOVED'].includes(String(m.trigger)) &&
+          slots.some(s => s.workerUserId === m.affectedWorkerUserId)
+      }
+      if (event.eventType === 'WORKER_IDENTITY_MISMATCH') {
+        return m.crewId === crew.id &&
+          m.capacityHeldForReview === slots.length &&
+          typeof m.assignmentId === 'string' &&
+          byAssignment.get(m.assignmentId)?.workerUserId === m.workerUserId
+      }
+      return false
+    } catch {
+      return false
+    }
+  })
+  if (!linkedEvents.length) {
+    throw new CrewCommitGateError('Unreviewed HIGH crew safety event is missing')
+  }
+
+  return {
+    crewDispatchId: crew.id,
+    crewVersion: crew.version,
+    heldWorkerCount: slots.length,
+    consumedPinClaimsPreserved: consumed.length,
+    witnessRecordsPreserved: witnesses.length,
+    unreviewedHighRiskEvents: linkedEvents.length,
+    manualSafetyReviewRequired: true,
+    independentPhysicalPresenceVerified: false,
+    capacityReleaseEnabled: false,
+    crewArrivalEnabled: false,
+    workStartEnabled: false,
+    paymentsEnabled: false,
+  }
+}
+
+/**
+ * Company-owner/dispatcher read-only support inventory. Manager authority
+ * revalidated under transaction locks; never grants operational authority.
+ */
+export async function inspectBlockedCrewSafetyEvidenceInsideTransaction(
+  tx: Prisma.TransactionClient,
+  input: CrewSafetyReviewScope & { actorUserId: string; actorRole: string },
+) {
+  return inspectCore(tx, input, {
+    kind: 'company', actorUserId: input.actorUserId, actorRole: input.actorRole,
+  })
+}
+
+/**
+ * CRM STAFF ONLY: call only after guardCrmRequest with risk_events:read,
+ * live session verification and a country-scoped event check. The fresh
+ * locked job country and EXACT event id are rechecked here to deny races.
+ * No CRM or company actor gains a crew RELEASE or work-start capability.
+ */
+export async function inspectBlockedCrewSafetyEvidenceForCrmInsideTransaction(
+  tx: Prisma.TransactionClient,
+  input: CrewSafetyReviewScope & {
+    riskEventId: string
+    allowedCountries: string[] | null
+  },
+) {
+  return inspectCore(tx, input, {
+    kind: 'crm', riskEventId: input.riskEventId,
+    allowedCountries: input.allowedCountries,
+  })
+}

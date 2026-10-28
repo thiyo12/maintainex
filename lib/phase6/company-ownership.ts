@@ -45,7 +45,12 @@ export async function canRemoveMemberSafe(
     return { allowed: false, reason: 'Not a member of this company' }
   }
 
-  if (actorRole !== 'COMPANY_OWNER' && actorRole !== 'MANAGER') {
+  // The caller's role is not authority. Check the persisted, still-active
+  // company membership, or a demoted worker could claim an old owner role.
+  if (
+    actorMembership.role !== actorRole ||
+    (actorMembership.role !== 'COMPANY_OWNER' && actorMembership.role !== 'MANAGER')
+  ) {
     return { allowed: false, reason: 'Insufficient permissions' }
   }
 
@@ -109,6 +114,59 @@ export async function transferOwnership(
 
   try {
     await prisma.$transaction(async (tx) => {
+      // A previously authorized owner or recipient can be globally suspended
+      // while their TeamMember row remains ACTIVE. Lock both user accounts in
+      // stable ID order so that transfer cannot elevate a restricted account.
+      const accounts = await tx.$queryRaw<Array<{
+        id: string
+        isActive: boolean
+        isSuspended: boolean
+        isBanned: boolean
+      }>>`
+        SELECT id, "isActive", "isSuspended", "isBanned"
+        FROM "User"
+        WHERE id IN (${currentOwnerId}, ${newOwnerId})
+        ORDER BY id FOR UPDATE
+      `
+      if (
+        accounts.length !== 2 ||
+        accounts.some(account => !account.isActive || account.isSuspended || account.isBanned)
+      ) {
+        throw new Error('TRANSFER_ACCOUNT_RESTRICTED')
+      }
+
+      if (originalRole === 'WORKER') {
+        // Dispatch holds this TeamMember row until assignment commit.
+        // Lock it before checking work, so a concurrent dispatch cannot
+        // attach a job while a worker is being promoted to non-worker owner.
+        const successors = await tx.$queryRaw<Array<{
+          id: string
+          role: string
+          status: string
+        }>>`
+          SELECT id, role, status
+          FROM "TeamMember"
+          WHERE id = ${newOwnerMembership.id} AND "companyId" = ${companyId}
+          FOR UPDATE
+        `
+        if (
+          successors.length !== 1 ||
+          successors[0].status !== 'ACTIVE' ||
+          successors[0].role !== 'WORKER'
+        ) {
+          throw new Error('TRANSFER_CONCURRENT')
+        }
+
+        const busy = await tx.companyJobAssignment.count({
+          where: {
+            companyId,
+            workerUserId: newOwnerId,
+            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+          },
+        })
+        if (busy > 0) throw new Error('TRANSFER_WORKER_HAS_ACTIVE_ASSIGNMENTS')
+      }
+
       const promoted = await tx.$executeRaw`
         UPDATE "TeamMember"
         SET "role" = 'COMPANY_OWNER', "updatedAt" = NOW()
@@ -149,6 +207,12 @@ export async function transferOwnership(
   } catch (err: any) {
     if (err?.message === 'TRANSFER_CONCURRENT') {
       return { success: false, error: 'Concurrent transfer detected' }
+    }
+    if (err?.message === 'TRANSFER_ACCOUNT_RESTRICTED') {
+      return { success: false, error: 'Current or new owner account is restricted' }
+    }
+    if (err?.message === 'TRANSFER_WORKER_HAS_ACTIVE_ASSIGNMENTS') {
+      return { success: false, error: 'Finish or reassign the worker\'s active jobs before transferring ownership' }
     }
     throw err
   }

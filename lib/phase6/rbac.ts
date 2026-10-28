@@ -19,7 +19,7 @@ const ROLE_HIERARCHY: Record<CompanyRole, number> = {
 export const COMPANY_PERMISSIONS: Record<CompanyRole, string[]> = {
   COMPANY_OWNER: [
     'company:read', 'company:update', 'company:delete', 'company:transfer_ownership',
-    'members:read', 'members:invite', 'members:remove', 'members:change_role',
+    'members:read', 'members:invite', 'members:manage', 'members:remove', 'members:change_role',
     'workers:read', 'workers:assign', 'workers:manage',
     'jobs:read', 'jobs:manage', 'jobs:assign',
     'quotes:read', 'quotes:submit', 'quotes:manage',
@@ -31,7 +31,7 @@ export const COMPANY_PERMISSIONS: Record<CompanyRole, string[]> = {
   ],
   MANAGER: [
     'company:read', 'company:update',
-    'members:read', 'members:invite',
+    'members:read', 'members:invite', 'members:manage',
     'workers:read', 'workers:assign', 'workers:manage',
     'jobs:read', 'jobs:manage', 'jobs:assign',
     'quotes:read', 'quotes:submit', 'quotes:manage',
@@ -61,7 +61,7 @@ export const COMPANY_PERMISSIONS: Record<CompanyRole, string[]> = {
 }
 
 export function isValidCompanyRole(role: string): role is CompanyRole {
-  return role in COMPANY_ROLES
+  return Object.prototype.hasOwnProperty.call(COMPANY_ROLES, role)
 }
 
 export function getRoleHierarchyLevel(role: CompanyRole): number {

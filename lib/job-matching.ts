@@ -5,6 +5,7 @@
  * @deprecated since Phase 10.2
  */
 import { prisma } from './prisma'
+import { isSupportedMarket, resolveMarketFromServiceAddress } from './geography/market-engine'
 import { getSetting } from './settings'
 import { haversineKm } from './distance'
 
@@ -94,17 +95,41 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
   const radiusKm = input.radiusKm ?? (await getSetting('matching.radius_km', 50))
   const targeted = !!input.targetTaskerId
 
+  // Phase 03: a browse request with no established market must return nobody.
+  // Previously the country filter was dropped entirely when countryCode was
+  // falsy, listing online providers from every launch market.
+  const market = (input.countryCode || '').trim().toUpperCase()
+  const marketFilter = isSupportedMarket(market) ? { countryCode: market } : { countryCode: '__none__' }
+  const hasCoords = input.lat != null && input.lng != null
+  const hasAnyCoords = input.lat != null || input.lng != null
+
+  // The old browse API checks the requested address, but this exported
+  // matcher has other possible callers. Invalid radius and incomplete GPS
+  // must never downgrade into unrestricted no-location discovery.
+  if (!Number.isFinite(radiusKm) || radiusKm <= 0) return []
+  if (hasAnyCoords) {
+    if (!hasCoords || !Number.isFinite(input.lat) || !Number.isFinite(input.lng)) return []
+    const resolved = resolveMarketFromServiceAddress({
+      latitude: input.lat,
+      longitude: input.lng,
+      claimedCountryCode: market,
+    })
+    if (!resolved.ok || resolved.countryCode !== market) return []
+  }
+
   const allProfiles = await prisma.taskerProfile.findMany({
     where: targeted
       ? {
           userId: input.targetTaskerId!,
           isVerified: true,
-          ...(input.countryCode ? { countryCode: input.countryCode } : {}),
+          verificationStatus: 'VERIFIED',
+          ...marketFilter,
         }
       : {
           isOnline: true,
           isVerified: true,
-          ...(input.countryCode ? { countryCode: input.countryCode } : {}),
+          verificationStatus: 'VERIFIED',
+          ...marketFilter,
         },
     include: {
       user: {
@@ -123,7 +148,6 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
   })
 
   const busy = await busyProviderIds()
-  const hasCoords = input.lat != null && input.lng != null
 
   const candidates: MatchCandidate[] = []
 
@@ -136,10 +160,20 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
     const skills = parseSkills(p.skills)
     if (!skills.some((s) => input.matchKeys.includes(s))) continue
 
+    // Do not pass a GPS-targeted search by skipping the distance check.
+    // Providers with absent, partial or corrupt coordinates have no verified
+    // distance and cannot satisfy a radius-constrained match.
+    if (hasCoords && (
+      p.latitude == null || p.longitude == null ||
+      !Number.isFinite(p.latitude) || !Number.isFinite(p.longitude) ||
+      p.latitude < -90 || p.latitude > 90 ||
+      p.longitude < -180 || p.longitude > 180
+    )) continue
+
     let distanceKm: number | undefined
     let distScore = 0
-    if (hasCoords && p.latitude != null && p.longitude != null) {
-      distanceKm = haversineKm(input.lat!, input.lng!, p.latitude, p.longitude)
+    if (hasCoords) {
+      distanceKm = haversineKm(input.lat!, input.lng!, p.latitude!, p.longitude!)
       const effectiveRadius = Math.min(radiusKm, p.serviceRadius ?? radiusKm)
       if (distanceKm > effectiveRadius) continue
       distScore = Math.max(0, 1 - distanceKm / Math.max(radiusKm, 1))

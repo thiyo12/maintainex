@@ -97,7 +97,7 @@ export async function evaluateEligibility(
     // COMPANY eligibility
     const company = await client.companyProfile.findUnique({
       where: { id: providerId },
-      select: { id: true, userId: true, verificationStatus: true, isVerified: true, subscriptionStatus: true },
+      select: { id: true, verificationStatus: true, isVerified: true, subscriptionStatus: true },
     })
     if (!company) {
       gates.push({ gate: 'COMPANY_EXISTS', passed: false, reason: 'Company not found' })
@@ -105,17 +105,30 @@ export async function evaluateEligibility(
     }
     gates.push({ gate: 'COMPANY_EXISTS', passed: true })
 
-    // Check owner account
-    const ownerUser = await client.user.findUnique({
-      where: { id: company.userId },
-      select: { isSuspended: true, isBanned: true },
+    // The company profile's userId is the original creator link. The active
+    // COMPANY_OWNER memberships define current authority after an ownership
+    // transfer. Match only with an unrestricted actual owner, even if the
+    // original creator is still active and the new owner is suspended.
+    const activeOwners = await client.teamMember.findMany({
+      where: { companyId: providerId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
+      select: { user: { select: { isActive: true, isSuspended: true, isBanned: true } } },
     })
-    if (ownerUser?.isSuspended) {
-      gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: false, reason: 'Company owner suspended' })
+    if (activeOwners.length === 0) {
+      gates.push({ gate: 'COMPANY_OWNER_EXISTS', passed: false, reason: 'No active company owner' })
       return buildIneligibleResult(gates)
     }
-    if (ownerUser?.isBanned) {
-      gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: false, reason: 'Company owner banned' })
+    const unrestrictedOwner = activeOwners.some(owner =>
+      owner.user && owner.user.isActive && !owner.user.isSuspended && !owner.user.isBanned
+    )
+    if (!unrestrictedOwner) {
+      const reason = activeOwners.every(owner => !owner.user || !owner.user.isActive)
+        ? 'Company owner account is inactive or missing'
+        : activeOwners.every(owner => !owner.user || owner.user.isSuspended)
+          ? 'Company owner suspended'
+          : activeOwners.every(owner => !owner.user || owner.user.isBanned)
+            ? 'Company owner banned'
+            : 'Company owner account is restricted'
+      gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: false, reason })
       return buildIneligibleResult(gates)
     }
     gates.push({ gate: 'COMPANY_OWNER_ACTIVE', passed: true })
@@ -132,13 +145,6 @@ export async function evaluateEligibility(
     }
     gates.push({ gate: 'COMPANY_SUBSCRIPTION', passed: true })
 
-    const ownerCount = await client.teamMember.count({
-      where: { companyId: providerId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
-    })
-    if (ownerCount === 0) {
-      gates.push({ gate: 'COMPANY_OWNER_EXISTS', passed: false, reason: 'No active company owner' })
-      return buildIneligibleResult(gates)
-    }
     gates.push({ gate: 'COMPANY_OWNER_EXISTS', passed: true })
 
     // Gate: Has APPROVED company profession for this service
@@ -265,6 +271,33 @@ interface ProfessionEvaluation {
   preferredSkillsMatched: string[]
 }
 
+/**
+ * Phase 04: selecting one canonical TemplateJob never grants permission to
+ * perform every sibling service under its parent JobCategory. Keep category
+ * fallback only for legacy jobs with no identified TemplateJob, or for an
+ * explicitly category-wide CompanySpecialty (jobId is null).
+ */
+export function matchesLegacyTaskerJob(
+  skills: ReadonlyArray<{ jobId: string; job: { categoryId: string } }>,
+  job: Pick<MatchingInput, 'categoryId' | 'templateJobId'>,
+): boolean {
+  return job.templateJobId
+    ? skills.some(skill => skill.jobId === job.templateJobId)
+    : skills.some(skill => skill.job.categoryId === job.categoryId)
+}
+
+export function matchesLegacyCompanyJob(
+  specialties: ReadonlyArray<{ categoryId: string | null; jobId: string | null }>,
+  job: Pick<MatchingInput, 'categoryId' | 'templateJobId'>,
+): boolean {
+  return specialties.some(specialty =>
+    job.templateJobId
+      ? specialty.jobId === job.templateJobId ||
+        (specialty.jobId === null && specialty.categoryId === job.categoryId)
+      : specialty.categoryId === job.categoryId
+  )
+}
+
 async function evaluateTaskerProfession(
   client: PrismaClient,
   taskerId: string,
@@ -294,8 +327,8 @@ async function evaluateTaskerProfession(
     if (!profile) {
       return { gate: { gate: 'PROFESSION_MATCH', passed: false, reason: 'No provider profile' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
     }
-    // Legacy fallback: check if any taskerSkill matches the job category
-    const hasLegacy = profile.taskerSkills.some(s => s.job.categoryId === job.categoryId)
+    // Exact job selection is authoritative when the booking identifies a TemplateJob.
+    const hasLegacy = matchesLegacyTaskerJob(profile.taskerSkills, job)
     if (hasLegacy) {
       return {
         gate: { gate: 'PROFESSION_MATCH', passed: true, detail: 'Legacy capability match' },
@@ -410,7 +443,7 @@ async function evaluateCompanyProfession(
     if (!company) {
       return { gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: false, reason: 'Company not found' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
     }
-    const hasSpecialty = company.specialties.some(s => s.categoryId === job.categoryId)
+    const hasSpecialty = matchesLegacyCompanyJob(company.specialties, job)
     if (hasSpecialty) {
       return {
         gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: true, detail: 'Legacy specialty match' },
@@ -496,14 +529,16 @@ function buildIneligibleResult(
   }
 }
 
-async function evaluateJurisdictionCredential(
+export async function evaluateJurisdictionCredential(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
   countryCode: string | undefined,
   matchedProfessionId: string,
 ): Promise<{ gate: EligibilityGate }> {
-  if (!countryCode) return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: 'No jurisdiction specified' } }
+  if (!countryCode) {
+    return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: false, reason: 'Job jurisdiction is unknown' } }
+  }
 
   const requirements = await client.professionJurisdictionRequirement.findMany({
     where: { countryCode, professionId: matchedProfessionId, isActive: true, credentialRequired: true },
@@ -511,25 +546,40 @@ async function evaluateJurisdictionCredential(
 
   if (requirements.length === 0) return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: 'No jurisdiction credential required' } }
 
-  const holderType = providerType === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'COMPANY'
-  const credentialTypes = requirements.map(r => r.credentialType).filter(Boolean) as string[]
-
-  if (credentialTypes.length === 0) return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: 'No credential type required' } }
-
-  const validCerts = await client.certification.count({
-    where: {
-      holderType,
-      holderId: providerId,
-      certificationType: { in: credentialTypes },
-      verificationStatus: 'VERIFIED',
-      isActive: true,
-    },
-  })
-
-  if (validCerts === 0) {
-    return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: false, reason: `Missing jurisdiction credential: ${credentialTypes.join(', ')}` } }
+  // A mandatory credential with no configured type cannot be satisfied.
+  // An unrelated verified certificate is not evidence for a different license.
+  if (requirements.some(r => !r.credentialType?.trim())) {
+    return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: false, reason: 'Jurisdiction credential requirement is not configured' } }
   }
-  return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: `Has ${validCerts} jurisdiction credential(s)` } }
+
+  const holderType = providerType === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'COMPANY'
+  const credentialTypes = [...new Set(requirements.map(r => r.credentialType!.trim()))]
+  const missing: string[] = []
+  const today = new Date()
+
+  // All independently required license types must be verified and unexpired.
+  // Never count an expired, suspended, or merely submitted certificate.
+  for (const certificationType of credentialTypes) {
+    const valid = await client.certification.count({
+      where: {
+        holderType,
+        holderId: providerId,
+        certificationType,
+        verificationStatus: 'VERIFIED',
+        isActive: true,
+        OR: [
+          { expiryDate: null },
+          { expiryDate: { gt: today } },
+        ],
+      },
+    })
+    if (valid === 0) missing.push(certificationType)
+  }
+
+  if (missing.length > 0) {
+    return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: false, reason: `Missing jurisdiction credential: ${missing.join(', ')}` } }
+  }
+  return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: `Has all ${credentialTypes.length} required jurisdiction credential(s)` } }
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -543,12 +593,45 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-function configuredAreaMatches(serviceAreas: string | null | undefined, areaId: string | null): boolean {
-  if (!serviceAreas || !areaId) return true
+/**
+ * Blank coverage is legacy fail-open in Sri Lanka and stays that way.
+ *
+ * In Canada it is not sufficient authority: the City of Vancouver is one
+ * municipality, so an undeclared area must not authorise work across the whole
+ * city. A Canadian provider needs a declared area, or a verified radius
+ * upstream. Historical records that cannot establish a service address at all
+ * (no job coordinates) keep their existing behaviour for both markets.
+ */
+function configuredAreaMatches(
+  serviceAreas: string | null | undefined,
+  areaId: string | null,
+  providerCountry?: string | null,
+  hasValidatedAddress: boolean = false,
+): boolean {
+  const isCanada = (providerCountry || '').trim().toUpperCase() === 'CA'
   const configured = readStoredList(serviceAreas)
     .map(value => value.trim().toLowerCase())
     .filter(Boolean)
-  if (configured.length === 0) return true
+  const hasDeclaredArea = configured.length > 0
+
+  // Older jobs may lack GPS coordinates but still have a canonical areaId.
+  // A known district/area must NEVER be ignored solely because GPS is missing:
+  // that previously matched a Colombo-only provider to Jaffna jobs.
+  // Truly unlocated legacy records (no GPS AND no areaId) keep their
+  // compatibility behavior; financial booking still requires a market.
+  if (!hasValidatedAddress && !areaId) return true
+
+  if (!isCanada) {
+    // Sri Lanka keeps its legacy fail-open coverage.
+    if (!areaId || !hasDeclaredArea) return true
+  } else if (!hasDeclaredArea) {
+    // Blank coverage must not authorise work across the whole City of Vancouver.
+    return false
+  }
+  // With a validated address but no named area on the job, a declared area is
+  // the only authority available: the address has already been bounded to the
+  // supported market by the caller.
+  if (!areaId) return hasDeclaredArea
 
   const fullLocation = getLocationName(areaId).toLowerCase()
   const normalizedAreaId = areaId.toLowerCase()
@@ -565,7 +648,12 @@ async function evaluateServiceArea(
   providerId: string,
   job: MatchingInput,
 ): Promise<boolean> {
-  if (!job.countryCode) return true
+  // A job whose market cannot be established must match nobody. Returning true
+  // here would surface providers from any country, including providers who cannot
+  // legally or practically serve the address.
+  if (!job.countryCode) return false
+
+  const jobCountry = job.countryCode.toUpperCase()
 
   const target = await client.marketplaceJob.findUnique({
     where: { id: job.jobId },
@@ -590,8 +678,8 @@ async function evaluateServiceArea(
       }),
     ])
 
-    const providerCountry = profile?.countryCode || user?.countryCode
-    if (providerCountry !== job.countryCode) return false
+    const providerCountry = (profile?.countryCode || user?.countryCode || '').toUpperCase()
+    if (providerCountry !== jobCountry) return false
 
     if (
       target?.latitude != null && target.longitude != null &&
@@ -601,7 +689,7 @@ async function evaluateServiceArea(
       return haversineKm(target.latitude, target.longitude, profile.latitude, profile.longitude) <= profile.serviceRadius
     }
 
-    return configuredAreaMatches(profile?.serviceAreas, target?.areaId ?? null)
+    return configuredAreaMatches(profile?.serviceAreas, target?.areaId ?? null, providerCountry, target?.latitude != null && target?.longitude != null)
   }
 
   const company = await client.companyProfile.findUnique({
@@ -617,8 +705,8 @@ async function evaluateServiceArea(
   })
   if (!company) return false
 
-  const providerCountry = company.countryCode || company.user?.countryCode
-  if (providerCountry !== job.countryCode) return false
+  const providerCountry = (company.countryCode || company.user?.countryCode || '').toUpperCase()
+  if (providerCountry !== jobCountry) return false
 
   if (
     target?.latitude != null && target.longitude != null &&
@@ -628,7 +716,7 @@ async function evaluateServiceArea(
     return haversineKm(target.latitude, target.longitude, company.latitude, company.longitude) <= company.serviceRadius
   }
 
-  return configuredAreaMatches(company.serviceAreas, target?.areaId ?? null)
+  return configuredAreaMatches(company.serviceAreas, target?.areaId ?? null, providerCountry, target?.latitude != null && target?.longitude != null)
 }
 
 function timeToMinutes(value: string): number | null {

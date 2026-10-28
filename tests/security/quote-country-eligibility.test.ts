@@ -3,6 +3,7 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
 const routePath = resolve(process.cwd(), 'app/api/mobile/v2/quotes/route.ts')
+const engineSource = readFileSync(resolve(process.cwd(), 'lib/geography/market-engine.ts'), 'utf-8')
 const routeSource = readFileSync(routePath, 'utf-8')
 
 describe('Gate 4 — Quote Country Eligibility (Server-Side Enforcement)', () => {
@@ -16,8 +17,17 @@ describe('Gate 4 — Quote Country Eligibility (Server-Side Enforcement)', () =>
       expect(routeSource).toContain("countryCode: true")
     })
 
-    it('Route resolves jobCountry from authoritative MarketplaceJob.countryCode', () => {
-      expect(routeSource).toContain("job.countryCode")
+    it('Route resolves jobCountry from the job record via the authoritative market engine', () => {
+      // Phase 02: the job country is resolved through requireJobMarket(job),
+      // which derives the market from the job's validated service address and
+      // falls back to MarketplaceJob.countryCode only for legacy coordinate-less
+      // rows. The route must never use a caller-supplied country value here.
+      expect(routeSource).toContain('requireJobMarket')
+      expect(routeSource).toContain('const jobCountry = jobMarket.countryCode')
+      expect(routeSource).toContain('PROVIDER_COUNTRY_MISMATCH')
+      // The engine itself must honour stored-job coordinates over a stored country.
+      expect(engineSource).toContain('resolveJobMarket')
+      expect(engineSource).toContain('claimedCountryCode: job.countryCode')
     })
 
     it('Route compares providerCountry vs jobCountry', () => {

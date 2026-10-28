@@ -2,7 +2,9 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import crypto from 'crypto'
 
 const DATABASE_URL = process.env.DATABASE_URL || ''
-const isPostgres = DATABASE_URL.includes('postgresql')
+// Never exercise destructive PostgreSQL fixtures against non-test databases.
+const isPostgres = DATABASE_URL.startsWith('postgresql') &&
+  (DATABASE_URL.includes('maintainex_test') || DATABASE_URL.includes('_ci'))
 
 function createPrisma() {
   if (!isPostgres) return null as any
@@ -22,26 +24,10 @@ let jobBId: string
 let workStartJobId: string
 let workStartQuoteId: string
 
-async function cleanUp() {
-  if (!prisma) return
-  await prisma.$executeRawUnsafe(`DELETE FROM "JobVerificationPin" WHERE "customerId" IN (SELECT id FROM "User" WHERE "email" LIKE '%pin-postgres-test%')`)
-  await prisma.$executeRawUnsafe(`DELETE FROM "JobVerificationPin" WHERE "jobId" LIKE 'test-pin-%'`)
-  await prisma.$executeRawUnsafe(`DELETE FROM "JobVerificationPin" WHERE "jobId" LIKE 'test-ws-%'`)
-  await prisma.$executeRawUnsafe(`DELETE FROM "JobQuote" WHERE "jobId" LIKE 'test-pin-%'`)
-  await prisma.$executeRawUnsafe(`DELETE FROM "JobQuote" WHERE "jobId" LIKE 'test-ws-%'`)
-  await prisma.$executeRawUnsafe(`DELETE FROM "JobWorkspace" WHERE "jobId" LIKE 'test-pin-%'`)
-  await prisma.$executeRawUnsafe(`DELETE FROM "JobWorkspace" WHERE "jobId" LIKE 'test-ws-%'`)
-  await prisma.$executeRawUnsafe(`DELETE FROM "MarketplaceJob" WHERE "id" LIKE 'test-pin-%'`)
-  await prisma.$executeRawUnsafe(`DELETE FROM "MarketplaceJob" WHERE "id" LIKE 'test-ws-%'`)
-  await prisma.$executeRawUnsafe(`DELETE FROM "User" WHERE "email" LIKE '%pin-postgres-test%'`)
-}
-
 describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
   beforeAll(async () => {
     prisma = createPrisma()
     if (!prisma) return
-
-    await cleanUp()
 
     const category = await prisma.$queryRaw`SELECT id FROM "JobCategory" LIMIT 1`
     const categoryId = category[0]?.id || 'cat-pin-pg-test'
@@ -191,15 +177,27 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
   })
 
   afterAll(async () => {
-    if (prisma) {
-      if (workStartJobId) {
-        await prisma.$executeRawUnsafe(`DELETE FROM "JobVerificationPin" WHERE "jobId" = $1`, workStartJobId)
-        await prisma.$executeRawUnsafe(`DELETE FROM "JobEscrow" WHERE "jobId" = $1`, workStartJobId)
-        await prisma.$executeRawUnsafe(`DELETE FROM "JobQuote" WHERE "jobId" = $1`, workStartJobId)
-        await prisma.$executeRawUnsafe(`DELETE FROM "JobWorkspace" WHERE "jobId" = $1`, workStartJobId)
-        await prisma.$executeRawUnsafe(`DELETE FROM "MarketplaceJob" WHERE "id" = $1`, workStartJobId)
+    if (!prisma) return
+    try {
+      // Generated CUIDs do not match the obsolete 'test-pin-%' fixture cleanup.
+      // Remove child rows before the job and only then delete its account.
+      const fixtureJobIds = [jobAId, jobBId, workStartJobId].filter(
+        (id): id is string => Boolean(id),
+      )
+      const fixtureUserIds = [customerAId, customerBId, providerId].filter(
+        (id): id is string => Boolean(id),
+      )
+      if (fixtureJobIds.length) {
+        await prisma.jobVerificationPin.deleteMany({ where: { jobId: { in: fixtureJobIds } } })
+        await prisma.jobEscrow.deleteMany({ where: { jobId: { in: fixtureJobIds } } })
+        await prisma.jobWorkspace.deleteMany({ where: { jobId: { in: fixtureJobIds } } })
+        await prisma.jobQuote.deleteMany({ where: { jobId: { in: fixtureJobIds } } })
+        await prisma.marketplaceJob.deleteMany({ where: { id: { in: fixtureJobIds } } })
       }
-      await cleanUp()
+      if (fixtureUserIds.length) {
+        await prisma.user.deleteMany({ where: { id: { in: fixtureUserIds } } })
+      }
+    } finally {
       await prisma.$disconnect()
     }
   })

@@ -1,9 +1,10 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
+import { parseWorkerCount } from '@/lib/domain/worker-count'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { getLocationName } from '@/lib/locations'
-import { hasCompanyPermission, type CompanyRole } from '@/lib/phase6/rbac'
+import { getReadableCompanyIds, getActiveAssignedCompanyId } from '@/lib/phase6/company-job-read-access'
 import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
 
 function redactSensitive(data: Record<string, any>, _isOwner: boolean): Record<string, any> {
@@ -16,8 +17,6 @@ async function getVerifiedTaskerPublicIdentity(userId: string) {
     where: { userId },
     select: {
       id: true,
-      latitude: true,
-      longitude: true,
       rating: true,
       completedJobs: true,
       isVerified: true,
@@ -44,29 +43,18 @@ async function getVerifiedTaskerPublicIdentity(userId: string) {
     profile.verificationStatus === 'VERIFIED' &&
     identity?.kycStatus === 'VERIFIED'
 
+  // Never overwrite the provider User.id with TaskerProfile.id when this
+  // public identity is combined with the accepted quote's user summary.
+  // Raw verification state remains internal; only the approved booleans go out.
   return {
-    ...profile,
+    providerProfileId: profile.id,
+    rating: profile.rating,
+    completedJobs: profile.completedJobs,
+    isVerified: profile.isVerified,
     identityVerified,
     profileImage: identityVerified ? identity?.verifiedPhotoUrl || null : null,
     profilePhotoVerified: identityVerified && Boolean(identity?.verifiedPhotoUrl),
   }
-}
-
-async function getReadableCompanyIds(userId: string): Promise<string[]> {
-  const [ownedCompany, memberships] = await Promise.all([
-    prisma.companyProfile.findUnique({ where: { userId }, select: { id: true } }),
-    prisma.teamMember.findMany({
-      where: { userId, status: 'ACTIVE' },
-      select: { companyId: true, role: true },
-    }),
-  ])
-
-  const ids = memberships
-    .filter(member => hasCompanyPermission(member.role as CompanyRole, 'quotes:read'))
-    .map(member => member.companyId)
-
-  if (ownedCompany?.id) ids.push(ownedCompany.id)
-  return Array.from(new Set(ids))
 }
 
 export async function GET(
@@ -86,20 +74,13 @@ export async function GET(
     const requestedContext = new URL(_request.url).searchParams.get('context')
 
     if (!isOwner && job.targetTaskerId) {
-      const [targetTasker, targetCompanies, workerAssignment] = await Promise.all([
+      const [targetTasker, targetCompanies, workerCompanyId] = await Promise.all([
         prisma.taskerProfile.findUnique({
           where: { userId: user.id },
           select: { id: true },
         }),
         getReadableCompanyIds(user.id),
-        prisma.companyJobAssignment.findFirst({
-          where: {
-            jobId: job.id,
-            workerUserId: user.id,
-            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
-          },
-          select: { companyId: true },
-        }),
+        getActiveAssignedCompanyId(job.id, user.id),
       ])
 
       const readableTargetIds = new Set(
@@ -113,7 +94,7 @@ export async function GET(
       let hasAcceptedCompanyParticipation = false
       const participantCompanyIds = [...new Set([
         ...targetCompanies,
-        ...(workerAssignment?.companyId ? [workerAssignment.companyId] : []),
+        ...(workerCompanyId ? [workerCompanyId] : []),
       ])]
 
       if (participantCompanyIds.length > 0) {
@@ -157,21 +138,13 @@ export async function GET(
           : null
 
         if (!companyQuote) {
-          const workerAssignment = await prisma.companyJobAssignment.findFirst({
-            where: {
-              jobId: job.id,
-              workerUserId: user.id,
-              status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
-            },
-            orderBy: { assignedAt: 'desc' },
-            select: { companyId: true },
-          })
-          if (workerAssignment) {
+          const workerCompanyId = await getActiveAssignedCompanyId(job.id, user.id)
+          if (workerCompanyId) {
             companyQuote = await prisma.jobQuote.findFirst({
               where: {
                 jobId: job.id,
                 providerType: 'COMPANY',
-                providerId: workerAssignment.companyId,
+                providerId: workerCompanyId,
                 status: 'ACCEPTED',
               },
               orderBy: { createdAt: 'desc' },
@@ -192,28 +165,20 @@ export async function GET(
           providerContextId = user.id
           providerContextType = 'INDIVIDUAL'
         } else {
-          const workerAssignment = await prisma.companyJobAssignment.findFirst({
-            where: {
-              jobId: job.id,
-              workerUserId: user.id,
-              status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
-            },
-            orderBy: { assignedAt: 'desc' },
-            select: { companyId: true },
-          })
+          const workerCompanyId = await getActiveAssignedCompanyId(job.id, user.id)
 
-          if (workerAssignment) {
+          if (workerCompanyId) {
             const companyQuote = await prisma.jobQuote.findFirst({
               where: {
                 jobId: job.id,
-                providerId: workerAssignment.companyId,
+                providerId: workerCompanyId,
                 providerType: 'COMPANY',
                 status: 'ACCEPTED',
               },
               select: { providerId: true },
             })
             if (companyQuote) {
-              providerContextId = workerAssignment.companyId
+              providerContextId = workerCompanyId
               providerContextType = 'COMPANY'
             }
           }
@@ -260,7 +225,7 @@ export async function GET(
       } else {
         const company = await prisma.companyProfile.findUnique({
           where: { id: acceptedQuote.providerId },
-          select: { id: true, userId: true, companyName: true, logo: true, rating: true, latitude: true, longitude: true },
+          select: { id: true, userId: true, companyName: true, logo: true, rating: true },
         })
         if (company) {
           acceptedProvider = {
@@ -269,8 +234,6 @@ export async function GET(
             name: company.companyName,
             profileImage: company.logo,
             rating: company.rating,
-            latitude: company.latitude,
-            longitude: company.longitude,
           }
         }
       }
@@ -433,6 +396,17 @@ export async function PATCH(
       if (key in body) {
         data[key] = body[key]
       }
+    }
+
+    if ('workersCount' in data) {
+      const validatedWorkerCount = parseWorkerCount(data.workersCount)
+      if (validatedWorkerCount === null) {
+        return NextResponse.json(
+          { error: 'workersCount must be a positive integer within database limits' },
+          { status: 400 },
+        )
+      }
+      data.workersCount = validatedWorkerCount
     }
 
     if (Object.keys(data).length === 0) {

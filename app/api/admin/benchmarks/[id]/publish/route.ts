@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
 import { serializeBigInts } from '@/lib/crm/benchmark-utils'
 import { createAuditLog } from '@/lib/crm/audit'
+import { benchmarkEvidenceErrors } from '@/lib/pricing/benchmark-evidence'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -21,6 +22,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!assertCrmCountryAllowed(security, existing.countryCode)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     if (existing.status !== 'APPROVED') {
       return NextResponse.json({ error: `Cannot publish a benchmark with status ${existing.status}. Only APPROVED benchmarks can be published.` }, { status: 409 })
+    }
+    const evidenceErrors = benchmarkEvidenceErrors(existing)
+    if (evidenceErrors.length) {
+      return NextResponse.json({ error: 'Benchmark evidence is incomplete', details: evidenceErrors }, { status: 400 })
     }
 
     const geographyWhere =

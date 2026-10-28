@@ -8,6 +8,12 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const country = (searchParams.get('country') || 'LK').trim().toUpperCase()
+    // Public/onboarding catalogue must never fall back to LKR for a new,
+    // unsupported market. Canadian templates are CAD-only and LK LKR-only.
+    const expectedCurrency = country === 'CA' ? 'CAD' : country === 'LK' ? 'LKR' : null
+    if (!expectedCurrency) {
+      return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } })
+    }
     const runtime = await getPlatformRuntimeConfig(country)
     if (
       runtime.maintenance.enabled ||
@@ -26,7 +32,18 @@ export async function GET(request: NextRequest) {
       orderBy: { sortOrder: 'asc' },
     })
 
-    const categories = allCategories.filter(c => storedListIncludes(c.countries, country))
+    // A country grant on a department does not prove any service is bookable
+    // there. Keep mobile discovery aligned with the canonical public catalogue:
+    // hide departments whose active jobs have no matching market/currency.
+    const categories = allCategories
+      .filter(c => storedListIncludes(c.countries, country))
+      .map(c => ({
+        ...c,
+        jobs: c.jobs.filter(j =>
+          storedListIncludes(j.countries, country) && j.currency === expectedCurrency
+        ),
+      }))
+      .filter(c => c.jobs.length > 0)
 
     return NextResponse.json(categories.map(c => ({
       id: c.id,

@@ -5,6 +5,7 @@ import type {
   GeographyLevel,
   PricingMode,
 } from './benchmark-types'
+import { benchmarkEvidenceErrors } from './benchmark-evidence'
 
 /**
  * Canonical benchmark resolution with geographic fallback hierarchy.
@@ -26,6 +27,7 @@ export async function resolveBenchmark(
   },
 ): Promise<BenchmarkResolution | null> {
   const now = params.asOf || new Date()
+  const config = await resolveBenchmarkConfig(client, params.countryCode)
 
   // Try each geographic level in order
   const attempts: Array<{ region: string | null; city: string | null; level: GeographyLevel }> = []
@@ -33,10 +35,12 @@ export async function resolveBenchmark(
   if (params.city) {
     attempts.push({ region: params.region || null, city: params.city, level: 'CITY' })
   }
-  if (params.region) {
+  if (params.region && (config.benchmarkFallbackEnabled || !params.city)) {
     attempts.push({ region: params.region, city: null, level: 'PROVINCE' })
   }
-  attempts.push({ region: null, city: null, level: 'COUNTRY' })
+  if (config.benchmarkFallbackEnabled || (!params.city && !params.region)) {
+    attempts.push({ region: null, city: null, level: 'COUNTRY' })
+  }
 
   for (const attempt of attempts) {
     const benchmark = await findPublishedBenchmark(client, {
@@ -49,7 +53,8 @@ export async function resolveBenchmark(
       now,
     })
 
-    if (benchmark) {
+    if (benchmark && benchmarkEvidenceErrors(benchmark).length === 0 && Number.isSafeInteger(benchmark.sampleSize) &&
+        benchmark.sampleSize >= Math.max(1, config.minBenchmarkSample)) {
       const confidence = deriveConfidence(benchmark.sampleSize, params.serviceTemplateId)
       return {
         ...benchmark,

@@ -17,8 +17,15 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const { jobId, reason, description } = await request.json()
-    if (!jobId || !reason || !description) {
-      return NextResponse.json({ error: 'jobId, reason, and description required' }, { status: 400 })
+    if (
+      typeof jobId !== 'string' || !jobId.trim() || jobId.length > 128 ||
+      typeof reason !== 'string' || !reason.trim() || reason.length > 120 ||
+      typeof description !== 'string' || !description.trim() || description.length > 5000
+    ) {
+      return NextResponse.json(
+        { error: 'Valid jobId, reason (max 120), and description (max 5000) required' },
+        { status: 400 },
+      )
     }
 
     const marketplaceJob = await prisma.marketplaceJob.findUnique({
@@ -50,13 +57,24 @@ export async function POST(request: NextRequest) {
         '/admin/jobs/disputes',
       )
 
+      // Escalate explicit safety concerns through the existing authenticated
+      // staff work queue. This is NOT emergency dispatch or 24/7 monitoring.
+      const safetyReasons = new Set([
+        'SAFETY_IMMEDIATE_DANGER',
+        'SAFETY_THREAT_OR_HARASSMENT',
+        'SAFETY_INJURY',
+        'SAFETY_UNSAFE_WORK',
+        'SAFETY_IDENTITY_MISMATCH',
+      ])
+      const safetyReport = safetyReasons.has(reason)
       await createWorkItem({
-        category: 'dispute',
-        title: `Dispute: ${reason}`,
+        category: safetyReport ? 'tasker_escalation' : 'dispute',
+        severity: safetyReport ? 'critical' : 'high',
+        title: `${safetyReport ? 'Safety report' : 'Dispute'}: ${reason}`,
         description: `${user.name || user.email} raised a dispute on job "${marketplaceJob.title}". ${description}`,
         targetTable: 'MarketplaceDispute',
         targetId: marketplaceDispute.disputeId,
-        priority: 'high',
+        priority: safetyReport ? 'critical' : 'high',
       })
 
       return NextResponse.json({

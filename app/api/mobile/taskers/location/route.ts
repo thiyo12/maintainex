@@ -17,11 +17,22 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Latitude and longitude required' }, { status: 400 })
     }
 
-    const parsedLatitude = typeof latitude === 'number' ? latitude : Number(latitude)
-    const parsedLongitude = typeof longitude === 'number' ? longitude : Number(longitude)
+    // Device clients may send decimal strings; do not coerce null, blank,
+    // boolean, arrays or objects with Number() (Number(null) === 0). Those
+    // values previously overwrote a valid provider GPS position with 0,0.
+    const parseCoordinate = (value: unknown): number | null => {
+      if (typeof value === 'number') return Number.isFinite(value) ? value : null
+      if (typeof value !== 'string') return null
+      const decimal = value.trim()
+      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(decimal)) return null
+      const parsed = Number(decimal)
+      return Number.isFinite(parsed) ? parsed : null
+    }
+    const parsedLatitude = parseCoordinate(latitude)
+    const parsedLongitude = parseCoordinate(longitude)
     if (
-      !Number.isFinite(parsedLatitude) ||
-      !Number.isFinite(parsedLongitude) ||
+      parsedLatitude === null ||
+      parsedLongitude === null ||
       parsedLatitude < -90 ||
       parsedLatitude > 90 ||
       parsedLongitude < -180 ||

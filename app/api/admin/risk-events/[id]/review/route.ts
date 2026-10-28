@@ -1,8 +1,9 @@
+import { Prisma } from '@prisma/client'
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
-import { reviewRiskEvent, type RiskEventResolution } from '@/lib/domain/admin-risk-event'
+import { assertCrmCountryAllowed, getCrmCountryCodes, guardCrmRequest } from '@/lib/crm/security'
+import { CrewSafetyCaseRequiresDedicatedResolutionError, reviewRiskEvent, type RiskEventResolution } from '@/lib/domain/admin-risk-event'
 import type { AdminSession } from '@/lib/admin-types'
 
 const VALID_RESOLUTIONS: RiskEventResolution[] = ['CONFIRMED', 'DISMISSED', 'ESCALATED', 'NO_ACTION']
@@ -61,13 +62,19 @@ export async function PATCH(
       authType: 'adminUser',
     }
 
-    const result = await reviewRiskEvent(prisma, {
+    // The persisted no-hold evidence read and reviewedAt update must share
+    // SERIALIZABLE isolation; otherwise a worker could consume a PIN after
+    // the read but before CRM closes a still safety-held incident.
+    const result = await prisma.$transaction(tx => reviewRiskEvent(tx, {
       eventId: id,
       resolution,
       reason,
       session,
       ipAddress: security.ipAddress,
-    })
+      // Recheck the live market assignment against the locked job within
+      // the review transaction; preflight alone is raceable.
+      allowedCountries: getCrmCountryCodes(security),
+    }), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
     return NextResponse.json({
       success: true,
@@ -75,6 +82,12 @@ export async function PATCH(
       resolution: result.resolution,
     })
   } catch (error) {
+    if (error instanceof CrewSafetyCaseRequiresDedicatedResolutionError) {
+      return NextResponse.json(
+        { error: 'Crew safety case requires separate authorized support resolution' },
+        { status: 409, headers: { 'Cache-Control': 'private, no-store' } },
+      )
+    }
     const message = error instanceof Error ? error.message : 'Server error'
     if (message.includes('already reviewed') || message.includes('Concurrent')) {
       return NextResponse.json({ error: message }, { status: 409 })

@@ -165,10 +165,17 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
     if (lkEscrowId) await prisma.commissionSettlement.deleteMany({ where: { escrowId: lkEscrowId } }).catch(() => {})
     if (caEscrowId) await prisma.commissionSettlement.deleteMany({ where: { escrowId: caEscrowId } }).catch(() => {})
     await prisma.weeklySettlement.deleteMany({ where: { providerId: { in: [lkProviderId, caProviderId] } } }).catch(() => {})
-    await prisma.jobEscrow.deleteMany({ where: { jobId: { in: [lkJobId, caJobId] } } }).catch(() => {})
-    await prisma.jobWorkspace.deleteMany({ where: { jobId: { in: [lkJobId, caJobId] } } }).catch(() => {})
-    await prisma.jobQuote.deleteMany({ where: { jobId: { in: [lkJobId, caJobId] } } }).catch(() => {})
-    await prisma.marketplaceJob.deleteMany({ where: { id: { in: [lkJobId, caJobId] } } }).catch(() => {})
+    // The orphan audit is blocking. Never swallow teardown errors for core
+    // booking relations and then delete customer/provider accounts anyway.
+    const fixtureJobIds = [lkJobId, caJobId].filter((id): id is string => !!id)
+    if (fixtureJobIds.length) {
+      await prisma.jobVerificationPin.deleteMany({ where: { jobId: { in: fixtureJobIds } } })
+      await prisma.companyJobAssignment.deleteMany({ where: { jobId: { in: fixtureJobIds } } })
+      await prisma.jobWorkspace.deleteMany({ where: { jobId: { in: fixtureJobIds } } })
+      await prisma.jobEscrow.deleteMany({ where: { jobId: { in: fixtureJobIds } } })
+      await prisma.jobQuote.deleteMany({ where: { jobId: { in: fixtureJobIds } } })
+      await prisma.marketplaceJob.deleteMany({ where: { id: { in: fixtureJobIds } } })
+    }
     await prisma.walletTransaction.deleteMany({ where: { userId: { in: [lkCustomerId, caCustomerId, lkProviderId, caProviderId] } } }).catch(() => {})
     await prisma.walletBalance.deleteMany({ where: { walletId: { in: [lkCustomerWalletId, caCustomerWalletId, lkProviderWalletId, caProviderWalletId] } } }).catch(() => {})
     await prisma.customerWallet.deleteMany({ where: { id: { in: [lkCustomerWalletId, caCustomerWalletId] } } }).catch(() => {})
@@ -177,7 +184,9 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
     await prisma.taskerProfile.deleteMany({ where: { userId: { in: [lkProviderId, caProviderId] } } }).catch(() => {})
     await prisma.templateJob.deleteMany({ where: { id: { in: [lkTemplateJobId, caTemplateJobId] } } }).catch(() => {})
     await prisma.jobCategory.deleteMany({ where: { id: { in: [lkCategoryId, caCategoryId] } } }).catch(() => {})
-    await prisma.user.deleteMany({ where: { id: { in: [lkCustomerId, caCustomerId, lkProviderId, caProviderId] } } }).catch(() => {})
+    // A failed user deletion should fail this suite, not strand jobs/quotes
+    // undetected until the final foreign-key audit.
+    await prisma.user.deleteMany({ where: { id: { in: [lkCustomerId, caCustomerId, lkProviderId, caProviderId] } } })
     await prisma.$disconnect()
   })
 

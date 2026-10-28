@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { normalizeCompanyServiceAreas, normalizeCompanyServices, validateCompanyCatalogueServices } from '@/lib/phase6/company-profile-market'
 
 function safeParseJson(val: string | null | undefined): string[] {
   if (!val) return []
@@ -110,14 +111,26 @@ export async function PUT(request: NextRequest) {
         }
 
         const companyName = typeof data.companyName === 'string' ? data.companyName.trim() : ''
-        const services = Array.isArray(data.services) ? data.services.filter(Boolean) : []
-        const serviceAreas = Array.isArray(data.serviceAreas) ? data.serviceAreas.filter(Boolean) : []
+        const market = (user.countryCode || 'LK').trim().toUpperCase()
+        const checkedAreas = normalizeCompanyServiceAreas(market, data.serviceAreas ?? [])
+        if (!checkedAreas.ok) {
+          return NextResponse.json({ error: checkedAreas.error }, { status: 400 })
+        }
+        const checkedServices = normalizeCompanyServices(data.services)
+        if (!checkedServices.ok) {
+          return NextResponse.json({ error: checkedServices.error }, { status: 400 })
+        }
+        const services = checkedServices.services
+        const serviceAreas = checkedAreas.areas
 
         if (!companyName) {
           return NextResponse.json({ error: 'Company name is required' }, { status: 400 })
         }
         if (services.length === 0) {
           return NextResponse.json({ error: 'Select at least one service' }, { status: 400 })
+        }
+        if (!await validateCompanyCatalogueServices(prisma, market, services)) {
+          return NextResponse.json({ error: 'Select active service IDs from your market catalogue' }, { status: 400 })
         }
 
         const created = await prisma.$transaction(async (tx) => {
@@ -129,7 +142,7 @@ export async function PUT(request: NextRequest) {
               description: data.description || null,
               services: JSON.stringify(services),
               serviceAreas: JSON.stringify(serviceAreas),
-              countryCode: user.countryCode || 'LK',
+              countryCode: market,
             },
           })
 
@@ -172,17 +185,50 @@ export async function PUT(request: NextRequest) {
             status: 'ACTIVE',
           },
         })
-      } else if (membership && user.role === 'COMPANY' &&
-        (membership.status !== 'ACTIVE' || membership.role !== 'COMPANY_OWNER')) {
-        await prisma.teamMember.update({
-          where: { id: membership.id },
-          data: { status: 'ACTIVE', role: 'COMPANY_OWNER', name: user.name },
-        })
       }
+      // Existing memberships are authoritative. Never restore SUSPENDED or
+      // REMOVED access (or promote a demoted member) through profile editing.
+      // Those changes must go through the authorized workforce flow.
     }
 
     const { context, error } = await resolveCompanyContext(user.id, companyId, 'company:update')
     if (error) return error
+
+    // Only mutate declarations in the company's persisted account market.
+    // Client-supplied country codes, including edits from a stale mobile
+    // session, cannot change a company's service territory.
+    const company = await prisma.companyProfile.findUnique({
+      where: { id: context!.companyId },
+      select: { countryCode: true, services: true },
+    })
+    if (!company) {
+      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
+    }
+    const accountMarket = (user.countryCode || 'LK').trim().toUpperCase()
+    const market = (company.countryCode || '').trim().toUpperCase()
+    if (market !== accountMarket || (market !== 'LK' && market !== 'CA')) {
+      return NextResponse.json({ error: 'Company and account markets do not match' }, { status: 403 })
+    }
+    const checkedAreas = data.serviceAreas === undefined
+      ? null : normalizeCompanyServiceAreas(market, data.serviceAreas)
+    if (checkedAreas && !checkedAreas.ok) {
+      return NextResponse.json({ error: checkedAreas.error }, { status: 400 })
+    }
+    const checkedServices = data.services === undefined
+      ? null : normalizeCompanyServices(data.services)
+    if (checkedServices && !checkedServices.ok) {
+      return NextResponse.json({ error: checkedServices.error }, { status: 400 })
+    }
+    if (checkedServices?.ok) {
+      // Preserve pre-existing legacy labels ONLY if the submitted list is
+      // identical. Newly asserted services must be active canonical job IDs.
+      const existing = safeParseJson(company.services)
+      const unchanged = existing.length === checkedServices.services.length &&
+        existing.every((value, i) => value === checkedServices.services[i])
+      if (!unchanged && !await validateCompanyCatalogueServices(prisma, market, checkedServices.services)) {
+        return NextResponse.json({ error: 'Select active service IDs from your market catalogue' }, { status: 400 })
+      }
+    }
 
     const profile = await prisma.companyProfile.update({
       where: { id: context!.companyId },
@@ -190,8 +236,8 @@ export async function PUT(request: NextRequest) {
         companyName: data.companyName ?? undefined,
         registrationNo: data.registrationNo ?? undefined,
         description: data.description ?? undefined,
-        services: data.services ? JSON.stringify(data.services) : undefined,
-        serviceAreas: data.serviceAreas ? JSON.stringify(data.serviceAreas) : undefined,
+        services: checkedServices?.ok ? JSON.stringify(checkedServices.services) : undefined,
+        serviceAreas: checkedAreas?.ok ? JSON.stringify(checkedAreas.areas) : undefined,
         logo: data.logo ?? undefined,
       },
     })

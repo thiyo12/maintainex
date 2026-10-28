@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { requireJobMarket } from '@/lib/geography/market-engine'
 import {
   MatchingInput, MatchResult, MatchCandidate, ExcludedProvider,
   MatchingConfig, ScoreComponents, MatchExclusionReason,
@@ -62,6 +63,9 @@ export async function resolveJobRequirements(
       select: { id: true, categoryId: true },
     })
     if (!directTemplateJob || directTemplateJob.categoryId !== category.id) return null
+    // A service template already pointing to one canonical job cannot be
+    // relabelled as a sibling through an inconsistent direct booking pointer.
+    if (templateJobIds.length > 0 && !templateJobIds.includes(directTemplateJob.id)) return null
     if (!templateJobIds.includes(directTemplateJob.id)) templateJobIds.push(directTemplateJob.id)
   }
 
@@ -99,8 +103,10 @@ export function hasCompanySpecialtyCapability(
   jobReqs: JobRequirements,
 ): boolean {
   return specialties.some((specialty) =>
-    specialty.categoryId === jobReqs.categoryId ||
-    (!!specialty.jobId && jobReqs.templateJobIds.includes(specialty.jobId))
+    jobReqs.templateJobIds.length > 0
+      ? (!!specialty.jobId && jobReqs.templateJobIds.includes(specialty.jobId)) ||
+        (specialty.jobId === null && specialty.categoryId === jobReqs.categoryId)
+      : specialty.categoryId === jobReqs.categoryId
   )
 }
 
@@ -134,19 +140,36 @@ export async function findCandidates(
     return emptyResult(input.jobId, fallbackConfig.matchingVersion)
   }
 
+  // Phase 03: the job's validated service address decides the market. Previously
+  // `job.countryCode || input.countryCode` let a stored or caller-supplied
+  // country override coordinates that had already established the market.
+  // Coordinate-less legacy jobs keep their stored-country behaviour because the
+  // shared resolver deliberately falls back to it.
+  const jobMarket = requireJobMarket(job)
+  if (!jobMarket.ok) {
+    // Unresolvable or contradictory market: match nobody.
+    const fallbackConfig = await resolveMatchingConfig(client, job.countryCode || 'GLOBAL')
+    return emptyResult(input.jobId, fallbackConfig.matchingVersion)
+  }
+
   const canonicalInput: MatchingInput = {
     ...input,
     categoryId: job.categoryId,
     serviceTemplateId: job.serviceTemplateId || undefined,
+    templateJobId: job.templateJobId || undefined,
     latitude: job.latitude ?? input.latitude,
     longitude: job.longitude ?? input.longitude,
     urgency: ((job.urgency || input.urgency || 'NORMAL').toUpperCase()) as MatchingInput['urgency'],
-    countryCode: job.countryCode || input.countryCode,
+    countryCode: jobMarket.countryCode,
   }
-  const config = await resolveMatchingConfig(client, canonicalInput.countryCode || 'GLOBAL')
+  const config = await resolveMatchingConfig(client, jobMarket.countryCode)
 
   const jobReqs = await resolveJobRequirements(client, job.categoryId, job.serviceTemplateId, job.templateJobId)
   if (!jobReqs) return emptyResult(input.jobId, config.matchingVersion)
+  // A ServiceTemplate can carry the canonical TemplateJob even when the job
+  // does not have a separate direct templateJobId. Eligibility must see the
+  // resolved exact service or a sibling category selection could slip through.
+  canonicalInput.templateJobId = jobReqs.templateJobIds[0]
 
   // =============================================
   // Phase 1: Collect eligible providers (eligibility evaluation)
@@ -168,7 +191,15 @@ export async function findCandidates(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: canonicalInput.countryCode ? { countryCode: canonicalInput.countryCode } : undefined,
+      // Phase 03: an unresolved market must not load every verified provider on
+      // the platform. '__none__' matches no real country, so the query fails
+      // closed instead of silently widening to every market.
+      user: {
+        countryCode: {
+          equals: canonicalInput.countryCode || '__none__',
+          mode: 'insensitive',
+        },
+      },
     },
     include: {
       user: { select: { id: true, email: true, isSuspended: true, isBanned: true, identityStatus: true, createdAt: true, countryCode: true } },
@@ -218,7 +249,13 @@ export async function findCandidates(
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: canonicalInput.countryCode ? { countryCode: canonicalInput.countryCode } : undefined,
+      // CompanyProfile.countryCode represents the registered service market.
+      // Its User relation is the historical creator, not necessarily the
+      // current owner after transfer. Keep country scoping fail-closed.
+      countryCode: {
+        equals: canonicalInput.countryCode || '__none__',
+        mode: 'insensitive',
+      },
     },
     include: {
       user: { select: { id: true, email: true, isSuspended: true, isBanned: true, countryCode: true, createdAt: true } },
@@ -228,15 +265,9 @@ export async function findCandidates(
 
   for (const company of companies) {
     if (process.env.ALLOW_TEST_OTP !== 'true' && company.user?.email.endsWith('@maintainex-test.lk')) continue
-    if (company.user?.isSuspended) {
-      excluded.push({ providerId: company.id, providerType: 'COMPANY', reason: 'COMPANY_OWNER_SUSPENDED' })
-      continue
-    }
-    if (company.user?.isBanned) {
-      excluded.push({ providerId: company.id, providerType: 'COMPANY', reason: 'COMPANY_OWNER_BANNED' })
-      continue
-    }
-
+    // Canonical eligibility checks the currently active COMPANY_OWNER
+    // memberships. Excluding by a suspended/banned historical creator here
+    // would incorrectly hide a company after a legitimate owner transfer.
     const eligibility = await evaluateEligibility({
       providerType: 'COMPANY',
       providerId: company.id,
@@ -366,6 +397,19 @@ export async function findCandidates(
 // NEW CANONICAL API (Phase 10.2)
 // =============================================
 
+function unsupportedJobCapability(): EligibilityResult {
+  return {
+    eligible: false,
+    gates: [{ gate: 'JOB_CAPABILITY', passed: false, reason: 'Booking catalogue service is inconsistent or missing' }],
+    matchedProfessionId: null,
+    matchedSkills: [],
+    preferredSkillsMatched: [],
+    jurisdictionPassed: false,
+    serviceAreaPassed: false,
+    availabilityPassed: false,
+  }
+}
+
 /**
  * Evaluate a single provider's eligibility for a job.
  */
@@ -376,7 +420,7 @@ export async function evaluateTaskerEligibility(
 ): Promise<EligibilityResult> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true, preferredDate: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true, latitude: true, longitude: true, preferredDate: true },
   })
   if (!job) {
     return {
@@ -386,6 +430,20 @@ export async function evaluateTaskerEligibility(
       jurisdictionPassed: false, serviceAreaPassed: false, availabilityPassed: false,
     }
   }
+  const jobMarket = requireJobMarket(job)
+  if (!jobMarket.ok) {
+    return {
+      eligible: false,
+      gates: [{ gate: 'JOB_MARKET', passed: false, reason: 'Service address is outside the supported market' }],
+      matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [],
+      jurisdictionPassed: false, serviceAreaPassed: false, availabilityPassed: false,
+    }
+  }
+
+  const reqs = await resolveJobRequirements(
+    client, job.categoryId, job.serviceTemplateId, job.templateJobId,
+  )
+  if (!reqs) return unsupportedJobCapability()
 
   return evaluateEligibility({
     providerType: 'INDIVIDUAL',
@@ -394,9 +452,10 @@ export async function evaluateTaskerEligibility(
       jobId,
       categoryId: job.categoryId,
       serviceTemplateId: job.serviceTemplateId || undefined,
+      templateJobId: reqs.templateJobIds[0],
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      countryCode: job.countryCode,
+      countryCode: jobMarket.countryCode,
       preferredDate: job.preferredDate,
     },
     client,
@@ -413,7 +472,7 @@ export async function evaluateCompanyEligibility(
 ): Promise<EligibilityResult> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true, preferredDate: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true, latitude: true, longitude: true, preferredDate: true },
   })
   if (!job) {
     return {
@@ -423,6 +482,20 @@ export async function evaluateCompanyEligibility(
       jurisdictionPassed: false, serviceAreaPassed: false, availabilityPassed: false,
     }
   }
+  const jobMarket = requireJobMarket(job)
+  if (!jobMarket.ok) {
+    return {
+      eligible: false,
+      gates: [{ gate: 'JOB_MARKET', passed: false, reason: 'Service address is outside the supported market' }],
+      matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [],
+      jurisdictionPassed: false, serviceAreaPassed: false, availabilityPassed: false,
+    }
+  }
+
+  const reqs = await resolveJobRequirements(
+    client, job.categoryId, job.serviceTemplateId, job.templateJobId,
+  )
+  if (!reqs) return unsupportedJobCapability()
 
   return evaluateEligibility({
     providerType: 'COMPANY',
@@ -431,9 +504,10 @@ export async function evaluateCompanyEligibility(
       jobId,
       categoryId: job.categoryId,
       serviceTemplateId: job.serviceTemplateId || undefined,
+      templateJobId: reqs.templateJobIds[0],
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      countryCode: job.countryCode,
+      countryCode: jobMarket.countryCode,
       preferredDate: job.preferredDate,
     },
     client,
@@ -449,15 +523,22 @@ export async function getEligibleTaskers(
 ): Promise<Array<{ providerId: string; eligibility: EligibilityResult }>> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, countryCode: true, preferredDate: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true, latitude: true, longitude: true, preferredDate: true },
   })
   if (!job) return []
+  const jobMarket = requireJobMarket(job)
+  if (!jobMarket.ok) return []
+  const reqs = await resolveJobRequirements(
+    client, job.categoryId, job.serviceTemplateId, job.templateJobId,
+  )
+  if (!reqs) return []
 
   const profiles = await client.taskerProfile.findMany({
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: job.countryCode ? { countryCode: job.countryCode } : undefined,
+      // Fail closed: an unresolved market must not widen to every provider.
+      user: { countryCode: { equals: jobMarket.countryCode, mode: 'insensitive' } },
     },
     select: { userId: true },
   })
@@ -471,9 +552,10 @@ export async function getEligibleTaskers(
         jobId,
         categoryId: job.categoryId,
         serviceTemplateId: job.serviceTemplateId || undefined,
+        templateJobId: reqs.templateJobIds[0],
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
-        countryCode: job.countryCode,
+        countryCode: jobMarket.countryCode,
         preferredDate: job.preferredDate,
       },
       client,
@@ -494,15 +576,22 @@ export async function getEligibleCompanies(
 ): Promise<Array<{ companyId: string; eligibility: EligibilityResult }>> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, countryCode: true, preferredDate: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true, latitude: true, longitude: true, preferredDate: true },
   })
   if (!job) return []
+  const jobMarket = requireJobMarket(job)
+  if (!jobMarket.ok) return []
+  const reqs = await resolveJobRequirements(
+    client, job.categoryId, job.serviceTemplateId, job.templateJobId,
+  )
+  if (!reqs) return []
 
   const companies = await client.companyProfile.findMany({
     where: {
       verificationStatus: 'VERIFIED',
       isVerified: true,
-      user: job.countryCode ? { countryCode: job.countryCode } : undefined,
+      // Use registered company market, not the historical creator's country.
+      countryCode: { equals: jobMarket.countryCode, mode: 'insensitive' },
     },
     select: { id: true },
   })
@@ -516,9 +605,10 @@ export async function getEligibleCompanies(
         jobId,
         categoryId: job.categoryId,
         serviceTemplateId: job.serviceTemplateId || undefined,
+        templateJobId: reqs.templateJobIds[0],
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
-        countryCode: job.countryCode,
+        countryCode: jobMarket.countryCode,
         preferredDate: job.preferredDate,
       },
       client,

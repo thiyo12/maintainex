@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking, AppState } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -9,6 +9,13 @@ import { fonts } from '@/lib/fonts'
 import { v2Jobs, v2JobActions } from '@/api/v2-jobs'
 import { v2Payments } from '@/api/v2-payments'
 import Avatar from '@/components/ui/Avatar'
+import {
+  canSubmitPayment,
+  createStaleResponseGuard,
+  derivePaymentPresentation,
+  resolveDisplayCurrency,
+  type PaymentFetchState,
+} from './payment-presentation'
 
 
 const CANVAS = '#0D0D0D'
@@ -34,14 +41,11 @@ export default function V2ConfirmBookingScreen() {
   const [scheduleSlot, setScheduleSlot] = useState('')
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null)
   const [paymentProvider, setPaymentProvider] = useState<string | null>(null)
-
-  useEffect(() => {
-    // Online payment availability is a server contract, not a hardcoded label.
-    v2Payments
-      .availability()
-      .then(res => setOnlinePaymentAvailable(Boolean(res?.onlinePaymentAvailable)))
-      .catch(() => setOnlinePaymentAvailable(false))
-  }, [])
+  // Phase 03: the server alone decides whether this market is payable. A failed
+  // or in-flight request is never treated as a valid market.
+  const [paymentFetch, setPaymentFetch] = useState<PaymentFetchState>({ kind: 'unknown' })
+  // Job id change, the poll and app resume can all start a load concurrently.
+  const loadGuard = useRef(createStaleResponseGuard()).current
 
   useEffect(() => { loadData() }, [id])
 
@@ -51,16 +55,43 @@ export default function V2ConfirmBookingScreen() {
     return () => clearInterval(timer)
   }, [id, paymentStatus])
 
+  // Requirement: never carry payment eligibility across a job change.
+  useEffect(() => {
+    setPaymentFetch({ kind: 'unknown' })
+    setPaymentStatus(null)
+    setPaymentProvider(null)
+  }, [id])
+
   const loadData = async () => {
+    const token = loadGuard.begin()
     try {
       const [jobRes, paymentRes] = await Promise.all([
         v2Jobs.get(id),
-        v2Payments.status(id).catch(() => ({ payment: null })),
+        // A failed status request must not be read as "market is fine".
+        v2Payments.status(id).catch(() => null),
       ])
+      // An older load must never overwrite the current job's eligibility.
+      if (!loadGuard.isCurrent(token)) return
       setJob(jobRes.job)
       setEscrow(jobRes.job.escrow || null)
-      setPaymentStatus(paymentRes.payment?.status || null)
-      setPaymentProvider(paymentRes.payment?.gateway || null)
+
+      if (!paymentRes) {
+        setPaymentFetch({ kind: 'failed' })
+        setPaymentStatus(null)
+        setPaymentProvider(null)
+      } else {
+        setPaymentStatus(paymentRes.payment?.status || null)
+        setPaymentProvider(paymentRes.payment?.gateway || null)
+        setPaymentFetch(
+          paymentRes.options
+            ? { kind: 'ready', options: paymentRes.options }
+            : {
+                kind: 'invalidMarket',
+                code: paymentRes.market?.code || 'JOB_MARKET_UNRESOLVED',
+                error: paymentRes.market?.error || 'Payment is not available for this job market.',
+              },
+        )
+      }
       if (jobRes.job.preferredTimeSlot && !scheduleSlot) {
         setScheduleSlot(jobRes.job.preferredTimeSlot)
       }
@@ -82,7 +113,27 @@ export default function V2ConfirmBookingScreen() {
     return () => subscription.remove()
   }, [id])
 
+  useEffect(() => {
+    // Online payment availability is a server contract, not a hardcoded label.
+    v2Payments
+      .availability()
+      .then(res => setOnlinePaymentAvailable(Boolean(res?.onlinePaymentAvailable)))
+      .catch(() => setOnlinePaymentAvailable(false))
+  }, [])
+
+  const paymentPresentation = derivePaymentPresentation({
+    fetch: paymentFetch,
+    escrowStatus: escrow?.status,
+    paymentStatus,
+  })
+
   const handleDeposit = async () => {
+    // Disabled UI is not an authorization boundary; re-check before acting so a
+    // stale render cannot fire a payment for a market that is no longer valid.
+    if (!canSubmitPayment(paymentPresentation, 'online')) {
+      Alert.alert(t('common.error'), paymentPresentation.marketError || 'Online payment is not available for this job.')
+      return
+    }
     setActionLoading('escrow')
     try {
       const payment = await v2Payments.start(id)
@@ -98,6 +149,10 @@ export default function V2ConfirmBookingScreen() {
   }
 
   const handleCash = () => {
+    if (!canSubmitPayment(paymentPresentation, 'cash')) {
+      Alert.alert(t('common.error'), paymentPresentation.marketError || 'Cash payment is not available for this job.')
+      return
+    }
     Alert.alert(
       'Use Cash Payment?',
       'Cash is paid directly to the provider and is not held by MaintainEX. The provider platform amount is recorded separately after completion.',
@@ -138,6 +193,22 @@ export default function V2ConfirmBookingScreen() {
 
   const acceptedQuote = job?.quotes?.find((q: any) => q.status === 'ACCEPTED')
 
+  // Phase 03: never hardcode LKR. Use the recorded currency, and show none when
+  // it is genuinely unknown rather than mislabelling a Vancouver booking.
+  const displayCurrency = resolveDisplayCurrency({
+    escrowCurrency: escrow?.currency,
+    quoteCurrency: acceptedQuote?.currency,
+  })
+
+  const onlineUnavailableNotice = (
+    <View style={[styles.ctaBtn, styles.onlineUnavailable, actionLoading !== '' && { opacity: 0.6 }]}>
+      <Text style={styles.ctaText}>Online payment is not available</Text>
+      <Text style={styles.onlineUnavailableText}>
+        Pay securely with cash directly to your provider.
+      </Text>
+    </View>
+  )
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -162,7 +233,9 @@ export default function V2ConfirmBookingScreen() {
                 <Text style={styles.providerName}>{acceptedQuote.provider?.name || t('jobDetail.provider')}</Text>
                 <Text style={styles.providerType}>{acceptedQuote.providerType}</Text>
               </View>
-              <Text style={styles.providerPrice}>LKR {acceptedQuote.price.toLocaleString()}</Text>
+              <Text style={styles.providerPrice}>
+                {displayCurrency ? `${displayCurrency} ` : ''}{acceptedQuote.price.toLocaleString()}
+              </Text>
             </View>
           </View>
         )}
@@ -189,7 +262,8 @@ export default function V2ConfirmBookingScreen() {
           </View>
           <Text style={styles.freezeLabel}>{t('wallet.balance')}</Text>
           <Text style={styles.freezeAmount}>
-            {escrow?.currency || 'LKR'} {(escrow?.totalAmount || acceptedQuote?.price || job?.budgetAmount || 0).toLocaleString()}
+            {displayCurrency ? `${displayCurrency} ` : ''}
+            {(escrow?.totalAmount || acceptedQuote?.price || job?.budgetAmount || 0).toLocaleString()}
           </Text>
           <Text style={styles.freezeDesc}>
             {escrow?.status === 'CASH_CONFIRMED'
@@ -197,44 +271,71 @@ export default function V2ConfirmBookingScreen() {
               : t('booking.escrowInfo')}
           </Text>
 
-          {escrow?.status === 'PENDING_PAYMENT' && !['REFUND_REQUIRED', 'CHARGEDBACK'].includes(paymentStatus || '') && (
+          {paymentPresentation.canShowActions && (
             <>
               {onlinePaymentAvailable ? (
+                paymentPresentation.canPayOnline ? (
+                  <TouchableOpacity
+                    style={[styles.ctaBtn, actionLoading !== '' && { opacity: 0.6 }]}
+                    onPress={handleDeposit}
+                    disabled={actionLoading !== ''}
+                    activeOpacity={0.8}
+                  >
+                    {actionLoading === 'escrow' ? (
+                      <ActivityIndicator color={CANVAS} />
+                    ) : (
+                      <Text style={styles.ctaText}>
+                        {paymentStatus === 'PENDING' ? 'Continue Secure Payment' : 'Pay Securely with PayPal'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  onlineUnavailableNotice
+                )
+              ) : (
+                onlineUnavailableNotice
+              )}
+              {paymentPresentation.canPayCash && (
                 <TouchableOpacity
-                  style={[styles.ctaBtn, actionLoading !== '' && { opacity: 0.6 }]}
-                  onPress={handleDeposit}
+                  style={[styles.ctaBtn, styles.cashBtn, actionLoading !== '' && { opacity: 0.6 }]}
+                  onPress={handleCash}
                   disabled={actionLoading !== ''}
                   activeOpacity={0.8}
                 >
-                  {actionLoading === 'escrow' ? (
+                  {actionLoading === 'cash' ? (
                     <ActivityIndicator color={CANVAS} />
                   ) : (
-                    <Text style={styles.ctaText}>
-                      {paymentStatus === 'PENDING' ? 'Continue Secure Payment' : 'Pay Securely with PayPal'}
-                    </Text>
+                    <Text style={[styles.ctaText, styles.cashBtnText]}>Use Cash Instead</Text>
                   )}
                 </TouchableOpacity>
-              ) : (
+              )}
+              {paymentPresentation.notice === 'NO_METHODS' && (
                 <View style={[styles.ctaBtn, styles.onlineUnavailable, actionLoading !== '' && { opacity: 0.6 }]}>
-                  <Text style={styles.ctaText}>Online payment is not available</Text>
+                  <Text style={styles.ctaText}>No payment method is available</Text>
                   <Text style={styles.onlineUnavailableText}>
-                    Pay securely with cash directly to your provider.
+                    Contact support to settle this booking.
                   </Text>
                 </View>
               )}
-              <TouchableOpacity
-                style={[styles.ctaBtn, styles.cashBtn, actionLoading !== '' && { opacity: 0.6 }]}
-                onPress={handleCash}
-                disabled={actionLoading !== ''}
-                activeOpacity={0.8}
-              >
-                {actionLoading === 'cash' ? (
-                  <ActivityIndicator color={CANVAS} />
-                ) : (
-                  <Text style={[styles.ctaText, styles.cashBtnText]}>Use Cash Instead</Text>
-                )}
-              </TouchableOpacity>
             </>
+          )}
+
+          {paymentPresentation.notice === 'INVALID_MARKET' && (
+            <View style={[styles.ctaBtn, styles.onlineUnavailable]}>
+              <Text style={styles.ctaText}>Payment is not available for this job</Text>
+              <Text style={styles.onlineUnavailableText}>
+                {paymentPresentation.marketError || 'This service address is outside the supported payment markets.'}
+              </Text>
+            </View>
+          )}
+
+          {paymentPresentation.notice === 'UNAVAILABLE' && (
+            <View style={[styles.ctaBtn, styles.onlineUnavailable]}>
+              <Text style={styles.ctaText}>Payment options could not be loaded</Text>
+              <Text style={styles.onlineUnavailableText}>
+                Pull down to retry before choosing a payment method.
+              </Text>
+            </View>
           )}
 
           {escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) && (

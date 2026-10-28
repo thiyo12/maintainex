@@ -49,11 +49,11 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     serviceTemplateId = `${prefix}-st`
 
     await prisma.jobCategory.create({
-      data: { id: categoryId, name: `${prefix} Services`, slug: prefix, iconName: 'wrench', colorHex: '#FF0000', countries: 'LK', isActive: true },
+      data: { id: categoryId, name: `${prefix} Services`, slug: prefix, iconName: 'wrench', colorHex: '#FF0000', countries: '["LK"]', isActive: true },
     })
 
     await prisma.templateJob.create({
-      data: { id: templateJobId, name: 'Integration Test Service', description: 'Full lifecycle test', categoryId, priceMin: 1000, priceMax: 5000, whatIsIncluded: 'Everything', typicalDurationMinutes: 60, countries: 'LK' },
+      data: { id: templateJobId, name: 'Integration Test Service', description: 'Full lifecycle test', categoryId, priceMin: 1000, priceMax: 5000, whatIsIncluded: 'Everything', typicalDurationMinutes: 60, countries: '["LK"]' },
     })
 
     await prisma.serviceTemplate.create({
@@ -82,7 +82,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
         userId: companyOwnerId,
         companyName: `${prefix} Corp`,
         services: '[]',
-        serviceAreas: '["Colombo"]',
+        serviceAreas: '["Colombo","Kandy","Galle"]',
         isVerified: true,
         verificationStatus: 'VERIFIED',
         subscriptionStatus: 'ACTIVE',
@@ -103,7 +103,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     await prisma.$executeRawUnsafe(
       `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
        VALUES ($1, $1, 'CUSTOMER', 10000000, 10000000, 0, 1, NOW(), NOW())
-       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = 10000000, "availableBalance" = 10000000`,
+       ON CONFLICT ("walletType", "walletId", "currency") DO UPDATE SET "balance" = 10000000, "availableBalance" = 10000000`,
       custWallet.id
     )
 
@@ -131,6 +131,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
       timeSlot: 'morning',
       address: '123 Test St',
       district: 'Colombo',
+      countryCode: 'LK',
     })
 
     expect(bookResult.job).toBeTruthy()
@@ -264,6 +265,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
       timeSlot: 'afternoon',
       address: '456 Corp Ave',
       district: 'Kandy',
+      countryCode: 'LK',
     })
 
     expect(bookResult.job).toBeTruthy()
@@ -389,6 +391,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
       timeSlot: 'evening',
       address: '789 Dispute Ln',
       district: 'Galle',
+      countryCode: 'LK',
     })
     jobIds.push(bookResult.job.id)
 

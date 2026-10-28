@@ -32,8 +32,15 @@ import {
 import { CrmModal } from '@/components/crm/v2/CrmOverlays'
 import { crmApiError } from '@/lib/crm/api-error'
 
-type Tab = 'services' | 'categories' | 'templates'
-type CreateType = 'category' | 'service'
+type Tab = 'services' | 'categories' | 'templates' | 'v2jobs' | 'v2categories'
+type CreateType = 'category' | 'service' | 'jobCategory' | 'templateJob'
+
+const LABEL: Record<CreateType, string> = {
+  category: 'Category',
+  service: 'Service',
+  jobCategory: 'V2 category',
+  templateJob: 'V2 job',
+}
 
 interface CategoryRow {
   id: string
@@ -91,6 +98,19 @@ interface Payload {
     slug: string
     countries: string[]
     isActive: boolean
+    _count?: { jobs: number; serviceTemplates: number }
+  }>
+  // Canonical V2 catalogue. These are the records the website and mobile apps read.
+  templateJobs: Array<{
+    id: string
+    categoryId: string
+    name: string
+    description: string
+    currency: string
+    priceMin: number
+    priceMax: number
+    countries: string[]
+    isActive: boolean
   }>
 }
 
@@ -104,11 +124,26 @@ interface CreateForm {
   isActive: boolean
 }
 
+// The CRM API stores canonical entity markets as JSON text; normalize them
+// before rendering lists or checking whether a parent category serves a market.
+function readMarkets(value: unknown): string[] {
+  let raw: unknown = value
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw) } catch { return [] }
+  }
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((item): item is string => typeof item === 'string')
+    .map(item => item.trim().toUpperCase())
+    .filter(item => item === 'LK' || item === 'CA')
+}
+
 const EMPTY: Payload = {
   categories: [],
   services: [],
   templates: [],
   jobCategories: [],
+  templateJobs: [],
 }
 
 const EMPTY_FORM: CreateForm = {
@@ -162,7 +197,12 @@ export default function CatalogManagementPage() {
         categories: body.categories || [],
         services: body.services || [],
         templates: body.templates || [],
-        jobCategories: body.jobCategories || [],
+        jobCategories: Array.isArray(body.jobCategories)
+          ? body.jobCategories.map((item: any) => ({ ...item, countries: readMarkets(item.countries) }))
+          : [],
+        templateJobs: Array.isArray(body.templateJobs)
+          ? body.templateJobs.map((item: any) => ({ ...item, countries: readMarkets(item.countries) }))
+          : [],
       })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load catalog')
@@ -185,6 +225,8 @@ export default function CatalogManagementPage() {
     const list =
       tab === 'services' ? data.services :
       tab === 'categories' ? data.categories :
+      tab === 'v2jobs' ? data.templateJobs :
+      tab === 'v2categories' ? data.jobCategories :
       data.templates
 
     const normalized = query.trim().toLowerCase()
@@ -195,6 +237,7 @@ export default function CatalogManagementPage() {
         item.name,
         item.slug,
         item.countryCode,
+        Array.isArray(item.countries) ? item.countries.join(' ') : '',
         item.category?.name,
         item.jobCategory?.name,
         item.pricingMode,
@@ -205,9 +248,11 @@ export default function CatalogManagementPage() {
   const activeCount =
     data.categories.filter(item => item.isActive).length +
     data.services.filter(item => item.isActive).length +
-    data.templates.filter(item => item.isActive).length
+    data.templates.filter(item => item.isActive).length +
+    data.jobCategories.filter(item => item.isActive).length +
+    data.templateJobs.filter(item => item.isActive).length
 
-  async function toggle(type: 'category' | 'service' | 'template', item: any) {
+  async function toggle(type: 'category' | 'service' | 'template' | 'jobCategory' | 'templateJob', item: any) {
     if (!canPublish) return
 
     setBusy(item.id)
@@ -250,7 +295,7 @@ export default function CatalogManagementPage() {
       toast.error('Name is required')
       return
     }
-    if (createType === 'service' && !form.categoryId) {
+    if ((createType === 'service' || createType === 'templateJob') && !form.categoryId) {
       toast.error('Select a category')
       return
     }
@@ -258,7 +303,32 @@ export default function CatalogManagementPage() {
     setBusy('create')
     try {
       const payload =
-        createType === 'category'
+        createType === 'jobCategory'
+          ? {
+              type: 'jobCategory',
+              name: form.name.trim(),
+              slug: form.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+              countries: [form.countryCode],
+              iconName: 'wrench',
+              colorHex: '#666666',
+              // Creating never publishes: publication is a separate decision.
+              isActive: canPublish && form.isActive === true,
+            }
+          : createType === 'templateJob'
+            ? {
+                type: 'templateJob',
+                name: form.name.trim(),
+                description: form.description.trim(),
+                categoryId: form.categoryId,
+                countries: [form.countryCode],
+                // Sri Lankan and Canadian pricing are independent; never derive
+                // one market's price from the other.
+                currency: form.countryCode === 'CA' ? 'CAD' : 'LKR',
+                priceMin: Number(form.price),
+                priceMax: Number(form.price),
+                isActive: canPublish && form.isActive === true,
+              }
+            : createType === 'category'
           ? {
               type: 'category',
               name: form.name.trim(),
@@ -288,8 +358,8 @@ export default function CatalogManagementPage() {
 
       toast.success(
         canPublish && form.isActive
-          ? `${createType === 'category' ? 'Category' : 'Service'} created and published`
-          : `${createType === 'category' ? 'Category' : 'Service'} created as inactive draft`
+          ? `${LABEL[createType]} created and published`
+          : `${LABEL[createType]} created as inactive draft`
       )
       setShowCreate(false)
       await load()
@@ -301,7 +371,8 @@ export default function CatalogManagementPage() {
   }
 
   if (!canView && user) {
-    return (
+  
+  return (
       <CrmState
         type="permission"
         title="Catalog access required"
@@ -403,6 +474,8 @@ export default function CatalogManagementPage() {
             { id: 'services', label: 'Services', count: data.services.length },
             { id: 'categories', label: 'Categories', count: data.categories.length },
             { id: 'templates', label: 'Templates', count: data.templates.length },
+            { id: 'v2jobs', label: 'V2 jobs', count: data.templateJobs.length },
+            { id: 'v2categories', label: 'V2 categories', count: data.jobCategories.length },
           ]}
           active={tab}
           onChange={id => setTab(id as Tab)}
@@ -430,8 +503,17 @@ export default function CatalogManagementPage() {
         />
       ) : (
         <CrmTableFrame
-          title={tab === 'services' ? 'Services' : tab === 'categories' ? 'Categories' : 'Service templates'}
-          description="Current market-scoped catalog records."
+          title={
+            tab === 'services' ? 'Services (legacy)' :
+            tab === 'categories' ? 'Categories (legacy)' :
+            tab === 'v2jobs' ? 'V2 catalogue jobs' :
+            tab === 'v2categories' ? 'V2 job categories' : 'Service templates'
+          }
+          description={
+            tab === 'v2jobs' || tab === 'v2categories'
+              ? 'Canonical JobCategory and TemplateJob records used by the website and mobile apps.'
+              : 'Current market-scoped catalog records.'
+          }
         >
           <table className={crmTableClass}>
             <thead>
@@ -448,6 +530,8 @@ export default function CatalogManagementPage() {
                 const type =
                   tab === 'services' ? 'service' :
                   tab === 'categories' ? 'category' :
+                  tab === 'v2jobs' ? 'templateJob' :
+                  tab === 'v2categories' ? 'jobCategory' :
                   'template'
 
                 const detail =
@@ -455,7 +539,11 @@ export default function CatalogManagementPage() {
                     ? `${item.category?.name || 'Uncategorised'} · ${item.price ?? 0} · ${item.duration ?? 0} min`
                     : tab === 'categories'
                       ? `${item._count?.services || 0} services · order ${item.displayOrder ?? 0}`
-                      : `${item.jobCategory?.name || 'No job category'} · ${String(item.pricingMode || 'UNSET').replaceAll('_', ' ')}`
+                      : tab === 'v2jobs'
+                        ? `${item.currency || ''} ${item.priceMin ?? 0}–${item.priceMax ?? 0} · ${(item.countries || []).join('/') || 'No market'} · canonical V2 job`
+                        : tab === 'v2categories'
+                          ? `${item._count?.jobs ?? 0} V2 jobs · ${item._count?.serviceTemplates ?? 0} service templates`
+                          : `${item.jobCategory?.name || 'No job category'} · ${String(item.pricingMode || 'UNSET').replaceAll('_', ' ')}`
 
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/70">
@@ -464,7 +552,7 @@ export default function CatalogManagementPage() {
                       <div className="mt-1 text-[11px] text-slate-400">{item.slug || item.id}</div>
                     </td>
                     <td className={crmTdClass}>
-                      <CrmBadge tone="info">{item.countryCode || 'MULTI'}</CrmBadge>
+                      <CrmBadge tone="info">{tab === 'v2jobs' || tab === 'v2categories' ? (item.countries?.join(' / ') || 'Unknown') : (item.countryCode || 'Unknown')}</CrmBadge>
                     </td>
                     <td className={crmTdClass}>
                       <div className="max-w-[360px] text-xs text-slate-500">{detail}</div>
@@ -529,8 +617,10 @@ export default function CatalogManagementPage() {
         <div className="space-y-4">
           <CrmTabs
             items={[
-              { id: 'service', label: 'Service' },
-              { id: 'category', label: 'Category' },
+              { id: 'service', label: 'Service (legacy)' },
+              { id: 'category', label: 'Category (legacy)' },
+              { id: 'jobCategory', label: 'V2 category' },
+              { id: 'templateJob', label: 'V2 job' },
             ]}
             active={createType}
             onChange={id => setCreateType(id as CreateType)}
@@ -572,6 +662,36 @@ export default function CatalogManagementPage() {
               ))}
             </select>
           </CrmField>
+
+          {createType === 'templateJob' && (
+            <>
+              <CrmField label="V2 job category">
+                <select
+                  value={form.categoryId}
+                  onChange={event => setForm(current => ({ ...current, categoryId: event.target.value }))}
+                  className={crmInputClass}
+                >
+                  <option value="">Select V2 category</option>
+                  {data.jobCategories
+                    .filter(category => category.countries.includes(form.countryCode))
+                    .map(category => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                </select>
+              </CrmField>
+              <CrmField label={`Indicative price (${form.countryCode === 'CA' ? 'CAD' : 'LKR'})`}>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.price}
+                  onChange={event => setForm(current => ({ ...current, price: event.target.value }))}
+                  className={crmInputClass}
+                />
+              </CrmField>
+              <p className="text-xs text-slate-500">New V2 jobs start inactive. Review local pricing before publishing.</p>
+            </>
+          )}
 
           {createType === 'service' && (
             <>

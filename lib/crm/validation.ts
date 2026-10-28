@@ -48,7 +48,7 @@ export const customerTagSchema = z.object({
 export const customerSegmentSchema = z.object({
   name: z.string().min(2).max(100),
   description: z.string().max(500).optional(),
-  criteria: z.record(z.any()),
+  criteria: z.record(z.string(), z.any()),
   type: z.enum(['DYNAMIC', 'STATIC']).default('DYNAMIC'),
 })
 

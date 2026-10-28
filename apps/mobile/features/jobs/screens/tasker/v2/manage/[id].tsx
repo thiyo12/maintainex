@@ -13,6 +13,7 @@ import type { V2Job } from '@/api/v2-types'
 import { getAuthToken } from '@/api/token'
 import NewChatModal from '@/features/messaging/components/NewChatModal'
 import * as Location from 'expo-location'
+import JobSafetyCentre from '@/features/safety/components/JobSafetyCentre'
 
 export default function V2ProviderManageJobScreen() {
   const { t } = useTranslation()
@@ -249,6 +250,10 @@ export default function V2ProviderManageJobScreen() {
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        {['QUOTE_ACCEPTED', 'ESCROW_DEPOSITED', 'IN_PROGRESS', 'COMPLETION_PENDING',
+          'COMPLETED', 'DISPUTED', 'CANCELLED'].includes(job.status) ? (
+          <JobSafetyCentre jobId={id} countryCode={job.countryCode} />
+        ) : null}
         {isAccepted ? (
           <>
             <View style={styles.mapStage}>

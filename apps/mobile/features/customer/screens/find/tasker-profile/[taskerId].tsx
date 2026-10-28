@@ -36,7 +36,7 @@ export default function ProviderProfile() {
     setError(false)
     try {
       const [provider, service] = await Promise.all([
-        taskers.get(taskerId),
+        taskers.get(taskerId, jobId),
         jobId ? templateJobs.get(jobId).catch(() => null) : Promise.resolve(null),
       ])
       setTasker(provider)
@@ -55,6 +55,10 @@ export default function ProviderProfile() {
   const specialty = tasker?.skills?.[0] || tasker?.specialty || tasker?.category || 'MaintainEX professional'
   const reviews = Array.isArray(tasker?.reviews) ? tasker.reviews : []
   const featuredReview = reviews[0]
+  // Phase 03: a REDUCED response hides reviews for privacy. That must never be
+  // reported to the customer as "this provider has no reviews".
+  const reviewsHidden = tasker?.visibility === 'REDUCED'
+  const reviewsAvailable = !reviewsHidden && reviews.length > 0
   const rating = Number(tasker?.rating || 0)
   const jobs = Number(tasker?.completedJobs || tasker?.jobsCompleted || 0)
 
@@ -156,11 +160,16 @@ export default function ProviderProfile() {
 
         <Text style={styles.sectionTitle}>Recent customer feedback</Text>
         <View style={styles.feedbackCard}>
-          {featuredReview ? (
+          {reviewsAvailable && featuredReview ? (
             <>
               <Text style={styles.stars}>{'★'.repeat(Math.max(1, Math.min(5, Number(featuredReview.rating || 5))))}</Text>
               <Text style={styles.feedbackText}>“{featuredReview.comment || 'Completed the job professionally.'}”</Text>
               <Text style={styles.feedbackMeta}>{featuredReview.serviceName || job?.name || specialty}{featuredReview.createdAt ? ` · ${new Date(featuredReview.createdAt).toLocaleDateString()}` : ''}</Text>
+            </>
+          ) : reviewsHidden ? (
+            <>
+              <Text style={styles.feedbackText}>Customer feedback is not shown for this listing.</Text>
+              <Text style={styles.feedbackMeta}>{jobs} completed jobs on MaintainEX</Text>
             </>
           ) : (
             <>

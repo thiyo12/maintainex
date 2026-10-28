@@ -1,7 +1,7 @@
 import { secureConsole } from '@/lib/shared/observability/secure-console'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 
 export async function GET(
   _request: NextRequest,
@@ -11,6 +11,8 @@ export async function GET(
     const { id } = await params
     const user = await authenticateRequest(_request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
@@ -35,11 +37,24 @@ export async function GET(
         where: {
           jobId: job.id,
           companyId: quote.providerId,
-          status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+          // An offer or unaccepted assignment must never enable GPS sharing.
+          status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
         },
         select: { workerUserId: true },
       })
-      providerUserId = assignment?.workerUserId ?? null
+      // Workers removed from a company lose job tracking permission even
+      // when an old job assignment remains in the database.
+      const activeWorker = assignment
+        ? await prisma.teamMember.findFirst({
+            where: {
+              companyId: quote.providerId,
+              userId: assignment.workerUserId,
+              status: 'ACTIVE',
+            },
+            select: { id: true },
+          })
+        : null
+      providerUserId = activeWorker ? assignment!.workerUserId : null
 
       if (providerUserId === user.id) {
         isAcceptedProvider = true
@@ -69,7 +84,10 @@ export async function GET(
       }),
     ])
 
+    // Stale workspace/escrow rows cannot reopen real-time tracking after
+    // the authoritative job closes, cancels, completes or enters a dispute.
     const sharing =
+      (job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS') &&
       !!protectedEscrow &&
       (workspace?.progressStatus === 'ACCEPTED' || workspace?.progressStatus === 'IN_PROGRESS')
 

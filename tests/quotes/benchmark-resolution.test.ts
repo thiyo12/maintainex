@@ -47,8 +47,8 @@ describe('Phase 10.3 — Benchmark Resolution', () => {
             minimumObservedCents: 500000n,
             maximumObservedCents: 2500000n,
             sourceType: 'MANUAL_MARKET_RESEARCH',
-            sourceReference: null,
-            methodologyNote: null,
+            sourceReference: 'https://market.example/lk-pricing-observations',
+            methodologyNote: 'Collected verified Sri Lankan market observations and normalized each price to the same service scope.',
             status: 'PUBLISHED',
             version: 1,
             effectiveFrom: null,
@@ -91,8 +91,8 @@ describe('Phase 10.3 — Benchmark Resolution', () => {
               minimumObservedCents: 400000n,
               maximumObservedCents: 2000000n,
               sourceType: 'MANUAL_MARKET_RESEARCH',
-              sourceReference: null,
-              methodologyNote: null,
+              sourceReference: 'https://market.example/lk-pricing-observations',
+              methodologyNote: 'Collected verified Sri Lankan market observations and normalized each price to the same service scope.',
               status: 'PUBLISHED',
               version: 1,
               effectiveFrom: null,
@@ -136,8 +136,8 @@ describe('Phase 10.3 — Benchmark Resolution', () => {
               minimumObservedCents: 300000n,
               maximumObservedCents: 1800000n,
               sourceType: 'MANUAL_MARKET_RESEARCH',
-              sourceReference: null,
-              methodologyNote: null,
+              sourceReference: 'https://market.example/lk-pricing-observations',
+              methodologyNote: 'Collected verified Sri Lankan market observations and normalized each price to the same service scope.',
               status: 'PUBLISHED',
               version: 1,
               effectiveFrom: null,
@@ -213,8 +213,8 @@ describe('Phase 10.3 — Benchmark Resolution', () => {
             minimumObservedCents: 400000n,
             maximumObservedCents: 2000000n,
             sourceType: 'MANUAL_MARKET_RESEARCH',
-            sourceReference: null,
-            methodologyNote: null,
+            sourceReference: 'https://market.example/lk-pricing-observations',
+            methodologyNote: 'Collected verified Sri Lankan market observations and normalized each price to the same service scope.',
             status: 'PUBLISHED',
             version: 2,
             effectiveFrom: null,
@@ -249,8 +249,8 @@ describe('Phase 10.3 — Benchmark Resolution', () => {
             minimumObservedCents: 400000n,
             maximumObservedCents: 1500000n,
             sourceType: 'MANUAL_MARKET_RESEARCH',
-            sourceReference: null,
-            methodologyNote: null,
+            sourceReference: 'https://market.example/lk-pricing-observations',
+            methodologyNote: 'Collected verified Sri Lankan market observations and normalized each price to the same service scope.',
             status: 'PUBLISHED',
             version: 1,
             effectiveFrom: null,
@@ -262,7 +262,9 @@ describe('Phase 10.3 — Benchmark Resolution', () => {
       const low = await resolveBenchmark(makeClientWithSample(3), {
         serviceTemplateId: 'st-1', countryCode: 'LK', currency: 'LKR', pricingMode: 'SMART_QUOTE',
       })
-      expect(low?.confidence).toBe('LOW')
+      // Three samples fall below the publication threshold; do not present
+      // inadequate evidence as even a low-confidence market benchmark.
+      expect(low).toBeNull()
 
       const medium = await resolveBenchmark(makeClientWithSample(15), {
         serviceTemplateId: 'st-1', countryCode: 'LK', currency: 'LKR', pricingMode: 'SMART_QUOTE',

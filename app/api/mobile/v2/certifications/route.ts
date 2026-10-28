@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const certs = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
       `SELECT * FROM "Certification" WHERE "holderType" = 'INDIVIDUAL' AND "holderId" = $1 ORDER BY "createdAt" DESC`,

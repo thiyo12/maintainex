@@ -67,7 +67,8 @@ export async function POST(request: NextRequest) {
         message.includes('already assigned') ||
         message.includes('already the active assignee') ||
         message.includes('No active worker assignment exists') ||
-        message.includes('Cannot reassign')
+        message.includes('Cannot reassign') ||
+        message.includes('arrival PIN verification')
 
       return NextResponse.json(
         { error: message, reasons: result.reasons },

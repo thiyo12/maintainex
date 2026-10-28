@@ -18,9 +18,20 @@ describe('Phase 7 — Pricing Engine (DB)', () => {
   let testTemplateJobId: string
   let testServiceTemplateId: string
   let testJobId: string
+  let previousMarket: { commissionRateBps: number; urgentModifierBps: number; emergencyModifierBps: number } | null
 
   beforeAll(async () => {
     const ts = Date.now()
+    previousMarket = await prisma.marketConfig.findUnique({
+      where: { countryCode: 'LK' },
+      select: { commissionRateBps: true, urgentModifierBps: true, emergencyModifierBps: true },
+    })
+    const rates = { commissionRateBps: 1000, urgentModifierBps: 2500, emergencyModifierBps: 5000 }
+    await prisma.marketConfig.upsert({
+      where: { countryCode: 'LK' },
+      create: { countryCode: 'LK', defaultCurrency: 'LKR', ...rates },
+      update: rates,
+    })
 
     const category = await prisma.jobCategory.create({
       data: { name: `PE Test Category ${ts}`, slug: `pe-test-cat-${ts}`, isActive: true, sortOrder: 0, iconName: 'wrench', colorHex: '#000000', countries: '["LK"]' },
@@ -78,6 +89,11 @@ describe('Phase 7 — Pricing Engine (DB)', () => {
   })
 
   afterAll(async () => {
+    if (previousMarket) {
+      await prisma.marketConfig.update({ where: { countryCode: 'LK' }, data: previousMarket })
+    } else {
+      await prisma.marketConfig.deleteMany({ where: { countryCode: 'LK' } })
+    }
     await prisma.marketplaceJob.delete({ where: { id: testJobId } }).catch(() => {})
     await prisma.serviceTemplate.delete({ where: { id: testServiceTemplateId } }).catch(() => {})
     await prisma.templateJob.delete({ where: { id: testTemplateJobId } }).catch(() => {})

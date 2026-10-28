@@ -1,0 +1,184 @@
+name: International Fast Gates
+
+on:
+  pull_request:
+    branches: [main, feature/international-launch-12phase]
+    paths:
+      - 'app/**'
+      - 'apps/mobile/**'
+      - 'lib/**'
+      - 'tests/**'
+      - 'scripts/international-provider-coverage-audit.sh'
+      - 'prisma/**'
+      - '.github/workflows/international-fast-gates.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-typecheck:
+    name: mobile-typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Install mobile dependencies
+        run: npm ci --prefix apps/mobile
+      - name: Mobile TypeScript
+        run: |
+          set -o pipefail
+          cd apps/mobile
+          npx tsc --noEmit 2>&1 | tee /tmp/mobile-tsc.txt
+      - name: Upload compiler diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mobile-tsc-diagnostics
+          path: /tmp/mobile-tsc.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
+  work-start-guard:
+    name: work-start-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install web dependencies
+        run: npm ci
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Market-isolation smoke self-test
+        run: node scripts/international-catalogue-smoke.mjs --self-test
+      - name: Fast authorization and launch-evidence regressions
+        run: |
+          npx vitest run \
+            tests/auth/work-start-auth.test.ts \
+            tests/security/phase07-company-work-start-authorization.test.ts \
+            tests/security/phase04-company-profile-market-write.test.ts \
+            tests/security/phase04-tasker-service-market.test.ts \
+            tests/security/phase04-service-template-market-integrity.test.ts \
+            tests/security/phase04-profession-market-authority.test.ts \
+            tests/security/phase04-tasker-skill-save-payload.test.ts \
+            tests/security/phase04-profession-skill-status-eligibility.test.ts \
+            tests/security/phase04-profession-requirement-active-eligibility.test.ts \
+            tests/security/phase04-company-catalogue-write-validation.test.ts \
+            tests/security/phase07-company-workspace-authorization.test.ts \
+            tests/security/phase07-safety-report-separation.test.ts \
+            tests/security/phase07-job-detail-company-membership.test.ts \
+            tests/security/phase07-company-quote-assignment-visibility.test.ts \
+            tests/security/phase07-accepted-provider-coordinate-privacy.test.ts \
+            tests/security/phase07-company-commercial-history-access.test.ts \
+            tests/security/phase07-company-evidence-membership.test.ts \
+            tests/security/phase07-company-inspection-read-access.test.ts \
+            tests/catalog/phase01-job-creation-market-integrity.test.ts \
+            tests/catalog/catalog-integrity.test.ts \
+            tests/domain/catalog-inventory.test.ts \
+            tests/domain/phase01-book-now-catalogue-market.test.ts \
+            tests/geography/phase02-book-now-district-authority.test.ts \
+            tests/geography/phase02-book-now-domain-market.test.ts \
+            tests/geography/phase02-location-picker-market-fallback.test.ts \
+            tests/geography/launch-location-data.test.ts \
+            tests/geography/phase02-tasker-gps-validation.test.ts \
+            tests/geography/phase02-provider-live-tracking-privacy.test.ts \
+            tests/catalog/proposed-expansion.test.ts \
+            tests/domain/catalog-provider-associations.test.ts \
+            tests/geography/phase02-incomplete-coordinate-market.test.ts \
+            tests/security/phase03-empty-market-category-search.test.ts \
+            tests/security/phase03-provider-profile-job-ownership.test.ts \
+            tests/security/phase03-tasker-directory-private-data.test.ts \
+            tests/security/phase03-find-tasker-browse-market.test.ts \
+            tests/security/phase03-tasker-directory-category-filter.test.ts \
+            tests/security/phase03-postgres-fixture-cleanup.test.ts \
+            tests/integration/phase11-orphan-audit-diagnostics.test.ts \
+            tests/integration/phase11-payment-fixture-dependency-cleanup.test.ts \
+            tests/matching/phase03-legacy-provider-gps-eligibility.test.ts \
+            tests/matching/phase03-eligibility-authoritative-job-market.test.ts \
+            tests/quotes/inspection-company-membership.test.ts \
+            tests/security/phase07-company-change-order-read-access.test.ts \
+            tests/security/phase07-company-change-order-staff-revocation.test.ts \
+            tests/matching/phase03-known-area-failclosed-contract.test.ts \
+            tests/structural/deployment-safety.test.ts \
+            tests/admin/pdf-generation.test.ts \
+            tests/security/phase11-crm-catalogue-fixture-cleanup.test.ts \
+            tests/pricing/phase06-mobile-bargain-market.test.ts \
+            tests/pricing/phase06-quote-review-payment-boundary.test.ts \
+            tests/pricing/phase10-canonical-payment-choice-boundary.test.ts \
+            tests/security/phase07-safety-quick-exit-contract.test.ts \
+            tests/security/phase04-company-profile-owner-reactivation.test.ts \
+            tests/security/phase04-worker-booking-acceptance.test.ts \
+            tests/security/phase04-workforce-actor-commit-authorization.test.ts \
+            tests/security/phase04-workforce-route-export.test.ts \
+            tests/security/phase04-dispatch-booking-requirement-race.test.ts \
+            tests/security/phase04-crew-pin-and-reassignment-boundary.test.ts \
+            tests/security/phase07-company-work-start-authorization.test.ts \
+            tests/security/phase04-company-assignment-detail-access.test.ts \
+            tests/security/phase04-company-team-dispatch-contract.test.ts \
+            tests/security/phase04-crew-readiness-preview.test.ts \
+            tests/security/phase04-crew-transaction-commit-gate.test.ts \
+            tests/security/phase04-crew-worker-lifecycle.test.ts \
+            tests/security/phase04-crew-workforce-atomic.test.ts \
+            tests/security/phase04-crew-financial-activation-boundary.test.ts \
+            tests/security/phase04-crew-pin-epoch.test.ts \
+            tests/security/phase04-crew-pin-consume.test.ts \
+            tests/security/phase04-crew-pin-issue.test.ts \
+            tests/security/phase04-crew-pin-claims.test.ts \
+            tests/security/phase04-crew-presence-witness.test.ts \
+            tests/security/phase04-crew-presence-record.test.ts \
+            tests/security/phase04-crew-witness-auth-route.test.ts \
+            tests/security/phase04-crew-witness-isolated-db.test.ts \
+            tests/security/phase04-crew-prestart-finance.test.ts \
+            tests/security/phase04-crew-pin-auth-routes.test.ts \
+            tests/security/phase04-crew-pin-dev-api-guard.test.ts \
+            tests/security/phase04-crew-pin-safety-hold.test.ts \
+            tests/security/phase04-crew-safety-review-inventory.test.ts \
+            tests/security/phase04-crm-crew-safety-readonly-route.test.ts \
+            tests/security/phase04-crew-safety-risk-closeout-barrier.test.ts \
+            tests/security/phase04-crew-safety-risk-review-route.test.ts \
+            tests/security/phase04-crew-pin-safety-hold-route.test.ts \
+            tests/security/phase04-patched-http-dependency.test.ts \
+            tests/security/phase04-crew-presence-schema.test.ts \
+            tests/security/phase04-crew-pin-revocation.test.ts \
+            tests/security/phase04-crew-pin-challenge-schema.test.ts \
+            tests/security/phase04-crew-arrival-inventory.test.ts \
+            tests/security/phase04-crew-lifecycle-routes.test.ts \
+            tests/security/phase04-worker-crew-mobile-invitations.test.ts \
+            tests/security/phase04-company-crew-roster-mobile.test.ts \
+            tests/security/phase04-customer-crew-identity-preview.test.ts \
+            tests/security/phase04-crew-identity-decision-route.test.ts \
+            tests/security/phase04-crew-identity-atomic.test.ts \
+            tests/security/phase04-crew-all-member-identity-barrier.test.ts \
+            tests/security/phase04-crew-evidence-route.test.ts \
+            tests/security/phase04-company-crew-evidence-mobile.test.ts \
+            tests/security/phase04-dev-only-crew-staging-mobile.test.ts \
+            tests/security/phase04-customer-crew-photo-mobile.test.ts \
+            tests/security/phase04-crew-schema-foundation.test.ts \
+            tests/security/phase04-crew-readiness-mobile-freshness.test.ts \
+            tests/security/phase04-crew-readiness-route.test.ts \
+            tests/security/phase04-company-worker-exact-job.test.ts \
+            tests/security/phase04-worker-rejection-atomicity.test.ts \
+            tests/security/phase04-assignment-list-pagination.test.ts \
+            tests/security/phase04-revoke-commit-authorization.test.ts \
+            tests/domain/phase04-worker-count.test.ts \
+            tests/security/phase11-inactive-company-owner-matching.test.ts \
+            tests/regions/phase11-provider-coverage-audit-contract.test.ts \
+            --reporter=verbose

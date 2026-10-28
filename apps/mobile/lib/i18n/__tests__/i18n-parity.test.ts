@@ -105,4 +105,16 @@ describe('Locale key parity', () => {
     expect(taKeys).toContain('jobPin.expired')
     expect(siKeys).toContain('jobPin.expired')
   })
+
+  it('Safety Centre and trusted-contact copy is translated in English, Tamil and Sinhala', () => {
+    const keys = ['safetyCentre.open', 'safetyCentre.immediateDanger', 'safetyCentre.reportTitle',
+      'safetyCentre.consent', 'safetyCentre.trustedDescription', 'safetyCentre.quickExitHint']
+    for (const key of keys) {
+      expect(enKeys).toContain(key)
+      expect(taKeys).toContain(key)
+      expect(siKeys).toContain(key)
+    }
+    expect(ta.safetyCentre.open).not.toBe(en.safetyCentre.open)
+    expect(si.safetyCentre.open).not.toBe(en.safetyCentre.open)
+  })
 })

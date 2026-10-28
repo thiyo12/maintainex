@@ -1710,6 +1710,28 @@ const en = {
     adjustmentRequired: 'Please enter a price adjustment',
     noAcceptedQuote: 'No accepted quote found for this job',
   },
+  safetyCentre: {
+    open: 'Safety Centre — report danger or get help', close: 'Close Safety Centre',
+    quickExit: 'Quick exit — return to home', immediateDanger: 'If you are in immediate danger, leave if safe and call emergency services.',
+    noDispatch: 'MaintainEX cannot dispatch responders or guarantee 24/7 monitoring.', localNumber: "Use your phone's emergency dialler for the local emergency number.",
+    reportTitle: 'Report a safety incident (not a payment dispute)',
+    immediateDangerReason: 'Immediate danger', threatReason: 'Threat or harassment', injuryReason: 'Injury',
+    unsafeWorkReason: 'Unsafe work conditions', identityReason: 'Identity mismatch',
+    detailsLabel: 'Safety incident details', detailsPlaceholder: 'What happened and what help do you need?',
+    sendReport: 'Send safety report', closeWithoutReporting: 'Close without reporting',
+    paymentBoundary: 'Payment disputes use a separate process. Safety intake does not place escrow on hold.',
+    trustedTitle: 'Trusted contact',
+    trustedDescription: 'Create a private link that shares booking status, market and scheduled date for up to 24 hours. It never shares the street address, account, payment or incident details.',
+    consent: 'I consent to create a time-limited booking status link and will share it with my trusted contact.',
+    copyLink: 'Copy trusted-contact link', revoke: 'Revoke link now', createLink: 'Create 4-hour status link',
+    expires: 'Expires {{date}}', linkCopied: 'Link copied', shareOnly: 'Share this link only with your trusted contact.',
+    detailsNeededTitle: 'Details needed', detailsNeededBody: 'Describe the safety issue in 10–2000 characters.',
+    recordedTitle: 'Report recorded', recordedBody: 'Staff can review your report. This is not emergency dispatch and does not automatically change a payment.',
+    reportFailedTitle: 'Could not record report', reportFailedBody: 'Check your connection. In immediate danger, call emergency services.',
+    linkFailedTitle: 'Could not create link', revokeFailedTitle: 'Could not revoke link', tryAgain: 'Try again.',
+    diallerTitle: 'Dialler unavailable', diallerBody: 'Call your local emergency services directly.',
+    reference: 'Recorded reference: {{reference}}', quickExitHint: 'Clears unsent details and leaves this screen without a confirmation',
+  },
 }
 
 export default en

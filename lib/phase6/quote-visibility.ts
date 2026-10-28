@@ -43,6 +43,22 @@ export async function resolveQuoteVisibility(
       return { allowedQuoteIds: [], isCustomer: false }
     }
 
+    // Generic quotes:read is historically included in the WORKER role, but
+    // must never reveal unrelated company customer/price information.
+    // Only the worker assigned to this exact job can read its company quote.
+    if (role === 'WORKER') {
+      const assigned = await client.companyJobAssignment.findFirst({
+        where: {
+          jobId,
+          companyId,
+          workerUserId: userId,
+          status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
+        },
+        select: { id: true },
+      })
+      if (!assigned) return { allowedQuoteIds: [], isCustomer: false }
+    }
+
     const companyQuote = await client.jobQuote.findFirst({
       where: { jobId, providerId: companyId, providerType: 'COMPANY' },
       select: { id: true },
