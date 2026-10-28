@@ -269,62 +269,17 @@ Prisma does not support model renames. Workaround:
 
 ---
 
-## Fresh Database Bootstrap
+## Fresh PostgreSQL Database Bootstrap
 
-### Why Bootstrap Is Needed
+The historical Prisma chain contains a timestamp-ordering defect: `20250626000000_add_name_change_cooldown` references `User` before `20260101000000_baseline` creates it. The checked-in baseline procedure handles a clean installation without rewriting historical migrations or altering an existing database's migration records.
 
-The historical migration chain (28 migrations) cannot replay on a completely empty database. Migration `20250626000000_add_name_change_cooldown` references the `User` table before the later-timestamped baseline `20260101000000_baseline` creates it. This is because the baseline was applied during initial setup before migration tracking was established, and subsequent migrations were recorded retrospectively.
+| Database state | Procedure |
+|---|---|
+| Existing development or deployed database | `npx prisma migrate deploy` |
+| Confirmed empty PostgreSQL database | `DATABASE_URL=... bash scripts/bootstrap-fresh-database.sh` |
 
-Production and staging are unaffected: the baseline was applied first during initial deployment, then migrations were tracked in `_prisma_migrations` afterward.
+The fresh bootstrap refuses any public relation or existing `_prisma_migrations` table. It generates and applies the current Prisma schema, applies `prisma/bootstrap/postgresql-invariants.sql` for constraints, triggers, and partial indexes Prisma cannot represent, and only then baselines the historical migration directories. Every `migrate resolve` must succeed. It finishes with `migrate deploy`, `migrate status`, and a successful migration-record count check. It does not offer a switch to skip the empty-database guard or schema application.
 
-### Existing vs. Empty Database
+Resolving historical migrations is legitimate here only because the complete current Prisma schema and the versioned PostgreSQL-only invariants have already been installed on a verified empty database. This operation is not a repair for an existing environment and must never run against a database containing application data. To validate the procedure, run it against a disposable isolated PostgreSQL database and verify both the raw invariants and migration status.
 
-| Scenario | Command |
-|----------|---------|
-| Existing database (production, staging, local dev with data) | `npx prisma migrate deploy` |
-| Completely empty database (new staging, disaster recovery, CI) | `./scripts/bootstrap-fresh-database.sh` |
-
-### Bootstrap Procedure
-
-For a completely empty PostgreSQL database:
-
-```bash
-# 1. Set environment
-export DATABASE_URL="postgresql://user:pass@host:5432/dbname?schema=public"
-
-# 2. Run bootstrap
-./scripts/bootstrap-fresh-database.sh
-```
-
-The script will:
-1. Refuse to run if the database is not empty
-2. Generate the canonical baseline SQL from `prisma/schema.prisma`
-3. Apply it to create all 152 tables
-4. Mark all 28 historical migrations as applied in `_prisma_migrations`
-5. Run `prisma migrate deploy` to verify consistency
-6. Run `prisma migrate status` to confirm schema is up to date
-
-### Disaster Recovery
-
-If production needs to be rebuilt from scratch:
-
-1. Provision empty PostgreSQL database
-2. Run `./scripts/bootstrap-fresh-database.sh` with `DATABASE_URL`
-3. Restore data from `pg_dump` backup (if available)
-4. Verify with `prisma migrate status` → "Database schema is up to date"
-
-### Why Not `prisma db push`?
-
-`prisma db push` is designed for rapid prototyping and does not create migration records. It cannot be used for production bootstrap because:
-- It doesn't track applied changes in `_prisma_migrations`
-- Future `prisma migrate deploy` calls would fail (drift detection)
-- No audit trail of schema changes
-
-### Why Not Rewrite Historical Migrations?
-
-Rewriting or reordering the historical migration files (e.g., moving `20260101000000_baseline` before `20250626000000`) would:
-- Create checksum mismatches in existing `_prisma_migrations` tables
-- Require `prisma migrate resolve` on every existing environment
-- Risk breaking production/staging migration history
-
-The bootstrap approach avoids touching any existing migration files or records.
+The direct historical chain remains unsuitable as the clean-install entry point until the older migration ordering can be corrected without invalidating migration checksums already stored by existing environments. Historical migrations are therefore preserved. Existing databases continue to upgrade with `prisma migrate deploy`; no database data is changed by the documentation or bootstrap code update.

@@ -36,19 +36,18 @@ export async function POST(
     }
 
     const paymentState = await prisma.jobEscrow.findFirst({
-      where: { jobId: id, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
-      select: { paymentMethod: true, status: true },
+      where: { jobId: id, status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] } },
+      select: { paymentMethod: true, status: true, cashCollectionStatus: true },
     })
     if (
       paymentState?.paymentMethod === 'CASH' &&
-      paymentState.status === 'CASH_CONFIRMED'
+      ['CASH_CONFIRMED', 'CASH_SELECTED'].includes(paymentState.status)
     ) {
-      const body = await request.json().catch(() => ({}))
-      if (body.cashPaidConfirmed !== true) {
+      if (paymentState.cashCollectionStatus !== 'CUSTOMER_CONFIRMED') {
         return NextResponse.json(
           {
-            error: 'Confirm that cash was paid to the provider before approving completion.',
-            code: 'CASH_PAYMENT_CONFIRMATION_REQUIRED',
+            error: 'The provider must report the cash received and you must confirm the amount before approving completion.',
+            code: 'CASH_COLLECTION_CONFIRMATION_REQUIRED',
           },
           { status: 400 }
         )

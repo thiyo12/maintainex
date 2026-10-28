@@ -7,23 +7,12 @@ function source(path: string) {
 }
 
 describe('payment webhook hardening', () => {
-  it('PayHere rejects oversized/unsupported/unsigned or wrong-merchant callbacks before payment mutation', () => {
+  it('PayHere webhook is retired and cannot mutate payment records', () => {
     const route = source('app/api/webhooks/payhere/route.ts')
-
-    expect(route).toContain('MAX_BODY_BYTES')
-    expect(route).toContain('application/x-www-form-urlencoded')
-    expect(route).toContain('application/json')
-    expect(route).toContain('SUPPORTED_STATUS_CODES')
-    expect(route).toContain('notification.merchant_id !== config.merchantId')
-    expect(route).toContain('verifyNotificationSignature')
-    expect(route).toContain("{ error: 'Invalid signature' }, { status: 403 }")
-
-    const signatureIndex = route.indexOf('verifyNotificationSignature')
-    const successIndex = route.indexOf('processPaymentSuccess')
-    const failureIndex = route.indexOf('processPaymentFailure')
-    expect(signatureIndex).toBeGreaterThan(-1)
-    expect(signatureIndex).toBeLessThan(successIndex)
-    expect(signatureIndex).toBeLessThan(failureIndex)
+    expect(route).toContain('PAYMENT_PROVIDER_RETIRED')
+    expect(route).toContain('status: 410')
+    expect(route).not.toContain('processPaymentSuccess')
+    expect(route).not.toContain('processPaymentFailure')
   })
 
   it('PayHere adapter signs/verifies amount, currency, status and order identity together', () => {
@@ -37,18 +26,11 @@ describe('payment webhook hardening', () => {
     expect(adapter).toContain('notification.md5sig')
   })
 
-  it('PayPal verifies provider signature before canonical event processing', () => {
+  it('PayPal webhook is retired and cannot process provider events', () => {
     const route = source('app/api/webhooks/paypal/route.ts')
-
-    expect(route).toContain('MAX_BODY_BYTES')
-    expect(route).toContain("contentType.includes('application/json')")
-    expect(route).toContain('verifyPayPalWebhook')
-    expect(route).toContain("{ error: 'Invalid signature' },")
-    expect(route).toContain('processVerifiedPayPalWebhook')
-
-    expect(route.indexOf('verifyPayPalWebhook')).toBeLessThan(
-      route.indexOf('processVerifiedPayPalWebhook({')
-    )
+    expect(route).toContain('PAYMENT_PROVIDER_RETIRED')
+    expect(route).toContain('status: 410')
+    expect(route).not.toContain('processVerifiedPayPalWebhook')
   })
 
   it('PayPal signature verification requires all transmission headers and server-side webhook verification', () => {

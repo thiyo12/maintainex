@@ -1,6 +1,16 @@
 name: International Fast Gates
 
 on:
+  push:
+    branches: [feature/payment-restructuring]
+    paths:
+      - 'app/**'
+      - 'apps/mobile/**'
+      - 'lib/**'
+      - 'tests/**'
+      - 'scripts/international-provider-coverage-audit.sh'
+      - 'prisma/**'
+      - '.github/workflows/international-fast-gates.yml'
   pull_request:
     branches: [main, feature/international-launch-12phase]
     paths:

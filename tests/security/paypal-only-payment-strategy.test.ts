@@ -6,8 +6,8 @@ function source(path: string) {
   return readFileSync(resolve(process.cwd(), path), 'utf8')
 }
 
-describe('PayPal-only launch strategy', () => {
-  it('does not expose PayHere as a new customer checkout choice', () => {
+describe('Payment-provider launch safety', () => {
+  it('does not expose legacy PayPal or PayHere as an unapproved new customer checkout choice', () => {
     const confirm = source(
       'apps/mobile/features/jobs/screens/customer/v2/confirm/[id].tsx'
     )
@@ -15,21 +15,23 @@ describe('PayPal-only launch strategy', () => {
       'apps/mobile/features/customer/screens/settings/payment/index.tsx'
     )
 
-    expect(confirm).toContain('Pay Securely with PayPal')
+    expect(confirm).toContain('Continue to secure checkout')
+    expect(confirm).not.toContain('Pay Securely with PayPal')
     expect(confirm).not.toContain('Pay Securely with PayHere')
-    expect(paymentSettings).toContain('PayPal online checkout')
+    expect(paymentSettings).toContain('Not enabled for this deployment')
+    expect(paymentSettings).not.toContain('PayPal online checkout')
+    expect(paymentSettings).not.toContain('PayHere online checkout')
     expect(paymentSettings).not.toContain('methodPayHere')
     expect(paymentSettings).not.toContain('methodStripe')
   })
 
-  it('keeps the CRM provider control aligned with PayHere legacy/read-only policy', () => {
+  it('keeps retired gateways read-only in CRM', () => {
     const page = source(
       'app/(admin)/admin/financial/providers/page.tsx'
     )
 
-    expect(page).toContain('Legacy / read only / disabled for new checkout')
-    expect(page).toContain("form.provider === 'PAYHERE'")
-    expect(page).toContain('Legacy read only')
+    expect(page).toContain('Retired · read only')
+    expect(page).toContain('PayPal and PayHere are retired')
     expect(page).not.toContain('<option value="PAYHERE">PayHere</option>')
   })
 
@@ -168,20 +170,13 @@ describe('PayPal-only launch strategy', () => {
     })
   })
 
-  it('requires server verification before a PayPal redirect can protect payment', () => {
+  it('closes retired PayPal redirect and webhook endpoints', () => {
     const returnRoute = source('app/api/payments/paypal/return/route.ts')
     const webhookRoute = source('app/api/webhooks/paypal/route.ts')
-    const canonicalCapture = source('lib/finance/payments/canonical-capture.ts')
-
-    expect(returnRoute).toContain('captureAndFinalizePayPal')
-    expect(returnRoute).toContain(
-      'No client-side success result is trusted as payment proof.'
-    )
-    expect(webhookRoute).toContain('verifyPayPalWebhook')
-    expect(webhookRoute).toContain("{ error: 'Invalid signature' }, { status: 403 }")
-    expect(canonicalCapture).toContain("status: 'PROTECTED'")
-    expect(canonicalCapture).toContain('PAYMENT_AMOUNT_MISMATCH')
-    expect(canonicalCapture).toContain('PAYMENT_CURRENCY_MISMATCH')
+    expect(returnRoute).toContain('PAYMENT_PROVIDER_RETIRED')
+    expect(returnRoute).toContain('status: 410')
+    expect(webhookRoute).toContain('PAYMENT_PROVIDER_RETIRED')
+    expect(webhookRoute).toContain('status: 410')
   })
 
   it('keeps webhook replay and payload mismatch protection', () => {

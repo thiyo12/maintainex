@@ -79,7 +79,7 @@ describe('provider cash receivable recovery contract', () => {
     expect(service).toContain("commissionPayments: { none: { status: 'PENDING' } }")
   })
 
-  it('reconciles a confirmed direct payment against the receivable instead of recognizing revenue twice', () => {
+  it('keeps the canonical direct-payment posting primitive but blocks confirmation without bank evidence', () => {
     const service = source('lib/finance/commissions/provider-balance-service.ts')
     const route = source('app/api/admin/financial/commission/payments/route.ts')
 
@@ -88,9 +88,8 @@ describe('provider cash receivable recovery contract', () => {
     expect(service).toContain("accountType: 'PROVIDER_COMMISSION_RECEIVABLE'")
     expect(service).toContain("method: 'DIRECT_SETTLEMENT'")
     expect(service).toContain('commission-payment-recovery:')
-    expect(route).toContain('remainingReceivableMinor')
-    expect(route).toContain('settleProviderReceivablesFromDirectPayment')
-    expect(route).toContain('Payment amount does not match the remaining commission due')
+    expect(route).toContain('BANK_CREDIT_EVIDENCE_REQUIRED')
+    expect(route).not.toContain('settleProviderReceivablesFromDirectPayment')
   })
 
   it('keeps cash-job restriction separate from online-job recovery eligibility', () => {

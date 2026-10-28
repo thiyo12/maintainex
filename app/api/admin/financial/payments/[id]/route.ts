@@ -8,8 +8,9 @@ import {
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { evaluateEffectivePermission } from '@/lib/crm/governance'
+import { isLegacyReadOnlyProvider } from '@/lib/finance/payments/provider-registry'
 
-const RECONCILIATION_STATUSES = new Set(['MATCHED', 'MISMATCH', 'MANUAL_REVIEW'])
+const RECONCILIATION_STATUSES = new Set(['MISMATCH', 'MANUAL_REVIEW'])
 
 function safeJson(value: unknown) {
   return redactCrmSensitiveData(
@@ -263,6 +264,13 @@ export async function PATCH(
     }
     const { security, intent, job } = scoped
 
+    if (isLegacyReadOnlyProvider(intent.gateway)) {
+      return NextResponse.json(
+        { error: 'Retired gateway transactions are read-only', code: 'PAYMENT_PROVIDER_RETIRED' },
+        { status: 409 },
+      )
+    }
+
     const body = await request.json().catch(() => ({}))
     const transactionId =
       typeof body.transactionId === 'string'
@@ -281,6 +289,15 @@ export async function PATCH(
         ? body.reason.trim().slice(0, 1000)
         : ''
 
+    if (reconciliationStatus === 'MATCHED') {
+      return NextResponse.json(
+        {
+          error: 'A staff-entered reference cannot establish a matched provider settlement. Independently verified provider evidence is required.',
+          code: 'PAYMENT_RECONCILIATION_EVIDENCE_REQUIRED',
+        },
+        { status: 409 },
+      )
+    }
     if (!transactionId || !RECONCILIATION_STATUSES.has(reconciliationStatus)) {
       return NextResponse.json(
         { error: 'A provider transaction and valid reconciliation status are required' },

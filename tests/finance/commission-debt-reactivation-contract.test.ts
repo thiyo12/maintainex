@@ -19,15 +19,11 @@ describe('commission debt reactivation contract', () => {
     expect(route).toContain('otherSuspendedDebt === 0')
   })
 
-  it('does not reactivate a provider after confirming one payment when other blocking debt exists', () => {
+  it('does not clear commission debt until independent bank-credit evidence is connected', () => {
     const route = read('app/api/admin/financial/commission/payments/route.ts')
 
-    expect(route).toContain('const otherBlockingDebt = await tx.weeklySettlement.count')
-    expect(route).toContain("id: { not: settlement.id }")
-    expect(route).toContain('commissionPaid: false')
-    expect(route).toContain("status: { in: ['OVERDUE', 'SUSPENDED'] }")
-    expect(route).toContain('{ dueAt: { lt: now } }')
-    expect(route).toContain('if (otherBlockingDebt === 0)')
-    expect(route).toContain("provider?.suspensionReason === 'Weekly commission not paid'")
+    expect(route).toContain('BANK_CREDIT_EVIDENCE_REQUIRED')
+    expect(route).toContain("status: 'WAITING_BANK'")
+    expect(route).not.toContain("status: 'CONFIRMED'")
   })
 })

@@ -19,11 +19,6 @@ const TEMPORARY_EXCEPTIONS = new Map([
     maxAffectedPublishedVersion: '2.0.2',
     reason: 'Metro image metadata build tooling; patched 2.0.3 is not published',
   }],
-  ['https://github.com/advisories/GHSA-86w9-cpqp-85rv', {
-    packageName: 'node-forge',
-    maxAffectedPublishedVersion: '1.4.0',
-    reason: 'Expo CLI code-signing tooling; upstream has no patched release',
-  }],
 ])
 
 function fail(message, detail) {

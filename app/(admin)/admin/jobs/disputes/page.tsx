@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiEye, FiX, FiSearch } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
@@ -29,6 +29,8 @@ interface Dispute {
   description: string
   resolution?: string
   status: string
+  assignedTo?: string | null
+  assignedRole?: string | null
   createdAt: string
   job: {
     id: string
@@ -42,6 +44,36 @@ interface Dispute {
     name: string
     email: string
   }
+}
+
+interface DisputeEvidence {
+  id: string
+  uploaderType: string
+  evidenceType: string
+  description: string | null
+  createdAt: string
+}
+
+interface DisputeAssignee {
+  id: string
+  name: string
+  role: string
+}
+
+interface CommissionReceivable {
+  id: string
+  currency: string
+  amountRemaining: string
+  debtorType: string
+}
+interface DisputeCorrection {
+  id: string
+  amountMinor: string
+  currency: string
+  reason: string
+  status: string
+  createdAt: string
+  events: Array<{ eventType: string; createdAt: string }>
 }
 
 const TABS = [
@@ -66,18 +98,26 @@ function disputeTone(status: string): CrmTone {
 export default function DisputesPage() {
   const { user: admin } = useAdminSession()
   const canResolveDisputes = Boolean(admin?.permissions?.includes('disputes:resolve'))
+  const canInitiateFinancialCorrection = Boolean(admin?.permissions?.includes('disputes:finance:initiate'))
   const [disputes, setDisputes] = useState<Dispute[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('ALL')
   const [detailModal, setDetailModal] = useState<Dispute | null>(null)
   const [resolveNotes, setResolveNotes] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [caseEvidence, setCaseEvidence] = useState<DisputeEvidence[]>([])
+  const [caseCorrections, setCaseCorrections] = useState<DisputeCorrection[]>([])
+  const [caseAssignees, setCaseAssignees] = useState<DisputeAssignee[]>([])
+  const [correctionReceivables, setCorrectionReceivables] = useState<CommissionReceivable[]>([])
+  const [correctionReceivableId, setCorrectionReceivableId] = useState('')
+  const [correctionAmountMinor, setCorrectionAmountMinor] = useState('')
+  const [correctionReason, setCorrectionReason] = useState('')
+  const [selectedAssignee, setSelectedAssignee] = useState('')
+  const [evidenceLoading, setEvidenceLoading] = useState(false)
+  const [evidenceError, setEvidenceError] = useState<string | null>(null)
+  const evidenceRequestId = useRef(0)
 
-  useEffect(() => {
-    fetchDisputes()
-  }, [activeTab])
-
-  const fetchDisputes = async () => {
+  const fetchDisputes = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch(`/api/admin/disputes?status=${activeTab === 'ALL' ? '' : activeTab}`, {
@@ -91,7 +131,11 @@ export default function DisputesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeTab])
+
+  useEffect(() => {
+    void fetchDisputes()
+  }, [fetchDisputes])
 
   const handleResolve = async (
     disputeId: string,
@@ -125,7 +169,9 @@ export default function DisputesPage() {
       } else if (resolutionAction === 'RELEASE_PROVIDER') {
         toast.success('Dispute resolved — escrow released to provider')
       } else if (resolutionAction === 'REFUND_CUSTOMER') {
-        toast.success('Dispute resolved — customer refund completed')
+        toast.success(data?.refundStatus === 'NO_FUNDS_TO_REFUND'
+          ? 'Dispute resolved — no collected funds required a refund'
+          : 'Dispute resolved — customer refund completed')
       } else {
         toast.success('Dispute resolved')
       }
@@ -186,8 +232,124 @@ export default function DisputesPage() {
     }
   }
 
+  const handleClaim = async (dispute: Dispute) => {
+    if (!canResolveDisputes || dispute.source !== 'MARKETPLACE') return
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/admin/disputes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disputeId: dispute.id, action: 'CLAIM' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Unable to claim case')
+      toast.success('Case assigned to you')
+      await fetchDisputes()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to claim case')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleReassign = async (dispute: Dispute) => {
+    if (!canResolveDisputes || dispute.source !== 'MARKETPLACE' || !selectedAssignee) return
+    setActionLoading(true)
+    try {
+      const response = await fetch('/api/admin/disputes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disputeId: dispute.id, action: 'REASSIGN', targetAdminId: selectedAssignee }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error || 'Unable to reassign case')
+      toast.success('Case reassigned')
+      await fetchDisputes()
+      setDetailModal(current => current ? { ...current, status: 'UNDER_REVIEW', assignedTo: selectedAssignee } : current)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to reassign case')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+
+  const openReview = async (dispute: Dispute) => {
+    const requestId = ++evidenceRequestId.current
+    setDetailModal(dispute)
+    setResolveNotes('')
+    setCaseEvidence([])
+    setCaseCorrections([])
+    setCaseAssignees([])
+    setSelectedAssignee(dispute.assignedTo || '')
+    setCorrectionReceivables([])
+    setCorrectionReceivableId('')
+    setCorrectionAmountMinor('')
+    setCorrectionReason('')
+    setEvidenceError(null)
+    if (dispute.source !== 'MARKETPLACE') return
+
+    setEvidenceLoading(true)
+    try {
+      const [response, assigneeResponse, correctionResponse] = await Promise.all([
+        fetch(`/api/admin/disputes?evidenceDisputeId=${encodeURIComponent(dispute.id)}`, { cache: 'no-store' }),
+        canResolveDisputes
+          ? fetch(`/api/admin/disputes?assigneesFor=${encodeURIComponent(dispute.id)}`, { cache: 'no-store' })
+          : Promise.resolve(null),
+        canInitiateFinancialCorrection
+          ? fetch(`/api/admin/disputes/${encodeURIComponent(dispute.id)}/corrections`, { cache: 'no-store' })
+          : Promise.resolve(null),
+      ])
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error || 'Unable to load dispute evidence')
+      if (requestId === evidenceRequestId.current) {
+        setCaseEvidence(Array.isArray(data.evidence) ? data.evidence : [])
+        setCaseCorrections(Array.isArray(data.corrections) ? data.corrections : [])
+      }
+      if (assigneeResponse) {
+        const assigneeData = await assigneeResponse.json().catch(() => ({}))
+        if (!assigneeResponse.ok) throw new Error(assigneeData?.error || 'Unable to load eligible assignees')
+        if (requestId === evidenceRequestId.current) {
+          setCaseAssignees(Array.isArray(assigneeData.assignees) ? assigneeData.assignees : [])
+        }
+      }
+      if (correctionResponse) {
+        const correctionData = await correctionResponse.json().catch(() => ({}))
+        if (!correctionResponse.ok) throw new Error(correctionData?.error || 'Unable to load open commission balances')
+        if (requestId === evidenceRequestId.current) setCorrectionReceivables(Array.isArray(correctionData.receivables) ? correctionData.receivables : [])
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load dispute evidence'
+      if (requestId === evidenceRequestId.current) {
+        setEvidenceError(message)
+        toast.error(message)
+      }
+    } finally {
+      if (requestId === evidenceRequestId.current) setEvidenceLoading(false)
+    }
+  }
+
+  const requestCommissionCorrection = async (dispute: Dispute) => {
+    if (!correctionReceivableId || !/^[1-9]\d*$/.test(correctionAmountMinor) || correctionReason.trim().length < 10) return
+    setActionLoading(true)
+    try {
+      const response = await fetch(`/api/admin/disputes/${encodeURIComponent(dispute.id)}/corrections`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': `crm-dispute-${crypto.randomUUID()}` },
+        body: JSON.stringify({ receivableId: correctionReceivableId, amountMinor: correctionAmountMinor, reason: correctionReason.trim() }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error || 'Unable to request financial correction')
+      toast.success(`Correction submitted for maker-checker approval (${data.approval?.status || 'pending'})`)
+      setCorrectionAmountMinor('')
+      setCorrectionReason('')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to request financial correction')
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   return (
     <>
@@ -265,13 +427,30 @@ export default function DisputesPage() {
                         <CrmBadge tone={disputeTone(dispute.status)} dot>
                           {dispute.status.replaceAll('_', ' ')}
                         </CrmBadge>
+                        {dispute.assignedTo && (
+                          <div className="mt-1 text-[10px] text-slate-500">
+                            Assigned · {dispute.assignedRole || 'staff'}
+                            {dispute.assignedTo === admin?.id ? ' · you' : ''}
+                          </div>
+                        )}
                       </td>
                       <td className={`${crmTdClass} whitespace-nowrap text-xs text-slate-500`}>{formatDate(dispute.createdAt)}</td>
                       <td className={crmTdClass}>
+                        {dispute.source === 'MARKETPLACE' && canResolveDisputes &&
+                          ['OPEN', 'UNDER_REVIEW'].includes(dispute.status) && !dispute.assignedTo && (
+                          <CrmButton
+                            size="sm"
+                            variant="secondary"
+                            disabled={actionLoading}
+                            onClick={() => { void handleClaim(dispute) }}
+                          >
+                            Claim case
+                          </CrmButton>
+                        )}
                         <CrmButton
                           size="sm"
                           variant="secondary"
-                          onClick={() => { setDetailModal(dispute); setResolveNotes('') }}
+                          onClick={() => { void openReview(dispute) }}
                         >
                           <FiEye size={13} />
                           Review
@@ -330,6 +509,90 @@ export default function DisputesPage() {
                   <div className="text-xs text-slate-400 mb-1">Description</div>
                   <div className="text-slate-700 text-sm bg-[var(--crm-surface-soft)] rounded-lg p-3">{detailModal.description}</div>
                 </div>
+
+                {detailModal.source === 'MARKETPLACE' && (
+                  <section aria-label="Case evidence" className="space-y-2">
+                    <div className="text-xs font-semibold text-slate-500">Participant case notes</div>
+                    {evidenceLoading ? (
+                      <CrmState type="loading" title="Loading evidence" description="Loading evidence permitted for this market-scoped case." />
+                    ) : evidenceError ? (
+                      <CrmState type="error" title="Evidence could not be loaded" description={evidenceError} />
+                    ) : caseEvidence.length === 0 ? (
+                      <CrmState type="empty" title="No evidence submitted" description="Participants have not submitted evidence notes to this case yet." />
+                    ) : caseEvidence.map(item => (
+                      <article key={item.id} className="rounded-lg border border-[var(--crm-border)] bg-white p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-sm font-semibold text-slate-800">{item.evidenceType.replaceAll('_', ' ')}</div>
+                          <CrmBadge tone={item.uploaderType === 'CUSTOMER' ? 'info' : 'neutral'}>{item.uploaderType}</CrmBadge>
+                        </div>
+                        {item.description && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700">{item.description}</p>}
+                        <p className="mt-2 text-[11px] text-slate-400">Submitted {new Date(item.createdAt).toLocaleString()}</p>
+                      </article>
+                    ))}
+                  </section>
+                )}
+
+                {canResolveDisputes && detailModal.source === 'MARKETPLACE' &&
+                  ['OPEN', 'UNDER_REVIEW'].includes(detailModal.status) && caseAssignees.length > 0 && (
+                  <section aria-label="Case assignment" className="space-y-2 rounded-lg border border-[var(--crm-border)] p-3">
+                    <label htmlFor="dispute-assignee" className="text-xs font-semibold text-slate-600">Assigned finance/support staff</label>
+                    <div className="flex flex-wrap gap-2">
+                      <select
+                        id="dispute-assignee"
+                        value={selectedAssignee}
+                        onChange={event => setSelectedAssignee(event.target.value)}
+                        className={`${crmInputClass} min-w-[220px] flex-1`}
+                      >
+                        <option value="">Select eligible staff</option>
+                        {caseAssignees.map(assignee => (
+                          <option key={assignee.id} value={assignee.id}>{assignee.name} · {assignee.role}</option>
+                        ))}
+                      </select>
+                      <CrmButton
+                        variant="secondary"
+                        disabled={actionLoading || !selectedAssignee || selectedAssignee === admin?.id}
+                        onClick={() => { void handleReassign(detailModal) }}
+                      >
+                        Reassign
+                      </CrmButton>
+                    </div>
+                  </section>
+                )}
+
+                {canInitiateFinancialCorrection && detailModal.source === 'MARKETPLACE' &&
+                  ['OPEN', 'UNDER_REVIEW', 'RESOLVING'].includes(detailModal.status) && (
+                  <section aria-label="Governed commission correction" className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                    <div className="text-xs font-semibold text-slate-700">Request commission debt waiver</div>
+                    <p className="text-xs text-slate-600">This reduces the provider’s unpaid commission receivable. It is not a customer refund or evidence of cash settlement. A separate authorized checker must approve it.</p>
+                    {correctionReceivables.length === 0 ? <CrmState type="empty" title="No open commission balance" description="This case has no eligible open receivable." /> : (
+                      <>
+                        <label htmlFor="dispute-correction-receivable" className="sr-only">Commission debtor receivable</label>
+                        <select id="dispute-correction-receivable" value={correctionReceivableId} onChange={event => setCorrectionReceivableId(event.target.value)} className={crmInputClass}>
+                          <option value="">Select receivable</option>
+                          {correctionReceivables.map(row => <option key={row.id} value={row.id}>{row.debtorType} · {row.amountRemaining} {row.currency} minor units · {row.id}</option>)}
+                        </select>
+                        <label htmlFor="dispute-correction-amount" className="sr-only">Waiver amount in minor units</label>
+                        <input id="dispute-correction-amount" inputMode="numeric" value={correctionAmountMinor} onChange={event => setCorrectionAmountMinor(event.target.value.replace(/[^0-9]/g, ''))} placeholder="Amount in minor units" className={crmInputClass} />
+                        <label htmlFor="dispute-correction-reason" className="sr-only">Correction reason</label>
+                        <textarea id="dispute-correction-reason" value={correctionReason} onChange={event => setCorrectionReason(event.target.value.slice(0, 1000))} placeholder="Document the financial basis (10–1000 characters)" className={crmInputClass} rows={3} />
+                        <CrmButton variant="secondary" disabled={actionLoading || !correctionReceivableId || !/^[1-9]\d*$/.test(correctionAmountMinor) || correctionReason.trim().length < 10} onClick={() => { void requestCommissionCorrection(detailModal) }}>Submit for approval</CrmButton>
+                      </>
+                    )}
+                  </section>
+                )}
+
+                {detailModal.source === 'MARKETPLACE' && caseCorrections.length > 0 && (
+                  <section aria-label="Financial corrections" className="space-y-2 rounded-lg border border-[var(--crm-border)] p-3">
+                    <div className="text-xs font-semibold text-slate-600">Applied financial corrections</div>
+                    {caseCorrections.map(item => (
+                      <article key={item.id} className="rounded border border-[var(--crm-border)] bg-white p-2 text-xs">
+                        <div className="font-semibold">Commission waiver · {item.amountMinor} {item.currency} minor units · {item.status}</div>
+                        <p className="mt-1 whitespace-pre-wrap text-slate-600">{item.reason}</p>
+                        <p className="mt-1 text-slate-400">Applied {new Date(item.createdAt).toLocaleString()}</p>
+                      </article>
+                    ))}
+                  </section>
+                )}
 
                 {detailModal.resolution && (
                   <div>

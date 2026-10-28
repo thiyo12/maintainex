@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { ArrowRight, MagnifyingGlass, Plus, X } from 'phosphor-react-native'
-import { v2Search } from '@/api/v2-search'
+import { loadDiscoverySearch } from '@/lib/discovery-search'
+import { useCountry } from '@/lib/country'
 import { v3 } from '../../theme/v3/tokens'
 
 interface CategoryResult {
@@ -26,45 +27,40 @@ interface Props {
 }
 
 export default function V3DiscoverySearch({ placeholder, onCategorySelect, onJobSelect, onPostJob }: Props) {
+  const { selectedCountry } = useCountry()
   const [value, setValue] = useState('')
   const [categories, setCategories] = useState<CategoryResult[]>([])
   const [services, setServices] = useState<ServiceResult[]>([])
   const [correctedQuery, setCorrectedQuery] = useState<string | undefined>()
   const [loading, setLoading] = useState(false)
+  const [searchFailed, setSearchFailed] = useState(false)
   const [focused, setFocused] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const requestSequence = useRef(0)
 
   const search = useCallback(async (query: string) => {
-    const q = query.trim()
-    if (q.length < 2) {
-      setCategories([])
-      setServices([])
-      setCorrectedQuery(undefined)
-      return
-    }
-
+    const sequence = ++requestSequence.current
     setLoading(true)
-    try {
-      const data = await v2Search.categories(q)
-      setCategories((data.categories || []).slice(0, 4))
-      setServices((data.subServices || []).slice(0, 5))
-      setCorrectedQuery(data.correctedQuery)
-    } catch {
-      setCategories([])
-      setServices([])
-      setCorrectedQuery(undefined)
-    } finally {
+    const result = await loadDiscoverySearch(query, selectedCountry?.code)
+    if (sequence !== requestSequence.current) return
+    setCategories(result.categories)
+    setServices(result.services)
+    setCorrectedQuery(result.correctedQuery)
+    setSearchFailed(result.failed)
       setLoading(false)
-    }
-  }, [])
+  }, [selectedCountry?.code])
 
   const change = (text: string) => {
     setValue(text)
+    requestSequence.current += 1
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => search(text), 250)
   }
 
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  useEffect(() => () => {
+    requestSequence.current += 1
+    if (timer.current) clearTimeout(timer.current)
+  }, [])
 
   const visible = focused && value.trim().length >= 2
 
@@ -97,6 +93,9 @@ export default function V3DiscoverySearch({ placeholder, onCategorySelect, onJob
 
       {visible ? (
         <View style={styles.dropdown}>
+          {loading && categories.length === 0 && services.length === 0 ? (
+            <View style={styles.statusRow}><ActivityIndicator size="small" color={v3.colors.ink} /><Text style={styles.resultMeta}>Searching this market…</Text></View>
+          ) : null}
           {correctedQuery ? (
             <TouchableOpacity style={styles.corrected} onPress={() => { change(correctedQuery); search(correctedQuery) }}>
               <Text style={styles.correctedText}>Search for “{correctedQuery}”</Text>
@@ -124,7 +123,7 @@ export default function V3DiscoverySearch({ placeholder, onCategorySelect, onJob
           ))}
 
           {!loading && categories.length === 0 && services.length === 0 ? (
-            <Text style={styles.noResult}>No direct match. You can post it as a custom request.</Text>
+            <Text style={styles.noResult}>{searchFailed ? 'Search is temporarily unavailable. You can still post this as a custom request.' : 'No matching service found. You can post this as a custom request.'}</Text>
           ) : null}
 
           <TouchableOpacity style={styles.customRow} onPress={() => onPostJob(value.trim())}>
@@ -195,6 +194,7 @@ const styles = StyleSheet.create({
   resultTitle: { fontSize: 11.5, fontFamily: 'Outfit_700Bold', color: v3.colors.ink },
   resultMeta: { marginTop: 2, fontSize: 8.8, fontFamily: 'Outfit_500Medium', color: v3.colors.textMuted },
   noResult: { paddingHorizontal: 14, paddingVertical: 12, fontSize: 9.5, fontFamily: 'Outfit_500Medium', color: v3.colors.textSecondary },
+  statusRow: { minHeight: 42, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 9 },
   customRow: { minHeight: 58, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   plusCircle: { width: 28, height: 28, borderRadius: 14, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
   customTitle: { fontSize: 11.5, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },

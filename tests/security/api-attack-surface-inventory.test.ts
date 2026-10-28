@@ -32,6 +32,14 @@ const PUBLIC_MUTATION_ROUTES = new Set([
 
 const RETIRED_MUTATION_ROUTES = new Set([
   'app/api/mobile/quick-bookings/route.ts',
+  'app/api/cron/payhere-refunds/route.ts',
+  'app/api/webhooks/payhere/route.ts',
+  'app/api/webhooks/paypal/route.ts',
+  'app/api/payments/payhere/[intentId]/route.ts',
+  'app/api/payments/payhere/cancel/route.ts',
+  'app/api/payments/payhere/return/route.ts',
+  'app/api/payments/paypal/cancel/route.ts',
+  'app/api/payments/paypal/return/route.ts',
 ])
 
 const LEGITIMATE_PRIVILEGED_SETUP_ROUTES = new Set([
@@ -57,6 +65,7 @@ const SECURITY_BOUNDARY_MARKERS = [
   'verifyPayPalWebhook',
   'verifyPayHere',
   'verifyNotificationSignature',
+  'verifyBankEvidenceSignature(',
   'signatureVerified',
   "process.env.NODE_ENV === 'production'",
 ] as const
@@ -108,6 +117,7 @@ const ROUTE_LOCAL_PRIVILEGED_MARKERS = [
   'requireInternal',
   'INTERNAL_SYNC_SECRET',
   'CRON_SECRET',
+  'verifyBankEvidenceSignature(',
 ] as const
 
 describe('API attack-surface inventory', () => {
@@ -213,6 +223,8 @@ describe('API attack-surface inventory', () => {
       const code = readFileSync(resolve(process.cwd(), path), 'utf8')
       const methods = exportedMethods(code)
       if (!methods.some(method => method !== 'GET')) continue
+
+      if (RETIRED_MUTATION_ROUTES.has(path)) continue
 
       if (!hasBoundary(code)) weak.push(path)
     }

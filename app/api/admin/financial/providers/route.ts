@@ -8,14 +8,7 @@ import {
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import {
-  getPayHereConfig,
-  getPayHereMerchantApiConfig,
-} from '@/lib/payment/payhere-adapter'
-import { getPayPalConfig } from '@/lib/finance/payments/paypal-adapter'
-import {
   isLegacyReadOnlyProvider,
-  isPayPalMarketVerified,
-  PAYPAL_SANDBOX_FIXTURE_CURRENCY,
   normalizePaymentProvider,
   parseProviderCapabilities,
   parseProviderList,
@@ -54,34 +47,7 @@ function capabilities(value: unknown): Record<string, boolean> | null {
   return result
 }
 
-function runtimeState(provider: string) {
-  if (provider === 'PAYPAL') {
-    const config = getPayPalConfig()
-    return {
-      configured: Boolean(config),
-      environment: config ? (config.sandbox ? 'SANDBOX' : 'LIVE') : null,
-      webhookConfigured: Boolean(config?.webhookId),
-      refundConfigured: Boolean(config),
-    }
-  }
-  if (provider === 'PAYHERE') {
-    const config = getPayHereConfig()
-    const merchantApi = getPayHereMerchantApiConfig()
-    return {
-      configured: Boolean(config),
-      environment: config ? (config.sandbox ? 'SANDBOX' : 'LIVE') : null,
-      webhookConfigured: Boolean(config),
-      refundConfigured: Boolean(merchantApi),
-    }
-  }
-  if (provider === 'MANUAL_BANK') {
-    return {
-      configured: true,
-      environment: 'LIVE',
-      webhookConfigured: false,
-      refundConfigured: false,
-    }
-  }
+function runtimeState() {
   return {
     configured: false,
     environment: null,
@@ -99,7 +65,7 @@ function serializeConfig(config: any) {
     refundPolicy: safeJson(config.refundPolicy),
     settlementConfig: safeJson(config.settlementConfig),
     feeConfig: safeJson(config.feeConfig),
-    runtime: runtimeState(config.provider),
+    runtime: runtimeState(),
   }
 }
 
@@ -184,6 +150,12 @@ export async function PATCH(request: NextRequest) {
 
     if (!/^[A-Z]{2}$/.test(countryCode)) return NextResponse.json({ error: 'Valid countryCode is required' }, { status: 400 })
     if (!provider) return NextResponse.json({ error: 'Supported provider is required' }, { status: 400 })
+    if (isLegacyReadOnlyProvider(provider)) {
+      return NextResponse.json(
+        { error: provider + ' is retired; historical records remain read-only for audit.' },
+        { status: 409 }
+      )
+    }
     if (!ENVIRONMENTS.has(environment)) return NextResponse.json({ error: 'Invalid environment' }, { status: 400 })
     if (!OPERATIONAL_STATUSES.has(operationalStatus)) return NextResponse.json({ error: 'Invalid operational status' }, { status: 400 })
     if (!CAPTURE_MODES.has(captureMode)) return NextResponse.json({ error: 'Invalid capture mode' }, { status: 400 })
@@ -207,53 +179,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Commission BPS must be 0 to 10000' }, { status: 400 })
     }
 
-    if (enabled && isLegacyReadOnlyProvider(provider)) {
-      return NextResponse.json(
-        {
-          error:
-            provider +
-            ' is legacy/read-only and cannot be enabled for new checkout. Historical records remain available for audit and reconciliation.',
-        },
-        { status: 409 }
-      )
-    }
-    if (
-      enabled &&
-      provider === 'PAYPAL' &&
-      !isPayPalMarketVerified(countryCode, environment as 'SANDBOX' | 'LIVE')
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            'PayPal Checkout is not verified for ' +
-            countryCode +
-            ' in ' +
-            environment +
-            '. Sandbox launch testing is restricted to CA/CAD and live markets require explicit verification.',
-        },
-        { status: 409 }
-      )
-    }
-    if (
-      enabled &&
-      provider === 'PAYPAL' &&
-      environment === 'SANDBOX' &&
-      (
-        supportedCurrencies.length !== 1 ||
-        supportedCurrencies[0] !== PAYPAL_SANDBOX_FIXTURE_CURRENCY
-      )
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            'PayPal sandbox launch testing is restricted to CA/CAD. ' +
-            'Configure CAD as the only sandbox currency.',
-        },
-        { status: 409 }
-      )
-    }
-
-    const runtime = runtimeState(provider)
+    const runtime = runtimeState()
     if (enabled && (!runtime.configured || runtime.environment !== environment)) {
       return NextResponse.json({ error: provider + ' cannot be enabled until its server runtime is configured for ' + environment }, { status: 409 })
     }

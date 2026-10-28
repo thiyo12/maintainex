@@ -62,14 +62,14 @@ function paymentIntent(overrides: Record<string, unknown> = {}) {
     paymentId: 'pay-1',
     amount: 10000n,
     currency: 'LKR',
-    gateway: 'PAYHERE',
+    gateway: 'MANUAL_BANK',
     status: 'REFUND_REQUIRED',
     gatewayResponse: null,
     ...overrides,
   }
 }
 
-describe('external refund ledger source finalization', () => {
+describe('external refund evidence gate', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.paymentIntentFindUnique.mockResolvedValue(paymentIntent())
@@ -83,133 +83,31 @@ describe('external refund ledger source finalization', () => {
     mocks.recordJobLifecycleEvent.mockResolvedValue(undefined)
   })
 
-  it('clears refund suspense for a late capture without touching escrow state', async () => {
-    mocks.financialLedgerFindFirst.mockResolvedValue({
-      id: 'ledger-suspense-1',
-      amount: 10000n,
-      currency: 'LKR',
-    })
-    mocks.jobEscrowFindUnique.mockResolvedValue(null)
-
+  it('does not finalize a refund from a staff-entered reference without external evidence', async () => {
     const { confirmManualExternalRefund } = await import('@/lib/payment/payment-service')
     const result = await confirmManualExternalRefund('pi-1', {
       actorId: 'admin-1',
       reference: 'BANK-REF-1001',
-      note: 'Customer refunded outside PayHere',
-    })
-
-    expect(result).toEqual({
-      success: true,
-      status: 'REFUNDED',
-      refundReference: 'BANK-REF-1001',
-    })
-    expect(mocks.jobEscrowFindUnique).not.toHaveBeenCalled()
-    expect(mocks.tx.jobEscrow.updateMany).not.toHaveBeenCalled()
-    expect(mocks.postLedgerTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        entries: [
-          expect.objectContaining({
-            accountId: 'refund-suspense:pi-1',
-            accountType: 'REFUND_SUSPENSE',
-            entryType: 'DEBIT',
-            amount: 10000n,
-          }),
-          expect.objectContaining({
-            accountId: 'external:payhere',
-            accountType: 'EXTERNAL_PAYOUT',
-            entryType: 'CREDIT',
-            amount: 10000n,
-          }),
-        ],
-        currency: 'LKR',
-        referenceType: 'PAYMENT_EXTERNAL_REFUND',
-        referenceId: 'pi-1',
-      }),
-      mocks.tx,
-    )
-    expect(mocks.recordJobLifecycleEvent).toHaveBeenCalledWith(
-      mocks.tx,
-      expect.objectContaining({
-        jobId: 'job-1',
-        actorId: 'admin-1',
-        actorType: 'STAFF',
-        action: 'PAYMENT_REFUNDED',
-        metadata: expect.objectContaining({
-          fundingSource: 'REFUND_SUSPENSE',
-          refundMinor: 10000n,
-        }),
-      })
-    )
-  })
-
-  it('debits protected escrow for a normal external refund', async () => {
-    mocks.financialLedgerFindFirst.mockResolvedValue(null)
-    mocks.jobEscrowFindUnique.mockResolvedValue({
-      id: 'escrow-1',
-      status: 'ON_HOLD',
-      totalAmount: 10000n,
-      currency: 'LKR',
-    })
-
-    const { confirmManualExternalRefund } = await import('@/lib/payment/payment-service')
-    const result = await confirmManualExternalRefund('pi-1', {
-      actorId: 'admin-1',
-      reference: 'BANK-REF-1002',
-    })
-
-    expect(result.status).toBe('REFUNDED')
-    expect(mocks.tx.jobEscrow.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          id: 'escrow-1',
-          status: { in: ['ON_HOLD', 'PROTECTED'] },
-        },
-        data: expect.objectContaining({ status: 'REFUNDED' }),
-      })
-    )
-    expect(mocks.postLedgerTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        entries: [
-          expect.objectContaining({
-            accountId: 'escrow:escrow-1',
-            accountType: 'ESCROW',
-            entryType: 'DEBIT',
-            amount: 10000n,
-          }),
-          expect.objectContaining({
-            accountId: 'external:payhere',
-            accountType: 'EXTERNAL_PAYOUT',
-            entryType: 'CREDIT',
-            amount: 10000n,
-          }),
-        ],
-        currency: 'LKR',
-        referenceType: 'ESCROW_EXTERNAL_REFUND',
-        referenceId: 'escrow-1',
-      }),
-      mocks.tx,
-    )
-  })
-
-  it('fails closed when escrow no longer matches the captured payment', async () => {
-    mocks.financialLedgerFindFirst.mockResolvedValue(null)
-    mocks.jobEscrowFindUnique.mockResolvedValue({
-      id: 'escrow-1',
-      status: 'ON_HOLD',
-      totalAmount: 9000n,
-      currency: 'LKR',
-    })
-
-    const { confirmManualExternalRefund } = await import('@/lib/payment/payment-service')
-    const result = await confirmManualExternalRefund('pi-1', {
-      actorId: 'admin-1',
-      reference: 'BANK-REF-1003',
     })
 
     expect(result).toMatchObject({
       success: false,
-      code: 'REFUND_ESCROW_MISMATCH',
+      code: 'REFUND_EXTERNAL_EVIDENCE_REQUIRED',
     })
+    expect(mocks.transaction).not.toHaveBeenCalled()
+    expect(mocks.postLedgerTransaction).not.toHaveBeenCalled()
+  })
+
+  it('keeps retired gateway records read-only without changing ledger or payment state', async () => {
+    mocks.paymentIntentFindUnique.mockResolvedValue(paymentIntent({ gateway: 'PAYHERE' }))
+
+    const { confirmManualExternalRefund } = await import('@/lib/payment/payment-service')
+    const result = await confirmManualExternalRefund('pi-1', {
+      actorId: 'admin-1',
+      reference: 'BANK-REF-1004',
+    })
+
+    expect(result).toMatchObject({ success: false, code: 'PAYMENT_PROVIDER_RETIRED' })
     expect(mocks.transaction).not.toHaveBeenCalled()
     expect(mocks.postLedgerTransaction).not.toHaveBeenCalled()
   })

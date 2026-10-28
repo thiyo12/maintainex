@@ -16,17 +16,11 @@ export const v2Availability = {
 }
 
 export const v2Quality = {
-  get: (providerId?: string) =>
-    v2Request<QualityResult>(
-      `/api/mobile/v2/quality${providerId ? `?providerId=${providerId}` : ''}`
-    ),
+  get: () => v2Request<QualityResult>('/api/mobile/v2/quality'),
 }
 
 export const v2Trust = {
-  get: (customerId?: string) =>
-    v2Request<TrustResult>(
-      `/api/mobile/v2/trust${customerId ? `?customerId=${customerId}` : ''}`
-    ),
+  get: () => v2Request<TrustResult>('/api/mobile/v2/trust'),
 }
 
 export const v2Schedule = {

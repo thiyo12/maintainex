@@ -16,6 +16,7 @@ import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import {
   reconcileProviderRefund,
 } from '@/lib/finance/payments/payment-service'
+import { isLegacyReadOnlyProvider } from '@/lib/finance/payments/provider-registry'
 
 const REFUND_STATUSES = ['REFUND_REQUIRED', 'REFUND_PROCESSING', 'REFUNDED'] as const
 
@@ -96,12 +97,46 @@ export async function GET(request: NextRequest) {
 
     const jobMap = new Map(jobs.map(job => [job.id, job]))
     const customerMap = new Map(customers.map(customer => [customer.id, customer]))
+    const refundAttempts = intents.length
+      ? await prisma.paymentProviderRefund.findMany({
+          where: { paymentIntentId: { in: intents.map(intent => intent.id) } },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, paymentIntentId: true, provider: true, amount: true, currency: true, status: true, reason: true, createdAt: true, completedAt: true },
+        })
+      : []
+    const refundEvidence = refundAttempts.length
+      ? await prisma.financialTransferEvidence.findMany({
+          where: { transferType: 'REFUND', targetId: { in: refundAttempts.map(refund => refund.id) } },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, targetId: true, sourceId: true, outcome: true, amount: true, currency: true, countryCode: true, verificationMethod: true, verifiedAt: true, observedAt: true, createdAt: true },
+        })
+      : []
+    const attemptsByIntent = new Map<string, typeof refundAttempts>()
+    for (const attempt of refundAttempts) {
+      const entries = attemptsByIntent.get(attempt.paymentIntentId) || []
+      if (entries.length < 10) entries.push(attempt)
+      attemptsByIntent.set(attempt.paymentIntentId, entries)
+    }
+    const evidenceByRefund = new Map<string, typeof refundEvidence>()
+    for (const evidence of refundEvidence) {
+      const entries = evidenceByRefund.get(evidence.targetId) || []
+      if (entries.length < 10) entries.push(evidence)
+      evidenceByRefund.set(evidence.targetId, entries)
+    }
 
     return NextResponse.json(
       {
         refunds: intents.map(intent => ({
           ...intent,
           amount: intent.amount.toString(),
+          refundAttempts: (attemptsByIntent.get(intent.id) || []).map(attempt => ({
+            ...attempt,
+            amount: attempt.amount.toString(),
+            transferEvidence: (evidenceByRefund.get(attempt.id) || []).map(evidence => ({
+              ...evidence,
+              amount: evidence.amount.toString(),
+            })),
+          })),
           job: jobMap.get(intent.jobId) || null,
           customer: customerMap.get(intent.customerId) || null,
         })),
@@ -141,10 +176,6 @@ export async function PATCH(request: NextRequest) {
       ? body.paymentIntentId.trim().slice(0, 128)
       : ''
     const action = typeof body?.action === 'string' ? body.action.trim().toUpperCase() : ''
-    const manualReference = typeof body?.manualReference === 'string'
-      ? body.manualReference.trim().slice(0, 200)
-      : ''
-    const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 500) : ''
     const idempotencyKey = typeof body?.idempotencyKey === 'string'
       ? body.idempotencyKey.trim().slice(0, 200)
       : ''
@@ -155,13 +186,6 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       )
     }
-    if (action === 'CONFIRM_MANUAL' && manualReference.length < 4) {
-      return NextResponse.json(
-        { error: 'manualReference is required to confirm an external refund' },
-        { status: 400 }
-      )
-    }
-
     const intent = await prisma.paymentIntent.findUnique({
       where: { id: paymentIntentId },
       select: {
@@ -186,6 +210,23 @@ export async function PATCH(request: NextRequest) {
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (!assertCrmCountryAllowed(security, job.countryCode)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    if (isLegacyReadOnlyProvider(intent.gateway)) {
+      return NextResponse.json(
+        { error: 'Legacy payment records are read-only; PayPal and PayHere refund actions are retired', code: 'PAYMENT_PROVIDER_RETIRED' },
+        { status: 409 }
+      )
+    }
+
+    if (action === 'CONFIRM_MANUAL') {
+      return NextResponse.json(
+        {
+          error: 'A typed refund reference is not evidence. Reconcile an independent bank or PSP result before completing the refund.',
+          code: 'REFUND_EXTERNAL_EVIDENCE_REQUIRED',
+          status: 'WAITING_BANK',
+        },
+        { status: 409 }
+      )
     }
 
     if (action === 'RECONCILE') {
@@ -252,25 +293,10 @@ export async function PATCH(request: NextRequest) {
       targetId: intent.id,
       amountMinor: intent.amount,
       currency: intent.currency,
-      reasonCode:
-        action === 'CONFIRM_MANUAL'
-          ? 'MANUAL_EXTERNAL_REFUND_CONFIRMATION'
-          : 'GATEWAY_REFUND_REQUEST',
-      note:
-        action === 'CONFIRM_MANUAL'
-          ? (note || 'Manual external refund confirmation requested')
-          : `${intent.gateway} refund request submitted for approval`,
+      reasonCode: 'GATEWAY_REFUND_REQUEST',
+      note: `${intent.gateway} refund request submitted for approval`,
       idempotencyKey,
-      actionPayload:
-        action === 'CONFIRM_MANUAL'
-          ? {
-              mode: 'CONFIRM_MANUAL',
-              manualReference,
-              note,
-            }
-          : {
-              mode: 'REQUEST_GATEWAY_REFUND',
-            },
+      actionPayload: { mode: 'STAGE_PROVIDER_NEUTRAL_REFUND' },
       risk: currentRisk.risk,
     })
 

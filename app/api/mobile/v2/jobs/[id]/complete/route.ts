@@ -116,18 +116,18 @@ export async function POST(
       if (rateLimitResponse) return rateLimitResponse
 
       const paymentState = await prisma.jobEscrow.findFirst({
-        where: { jobId: job.id, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
-        select: { paymentMethod: true, status: true },
+        where: { jobId: job.id, status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] } },
+        select: { paymentMethod: true, status: true, cashCollectionStatus: true },
       })
       if (
         paymentState?.paymentMethod === 'CASH' &&
-        paymentState.status === 'CASH_CONFIRMED' &&
-        body.cashPaidConfirmed !== true
+        ['CASH_CONFIRMED', 'CASH_SELECTED'].includes(paymentState.status) &&
+        paymentState.cashCollectionStatus !== 'CUSTOMER_CONFIRMED'
       ) {
         return NextResponse.json(
           {
-            error: 'Confirm that cash was paid to the provider before approving completion.',
-            code: 'CASH_PAYMENT_CONFIRMATION_REQUIRED',
+            error: 'The provider must report the cash received and you must confirm the amount before approving completion.',
+            code: 'CASH_COLLECTION_CONFIRMATION_REQUIRED',
           },
           { status: 400 }
         )
@@ -161,7 +161,7 @@ export async function POST(
         success: true,
         message:
           result.paymentMethod === 'CASH'
-            ? 'Job completed. Cash settlement recorded and platform amount added to the provider weekly settlement.'
+            ? 'Job completed. The customer-confirmed cash amount was recorded; no funds were held by MaintainEX.'
             : 'Job completed, funds released',
         paymentMethod: result.paymentMethod,
         commission: result.commission,

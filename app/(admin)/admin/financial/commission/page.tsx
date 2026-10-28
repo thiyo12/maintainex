@@ -124,9 +124,7 @@ interface PaymentPayload {
   }
 }
 
-type StepUpTarget =
-  | { type: 'settlement'; id: string; action: 'SUSPEND' | 'UNSUSPEND' }
-  | { type: 'payment'; id: string; action: 'CONFIRM' }
+type StepUpTarget = { type: 'settlement'; id: string; action: 'SUSPEND' | 'UNSUSPEND' }
 
 function money(amount: number, currency: string) {
   return new Intl.NumberFormat(currency === 'CAD' ? 'en-CA' : 'en-LK', {
@@ -149,10 +147,6 @@ function settlementTone(status: string): CrmTone {
   if (status === 'OVERDUE') return 'danger'
   if (status === 'SUSPENDED') return 'warning'
   return 'info'
-}
-
-function paymentTone(status: string): CrmTone {
-  return status === 'CONFIRMED' ? 'success' : 'warning'
 }
 
 export default function CommissionPage() {
@@ -286,32 +280,6 @@ export default function CommissionPage() {
     }
   }
 
-  async function confirmPayment(paymentId: string, proof: string) {
-    if (acting) return
-    setActing(paymentId)
-    try {
-      const response = await fetch('/api/admin/financial/commission/payments', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CRM-Step-Up': proof,
-        },
-        body: JSON.stringify({ paymentId }),
-      })
-      const body = await response.json().catch(() => ({}))
-      if (!response.ok) crmApiError(body, 'Payment confirmation failed')
-
-      toast.success('Commission payment confirmed and settlement reconciled')
-      setStepUpTarget(null)
-      await load()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Payment confirmation failed')
-    } finally {
-      setActing(null)
-    }
-  }
-
   const metrics = settlements?.summaryByCurrency || []
 
   return (
@@ -319,9 +287,15 @@ export default function CommissionPage() {
       <CrmPageHeader
         eyebrow="Finance · Provider obligations"
         title="Commission Control"
-        description="Monitor weekly provider commission debt, enforce overdue obligations, and reconcile recorded payments. CRM never clears commission debt without a matching payment record."
+        description="Monitor weekly provider commission obligations and reviewed appeals. A recorded transfer reference stays pending until a bank credit is independently matched."
         actions={
           <>
+            <Link href="/admin/financial/commission/bank-reconciliation">
+              <CrmButton variant="secondary">
+                <FiCheckCircle size={14} />
+                Bank reconciliation
+              </CrmButton>
+            </Link>
             <Link href="/admin/approvals">
               <CrmButton variant="secondary">
                 <FiShield size={14} />
@@ -592,12 +566,12 @@ export default function CommissionPage() {
         <CrmState
           type="empty"
           title="No commission payment records match this view"
-          description="A provider payment must be recorded before Finance can confirm and clear the matching commission debt."
+            description="No remittance claims match the current filters. Bank confirmation remains pending until independent credit evidence is connected."
         />
       ) : (
         <CrmTableFrame
           title="Recorded commission payments"
-          description="Confirmation checks provider, settlement, market, currency and exact amount, then atomically reconciles the settlement."
+          description="Claims remain pending until an independent bank-credit record is matched to the provider, market, currency and amount."
         >
           <table className={`${crmTableClass} min-w-[1180px]`}>
             <thead>
@@ -640,32 +614,14 @@ export default function CommissionPage() {
                     </div>
                   </td>
                   <td className={crmTdClass}>
-                    <CrmBadge tone={paymentTone(item.status)} dot>
-                      {item.status}
+                    <CrmBadge tone={item.status === 'PENDING' ? 'warning' : 'neutral'} dot>
+                      {item.status === 'PENDING' ? 'Waiting for bank' : 'Historical · needs review'}
                     </CrmBadge>
                   </td>
                   <td className={`${crmTdClass} text-right`}>
-                    {item.status === 'PENDING' && payments?.actions.reconcile ? (
-                      <CrmButton
-                        size="sm"
-                        variant="primary"
-                        disabled={acting === item.id}
-                        onClick={() =>
-                          setStepUpTarget({
-                            type: 'payment',
-                            id: item.id,
-                            action: 'CONFIRM',
-                          })
-                        }
-                      >
-                        <FiCheckCircle size={13} />
-                        Confirm payment
-                      </CrmButton>
-                    ) : (
-                      <CrmBadge tone={item.status === 'CONFIRMED' ? 'success' : 'neutral'}>
-                        {item.status === 'CONFIRMED' ? 'Confirmed' : 'Read only'}
-                      </CrmBadge>
-                    )}
+                    <CrmBadge tone="warning">
+                      {item.status === 'PENDING' ? 'Evidence required' : 'Do not treat as paid'}
+                    </CrmBadge>
                   </td>
                 </tr>
               ))}
@@ -688,9 +644,7 @@ export default function CommissionPage() {
           <div>
             <div className="text-sm font-semibold text-amber-950">Commission safety model</div>
             <p className="mt-1 text-xs leading-5 text-amber-900/75">
-              CRM cannot directly mark weekly debt paid. Finance confirms an existing payment reference after
-              server-side provider, amount, currency and market checks. Suspension/reactivation uses a one-time
-              TOTP proof and never clears the debt itself.
+              CRM cannot clear debt from a provider-entered reference or screenshot. A bank statement/feed match is still required; existing confirmed flags need reconciliation review. Suspension/reactivation uses one-time TOTP and never clears the debt.
             </p>
           </div>
         </div>
@@ -698,33 +652,21 @@ export default function CommissionPage() {
 
       <CrmStepUpModal
         open={Boolean(stepUpTarget)}
-        actionId={
-          stepUpTarget?.type === 'payment'
-            ? 'finance.commission.reconcile'
-            : 'finance.commission.enforce'
-        }
+        actionId="finance.commission.enforce"
         title={
-          stepUpTarget?.type === 'payment'
-            ? 'Verify commission payment confirmation'
-            : stepUpTarget?.action === 'SUSPEND'
+          stepUpTarget?.action === 'SUSPEND'
               ? 'Verify provider suspension'
               : 'Verify provider reactivation'
         }
         description={
-          stepUpTarget?.type === 'payment'
-            ? 'Confirming payment clears the matching commission debt and may reactivate the provider. Enter your authenticator code.'
-            : 'This changes provider marketplace access. The commission debt itself is not edited.'
+          'This changes provider marketplace access. The commission debt itself is not edited.'
         }
         onClose={() => {
           if (!acting) setStepUpTarget(null)
         }}
         onVerified={async proof => {
           if (!stepUpTarget) return
-          if (stepUpTarget.type === 'payment') {
-            await confirmPayment(stepUpTarget.id, proof)
-          } else {
-            await settlementAction(stepUpTarget.id, stepUpTarget.action, proof)
-          }
+          await settlementAction(stepUpTarget.id, stepUpTarget.action, proof)
         }}
       />
     </div>

@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
+import { randomUUID } from 'node:crypto'
 
 const prisma = new PrismaClient()
+const fixture = randomUUID()
+const slug = `test-electrician-${fixture}`
+const i18nKey = `professions.testElectrician-${fixture}`
 
 describe('Phase 10.1 — Profession CRUD', () => {
   let professionId: string
@@ -9,7 +13,7 @@ describe('Phase 10.1 — Profession CRUD', () => {
   afterAll(async () => {
     // Cleanup: delete test data
     if (professionId) {
-      await prisma.profession.deleteMany({ where: { slug: { startsWith: 'test-' } } })
+      await prisma.profession.deleteMany({ where: { id: professionId } })
     }
     await prisma.$disconnect()
   })
@@ -17,21 +21,21 @@ describe('Phase 10.1 — Profession CRUD', () => {
   it('creates a profession with valid data', async () => {
     const prof = await prisma.profession.create({
       data: {
-        slug: 'test-electrician',
-        i18nKey: 'professions.testElectrician',
+        slug,
+        i18nKey,
         description: 'Test electrician profession',
         sortOrder: 100,
       },
     })
     professionId = prof.id
-    expect(prof.slug).toBe('test-electrician')
+    expect(prof.slug).toBe(slug)
     expect(prof.isActive).toBe(true)
   })
 
   it('rejects duplicate slug', async () => {
     await expect(
       prisma.profession.create({
-        data: { slug: 'test-electrician', i18nKey: 'professions.testElectrician2' },
+        data: { slug, i18nKey: `${i18nKey}2` },
       })
     ).rejects.toThrow()
   })
@@ -39,7 +43,7 @@ describe('Phase 10.1 — Profession CRUD', () => {
   it('rejects duplicate i18nKey', async () => {
     await expect(
       prisma.profession.create({
-        data: { slug: 'test-electrician-2', i18nKey: 'professions.testElectrician' },
+        data: { slug: `${slug}-2`, i18nKey },
       })
     ).rejects.toThrow()
   })

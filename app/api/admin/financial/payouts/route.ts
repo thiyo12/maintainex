@@ -110,6 +110,23 @@ export async function GET(request: NextRequest) {
       : []
 
     const userMap = new Map(users.map(user => [user.id, user]))
+    const transferEvidence = payouts.length
+      ? await prisma.financialTransferEvidence.findMany({
+          where: { transferType: 'PAYOUT', targetId: { in: payouts.map(row => row.id) } },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true, targetId: true, sourceId: true, outcome: true, amount: true,
+            currency: true, countryCode: true, verificationMethod: true, verifiedAt: true,
+            observedAt: true, createdAt: true,
+          },
+        })
+      : []
+    const evidenceByPayout = new Map<string, typeof transferEvidence>()
+    for (const evidence of transferEvidence) {
+      const entries = evidenceByPayout.get(evidence.targetId) || []
+      if (entries.length < 10) entries.push(evidence)
+      evidenceByPayout.set(evidence.targetId, entries)
+    }
 
     return NextResponse.json(
       {
@@ -119,6 +136,10 @@ export async function GET(request: NextRequest) {
             ...payout,
             amount: payout.amount.toString(),
             bankDetails: payout.bankDetails ? '[REDACTED]' : null,
+            transferEvidence: (evidenceByPayout.get(payout.id) || []).map(evidence => ({
+              ...evidence,
+              amount: evidence.amount.toString(),
+            })),
             provider: user
               ? {
                   id: user.id,

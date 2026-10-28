@@ -1,44 +1,46 @@
-import { describe, expect, it, vi } from 'vitest'
-import { resolveEscrowFundingSource } from '@/lib/finance/payments/funding-source'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-function client(options: {
-  debit?: { accountId: string; accountType: string } | null
-  captured?: { id: string } | null
-}) {
-  return {
-    financialLedger: {
-      findFirst: vi.fn().mockResolvedValue(options.debit ?? null),
-    },
-    paymentIntent: {
-      findFirst: vi.fn().mockResolvedValue(options.captured ?? null),
-    },
-  } as any
-}
+const mocks = vi.hoisted(() => ({
+  ledger: vi.fn(),
+  intent: vi.fn(),
+}))
 
-describe('escrow funding source resolution', () => {
-  it('recognizes PayHere ledger deposits', async () => {
-    await expect(resolveEscrowFundingSource(client({
-      debit: { accountId: 'external:payhere', accountType: 'EXTERNAL_PAYOUT' },
-    }), 'esc-1')).resolves.toBe('PAYHERE')
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    financialLedger: { findFirst: mocks.ledger },
+    paymentIntent: { findFirst: mocks.intent },
+  },
+}))
+
+describe('historical escrow funding source', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.ledger.mockResolvedValue(null)
+    mocks.intent.mockResolvedValue(null)
   })
 
-  it('recognizes customer wallet deposits', async () => {
-    await expect(resolveEscrowFundingSource(client({
-      debit: { accountId: 'wallet-1', accountType: 'CUSTOMER_WALLET' },
-    }), 'esc-1')).resolves.toBe('WALLET')
+  it('uses the gateway recorded on the captured intent instead of assuming PayHere', async () => {
+    mocks.intent.mockResolvedValue({ id: 'pi-paypal', gateway: 'PAYPAL' })
+    const { resolveEscrowFundingSource } = await import('@/lib/finance/payments/funding-source')
+
+    await expect(resolveEscrowFundingSource({ financialLedger: { findFirst: mocks.ledger }, paymentIntent: { findFirst: mocks.intent } } as never, 'escrow-1')).resolves.toBe('PAYPAL')
   })
 
-  it('falls back to captured payment intent for historical PayHere deposits', async () => {
-    await expect(resolveEscrowFundingSource(client({
-      debit: null,
-      captured: { id: 'pi-1' },
-    }), 'esc-1')).resolves.toBe('PAYHERE')
+  it('does not infer PayHere from a generic external payout account type', async () => {
+    mocks.ledger.mockResolvedValue({ accountId: 'external:unknown-provider', accountType: 'EXTERNAL_PAYOUT' })
+    mocks.intent.mockResolvedValue({ id: 'pi-unknown', gateway: 'NEW_PROVIDER' })
+    const { resolveEscrowFundingSource } = await import('@/lib/finance/payments/funding-source')
+
+    await expect(resolveEscrowFundingSource({ financialLedger: { findFirst: mocks.ledger }, paymentIntent: { findFirst: mocks.intent } } as never, 'escrow-1')).resolves.toBe('UNKNOWN')
   })
 
-  it('fails closed when funding source cannot be proven', async () => {
-    await expect(resolveEscrowFundingSource(client({
-      debit: null,
-      captured: null,
-    }), 'esc-1')).resolves.toBe('UNKNOWN')
+  it('continues to identify legacy PayHere and wallet funding from explicit ledger accounts', async () => {
+    const { resolveEscrowFundingSource } = await import('@/lib/finance/payments/funding-source')
+    mocks.ledger.mockResolvedValue({ accountId: 'external:payhere', accountType: 'EXTERNAL_PAYOUT' })
+    const client = { financialLedger: { findFirst: mocks.ledger }, paymentIntent: { findFirst: mocks.intent } } as never
+    await expect(resolveEscrowFundingSource(client, 'escrow-1')).resolves.toBe('PAYHERE')
+
+    mocks.ledger.mockResolvedValue({ accountId: 'wallet-1', accountType: 'CUSTOMER_WALLET' })
+    await expect(resolveEscrowFundingSource(client, 'escrow-2')).resolves.toBe('WALLET')
   })
 })

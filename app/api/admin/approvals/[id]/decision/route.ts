@@ -16,6 +16,7 @@ import {
 import { consumeCrmStepUpFromHeader } from '@/lib/crm/governance/step-up'
 import { resolveCurrentApprovalRisk } from '@/lib/crm/governance/current-risk'
 import { executeApprovedCrmRequest } from '@/lib/crm/governance/approval-execution'
+import { rejectCommissionBankReversal } from '@/lib/finance/commissions/bank-credit-reversal'
 
 export async function POST(
   request: NextRequest,
@@ -102,6 +103,29 @@ export async function POST(
       stepUp,
       currentRisk: current.risk,
     })
+
+    if (decision === 'REJECT' && approval.actionId === 'finance.commission.reconcile' && approval.actionPayload) {
+      try {
+        const payload = JSON.parse(approval.actionPayload)
+        if (
+          payload && typeof payload === 'object' && !Array.isArray(payload) &&
+          payload.mode === 'BANK_REVERSAL' && payload.bankTransactionId === approval.targetId
+        ) {
+          await rejectCommissionBankReversal({
+            bankTransactionId: approval.targetId,
+            actorAdminId: security.adminId,
+            approvalRequestId: approval.id,
+            reason: typeof reason === 'string' ? reason : 'Bank reversal approval rejected',
+          })
+        }
+      } catch (error) {
+        secureConsole.error('CRM bank reversal rejection follow-up failed', {
+          errorType: error instanceof Error ? error.name : 'unknown',
+          approvalId: approval.id,
+        })
+        return NextResponse.json({ error: 'Approval was rejected but reversal reservation cleanup failed', code: 'BANK_REVERSAL_REJECTION_CLEANUP_FAILED' }, { status: 500 })
+      }
+    }
 
     if ('retiered' in result && result.retiered) {
       return NextResponse.json({

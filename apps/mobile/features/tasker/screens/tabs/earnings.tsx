@@ -179,7 +179,7 @@ export default function TaskerEarnings() {
                 <View key={payment.id} style={styles.commissionRow}>
                   <View style={styles.txCopy}>
                     <Text style={styles.txTitle}>{payment.referenceNumber}</Text>
-                    <Text style={styles.txDate}>Payment reference · {payment.method}</Text>
+                    <Text style={styles.txDate}>Waiting for verified bank-credit instructions · {payment.referenceNumber}</Text>
                   </View>
                   <Text style={styles.commissionAmount}>{displayCurrency} {Number(payment.amountDue || 0).toLocaleString()}</Text>
                 </View>

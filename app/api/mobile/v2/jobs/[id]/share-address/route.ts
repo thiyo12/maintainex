@@ -45,7 +45,7 @@ export async function POST(
       if (job.addressSharedAt) throw new Error('SHARE_ADDRESS_ALREADY_SHARED')
 
       const paymentReady = await tx.jobEscrow.findFirst({
-        where: { jobId: id, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+        where: { jobId: id, status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] } },
         select: { id: true, paymentMethod: true },
       })
       if (!paymentReady) throw new Error('SHARE_ADDRESS_PAYMENT_NOT_CONFIRMED')

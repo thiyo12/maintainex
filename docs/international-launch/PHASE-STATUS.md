@@ -318,9 +318,15 @@ The software changes below remain subject to review and CI; this is not market o
 - Added Safety Centre English/Tamil/Sinhala dictionary entries and parity checks plus Tamil/Sinhala
   service-search alias tests. Automated key/route tests pass; native-speaker and legal copy review
   remains pending. French continues to use the explicitly documented English fallback.
-- Added a version- and source-guarded mobile `node-forge@1.4.0` postinstall hardening patch with
-  valid-signature and malformed-DigestInfo regression coverage. The upstream package advisory has
-  no fixed release; scanners may continue to flag package metadata until upstream publishes one.
+- Upgraded mobile `node-forge` to upstream `1.4.2` without changing Expo 56. Its 1.4.1 security
+  release adds nested DigestAlgorithm and canonical DigestInfo validation; 1.4.2 contains those
+  guards and a PEM Buffer compatibility fix. A clean Expo 56 install, mobile TypeScript, and six
+  actual-package signature regressions pass. The local postinstall patch was removed. Exact-head CI
+  passed on payment SHA `d198e5088d9c226426b39bbe3ef134be96d13f95`: all three PR workflows passed;
+  CRM reported 4,762 tests passed across 508 files with no skips. The separate local-HTTP gate
+  passed 8 tests and skipped 18 API-environment-gated checks. The iOS simulator build workflow is
+  still running. GHSA-86w9 metadata still shows no patched version even though upstream lists the
+  same nested-element issue as patched in 1.4.1. Private Dependabot status remains unverified.
 - The checked Next.js version is `15.5.28`, which the [14 Oct 2026 upstream security update](https://nextjs.org/blog/nextjs-security-update-october-14-2026)
   names as the patched Maintenance LTS version. The production build and web/mobile TypeScript
   checks passed locally.

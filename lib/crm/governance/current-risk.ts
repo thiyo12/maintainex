@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getActiveEmergencyControl } from '@/lib/crm/emergency-controls'
 import { inspectCrmJobCancellation } from '@/lib/crm/jobs/cancellation'
 import type { CrmActionId, RiskPolicyContext } from './types'
+import { assertTrustedBankEvidenceSource } from '@/lib/finance/commissions/bank-credit-reconciliation'
 
 export interface ApprovalRiskResolution {
   actionId: CrmActionId
@@ -18,7 +19,46 @@ export async function resolveCurrentApprovalRisk(request: {
   targetId: string
   amountMinor: bigint | null
   currency: string | null
+  actionPayload?: string | null
+  id?: string
+  initiatorAdminId?: string
 }): Promise<ApprovalRiskResolution> {
+  if (request.actionId === 'disputes.financial_resolution') {
+    if (request.targetType !== 'MarketplaceDispute' || !request.actionPayload) throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+    let payload: unknown
+    try { payload = JSON.parse(request.actionPayload) } catch { throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID') }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+    const value = payload as Record<string, unknown>
+    if (value.mode !== 'COMMISSION_WAIVER' || value.disputeId !== request.targetId || typeof value.receivableId !== 'string' || typeof value.reason !== 'string') {
+      throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+    }
+    const [dispute, receivable] = await Promise.all([
+      prisma.marketplaceDispute.findUnique({ where: { id: request.targetId }, select: { id: true, status: true, countryCode: true, job: { select: { id: true, countryCode: true } } } }),
+      prisma.providerCommissionReceivable.findUnique({ where: { id: value.receivableId }, select: { id: true, jobId: true, currency: true, amountRemaining: true, status: true, providerIdentity: { select: { countryCode: true } } } }),
+    ])
+    if (!dispute || !receivable) throw new Error('APPROVAL_TARGET_NOT_FOUND')
+    const market = (dispute.countryCode || dispute.job.countryCode).toUpperCase()
+    if (dispute.job.id !== receivable.jobId || market !== dispute.job.countryCode.toUpperCase() || market !== receivable.providerIdentity.countryCode.toUpperCase() || market !== request.market.toUpperCase()) {
+      throw new Error('APPROVAL_MARKET_CHANGED')
+    }
+    if (!['OPEN', 'UNDER_REVIEW', 'RESOLVING'].includes(dispute.status)) throw new Error('APPROVAL_DISPUTE_STATE_INVALID')
+    if (request.initiatorAdminId) {
+      const [initiator, assignment] = await Promise.all([
+        prisma.adminUser.findUnique({ where: { id: request.initiatorAdminId }, select: { role: true, isActive: true, deletedAt: true } }),
+        prisma.adminAlert.findFirst({ where: { targetTable: 'MarketplaceDispute', targetId: dispute.id, status: { in: ['open', 'in_progress'] } }, select: { assignedTo: true }, orderBy: { createdAt: 'asc' } }),
+      ])
+      if (!initiator?.isActive || initiator.deletedAt ||
+          (!['MANAGER', 'SUPER_ADMIN'].includes(initiator.role) && assignment?.assignedTo !== request.initiatorAdminId)) {
+        throw new Error('APPROVAL_CASE_ASSIGNMENT_CHANGED')
+      }
+    }
+    if (!['OPEN', 'PARTIAL'].includes(receivable.status)) throw new Error('APPROVAL_RECEIVABLE_STATE_INVALID')
+    if (request.amountMinor === null || request.amountMinor <= 0n || request.amountMinor > receivable.amountRemaining) throw new Error('APPROVAL_AMOUNT_CHANGED')
+    if (request.currency?.toUpperCase() !== receivable.currency.toUpperCase()) throw new Error('APPROVAL_CURRENCY_CHANGED')
+    if (value.reason.trim().length < 10 || value.reason.length > 1000) throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+    return { actionId: 'disputes.financial_resolution', market, amountMinor: request.amountMinor, currency: receivable.currency, risk: {} }
+  }
+
   if (request.actionId === 'finance.refund') {
     if (request.targetType !== 'PaymentIntent') {
       throw new Error('APPROVAL_TARGET_TYPE_INVALID')
@@ -263,6 +303,92 @@ export async function resolveCurrentApprovalRisk(request: {
         firstPayout: priorSucceededCount === 0,
         rollingRecipientAmountMinor24h: recipient24h._sum.amount ?? payout.amount,
         rollingRecipientAmountMinor7d: recipient7d._sum.amount ?? payout.amount,
+      },
+    }
+  }
+
+  if (request.actionId === 'finance.commission.reconcile') {
+    if (request.targetType !== 'CommissionBankTransaction') {
+      throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+    }
+    let mode = 'BANK_CREDIT'
+    if (request.actionPayload) {
+      try {
+        const payload = JSON.parse(request.actionPayload)
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('invalid')
+        mode = typeof payload.mode === 'string' ? payload.mode : ''
+        if (payload.bankTransactionId !== request.targetId) throw new Error('invalid')
+      } catch {
+        throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+      }
+    }
+    if (mode === 'BANK_REVERSAL') {
+      const reversal = await prisma.commissionBankReversal.findUnique({
+        where: { bankTransactionId: request.targetId },
+        include: {
+          bankTransaction: { include: { statementImport: true } },
+          originalBankTransaction: { include: { statementImport: true, reconciliation: true } },
+        },
+      })
+      if (!reversal) throw new Error('APPROVAL_TARGET_NOT_FOUND')
+      const debit = reversal.bankTransaction
+      const original = reversal.originalBankTransaction
+      if (
+        reversal.status !== 'PENDING_REVIEW' || debit.direction !== 'DEBIT' ||
+        debit.reversalOfTransactionId !== original.transactionId || original.direction !== 'CREDIT' ||
+        !original.reconciliation || original.reconciliation.status !== 'POSTED' ||
+        reversal.originalReconciliationId !== original.reconciliation.id ||
+        request.id && reversal.approvalRequestId !== request.id ||
+        debit.bankAccountRef !== original.bankAccountRef || debit.sourceSystem !== original.sourceSystem ||
+        debit.countryCode.toUpperCase() !== original.countryCode.toUpperCase() || debit.countryCode.toUpperCase() !== request.market.toUpperCase() ||
+        debit.currency !== original.currency || reversal.amountMinor !== debit.amountMinor ||
+        request.amountMinor !== null && request.amountMinor !== debit.amountMinor ||
+        request.currency && request.currency.toUpperCase() !== debit.currency.toUpperCase()
+      ) throw new Error('BANK_REVERSAL_NO_LONGER_ELIGIBLE')
+      assertTrustedBankEvidenceSource(debit.statementImport)
+      assertTrustedBankEvidenceSource(original.statementImport)
+      return {
+        actionId: 'finance.commission.reconcile',
+        market: debit.countryCode,
+        amountMinor: debit.amountMinor,
+        currency: debit.currency,
+        risk: { currencyMismatch: false, countryOrRecipientMismatch: false },
+      }
+    }
+    if (mode !== 'BANK_CREDIT') throw new Error('APPROVAL_ACTION_PAYLOAD_INVALID')
+    const bankTransaction = await prisma.commissionBankTransaction.findUnique({
+      where: { id: request.targetId },
+      include: { statementImport: true, reconciliation: true },
+    })
+    if (!bankTransaction || !bankTransaction.reconciliation) throw new Error('APPROVAL_TARGET_NOT_FOUND')
+    if (bankTransaction.countryCode.toUpperCase() !== request.market.toUpperCase() ||
+        bankTransaction.reconciliation.countryCode.toUpperCase() !== request.market.toUpperCase()) {
+      throw new Error('APPROVAL_MARKET_CHANGED')
+    }
+    if (request.amountMinor !== null && request.amountMinor !== bankTransaction.amountMinor) {
+      throw new Error('APPROVAL_AMOUNT_CHANGED')
+    }
+    if (request.currency && request.currency.toUpperCase() !== bankTransaction.currency.toUpperCase()) {
+      throw new Error('APPROVAL_CURRENCY_CHANGED')
+    }
+    try {
+      assertTrustedBankEvidenceSource(bankTransaction.statementImport)
+    } catch {
+      throw new Error('BANK_RECONCILIATION_NO_LONGER_ELIGIBLE')
+    }
+    if (
+        bankTransaction.reconciliation.status !== 'PENDING_REVIEW' ||
+        bankTransaction.direction !== 'CREDIT' || bankTransaction.reversalOfTransactionId) {
+      throw new Error('BANK_RECONCILIATION_NO_LONGER_ELIGIBLE')
+    }
+    return {
+      actionId: 'finance.commission.reconcile',
+      market: bankTransaction.countryCode,
+      amountMinor: bankTransaction.amountMinor,
+      currency: bankTransaction.currency,
+      risk: {
+        currencyMismatch: false,
+        countryOrRecipientMismatch: false,
       },
     }
   }

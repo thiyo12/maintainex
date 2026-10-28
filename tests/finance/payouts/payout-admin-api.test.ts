@@ -171,7 +171,7 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
     expect(denied.status).toBe(403)
   })
 
-  it('FINANCE admin external payout confirmation creates a governed approval request', async () => {
+  it('FINANCE admin cannot confirm a payout from a typed external reference alone', async () => {
     const requested = await requestPayout(
       providerUserId, 50000n, 'BANK', '{"account":"test-acc"}',
       `payout-admin-api-${ts}-approve`, 'test'
@@ -190,10 +190,10 @@ describe.skipIf(!requiresPostgres())('Admin payout approval API', () => {
       providerRef: 'BANK-REF-1',
       idempotencyKey: `payout-admin-api-${ts}-confirm-${requested.payoutId}`,
     }), params(requested.payoutId))
-    expect(res.status).toBe(202)
+    expect(res.status).toBe(409)
     const data = await res.json()
-    expect(data.mode).toBe('APPROVAL_REQUIRED')
-    expect(data.approval?.id).toBeTruthy()
+    expect(data.code).toBe('PAYOUT_EXTERNAL_EVIDENCE_REQUIRED')
+    expect(data.status).toBe('WAITING_BANK')
 
     const payout = await prisma.payout.findUnique({ where: { id: requested.payoutId } })
     expect(payout!.status).toBe('RESERVED')

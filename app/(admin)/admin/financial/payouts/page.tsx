@@ -117,14 +117,6 @@ function statusTone(status: string): CrmTone {
   return 'warning'
 }
 
-function newIdempotencyKey(item: PayoutItem) {
-  const nonce =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  return `crm-payout-confirm:${item.id}:${nonce}`
-}
-
 export default function PayoutQueuePage() {
   const [payload, setPayload] = useState<Payload | null>(null)
   const [status, setStatus] = useState('ALL')
@@ -132,9 +124,6 @@ export default function PayoutQueuePage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string | null>(null)
-
-  const [confirmTarget, setConfirmTarget] = useState<PayoutItem | null>(null)
-  const [providerRef, setProviderRef] = useState('')
 
   const [reasonTarget, setReasonTarget] = useState<{
     item: PayoutItem
@@ -227,50 +216,6 @@ export default function PayoutQueuePage() {
     }))
   }, [payload])
 
-  async function submitExternalConfirmation() {
-    if (!confirmTarget || acting) return
-    const ref = providerRef.trim()
-    if (ref.length < 4) {
-      toast.error('Enter the external bank/provider transfer reference')
-      return
-    }
-
-    setActing(confirmTarget.id)
-    try {
-      const response = await fetch(
-        `/api/admin/financial/payouts/${confirmTarget.id}`,
-        {
-          method: 'PATCH',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'CONFIRM_EXTERNAL',
-            providerRef: ref,
-            idempotencyKey: newIdempotencyKey(confirmTarget),
-          }),
-        }
-      )
-      const body = await response.json().catch(() => ({}))
-
-      if (!response.ok && response.status !== 202) {
-        crmApiError(body, 'Unable to submit payout approval')
-      }
-
-      toast.success(
-        body?.approval?.status === 'ON_HOLD'
-          ? 'Payout request created but held by live risk policy'
-          : `Payout submitted for ${body?.approval?.tier || 'finance'} approval`
-      )
-      setConfirmTarget(null)
-      setProviderRef('')
-      await load()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Payout approval failed')
-    } finally {
-      setActing(null)
-    }
-  }
-
   function prepareSaferAction() {
     if (!reasonTarget) return
     if (reason.trim().length < 4) {
@@ -334,7 +279,7 @@ export default function PayoutQueuePage() {
       <CrmPageHeader
         eyebrow="Finance · External disbursements"
         title="Payout Queue"
-        description="Review reserved provider funds, submit external-transfer evidence for maker-checker approval, and safely fail or cancel payouts back to the provider wallet."
+        description="Review reserved provider funds and resolve failures. Success stays pending until an independent bank or payment-provider result is available."
         actions={
           <>
             <Link href="/admin/approvals">
@@ -411,7 +356,7 @@ export default function PayoutQueuePage() {
       ))}
 
       <CrmFilterBar>
-        <div className="relative min-w-0 flex-1">
+        <div className="relative w-full min-w-0 md:flex-1">
           <FiSearch
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
             size={15}
@@ -427,7 +372,7 @@ export default function PayoutQueuePage() {
         <select
           value={status}
           onChange={event => setStatus(event.target.value)}
-          className={crmInputClass}
+          className={`${crmInputClass} w-full min-w-0 md:w-auto md:min-w-[190px] md:flex-none`}
           aria-label="Payout status"
         >
           <option value="ALL">All payout states</option>
@@ -455,7 +400,7 @@ export default function PayoutQueuePage() {
       ) : (
         <CrmTableFrame
           title="Provider payout operations"
-          description="Bank details are redacted. External completion creates a governed approval request; CRM never directly marks a payout successful."
+          description="Bank details are redacted. A typed transfer reference cannot prove payment; unresolved transfers remain pending."
         >
           <table className={`${crmTableClass} min-w-[1380px]`}>
             <thead>
@@ -533,18 +478,7 @@ export default function PayoutQueuePage() {
                         {payload?.actions?.payout &&
                           ['RESERVED', 'PROCESSING'].includes(item.status) && (
                             <>
-                              <CrmButton
-                                size="sm"
-                                variant="primary"
-                                disabled={acting === item.id || isMarketFrozen(item.countryCode)}
-                                onClick={() => {
-                                  setConfirmTarget(item)
-                                  setProviderRef('')
-                                }}
-                              >
-                                <FiCheckCircle size={13} />
-                                Confirm transfer
-                              </CrmButton>
+                              <CrmBadge tone="warning">Waiting for verified bank result</CrmBadge>
 
                               <CrmButton
                                 size="sm"
@@ -602,61 +536,12 @@ export default function PayoutQueuePage() {
             <div className="text-sm font-semibold text-amber-950">Payout safety model</div>
             <p className="mt-1 text-xs leading-5 text-amber-900/75">
               Amount, market, KYC, account risk and payout velocity are recalculated from live data.
-              Confirmation requires an external transfer reference and T1–T4 approval. T2+ uses maker-checker separation.
+              A provider reference alone cannot mark a payout paid. Confirmations remain disabled until an independent bank/PSP result is connected and reconciled.
               Failed/cancelled payouts require TOTP step-up and restore reserved funds through the canonical ledger.
             </p>
           </div>
         </div>
       </div>
-
-      <CrmModal
-        open={Boolean(confirmTarget)}
-        onClose={() => {
-          if (!acting) setConfirmTarget(null)
-        }}
-        title="Submit external payout confirmation"
-        description={
-          confirmTarget
-            ? `${confirmTarget.provider?.name || confirmTarget.userId} · ${money(confirmTarget.amount, confirmTarget.currency)}`
-            : undefined
-        }
-        maxWidth="max-w-lg"
-        footer={
-          <>
-            <CrmButton
-              variant="secondary"
-              onClick={() => setConfirmTarget(null)}
-              disabled={Boolean(acting)}
-            >
-              Cancel
-            </CrmButton>
-            <CrmButton
-              variant="primary"
-              onClick={submitExternalConfirmation}
-              disabled={Boolean(acting)}
-            >
-              {acting ? 'Submitting…' : 'Submit for approval'}
-            </CrmButton>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-              External transfer reference
-            </label>
-            <input
-              value={providerRef}
-              onChange={event => setProviderRef(event.target.value.slice(0, 500))}
-              className={crmInputClass}
-              placeholder="Bank / payment-provider transfer reference"
-            />
-          </div>
-          <div className="rounded-xl border border-[var(--crm-border)] bg-[#fafbf9] p-3 text-xs leading-5 text-slate-500">
-            This does not immediately mark the payout successful. It creates a governed approval request. The payout engine executes only after live risk checks and required approvals pass.
-          </div>
-        </div>
-      </CrmModal>
 
       <CrmModal
         open={Boolean(reasonTarget)}

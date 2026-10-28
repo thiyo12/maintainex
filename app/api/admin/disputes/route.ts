@@ -10,6 +10,11 @@ import { createAuditLog } from '@/lib/crm/audit'
 import { completeAndReleaseEscrow, refundEscrow } from '@/lib/finance/escrow/escrow-service'
 import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
 import { notifyDisputeResolved, notifyPaymentReleased, notifyCashJobCompleted, notifyCashDisputeResolved } from '@/lib/notifications'
+import { claimMarketplaceDisputeInTransaction } from '@/lib/crm/disputes/claim-marketplace-dispute'
+import { finalizeMarketplaceDisputeInTransaction } from '@/lib/crm/disputes/finalize-marketplace-dispute'
+import { reassignMarketplaceDisputeInTransaction } from '@/lib/crm/disputes/reassign-marketplace-dispute'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import { evaluateEffectivePermission } from '@/lib/crm/governance/permissions'
 
 const VALID_STATUSES = new Set(['OPEN', 'UNDER_REVIEW', 'RESOLVING', 'RESOLVED', 'DISMISSED'])
 const MARKETPLACE_RESOLUTION_ACTIONS = new Set(['RELEASE_PROVIDER', 'REFUND_CUSTOMER'])
@@ -59,32 +64,7 @@ async function finalizeMarketplaceDisputeRecord(params: {
   resolution: string
   resolutionAction: 'RELEASE_PROVIDER' | 'REFUND_CUSTOMER'
 }) {
-  const updated = await prisma.marketplaceDispute.update({
-    where: { id: params.disputeId },
-    data: {
-      status: 'RESOLVED',
-      resolution: params.resolution,
-      resolutionAction: params.resolutionAction,
-      resolvedBy: params.adminId,
-      resolvedAt: new Date(),
-    },
-  })
-
-  await prisma.adminAlert.updateMany({
-    where: {
-      targetTable: 'MarketplaceDispute',
-      targetId: params.disputeId,
-      status: { in: ['open', 'in_progress'] },
-    },
-    data: {
-      status: 'resolved',
-      resolvedAt: new Date(),
-      resolvedBy: params.adminId,
-      notes: params.resolution,
-    },
-  })
-
-  return updated
+  return prisma.$transaction(tx => finalizeMarketplaceDisputeInTransaction(tx, params))
 }
 
 export async function GET(request: NextRequest) {
@@ -98,6 +78,104 @@ export async function GET(request: NextRequest) {
     const security = guard.context
 
     const { searchParams } = new URL(request.url)
+    const assigneesFor = searchParams.get('assigneesFor')?.trim()
+    if (assigneesFor) {
+      const canResolve = evaluateEffectivePermission({
+        role: security.role,
+        permission: 'disputes:resolve',
+        overrides: security.permissionOverrides as Array<{ permission: string; effect: 'ALLOW' | 'DENY' }>,
+      }).allowed
+      if (!canResolve) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      if (assigneesFor.length > 128) return NextResponse.json({ error: 'Invalid dispute id' }, { status: 400 })
+      const dispute = await prisma.marketplaceDispute.findUnique({
+        where: { id: assigneesFor },
+        select: { countryCode: true, job: { select: { countryCode: true } } },
+      })
+      if (!dispute) return NextResponse.json({ error: 'Marketplace dispute not found' }, { status: 404 })
+      const countryCode = (dispute.countryCode || dispute.job.countryCode).toUpperCase()
+      if (!assertCrmCountryAllowed(security, countryCode)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+      const staff = await prisma.adminUser.findMany({
+        where: {
+          isActive: true,
+          deletedAt: null,
+          id: { not: security.adminId },
+          OR: [
+            { role: { not: 'SUPER_ADMIN' } },
+            { role: 'SUPER_ADMIN', totpEnabled: true, totpSecret: { not: null } },
+          ],
+        },
+        select: {
+          id: true, role: true, firstName: true, lastName: true, assignedCountries: true,
+          lockedUntil: true, totpEnabled: true,
+          permissionOverrides: { select: { permission: true, effect: true } },
+        },
+        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      })
+      const assignees = staff.filter(candidate => {
+        if (candidate.lockedUntil && candidate.lockedUntil > new Date()) return false
+        if (!Object.hasOwn(ROLE_PERMISSIONS, candidate.role)) return false
+        if (candidate.role === 'SUPER_ADMIN' && !candidate.totpEnabled) return false
+        const permission = evaluateEffectivePermission({
+          role: candidate.role as AdminRole,
+          permission: 'disputes:resolve',
+          overrides: candidate.permissionOverrides
+            .filter(item => item.effect === 'ALLOW' || item.effect === 'DENY')
+            .map(item => ({ permission: item.permission, effect: item.effect as 'ALLOW' | 'DENY' })),
+        })
+        if (!permission.allowed) return false
+        if (candidate.role === 'SUPER_ADMIN') return true
+        let countries: unknown = candidate.assignedCountries
+        try { countries = JSON.parse(candidate.assignedCountries) } catch {}
+        const assigned = Array.isArray(countries) ? countries : String(countries).split(',')
+        return assigned.some(value => typeof value === 'string' && value.trim().toUpperCase() === countryCode)
+      }).map(({ id, role, firstName, lastName }) => ({ id, role, name: `${firstName} ${lastName}`.trim() }))
+      return NextResponse.json({ assignees }, { headers: { 'Cache-Control': 'no-store' } })
+    }
+    const evidenceDisputeId = searchParams.get('evidenceDisputeId')?.trim()
+    if (evidenceDisputeId) {
+      if (evidenceDisputeId.length > 128) {
+        return NextResponse.json({ error: 'Invalid dispute id' }, { status: 400 })
+      }
+      const dispute = await prisma.marketplaceDispute.findUnique({
+        where: { id: evidenceDisputeId },
+        select: { id: true, jobId: true, countryCode: true, job: { select: { countryCode: true } } },
+      })
+      if (!dispute) return NextResponse.json({ error: 'Dispute not found' }, { status: 404 })
+      if (!assertCrmCountryAllowed(security, dispute.countryCode || dispute.job.countryCode)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+
+      const [evidence, corrections] = await Promise.all([prisma.marketplaceDisputeEvidence.findMany({
+        where: { disputeId: dispute.id },
+        select: {
+          id: true,
+          participantType: true,
+          evidenceType: true,
+          description: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 100,
+      }), prisma.marketplaceDisputeCorrection.findMany({
+        where: { disputeId: dispute.id },
+        select: { id: true, amountMinor: true, currency: true, reason: true, status: true, createdAt: true, events: { select: { eventType: true, createdAt: true } } },
+        orderBy: { createdAt: 'asc' }, take: 50,
+      })])
+      return NextResponse.json({
+        evidence: evidence.map(item => ({
+          id: item.id,
+          uploaderType: item.participantType,
+          evidenceType: item.evidenceType,
+          description: item.description,
+          createdAt: item.createdAt,
+        })),
+        corrections: corrections.map(item => ({ ...item, amountMinor: item.amountMinor.toString() })),
+      }, { headers: { 'Cache-Control': 'no-store' } })
+    }
+
     const status = (searchParams.get('status') || '').toUpperCase()
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50))
@@ -162,7 +240,24 @@ export async function GET(request: NextRequest) {
           select: { id: true, mxId: true, name: true, email: true },
         })
       : []
+    const marketplaceAlerts = marketplaceDisputes.length
+      ? await prisma.adminAlert.findMany({
+          where: {
+            targetTable: 'MarketplaceDispute',
+            targetId: { in: marketplaceDisputes.map(item => item.id) },
+            status: { in: ['open', 'in_progress'] },
+          },
+          select: { id: true, targetId: true, assignedTo: true, assignedRole: true },
+          orderBy: { createdAt: 'asc' },
+        })
+      : []
     const userById = new Map(marketplaceUsers.map(user => [user.id, user]))
+    const alertByDisputeId = new Map<string, (typeof marketplaceAlerts)[number]>()
+    for (const alert of marketplaceAlerts) {
+      if (alert.targetId && !alertByDisputeId.has(alert.targetId)) {
+        alertByDisputeId.set(alert.targetId, alert)
+      }
+    }
 
     const normalizedLegacy = legacyDisputes.map(dispute => ({
       ...dispute,
@@ -184,6 +279,7 @@ export async function GET(request: NextRequest) {
         dispute.job.budgetAmount ??
         0n
       const raisedBy = userById.get(dispute.raisedById)
+      const assignment = alertByDisputeId.get(dispute.id)
 
       return {
         id: dispute.id,
@@ -197,6 +293,9 @@ export async function GET(request: NextRequest) {
         resolution: dispute.resolution,
         resolutionAction: dispute.resolutionAction,
         status: dispute.status,
+        assignedTo: assignment?.assignedTo ?? null,
+        assignedRole: assignment?.assignedRole ?? null,
+        assignmentId: assignment?.id ?? null,
         countryCode: dispute.countryCode,
         createdAt: dispute.createdAt,
         updatedAt: dispute.updatedAt,
@@ -250,12 +349,93 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
     const disputeId = typeof body?.disputeId === 'string' ? body.disputeId.trim() : ''
+    const action = typeof body?.action === 'string' ? body.action.trim().toUpperCase() : ''
     const status = typeof body?.status === 'string' ? body.status.trim().toUpperCase() : ''
     const resolution = typeof body?.resolution === 'string' ? body.resolution.trim().slice(0, 5000) : ''
     const resolutionAction =
       typeof body?.resolutionAction === 'string'
         ? body.resolutionAction.trim().toUpperCase()
         : ''
+
+    if (action === 'CLAIM') {
+      if (!disputeId || disputeId.length > 128) {
+        return NextResponse.json({ error: 'A valid dispute id is required' }, { status: 400 })
+      }
+      const claimable = await prisma.marketplaceDispute.findUnique({
+        where: { id: disputeId },
+        include: { job: { select: { countryCode: true } } },
+      })
+      if (!claimable) return NextResponse.json({ error: 'Marketplace dispute not found' }, { status: 404 })
+      if (!assertCrmCountryAllowed(security, claimable.countryCode || claimable.job.countryCode)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+
+      const claim = await prisma.$transaction(tx => claimMarketplaceDisputeInTransaction(tx, {
+        disputeId,
+        adminId: security.adminId,
+        adminRole: security.role,
+      }))
+      if (!claim.ok) {
+        const statusCode = claim.code === 'NOT_FOUND' ? 404 : 409
+        return NextResponse.json({
+          error: claim.code === 'ASSIGNED_TO_OTHER'
+            ? 'This case is assigned to another staff member'
+            : claim.code === 'CLOSED'
+              ? 'Resolved cases cannot be claimed'
+              : 'Marketplace dispute not found',
+          code: claim.code,
+        }, { status: statusCode })
+      }
+
+      await createAuditLog({
+        action: 'UPDATE',
+        category: 'DISPUTE',
+        userId: security.adminId,
+        userEmail: security.email,
+        userRole: security.role,
+        entityType: 'MarketplaceDispute',
+        entityId: disputeId,
+        description: 'Marketplace financial dispute claimed by assigned-market staff',
+        newValue: { assignedTo: security.adminId, assignedRole: security.role, status: claim.status },
+        ipAddress: security.ipAddress,
+        userAgent: security.userAgent || undefined,
+        riskLevel: 'LOW',
+      })
+      return NextResponse.json({ claim }, { headers: { 'Cache-Control': 'no-store' } })
+    }
+
+    if (action === 'REASSIGN') {
+      const targetAdminId = typeof body?.targetAdminId === 'string' ? body.targetAdminId.trim() : ''
+      if (!disputeId || disputeId.length > 128 || !targetAdminId || targetAdminId.length > 128) {
+        return NextResponse.json({ error: 'A valid dispute and staff assignee are required' }, { status: 400 })
+      }
+      const item = await prisma.marketplaceDispute.findUnique({
+        where: { id: disputeId },
+        select: { countryCode: true, job: { select: { countryCode: true } } },
+      })
+      if (!item) return NextResponse.json({ error: 'Marketplace dispute not found' }, { status: 404 })
+      const countryCode = item.countryCode || item.job.countryCode
+      if (!assertCrmCountryAllowed(security, countryCode)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      const result = await prisma.$transaction(tx => reassignMarketplaceDisputeInTransaction(tx, {
+        disputeId,
+        actorAdminId: security.adminId,
+        actorEmail: security.email,
+        actorRole: security.role,
+        targetAdminId,
+        countryCode,
+        ipAddress: security.ipAddress,
+        userAgent: security.userAgent,
+      }))
+      if (!result.ok) {
+        const statusCode = result.code === 'NOT_FOUND' ? 404
+          : result.code === 'TARGET_OUT_OF_SCOPE' || result.code === 'TARGET_LACKS_PERMISSION' ? 403
+            : result.code === 'SELF_ASSIGNMENT' ? 400 : 409
+        return NextResponse.json({ error: result.code, code: result.code }, { status: statusCode })
+      }
+      return NextResponse.json({ assignment: result }, { headers: { 'Cache-Control': 'no-store' } })
+    }
 
     if (!disputeId || !VALID_STATUSES.has(status)) {
       return NextResponse.json({ error: 'Invalid dispute update payload' }, { status: 400 })
@@ -465,6 +645,7 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({
               dispute: updated,
               financialAction: canonicalAction,
+              refundStatus: recoveredRefund.refundCents === 0n ? 'NO_FUNDS_TO_REFUND' : 'REFUNDED',
               recovered: true,
             })
           }
@@ -680,6 +861,7 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({
           dispute: updated,
           financialAction: canonicalAction,
+          refundStatus: refund.refundCents === 0n ? 'NO_FUNDS_TO_REFUND' : 'REFUNDED',
         })
       } catch (error) {
         if (!moneyApplied) {

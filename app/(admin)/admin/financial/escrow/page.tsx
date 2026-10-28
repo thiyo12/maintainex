@@ -106,7 +106,7 @@ function statusTone(status: string): CrmTone {
   if (status === 'RELEASED') return 'success'
   if (status === 'REFUNDED' || status === 'CANCELLED') return 'neutral'
   if (status === 'ON_HOLD') return 'danger'
-  if (status === 'PROTECTED' || status === 'CASH_CONFIRMED') return 'info'
+  if (status === 'PROTECTED' || status === 'CASH_SELECTED') return 'info'
   return 'warning'
 }
 
@@ -348,7 +348,8 @@ export default function EscrowOperationsPage() {
           <option value="RELEASED">Released</option>
           <option value="REFUNDED">Refunded</option>
           <option value="CANCELLED">Cancelled</option>
-          <option value="CASH_CONFIRMED">Cash confirmed</option>
+          <option value="CASH_SELECTED">Cash selected</option>
+          <option value="CASH_CONFIRMED">Legacy cash state</option>
         </select>
       </CrmFilterBar>
 

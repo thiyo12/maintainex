@@ -10,6 +10,7 @@ on:
       - phase0-7-integration-fix
       - phase8-country-engine
       - phase9-production-readiness
+      - feature/payment-restructuring
   pull_request:
     branches:
       - main
@@ -100,97 +101,15 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
-      - name: Bootstrap isolated DB from immutable production baseline
-        run: |
-          # Generate baseline from current schema (creates ALL 150 tables)
-          npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > /tmp/baseline.sql
-          npx prisma db execute --file /tmp/baseline.sql --schema prisma/schema.prisma
-          # Resolve ALL directory migrations as applied (baseline already created full schema)
-          for dir in prisma/migrations/*/; do
-            name=$(basename "$dir")
-            npx prisma migrate resolve --applied "$name" 2>&1 | grep -E "marked|Error" || true
-          done
-
-      - name: Restore raw production invariants omitted by Prisma schema baseline
-        run: |
-          psql "$DATABASE_URL" <<'SQL'
-          ALTER TABLE "ProviderOpportunity"
-            DROP CONSTRAINT IF EXISTS "ProviderOpportunity_xor_provider";
-          ALTER TABLE "ProviderOpportunity"
-            ADD CONSTRAINT "ProviderOpportunity_xor_provider"
-            CHECK (
-              ("taskerId" IS NOT NULL AND "companyId" IS NULL)
-              OR
-              ("taskerId" IS NULL AND "companyId" IS NOT NULL)
-            );
-
-          CREATE UNIQUE INDEX IF NOT EXISTS "JobVerificationPin_one_active_per_job"
-            ON "JobVerificationPin"("jobId")
-            WHERE "status" = 'ACTIVE';
-
-          CREATE OR REPLACE FUNCTION check_job_review_owner()
-          RETURNS TRIGGER AS $review_owner$
-          BEGIN
-            IF NOT EXISTS (
-              SELECT 1 FROM "MarketplaceJob"
-              WHERE id = NEW."jobId" AND "customerId" = NEW."customerId"
-            ) THEN
-              RAISE EXCEPTION 'Customer does not own this job';
-            END IF;
-            RETURN NEW;
-          END;
-          $review_owner$ LANGUAGE plpgsql;
-
-          DROP TRIGGER IF EXISTS trg_job_review_owner_check ON "JobReview";
-          CREATE TRIGGER trg_job_review_owner_check
-            BEFORE INSERT ON "JobReview"
-            FOR EACH ROW EXECUTE FUNCTION check_job_review_owner();
-
-          CREATE UNIQUE INDEX IF NOT EXISTS "CompanyJobAssignment_active_per_job_idx"
-            ON "CompanyJobAssignment"("jobId")
-            WHERE "status" IN ('ASSIGNED', 'ACCEPTED', 'IN_PROGRESS');
-
-          -- The Prisma-generated CI baseline omits custom SQL CHECK constraints
-          -- and partial indexes. Mirror only the additive Phase04 challenge
-          -- invariants so isolated CI matches the actual migration.
-          ALTER TABLE "CompanyCrewPinChallenge"
-            ADD CONSTRAINT "CompanyCrewPinChallenge_epoch_check"
-              CHECK ("crewVersion" >= 1 AND "challengeVersion" >= 1),
-            ADD CONSTRAINT "CompanyCrewPinChallenge_purpose_check"
-              CHECK ("purpose" IN ('ARRIVAL', 'WORK_START')),
-            ADD CONSTRAINT "CompanyCrewPinChallenge_attempt_check"
-              CHECK ("failedAttempts" BETWEEN 0 AND 5),
-            ADD CONSTRAINT "CompanyCrewPinChallenge_digest_check"
-              CHECK ("pinDigest" ~ '^[a-f0-9]{64}$'),
-            ADD CONSTRAINT "CompanyCrewPinChallenge_expiry_check"
-              CHECK ("expiresAt" > "createdAt"),
-            ADD CONSTRAINT "CompanyCrewPinChallenge_terminal_check"
-              CHECK ("consumedAt" IS NULL OR "revokedAt" IS NULL);
-
-          CREATE UNIQUE INDEX IF NOT EXISTS "CrewPinChallenge_one_live_idx"
-            ON "CompanyCrewPinChallenge"
-              ("crewDispatchId", "crewVersion", "assignmentId", "purpose")
-            WHERE "consumedAt" IS NULL AND "revokedAt" IS NULL;
-
-          -- CI bootstraps a Prisma-generated schema rather than replaying raw
-          -- migrations. Restore the two additive witness CHECK invariants.
-          ALTER TABLE "CompanyCrewPresenceWitness"
-            ADD CONSTRAINT "CrewPresenceWitness_positive_epoch_check"
-              CHECK ("crewVersion" >= 1),
-            ADD CONSTRAINT "CrewPresenceWitness_nonempty_check"
-              CHECK ("workerAttestedAt" IS NOT NULL OR "customerAttestedAt" IS NOT NULL);
-
-          CREATE UNIQUE INDEX IF NOT EXISTS "JobQuote_one_pending_per_provider_job"
-            ON "JobQuote"("jobId", "providerId")
-            WHERE status = 'PENDING';
-
-          CREATE UNIQUE INDEX IF NOT EXISTS "PaymentIntent_one_active_per_job"
-            ON "PaymentIntent"("jobId")
-            WHERE status IN ('CREATED', 'PENDING');
-          SQL
+      - name: Bootstrap isolated PostgreSQL from the checked-in baseline procedure
+        id: postgres_bootstrap
+        run: bash scripts/bootstrap-fresh-database.sh
 
       - name: Verify migration deploy is no-op
         run: npx prisma migrate deploy
+
+      - name: Verify additive commission bank migration on isolated prior-schema fixture
+        run: bash scripts/test-commission-bank-migration.sh
 
       - name: Verify Phase 8 migration columns exist in PostgreSQL
         run: |
@@ -257,7 +176,7 @@ jobs:
           retention-days: 3
 
       - name: International launch Phases 04-11 blocking acceptance gates
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
         run: |
           set -euo pipefail
           npx vitest run \
@@ -286,11 +205,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
       - name: International launch market regression checks
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
         run: npx vitest run tests/regions/international-launch-regions.test.ts tests/security/international-v2-search-market-contract.test.ts tests/domain/catalog-market-eligibility.test.ts tests/domain/catalog-inventory.test.ts tests/domain/international-template-job-route-market.test.ts tests/pricing/international-estimate-market-contract.test.ts tests/pricing/international-authoritative-job-country.test.ts tests/security/international-tracking-issue-report-contract.test.ts tests/security/international-safety-escalation-contract.test.ts tests/security/international-active-v2-safety-report-contract.test.ts tests/integration/phase04-crew-commit-postgres.test.ts
 
       - name: Schema integrity tests
         run: npx vitest run tests/structural/schema-integrity.test.ts tests/structural/migration-validation.test.ts tests/structural/crm-legacy-role-retirement.test.ts tests/structural/crm-app-web-v2.test.ts tests/structural/crm-legacy-customer-api-retirement.test.ts tests/structural/crm-v2-shell-permissions.test.ts tests/structural/crm-v2-visual-contract.test.ts tests/structural/crm-reference-parity-all-pages.test.ts tests/structural/crm-global-readability.test.ts tests/structural/crm-v2-migrated-page-contract.test.ts tests/structural/crm-v2-shell.test.ts tests/structural/crm-phase14-v2.test.ts tests/structural/crm-phase15-legacy-demolition.test.ts --reporter=verbose 2>&1 | tee /tmp/schema-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload schema test diagnostics
         if: always()
@@ -307,11 +227,11 @@ jobs:
           tests/security/crm-catalog-v2.test.ts
           tests/security/mobile-taxonomy-source-v2.test.ts
           --reporter=verbose
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Migration preservation tests
         run: npx vitest run tests/structural/migration-preservation.test.ts --reporter=verbose 2>&1 | tee /tmp/migration-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload migration test diagnostics
         if: always()
@@ -324,7 +244,7 @@ jobs:
 
       - name: Country engine invariant tests
         run: npx vitest run tests/finance/country-engine-invariants.test.ts tests/security/matching-isolation.test.ts tests/rbac/admin-country-rbac.test.ts tests/security/quote-country-eligibility.test.ts --reporter=verbose 2>&1 | tee /tmp/invariant-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload invariant test diagnostics
         if: always()
@@ -346,7 +266,7 @@ jobs:
           tests/auth/staff-jwt.test.ts
           tests/auth/staff-auth-verification.test.ts
           --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload Phase 9 security test diagnostics
         if: always()
@@ -389,7 +309,7 @@ jobs:
           tests/notifications/booking-notifications.test.ts
           tests/notifications/company-job-recipient-routing.test.ts
           --reporter=verbose 2>&1 | tee /tmp/core-app-lifecycle-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload core app lifecycle diagnostics
         if: always()
@@ -404,6 +324,7 @@ jobs:
         run: >-
           npx vitest run
           tests/finance/payments/cash-payment-lifecycle.test.ts
+          tests/finance/payments/marketplace-dispute-appeal-postgres.test.ts
           tests/finance/payments/payment-work-start-lifecycle.test.ts
           tests/finance/payments/cancellation-payment-postgres.test.ts
           tests/finance/payments/payment-intent-concurrency-postgres.test.ts
@@ -417,7 +338,7 @@ jobs:
           tests/finance/commission-currency-isolation.test.ts tests/finance/commission-governance.test.ts tests/finance/commission-settlement-actions.test.ts tests/finance/settlement-history-v2.test.ts
           tests/quotes/change-order.test.ts
           --reporter=verbose 2>&1 | tee /tmp/financial-flow-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload financial flow test diagnostics
         if: always()
@@ -445,7 +366,7 @@ jobs:
           retention-days: 3
 
       - name: Full regression suite including local HTTP security (blocking)
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
         run: |
           set -euo pipefail
           NODE_ENV=production ALLOW_TEST_OTP=false node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3198 > /tmp/http-test-server.txt 2>&1 &
@@ -472,7 +393,7 @@ jobs:
       # Audit persisted integrity after every fixture teardown. The full suite
       # is serialized above so database snapshots cannot observe partial cleanup.
       - name: Final PostgreSQL orphan audit after regression cleanup (blocking)
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
         run: |
           set -euo pipefail
           [[ "$DATABASE_URL" == *'@localhost:5432/maintainex_test_phase07_ci' ]] || {
@@ -530,6 +451,7 @@ jobs:
         if: always()
 
       - name: Docker container start
+        id: docker_container_start
         run: |
           docker run -d \
             --name phase9-ci-test \
@@ -566,9 +488,10 @@ jobs:
           fi
           echo "Container is alive. Startup logs:"
           docker logs phase9-ci-test 2>&1 | tail -20 || true
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Docker health check
+        id: docker_health_check
         run: |
           echo "Waiting for Next.js to finish booting after prisma migrate..."
           for i in 1 2 3 4 5 6 7 8; do
@@ -591,14 +514,14 @@ jobs:
           echo "Health check FAILED after 8 attempts"
           docker logs phase9-ci-test 2>&1 | tail -50 || true
           exit 1
-        if: always()
+        if: always() && steps.docker_container_start.outcome == 'success'
 
       - name: International launch running-container market-isolation smoke
         run: |
           set -euo pipefail
           node scripts/international-catalogue-smoke.mjs --self-test
           node scripts/international-catalogue-smoke.mjs http://127.0.0.1:3199
-        if: always()
+        if: always() && steps.docker_health_check.outcome == 'success'
       - name: Verify non-root user
         run: |
           RUNNING=$(docker inspect -f '{{.State.Running}}' phase9-ci-test 2>/dev/null || echo "false")
@@ -618,7 +541,7 @@ jobs:
             exit 1
           fi
           echo "PASS: Container running as non-root (UID $UID_VALUE)"
-        if: always()
+        if: always() && steps.docker_health_check.outcome == 'success'
 
       - name: Docker cleanup
         if: always()

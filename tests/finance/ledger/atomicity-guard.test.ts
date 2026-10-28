@@ -54,7 +54,7 @@ describe('Phase 5E — Financial Atomicity Guard', () => {
     it('cash selection delegates to canonical escrow lifecycle without manufacturing wallet funds', () => {
       expect(cashPayment).toContain('confirmCashPayment')
       expect(cashPayment).toContain("paymentMethod: 'CASH'")
-      expect(cashPayment).toContain("status: 'CASH_CONFIRMED'")
+      expect(cashPayment).toContain("status: 'CASH_SELECTED'")
       expect(cashPayment).not.toContain('providerWallet.upsert(')
       expect(cashPayment).not.toContain('postLedgerTransaction')
       expect(lifecycle).toContain('recordCashPlatformReceivable')

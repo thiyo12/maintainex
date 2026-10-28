@@ -258,10 +258,10 @@ describe('Phase 03 — cash payment market enforcement (PostgreSQL)', () => {
     mockUser.current = { id: customerId }
     const res = await callRoute(job.id)
     expect(res.status).toBe(200)
-    expect(res.body.status).toBe('CASH_CONFIRMED')
+    expect(res.body.status).toBe('CASH_SELECTED')
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
-    expect(escrow?.status).toBe('CASH_CONFIRMED')
+    expect(escrow?.status).toBe('CASH_SELECTED')
   })
 
   it('allows a legitimate Vancouver/CAD cash selection', async () => {
@@ -275,7 +275,7 @@ describe('Phase 03 — cash payment market enforcement (PostgreSQL)', () => {
     mockUser.current = { id: customerId }
     const res = await callRoute(job.id)
     expect(res.status).toBe(200)
-    expect(res.body.status).toBe('CASH_CONFIRMED')
+    expect(res.body.status).toBe('CASH_SELECTED')
   })
 
   it('refuses a non-owner', async () => {

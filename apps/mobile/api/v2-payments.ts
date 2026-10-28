@@ -29,6 +29,5 @@ export const v2Payments = {
       onlinePaymentAvailable: boolean
       provider: 'PAYPAL' | null
       reason: 'not_configured' | 'available'
-      cashAvailable: boolean
     }>('/api/mobile/v2/payments/availability'),
 }

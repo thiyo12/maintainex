@@ -100,7 +100,7 @@ export async function POST(
       {
         success: true,
         message: pendingExternal
-          ? 'Refund requested. PayHere confirmation is pending.'
+          ? 'Refund requested from the original payment provider. Confirmation is pending.'
           : cashCancelled
             ? 'Cash booking cancelled. MaintainEX held no cash, so no platform refund was created.'
             : 'Escrow refunded',
@@ -124,6 +124,7 @@ export async function POST(
       return NextResponse.json({ error: message }, { status: 409 })
     }
     if (
+      message.includes('EXTERNAL_REFUND_PAYMENT_NOT_FOUND') ||
       message.includes('PAYHERE_REFUND_PAYMENT_NOT_FOUND') ||
       message.includes('REFUND_FUNDING_SOURCE_UNKNOWN')
     ) {

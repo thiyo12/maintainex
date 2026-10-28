@@ -21,7 +21,7 @@ describe('accepted booking mutation boundary', () => {
 
     expect(route).toContain('FOR UPDATE')
     expect(route).toContain("!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)")
-    expect(route).toContain("status: { in: ['PROTECTED', 'CASH_CONFIRMED'] }")
+    expect(route).toContain("status: { in: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'] }")
     expect(route).toContain('addressSharedAt: null')
     expect(route).toContain("if (claimed.count !== 1) throw new Error('SHARE_ADDRESS_STATE_CHANGED')")
   })

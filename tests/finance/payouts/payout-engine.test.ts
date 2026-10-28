@@ -9,6 +9,7 @@ import {
   isValidTransition,
 } from '@/lib/finance/payouts/payout-engine'
 import { assertNotProductionDb } from '../../helpers/test-guard'
+import { reconcileFinancialTransfer, type TransferEvidenceQuery, type TrustedTransferEvidenceSource } from '@/lib/finance/transfers/reconciliation'
 
 assertNotProductionDb()
 
@@ -60,6 +61,15 @@ async function ledgerFor(payoutId: string) {
     where: { referenceId: payoutId, createdBy: 'test-5f' },
     orderBy: { createdAt: 'asc' },
   })
+}
+
+async function recordApprovedPayout(payoutId: string, amountMinor: bigint) {
+  await prisma.crmApprovalRequest.create({ data: {
+    actionId: 'finance.payout', status: 'SUCCEEDED', initiatorAdminId: 'synthetic-maker',
+    market: 'LK', targetType: 'Payout', targetId: payoutId, amountMinor, currency: 'LKR',
+    tier: 'T1', reversibility: 'R4', policyVersion: 'test',
+    executionRef: `Payout:${payoutId}:PROCESSING_AWAITING_EXTERNAL_EVIDENCE`,
+  } })
 }
 
 describe('Phase 5F — canonical payout engine', () => {
@@ -207,24 +217,22 @@ describe('Phase 5F — canonical payout engine', () => {
     if (!conflict.ok) expect(conflict.code).toBe('IDEMPOTENCY_CONFLICT')
   })
 
-  it('successful payout clears the reservation to an external payout account exactly once', async () => {
+  it('does not clear a payout from a typed bank reference alone', async () => {
     const requested = await requestPayout(USER_ID, 125_000n, 'bank', null, 'test-5f-success-request', 'test-5f')
     expect(requested.ok).toBe(true)
     if (!requested.ok) return
 
     expect((await markProcessing(requested.payoutId, 'admin-test', 'test-5f-success-processing')).ok).toBe(true)
-    expect((await markSucceeded(requested.payoutId, 'BANK-123', 'test-5f-success-callback', 'test-5f')).ok).toBe(true)
-    expect((await markSucceeded(requested.payoutId, 'BANK-123', 'test-5f-success-duplicate', 'test-5f')).ok).toBe(true)
+    const result = await markSucceeded(requested.payoutId, 'BANK-123', 'test-5f-success-callback', 'test-5f')
+    expect(result).toMatchObject({ ok: false, code: 'PAYOUT_EXTERNAL_EVIDENCE_REQUIRED' })
 
     const payout = await prisma.payout.findUniqueOrThrow({ where: { id: requested.payoutId } })
-    expect(payout.status).toBe('SUCCEEDED')
-    expect(payout.clearedAt).not.toBeNull()
+    expect(payout.status).toBe('PROCESSING')
+    expect(payout.clearedAt).toBeNull()
 
     const entries = await ledgerFor(requested.payoutId)
     const successEntries = entries.filter(e => e.referenceType === 'PAYOUT_SUCCEEDED')
-    expect(successEntries).toHaveLength(2)
-    expect(successEntries.find(e => e.accountId === `payout:${requested.payoutId}` && e.entryType === 'DEBIT')?.amount).toBe(125_000n)
-    expect(successEntries.find(e => e.accountId === `external:payout:${requested.payoutId}` && e.entryType === 'CREDIT')?.amount).toBe(125_000n)
+    expect(successEntries).toHaveLength(0)
   })
 
   it('failed payout restores provider funds exactly once', async () => {
@@ -252,24 +260,126 @@ describe('Phase 5F — canonical payout engine', () => {
     expect((await balanceMajor()).balance).toBe(10000)
   })
 
-  it('success/failure race produces one terminal outcome without wallet underflow', async () => {
+  it('does not let a typed success reference beat an independently reported payout failure', async () => {
     const requested = await requestPayout(USER_ID, 100_000n, 'bank', null, 'test-5f-race-request', 'test-5f')
     expect(requested.ok).toBe(true)
     if (!requested.ok) return
     await markProcessing(requested.payoutId, 'admin-test', 'test-5f-race-processing')
 
-    await Promise.all([
+    const [successAttempt, failure] = await Promise.all([
       markSucceeded(requested.payoutId, 'BANK-RACE', 'test-5f-race-success', 'test-5f'),
       markFailed(requested.payoutId, 'timeout', 'test-5f-race-failure', 'test-5f'),
     ])
+    expect(successAttempt).toMatchObject({ ok: false, code: 'PAYOUT_EXTERNAL_EVIDENCE_REQUIRED' })
+    expect(failure.ok).toBe(true)
 
     const payout = await prisma.payout.findUniqueOrThrow({ where: { id: requested.payoutId } })
-    expect(['SUCCEEDED', 'FAILED']).toContain(payout.status)
+    expect(payout.status).toBe('FAILED')
     const terminalEntries = (await ledgerFor(requested.payoutId)).filter(e =>
       e.referenceType === 'PAYOUT_SUCCEEDED' || e.referenceType === 'WITHDRAWAL_RELEASED'
     )
     expect(terminalEntries).toHaveLength(2)
     expect((await balanceMajor()).balance).toBeGreaterThanOrEqual(0)
+  })
+
+  it('settles and reverses only independently verified, idempotent payout evidence', async () => {
+    const requested = await requestPayout(USER_ID, 175_000n, 'bank', null, 'test-5f-evidence-request', 'test-5f')
+    expect(requested.ok).toBe(true)
+    if (!requested.ok) return
+    await markProcessing(requested.payoutId, 'admin-test', 'test-5f-evidence-processing')
+
+    const sourceId = `synthetic-${Date.now()}`
+    let outcome: 'SUCCEEDED' | 'REVERSED' = 'SUCCEEDED'
+    const source: TrustedTransferEvidenceSource = {
+      sourceId,
+      verifyAndFetch: async (query: TransferEvidenceQuery) => ({
+        externalEventId: query.externalEventId,
+        externalReference: `synthetic-bank-${query.externalEventId}`,
+        outcome,
+        amount: query.expectedAmount,
+        currency: query.currency,
+        countryCode: query.countryCode,
+        verificationMethod: 'INDEPENDENT_API_QUERY',
+        payloadHash: 'a'.repeat(64),
+        verifiedAt: new Date(),
+        observedAt: new Date(),
+      }),
+    }
+    const query: TransferEvidenceQuery = {
+      transferType: 'PAYOUT', targetId: requested.payoutId,
+      externalEventId: `settled-${Date.now()}`, expectedAmount: 175_000n,
+      currency: 'LKR', countryCode: 'LK',
+    }
+    expect(await reconcileFinancialTransfer(query, source, 'test-5f')).toEqual({ ok: false, code: 'TRANSFER_APPROVAL_REQUIRED' })
+    await recordApprovedPayout(requested.payoutId, 175_000n)
+    const settled = await reconcileFinancialTransfer(query, source, 'test-5f')
+    expect(settled).toMatchObject({ ok: true, status: 'SUCCEEDED', replayed: false })
+    const replay = await reconcileFinancialTransfer(query, source, 'test-5f')
+    expect(replay).toMatchObject({ ok: true, status: 'SUCCEEDED', replayed: true })
+    expect((await prisma.financialLedger.count({ where: { referenceType: 'PAYOUT_EXTERNAL_SETTLED', referenceId: requested.payoutId } }))).toBe(2)
+
+    outcome = 'REVERSED'
+    const reversed = await reconcileFinancialTransfer({ ...query, externalEventId: `reverse-${Date.now()}` }, source, 'test-5f')
+    expect(reversed).toMatchObject({ ok: true, status: 'REVERSED', replayed: false })
+    expect((await prisma.payout.findUniqueOrThrow({ where: { id: requested.payoutId } })).status).toBe('REVERSED')
+    expect((await prisma.financialLedger.count({ where: { referenceType: 'PAYOUT_EXTERNAL_REVERSAL', referenceId: requested.payoutId } }))).toBe(2)
+    expect((await balanceMajor()).balance).toBe(10000)
+  })
+
+  it('rejects country/currency and amount mismatches before writing evidence', async () => {
+    const requested = await requestPayout(USER_ID, 125_000n, 'bank', null, 'test-5f-evidence-mismatch', 'test-5f')
+    expect(requested.ok).toBe(true)
+    if (!requested.ok) return
+    await recordApprovedPayout(requested.payoutId, 125_000n)
+    const source: TrustedTransferEvidenceSource = {
+      sourceId: `synthetic-mismatch-${Date.now()}`,
+      verifyAndFetch: async query => ({
+        externalEventId: query.externalEventId, externalReference: 'synthetic-ref', outcome: 'SUCCEEDED',
+        amount: query.expectedAmount - 1n, currency: query.currency, countryCode: query.countryCode,
+        verificationMethod: 'AUTHENTICATED_STATEMENT', payloadHash: 'b'.repeat(64), verifiedAt: new Date(), observedAt: new Date(),
+      }),
+    }
+    const rejected = await reconcileFinancialTransfer({
+      transferType: 'PAYOUT', targetId: requested.payoutId, externalEventId: `mismatch-${Date.now()}`,
+      expectedAmount: 125_000n, currency: 'LKR', countryCode: 'LK',
+    }, source, 'test-5f')
+    expect(rejected).toEqual({ ok: false, code: 'EXTERNAL_EVIDENCE_MISMATCH' })
+    expect(await prisma.financialTransferEvidence.count({ where: { targetId: requested.payoutId } })).toBe(0)
+    expect((await prisma.payout.findUniqueOrThrow({ where: { id: requested.payoutId } })).status).toBe('RESERVED')
+  })
+
+  it('serializes concurrent conflicting external outcomes to one terminal ledger result', async () => {
+    const requested = await requestPayout(USER_ID, 225_000n, 'bank', null, 'test-5f-evidence-race-request', 'test-5f')
+    expect(requested.ok).toBe(true)
+    if (!requested.ok) return
+    await markProcessing(requested.payoutId, 'admin-test', 'test-5f-evidence-race-processing')
+    await recordApprovedPayout(requested.payoutId, 225_000n)
+    const source: TrustedTransferEvidenceSource = {
+      sourceId: `synthetic-race-${Date.now()}`,
+      verifyAndFetch: async query => ({
+        externalEventId: query.externalEventId, externalReference: `fixture-${query.externalEventId}`,
+        outcome: query.externalEventId === 'race-success' ? 'SUCCEEDED' : 'FAILED',
+        amount: query.expectedAmount, currency: query.currency, countryCode: query.countryCode,
+        verificationMethod: 'INDEPENDENT_API_QUERY', payloadHash: query.externalEventId === 'race-success' ? '1'.repeat(64) : '2'.repeat(64),
+        verifiedAt: new Date(), observedAt: new Date(),
+      }),
+    }
+    const base: Omit<TransferEvidenceQuery, 'externalEventId'> = {
+      transferType: 'PAYOUT', targetId: requested.payoutId, expectedAmount: 225_000n, currency: 'LKR', countryCode: 'LK',
+    }
+    const outcomes = await Promise.all([
+      reconcileFinancialTransfer({ ...base, externalEventId: 'race-success' }, source, 'test-5f'),
+      reconcileFinancialTransfer({ ...base, externalEventId: 'race-failure' }, source, 'test-5f'),
+    ])
+    expect(outcomes.filter(result => result.ok)).toHaveLength(1)
+    expect(outcomes.filter(result => !result.ok)).toHaveLength(1)
+    const payout = await prisma.payout.findUniqueOrThrow({ where: { id: requested.payoutId } })
+    expect(['SUCCEEDED', 'FAILED']).toContain(payout.status)
+    const terminal = await prisma.financialLedger.count({ where: {
+      referenceId: requested.payoutId,
+      referenceType: { in: ['PAYOUT_EXTERNAL_SETTLED', 'WITHDRAWAL_RELEASED'] },
+    } })
+    expect(terminal).toBe(2)
   })
 
   it('rejects insufficient, below-minimum, zero and frozen withdrawals', async () => {

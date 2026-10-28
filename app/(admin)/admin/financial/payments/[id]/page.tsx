@@ -86,7 +86,7 @@ export default function PaymentDetailPage() {
   const [data, setData] = useState<Payload | null>(null)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<any | null>(null)
-  const [status, setStatus] = useState<'MATCHED' | 'MISMATCH' | 'MANUAL_REVIEW'>('MATCHED')
+  const [status, setStatus] = useState<'MISMATCH' | 'MANUAL_REVIEW'>('MANUAL_REVIEW')
   const [reference, setReference] = useState('')
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
@@ -127,7 +127,7 @@ export default function PaymentDetailPage() {
     setModal(item)
     setStatus(item.reconciliationStatus === 'MISMATCH' || item.reconciliationStatus === 'MANUAL_REVIEW'
       ? item.reconciliationStatus
-      : 'MATCHED')
+      : 'MANUAL_REVIEW')
     setReference(item.reconciliationReference || '')
     setReason('')
   }
@@ -281,7 +281,7 @@ export default function PaymentDetailPage() {
                     <Badge value={item.status} />
                     <Badge value={item.reconciliationStatus} />
                   </div>
-                  {data.actions.reconcile && (
+                  {data.actions.reconcile && !['PAYPAL', 'PAYHERE'].includes(String(item.provider).toUpperCase()) && (
                     <CrmButton variant="secondary" size="sm" onClick={() => openReconcile(item)}>
                       Reconcile
                     </CrmButton>
@@ -423,7 +423,6 @@ export default function PaymentDetailPage() {
         <div className="space-y-4">
           <CrmField label="Result">
             <select value={status} onChange={event => setStatus(event.target.value as any)} className={crmInputClass}>
-              <option value="MATCHED">Matched</option>
               <option value="MISMATCH">Mismatch</option>
               <option value="MANUAL_REVIEW">Manual review</option>
             </select>

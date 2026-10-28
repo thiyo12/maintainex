@@ -276,7 +276,7 @@ export const CRM_ACTIONS: Readonly<Record<CrmActionId, ActionDefinition>> = {
   },
   'finance.commission.reconcile': {
     id: 'finance.commission.reconcile',
-    label: 'Confirm commission payment',
+    label: 'Reconcile verified bank commission credit',
     permissionClass: 'SENSITIVE',
     initiatePermission: 'finance:commission:reconcile',
     ownerRoles: ['FINANCE', 'SUPER_ADMIN'],
@@ -286,6 +286,7 @@ export const CRM_ACTIONS: Readonly<Record<CrmActionId, ActionDefinition>> = {
     reversibility: 'R3',
     riskLevel: 'CRITICAL',
     baseTier: 'T1',
+    makerCheckerFromTier: 'T1',
     stepUpFromTier: 'T1',
     breakGlass: 'NONE',
   },
@@ -543,6 +544,17 @@ export function getApprovalSlots(actionId: CrmActionId, tier: ApprovalTier): rea
       }
       break
     }
+
+    case 'finance.commission.reconcile':
+      if (tier === 'T1') return [['FINANCE', 'SUPER_ADMIN']]
+      if (tier === 'T2') return [['FINANCE', 'MANAGER', 'SUPER_ADMIN']]
+      if (tier === 'T3' || tier === 'T4') {
+        return [
+          ['MANAGER', 'SUPER_ADMIN'],
+          ['SUPER_ADMIN'],
+        ]
+      }
+      break
 
     case 'finance.payout_destination.change':
       if (tier === 'T3' || tier === 'T4') {

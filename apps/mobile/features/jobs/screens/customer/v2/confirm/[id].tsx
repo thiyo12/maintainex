@@ -185,7 +185,7 @@ export default function V2ConfirmBookingScreen() {
   }
 
   const steps = [
-    { label: escrow?.status === 'CASH_CONFIRMED' ? 'Cash payment selected' : t('booking.paymentSecured'), done: ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) },
+    { label: ['CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow?.status) ? 'Cash payment selected' : t('booking.paymentSecured'), done: ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow?.status) },
     { label: t('tracking.inProgress'), done: job?.status === 'IN_PROGRESS' || job?.status === 'COMPLETED' },
     { label: t('booking.confirmComplete'), done: job?.workspace?.progressStatus === 'COMPLETION_REQUESTED' || job?.status === 'COMPLETED' },
     { label: t('tracking.completed'), done: job?.status === 'COMPLETED' },
@@ -266,7 +266,7 @@ export default function V2ConfirmBookingScreen() {
             {(escrow?.totalAmount || acceptedQuote?.price || job?.budgetAmount || 0).toLocaleString()}
           </Text>
           <Text style={styles.freezeDesc}>
-            {escrow?.status === 'CASH_CONFIRMED'
+            {['CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow?.status)
               ? 'Cash is paid directly to the provider. MaintainEX does not hold these funds.'
               : t('booking.escrowInfo')}
           </Text>
@@ -285,7 +285,7 @@ export default function V2ConfirmBookingScreen() {
                       <ActivityIndicator color={CANVAS} />
                     ) : (
                       <Text style={styles.ctaText}>
-                        {paymentStatus === 'PENDING' ? 'Continue Secure Payment' : 'Pay Securely with PayPal'}
+                        {paymentStatus === 'PENDING' ? 'Continue Secure Payment' : 'Continue to secure checkout'}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -338,11 +338,11 @@ export default function V2ConfirmBookingScreen() {
             </View>
           )}
 
-          {escrow && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) && (
+          {escrow && ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow.status) && (
             <View style={styles.successBadge}>
               <CheckCircle size={18} color={SUCCESS} weight="fill" />
               <Text style={styles.successText}>
-                {escrow.status === 'CASH_CONFIRMED' ? 'Cash payment selected' : t('booking.paymentSecured')}
+                {['CASH_CONFIRMED', 'CASH_SELECTED'].includes(escrow.status) ? 'Cash payment selected' : t('booking.paymentSecured')}
               </Text>
             </View>
           )}

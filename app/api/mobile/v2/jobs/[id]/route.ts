@@ -71,6 +71,11 @@ export async function GET(
     const currency = getCurrencyForCountry(job.countryCode)
 
     const isOwner = job.customerId === user.id
+    // Customers may read only their own job record. Provider discovery uses
+    // the provider role and remains available for OPEN marketplace jobs.
+    if (!isOwner && user.role === 'CUSTOMER') {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    }
     const requestedContext = new URL(_request.url).searchParams.get('context')
 
     if (!isOwner && job.targetTaskerId) {
@@ -335,7 +340,13 @@ export async function GET(
         customer: customer ? redactSensitive(customer, isOwner) : null,
         locationName,
         quotes: enrichedQuotes,
-        escrow: escrow ? { ...escrow, amount: minorUnitsToMajorUnits(escrow.amount, currency), serviceFee: minorUnitsToMajorUnits(escrow.serviceFee, currency), totalAmount: minorUnitsToMajorUnits(escrow.totalAmount, currency) } : null,
+        escrow: escrow ? {
+          ...escrow,
+          cashCollectedMinor: escrow.cashCollectedMinor?.toString() ?? null,
+          amount: minorUnitsToMajorUnits(escrow.amount, currency),
+          serviceFee: minorUnitsToMajorUnits(escrow.serviceFee, currency),
+          totalAmount: minorUnitsToMajorUnits(escrow.totalAmount, currency),
+        } : null,
         workspace: workspace || null,
         reviews: { customerReviews, providerReviews },
         companyAssignment,

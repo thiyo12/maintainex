@@ -79,6 +79,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    // The legacy location field can contain either a district or a full
+    // street address. Do not expose it or precise coordinates during public
+    // discovery; reveal the location only to the owner or a tasker assigned
+    // to the historical job.
+    const canViewExactLocation = isOwner || Boolean(
+      viewerTaskerId &&
+      job.status !== 'OPEN' &&
+      job.assignments.some((assignment: { taskerId?: string; status?: string }) =>
+        assignment.taskerId === viewerTaskerId &&
+        ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(assignment.status || '')
+      )
+    )
+
     const visibleBids = isOwner
       ? job.bids
       : viewerTaskerId
@@ -91,9 +104,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       description: job.description,
       category: job.category,
       budget: job.budget,
-      location: job.location,
-      latitude: job.latitude,
-      longitude: job.longitude,
+      location: canViewExactLocation ? job.location : '',
+      latitude: canViewExactLocation ? job.latitude : null,
+      longitude: canViewExactLocation ? job.longitude : null,
       status: job.status,
       scheduledDate: job.scheduledDate?.toISOString(),
       createdAt: job.createdAt.toISOString(),

@@ -18,12 +18,12 @@ describe('Phase04 crew member challenge persistence remains inert and scoped', (
     }
     expect(schema).not.toContain('plaintextPin')
     expect(migration).toContain('CrewPinChallenge_scope_version_key')
-    const fullCi = source('.github/workflows/phase0-7-validation.yml')
-    // The release gate baselines from Prisma, which cannot express partial
-    // indexes, then marks SQL migrations applied; restore this guard by hand.
+    const bootstrapInvariants = source('prisma/bootstrap/postgresql-invariants.sql')
+    // The release gate uses the shared fresh-database bootstrap; keep raw
+    // indexes and checks in its reviewed invariant bundle.
     expect(migration).toContain('CREATE UNIQUE INDEX "CrewPinChallenge_one_live_idx"')
-    expect(fullCi).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "CrewPinChallenge_one_live_idx"')
-    expect(fullCi).toContain('WHERE "consumedAt" IS NULL AND "revokedAt" IS NULL')
+    expect(bootstrapInvariants).toContain('CREATE UNIQUE INDEX "CrewPinChallenge_one_live_idx"')
+    expect(bootstrapInvariants).toContain('WHERE "consumedAt" IS NULL AND "revokedAt" IS NULL')
     expect(migration).toContain('"purpose" IN (\'ARRIVAL\', \'WORK_START\')')
     expect(migration).toContain('"pinDigest" ~ \'^[a-f0-9]{64}$\'')
     expect(migration).toContain('"failedAttempts" BETWEEN 0 AND 5')
@@ -39,8 +39,8 @@ describe('Phase04 crew member challenge persistence remains inert and scoped', (
     ] as const
     for (const [name, expression] of pinChecks) {
       expect(migration).toContain('"' + name + '"')
-      expect(fullCi).toContain('"' + name + '"')
-      expect(fullCi).toContain('CHECK (' + expression + ')')
+      expect(bootstrapInvariants).toContain('"' + name + '"')
+      expect(bootstrapInvariants).toContain('CHECK (' + expression + ')')
     }
   })
 

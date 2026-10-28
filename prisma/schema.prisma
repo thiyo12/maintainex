@@ -2293,11 +2293,75 @@ model MarketplaceDispute {
   countryCode      String         @default("LK")
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  evidence         MarketplaceDisputeEvidence[]
+  corrections      MarketplaceDisputeCorrection[]
 
   @@index([status, createdAt])
   @@index([countryCode, status])
   @@index([raisedById])
   @@index([escrowId])
+}
+
+model MarketplaceDisputeEvidence {
+  id              String   @id @default(cuid())
+  disputeId       String
+  dispute         MarketplaceDispute @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+  submittedById   String
+  participantType String
+  evidenceType    String   @default("NOTE")
+  description     String
+  contentSha256   String
+  idempotencyKey  String
+  createdAt       DateTime @default(now())
+  events          MarketplaceDisputeEvidenceEvent[]
+
+  @@index([disputeId, createdAt])
+  @@index([submittedById, createdAt])
+  @@unique([disputeId, submittedById, idempotencyKey])
+}
+
+model MarketplaceDisputeEvidenceEvent {
+  id         String   @id @default(cuid())
+  evidenceId String
+  evidence   MarketplaceDisputeEvidence @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  eventType  String
+  actorId    String
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([evidenceId, createdAt])
+}
+
+model MarketplaceDisputeCorrection {
+  id                String   @id @default(cuid())
+  disputeId         String
+  dispute           MarketplaceDispute @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+  receivableId      String
+  receivable        ProviderCommissionReceivable @relation(fields: [receivableId], references: [id], onDelete: Restrict)
+  approvalRequestId String   @unique
+  approvalRequest   CrmApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Restrict)
+  amountMinor       BigInt
+  currency          String
+  reason            String
+  status            String   @default("APPLIED")
+  appliedByAdminId  String
+  createdAt         DateTime @default(now())
+  events            MarketplaceDisputeCorrectionEvent[]
+
+  @@index([disputeId, createdAt])
+  @@index([receivableId, createdAt])
+}
+
+model MarketplaceDisputeCorrectionEvent {
+  id           String   @id @default(cuid())
+  correctionId String
+  correction   MarketplaceDisputeCorrection @relation(fields: [correctionId], references: [id], onDelete: Restrict)
+  eventType    String
+  actorAdminId String
+  metadata     String?
+  createdAt    DateTime @default(now())
+
+  @@index([correctionId, createdAt])
 }
 
 model JobEscrow {
@@ -2316,6 +2380,11 @@ model JobEscrow {
   releasedAt      DateTime?
   refundedAt      DateTime?
   cashConfirmedAt DateTime?
+  cashCollectedMinor BigInt?
+  cashCollectionStatus String @default("NOT_REPORTED") // NOT_REPORTED, PROVIDER_REPORTED, CUSTOMER_CONFIRMED, CONTESTED
+  cashReportedAt DateTime?
+  cashReportedBy String?
+  cashCollectionConfirmedAt DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -2555,6 +2624,7 @@ model CrmApprovalRequest {
 
   decisions CrmApprovalDecision[]
   events    CrmApprovalEvent[]
+  disputeCorrection MarketplaceDisputeCorrection?
 
   @@index([status, createdAt])
   @@index([actionId, status])
@@ -3261,6 +3331,7 @@ model CommissionPayment {
   countryCode        String           @default("LK")
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
+  bankReconciliations CommissionBankReconciliation[]
 
   @@index([providerId])
   @@index([referenceNumber])
@@ -3742,6 +3813,7 @@ model PaymentProviderRefund {
   @@index([paymentIntentId, createdAt])
   @@index([providerTransactionId, createdAt])
   @@index([countryCode, provider, status])
+  @@unique([approvalRequestId])
 }
 
 model PaymentProviderEvent {
@@ -3768,6 +3840,31 @@ model PaymentProviderEvent {
   @@index([providerTransactionId, createdAt])
   @@index([countryCode, provider, eventType])
   @@index([processingStatus, createdAt])
+}
+
+/// Immutable, provider-neutral evidence accepted only after an independently
+/// trusted bank/PSP adapter has authenticated and reconciled the source result.
+/// This stores normalized provenance and a payload digest, never raw secrets.
+model FinancialTransferEvidence {
+  id                  String   @id @default(cuid())
+  transferType        String   // REFUND or PAYOUT
+  targetId            String   // PaymentProviderRefund.id or Payout.id
+  sourceId            String   // Stable allowlisted bank/PSP source identifier
+  externalEventId     String
+  externalReference   String
+  outcome             String   // PENDING, SUCCEEDED, FAILED, REVERSED
+  amount              BigInt
+  currency            String
+  countryCode         String
+  verificationMethod  String   // INDEPENDENT_API_QUERY or AUTHENTICATED_STATEMENT
+  payloadHash         String
+  verifiedAt          DateTime
+  observedAt          DateTime
+  createdAt           DateTime @default(now())
+
+  @@unique([sourceId, externalEventId])
+  @@index([transferType, targetId, createdAt])
+  @@index([countryCode, currency, outcome, createdAt], map: "financial_transfer_evidence_market_currency_status_idx")
 }
 
 model PaymentIntent {
@@ -3887,6 +3984,7 @@ model ProviderCommissionReceivable {
   currency           String
   amountOriginal     BigInt
   amountRemaining    BigInt
+  amountWaived       BigInt           @default(0)
   status             String           @default("OPEN") // OPEN, PARTIAL, SETTLED, WAIVED
   dueAt              DateTime
   settledAt          DateTime?
@@ -3894,10 +3992,185 @@ model ProviderCommissionReceivable {
   updatedAt          DateTime         @updatedAt
 
   recoveries ProviderCommissionRecovery[]
+  bankAllocations CommissionBankAllocation[]
+  disputeCorrections MarketplaceDisputeCorrection[]
 
   @@index([providerIdentityId, currency, status, dueAt])
   @@index([jobId])
   @@index([weeklySettlementId])
+}
+
+/// Imported bank evidence is kept separate from ledger postings. Statement
+/// imports remain UNVERIFIED until an authenticated source adapter confirms
+/// provenance; uploaded documents alone never settle a receivable.
+model CommissionBankStatementImport {
+  id                String   @id @default(cuid())
+  sourceSystem      String
+  statementId       String
+  accountRef        String
+  countryCode       String
+  currency          String
+  contentSha256     String
+  provenanceType    String   // BANK_FEED, STATEMENT_FILE, SIMULATED
+  provenanceStatus  String   @default("UNVERIFIED") // UNVERIFIED, VERIFIED, REJECTED
+  verificationSource String?
+  verificationRef   String?
+  verifiedAt        DateTime?
+  importedByAdminId String
+  rowCount          Int
+  createdAt         DateTime @default(now())
+  transactions      CommissionBankTransaction[]
+  events            CommissionBankStatementEvent[]
+
+  @@unique([sourceSystem, statementId])
+  @@unique([sourceSystem, contentSha256])
+  @@index([countryCode, provenanceStatus, createdAt])
+}
+
+model CommissionBankStatementEvent {
+  id               String   @id @default(cuid())
+  statementImportId String
+  statementImport  CommissionBankStatementImport @relation(fields: [statementImportId], references: [id], onDelete: Restrict)
+  eventType        String
+  actor            String
+  evidenceHash     String?
+  metadata         String?
+  createdAt        DateTime @default(now())
+
+  @@index([statementImportId, createdAt])
+}
+
+model CommissionBankTransaction {
+  id                    String   @id @default(cuid())
+  statementImportId     String
+  statementImport       CommissionBankStatementImport @relation(fields: [statementImportId], references: [id], onDelete: Restrict)
+  sourceSystem          String
+  transactionId         String
+  bankAccountRef        String
+  direction             String // CREDIT, DEBIT
+  amountMinor           BigInt
+  currency              String
+  countryCode           String
+  reference             String
+  reversalOfTransactionId String?
+  status                String   @default("UNREVIEWED") // UNREVIEWED, MATCHED, MISMATCH, DUPLICATE, RECONCILED, PARTIALLY_REVERSED, REVERSED
+  mismatchCode          String?
+  createdAt             DateTime @default(now())
+  reconciliation        CommissionBankReconciliation?
+  reversalEvidence      CommissionBankReversal? @relation("ReversalBankTransaction")
+  reversals             CommissionBankReversal[] @relation("OriginalBankTransaction")
+
+  @@unique([sourceSystem, bankAccountRef, transactionId])
+  @@index([countryCode, status, createdAt])
+  @@index([reference, bankAccountRef])
+  @@index([reversalOfTransactionId])
+}
+
+model CommissionBankReconciliation {
+  id                     String   @id @default(cuid())
+  bankTransactionId      String   @unique
+  bankTransaction        CommissionBankTransaction @relation(fields: [bankTransactionId], references: [id], onDelete: Restrict)
+  providerIdentityId     String
+  commissionPaymentId    String?
+  commissionPayment      CommissionPayment? @relation(fields: [commissionPaymentId], references: [id], onDelete: SetNull)
+  approvalRequestId      String?  @unique
+  initiatedByAdminId     String
+  status                 String   @default("PENDING_REVIEW") // PENDING_REVIEW, APPROVED, POSTED, REJECTED, REVERSED
+  totalAmountMinor       BigInt
+  currency               String
+  countryCode            String
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  allocations            CommissionBankAllocation[]
+  events                 CommissionBankReconciliationEvent[]
+  reversals              CommissionBankReversal[]
+
+  @@index([providerIdentityId, status, createdAt])
+  @@index([commissionPaymentId, status, createdAt])
+  @@index([countryCode, status, createdAt])
+}
+
+model CommissionBankReconciliationEvent {
+  id               String   @id @default(cuid())
+  reconciliationId String
+  reconciliation   CommissionBankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Restrict)
+  eventType        String
+  actorAdminId     String
+  metadata         String?
+  createdAt        DateTime @default(now())
+
+  @@index([reconciliationId, createdAt])
+}
+
+model CommissionBankAllocation {
+  id               String   @id @default(cuid())
+  reconciliationId String
+  reconciliation   CommissionBankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Restrict)
+  receivableId     String
+  receivable       ProviderCommissionReceivable @relation(fields: [receivableId], references: [id], onDelete: Restrict)
+  amountMinor      BigInt
+  createdAt        DateTime @default(now())
+  reversals        CommissionBankReversalAllocation[]
+
+  @@unique([reconciliationId, receivableId])
+  @@index([receivableId, createdAt])
+}
+
+/// Append-only compensating bank reversal records. The debit transaction must
+/// identify the original posted bank credit; approvals and allocations retain
+/// the exact recovery amounts that were reversed.
+model CommissionBankReversal {
+  id                       String   @id @default(cuid())
+  bankTransactionId        String   @unique
+  bankTransaction          CommissionBankTransaction @relation("ReversalBankTransaction", fields: [bankTransactionId], references: [id], onDelete: Restrict)
+  originalBankTransactionId String
+  originalBankTransaction  CommissionBankTransaction @relation("OriginalBankTransaction", fields: [originalBankTransactionId], references: [id], onDelete: Restrict)
+  originalReconciliationId String
+  originalReconciliation   CommissionBankReconciliation @relation(fields: [originalReconciliationId], references: [id], onDelete: Restrict)
+  providerIdentityId       String
+  initiatedByAdminId       String
+  approvalRequestId        String?  @unique
+  status                   String   @default("PENDING_REVIEW") // PENDING_REVIEW, POSTED, REJECTED
+  amountMinor              BigInt
+  currency                 String
+  countryCode              String
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  allocations              CommissionBankReversalAllocation[]
+  events                   CommissionBankReversalEvent[]
+
+  @@index([originalReconciliationId, status, createdAt])
+  @@index([providerIdentityId, countryCode, status])
+}
+
+/// Allocation reversal links one compensating amount to the exact original
+/// bank allocation. These rows are append-only; rejection state is on parent.
+model CommissionBankReversalAllocation {
+  id                   String   @id @default(cuid())
+  reversalId           String
+  reversal             CommissionBankReversal @relation(fields: [reversalId], references: [id], onDelete: Restrict)
+  originalAllocationId String
+  originalAllocation   CommissionBankAllocation @relation(fields: [originalAllocationId], references: [id], onDelete: Restrict)
+  recoveryId           String
+  recovery             ProviderCommissionRecovery @relation(fields: [recoveryId], references: [id], onDelete: Restrict)
+  amountMinor          BigInt
+  createdAt            DateTime @default(now())
+
+  @@unique([reversalId, originalAllocationId])
+  @@index([originalAllocationId])
+  @@index([recoveryId])
+}
+
+model CommissionBankReversalEvent {
+  id               String   @id @default(cuid())
+  reversalId       String
+  reversal         CommissionBankReversal @relation(fields: [reversalId], references: [id], onDelete: Restrict)
+  eventType        String
+  actorAdminId     String
+  metadata         String?
+  createdAt        DateTime @default(now())
+
+  @@index([reversalId, createdAt])
 }
 
 model ProviderCommissionRecovery {
@@ -3914,6 +4187,7 @@ model ProviderCommissionRecovery {
   idempotencyKey     String                       @unique
   createdBy          String
   createdAt          DateTime                     @default(now())
+  bankReversalAllocations CommissionBankReversalAllocation[]
 
   @@index([providerIdentityId, createdAt])
   @@index([receivableId])

@@ -277,7 +277,7 @@ export async function approveChangeOrder(
       const activeEscrow = await tx.jobEscrow.findFirst({
         where: {
           jobId: co.jobId,
-          status: { in: ['PENDING_PAYMENT', 'PROTECTED', 'ON_HOLD', 'CASH_CONFIRMED'] },
+          status: { in: ['PENDING_PAYMENT', 'PROTECTED', 'ON_HOLD', 'CASH_CONFIRMED', 'CASH_SELECTED'] },
         },
         orderBy: { createdAt: 'desc' },
       })
@@ -288,7 +288,7 @@ export async function approveChangeOrder(
         }
         if (
           activeEscrow.status !== 'PENDING_PAYMENT' &&
-          !(activeEscrow.status === 'CASH_CONFIRMED' && activeEscrow.paymentMethod === 'CASH')
+          !(['CASH_CONFIRMED', 'CASH_SELECTED'].includes(activeEscrow.status) && activeEscrow.paymentMethod === 'CASH')
         ) {
           throw new Error('CHANGE_ORDER_TOPUP_NOT_SUPPORTED_AFTER_FUNDING')
         }
@@ -354,13 +354,13 @@ export async function approveChangeOrder(
             data: { status: 'CANCELLED' },
           })
         } else if (
-          activeEscrow.status === 'CASH_CONFIRMED' &&
+          ['CASH_CONFIRMED', 'CASH_SELECTED'].includes(activeEscrow.status) &&
           activeEscrow.paymentMethod === 'CASH'
         ) {
           const escrowClaim = await tx.jobEscrow.updateMany({
             where: {
               id: activeEscrow.id,
-              status: 'CASH_CONFIRMED',
+              status: activeEscrow.status,
               paymentMethod: 'CASH',
             },
             data: {

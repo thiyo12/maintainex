@@ -103,7 +103,7 @@ export default function CompanyEditProfile() {
       Alert.alert('Photo access needed', 'Allow photo access to upload your company logo.')
       return
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 })
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.8, preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible })
     if (result.canceled || !result.assets[0]) return
     setUploading(true)
     try {

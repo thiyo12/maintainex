@@ -118,7 +118,8 @@ export default function TaskerEditProfile() {
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,

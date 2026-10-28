@@ -93,10 +93,10 @@ describe('Legacy Bypass Closure — current marketplace and finance boundaries',
       expect(commissionRoute).toContain("guardCrmAction(request, 'finance.commission.enforce')")
     })
 
-    it('payment confirmation reconciles durable provider receivables before clearing debt', () => {
-      expect(commissionPayments).toContain('settleProviderReceivablesFromDirectPayment')
+    it('commission payment claims cannot clear debt without independent bank evidence', () => {
+      expect(commissionPayments).toContain('BANK_CREDIT_EVIDENCE_REQUIRED')
       expect(commissionPayments).toContain("guardCrmAction(request, 'finance.commission.reconcile')")
-      expect(commissionPayments).toContain("status: 'PAID'")
+      expect(commissionPayments).not.toContain("status: 'PAID'")
       expect(providerBalance).toContain('providerCommissionReceivable')
       expect(providerBalance).toContain("method: 'DIRECT_SETTLEMENT'")
     })

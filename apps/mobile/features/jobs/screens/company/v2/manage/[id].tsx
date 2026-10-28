@@ -25,8 +25,10 @@ import {
 } from 'phosphor-react-native'
 import { getActiveCompanyId } from '@/api/companies'
 import { v2JobActions, v2Jobs } from '@/api/v2-jobs'
+import { disputes } from '@/api/disputes'
 import { v3 } from '@/theme/v3/tokens'
 import NewChatModal from '@/features/messaging/components/NewChatModal'
+import CashCollectionPanel from '@/features/jobs/components/CashCollectionPanel'
 
 export default function CompanyManageJobScreen() {
   const router = useRouter()
@@ -77,7 +79,7 @@ export default function CompanyManageJobScreen() {
   )
 
   const accepted = myQuote?.status === 'ACCEPTED'
-  const protectedPayment = !!job && ['PROTECTED', 'CASH_CONFIRMED'].includes(job.escrow?.status)
+  const protectedPayment = !!job && ['PROTECTED', 'CASH_CONFIRMED', 'CASH_SELECTED'].includes(job.escrow?.status)
   const isReadyToTravel = accepted && protectedPayment && progress === 'ACCEPTED'
   const isInProgress = progress === 'IN_PROGRESS'
   const isWaitingCustomer = progress === 'COMPLETION_REQUESTED'
@@ -123,6 +125,15 @@ export default function CompanyManageJobScreen() {
     }
   }
 
+  const openDisputeCase = async () => {
+    try {
+      const dispute = await disputes.getByJob(id)
+      router.push(`/disputes/${encodeURIComponent(dispute.id)}` as any)
+    } catch (error) {
+      Alert.alert('Case unavailable', error instanceof Error ? error.message : 'Unable to open the financial case.')
+    }
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -161,6 +172,19 @@ export default function CompanyManageJobScreen() {
           <Text style={styles.heroTitle}>{job.title || 'MaintainEX job'}</Text>
           <Text style={styles.heroText} numberOfLines={3}>{job.description || 'Review the job details and continue when the next step is available.'}</Text>
         </View>
+
+        {job.status === 'DISPUTED' ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="View financial dispute case"
+            onPress={() => { void openDisputeCase() }}
+            style={{ borderColor: v3.colors.line, borderWidth: 1, borderRadius: 14, backgroundColor: v3.colors.surfaceWhite, padding: 16, gap: 6 }}
+          >
+            <Text style={styles.sectionTitle}>Financial case under review</Text>
+            <Text style={styles.heroText}>Review the case and submit an appeal if the decision is complete.</Text>
+            <Text style={{ color: v3.colors.amber, fontWeight: '600' }}>View case</Text>
+          </TouchableOpacity>
+        ) : null}
 
         <View style={styles.customerCard}>
           <View style={styles.customerAvatar}><Text style={styles.customerInitial}>{customerInitial}</Text></View>
@@ -343,6 +367,8 @@ export default function CompanyManageJobScreen() {
           <Detail label="Escrow" value={job.escrow?.status || 'Not funded'} />
           <Detail label="Job status" value={String(job.status || '—').replaceAll('_', ' ')} last />
         </View>
+
+        <CashCollectionPanel jobId={id} role="provider" jobStatus={job?.status || ''} escrow={job?.escrow || null} onUpdated={load} />
 
         {canOtpCancel ? (
           <TouchableOpacity

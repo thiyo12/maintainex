@@ -87,6 +87,16 @@ export async function GET(request: NextRequest) {
         : viewerTaskerId
           ? j.bids.filter(bid => bid.taskerId === viewerTaskerId)
           : []
+      // JobPosting.location is historically ambiguous (district or street
+      // address). Keep it private with precise coordinates until assignment.
+      const canViewExactLocation = isCustomer || Boolean(
+        viewerTaskerId &&
+        j.status !== 'OPEN' &&
+        j.assignments.some(assignment =>
+          assignment.taskerId === viewerTaskerId &&
+          ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(assignment.status)
+        )
+      )
 
       return ({
       id: j.id,
@@ -94,9 +104,9 @@ export async function GET(request: NextRequest) {
       description: j.description,
       category: j.category,
       budget: j.budget,
-      location: j.location,
-      latitude: j.latitude,
-      longitude: j.longitude,
+      location: canViewExactLocation ? j.location : '',
+      latitude: canViewExactLocation ? j.latitude : null,
+      longitude: canViewExactLocation ? j.longitude : null,
       status: j.status,
       scheduledDate: j.scheduledDate?.toISOString(),
       createdAt: j.createdAt.toISOString(),
