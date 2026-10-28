@@ -6,16 +6,19 @@ RUN npm ci --ignore-scripts
 
 FROM node:20-slim AS builder
 WORKDIR /app
-# Release provenance (fail closed): the build pipeline MUST pass
-# --build-arg GIT_SHA=<full 40-char commit>. Anything else aborts the build,
-# so an image can never ship without a valid baked release identity
-# (see scripts/require-release-sha.sh and scripts/start-production.sh).
+# Release provenance: CI/deploy pipelines may pass the full SHA explicitly.
+# Dokploy's standard builder may omit build arguments; derive the checkout SHA
+# from the Git metadata file in the context in that case.
 ARG GIT_SHA
-RUN if ! printf '%s' "${GIT_SHA:-}" | grep -Eq '^[0-9a-f]{40}$'; then echo "ERROR: GIT_SHA build arg must be exactly 40 lowercase hex characters (full commit SHA)" >&2; exit 1; fi
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY --from=installer /app/node_modules ./node_modules
 COPY . .
-RUN printf '%s' "$GIT_SHA" > /app/.release-sha
+RUN if ! printf '%s' "${GIT_SHA:-}" | grep -Eq '^[0-9a-f]{40}$'; then \
+      GIT_SHA="$(node -e 'const fs=require("fs");const h=fs.readFileSync(".git/HEAD","utf8").trim();if(h.startsWith("ref: ")){const r=h.slice(5);if(fs.existsSync(`.git/${r}`))process.stdout.write(fs.readFileSync(`.git/${r}`,"utf8").trim());else{const p=fs.readFileSync(".git/packed-refs","utf8").split("\n").find(x=>x.endsWith(` ${r}`));if(p)process.stdout.write(p.split(" ")[0]);}}else process.stdout.write(h);' 2>/dev/null || true)"; \
+    fi && \
+    if ! printf '%s' "${GIT_SHA:-}" | grep -Eq '^[0-9a-f]{40}$'; then \
+      echo "ERROR: could not determine full Git commit SHA from build arg or .git" >&2; exit 1; \
+    fi && printf '%s' "$GIT_SHA" > /app/.release-sha
 RUN npx prisma generate && mkdir -p public/uploads/services && chmod 755 public/uploads/services
 RUN npm run build
 
