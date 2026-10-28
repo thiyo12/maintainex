@@ -140,7 +140,7 @@ jobs:
           grep -Eq '\(28 rows\)' /tmp/phase11-coverage-sql-test.txt
       - name: Upload Phase 11 coverage SQL diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: phase11-coverage-sql-diagnostics
           path: /tmp/phase11-coverage-sql-test.txt
@@ -154,7 +154,7 @@ jobs:
 
       - name: Upload TypeScript diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: typescript-diagnostics
           path: /tmp/tsc.txt
@@ -168,7 +168,7 @@ jobs:
 
       - name: Upload Mobile TypeScript diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: mobile-typescript-diagnostics
           path: /tmp/mobile-tsc.txt
@@ -198,7 +198,7 @@ jobs:
 
       - name: Upload international launch acceptance diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: international-launch-acceptance-diagnostics
           path: /tmp/international-launch-phase-gates.txt
@@ -214,7 +214,7 @@ jobs:
 
       - name: Upload schema test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: schema-test-diagnostics
           path: /tmp/schema-tests.txt
@@ -235,7 +235,7 @@ jobs:
 
       - name: Upload migration test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: migration-test-diagnostics
           path: /tmp/migration-tests.txt
@@ -248,7 +248,7 @@ jobs:
 
       - name: Upload invariant test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: invariant-test-diagnostics
           path: /tmp/invariant-tests.txt
@@ -270,7 +270,7 @@ jobs:
 
       - name: Upload Phase 9 security test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: phase9-security-test-diagnostics
           path: /tmp/phase9-security-tests.txt
@@ -279,7 +279,7 @@ jobs:
 
       - name: Upload security test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: security-test-diagnostics
           path: /tmp/security-tests.txt
@@ -313,7 +313,7 @@ jobs:
 
       - name: Upload core app lifecycle diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: core-app-lifecycle-diagnostics
           path: /tmp/core-app-lifecycle-tests.txt
@@ -342,7 +342,7 @@ jobs:
 
       - name: Upload financial flow test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: financial-flow-test-diagnostics
           path: /tmp/financial-flow-tests.txt
@@ -358,7 +358,7 @@ jobs:
 
       - name: Upload build diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: build-diagnostics
           path: /tmp/build-output.txt
@@ -383,7 +383,7 @@ jobs:
 
       - name: Upload regression test diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: regression-test-diagnostics
           path: /tmp/regression-tests.txt
@@ -406,7 +406,7 @@ jobs:
 
       - name: Upload final PostgreSQL orphan audit diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: phase11-final-postgres-orphan-audit-diagnostics
           path: /tmp/phase11-final-postgres-orphan-audit.txt
