@@ -150,7 +150,7 @@ export default function ExploreScreen() {
         <View style={styles.grid}>
           {visibleCategories.map((item: any, index: number) => {
             const slug = item.slug || ''
-            const visual = categoryVisualBySlug(slug)
+            const visual = categoryVisualBySlug(slug || item.iconName || item.name?.toLowerCase())
             const Icon = visual.icon
             const wide = index === 0 || index === 5
             const count = item.jobs?.length || item.jobCount || item.services?.length || 0
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: 'Outfit_900Black', fontSize: 15, color: v3.colors.ink },
   sectionMeta: { marginTop: 2, fontFamily: 'Outfit_400Regular', fontSize: 10.5, color: v3.colors.textMuted },
   sectionLink: { fontFamily: 'Outfit_800ExtraBold', fontSize: 11, color: v3.colors.ink },
-  grid: { paddingHorizontal: 18, paddingTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  grid: { marginHorizontal: 18, paddingTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   categoryCard: { width: '48.5%', minHeight: 146, borderRadius: 20, borderWidth: 1, borderColor: v3.colors.line, padding: 13 },
   categoryCardWide: { width: '100%', minHeight: 132 },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

@@ -7,7 +7,6 @@ import { spawnSync } from 'node:child_process'
 
 const mobileRequire = createRequire(path.resolve(process.cwd(), 'apps/mobile/package.json'))
 const sourcePackagePath = mobileRequire.resolve('node-forge/package.json')
-const patchScriptPath = path.resolve(process.cwd(), 'apps/mobile/scripts/apply-node-forge-security-patch.cjs')
 
 let fixtureRoot: string
 let fixtureMobileRoot: string
@@ -63,61 +62,34 @@ function runNpm(args: string[], cwd: string): string {
 
 beforeAll(() => {
   fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'maintainex-node-forge-install-'))
-  const mobilePackageRoot = path.dirname(sourcePackagePath)
-  const cleanPackageRoot = path.join(fixtureRoot, 'node-forge')
   fixtureMobileRoot = path.join(fixtureRoot, 'project', 'apps', 'mobile')
-  fs.cpSync(mobilePackageRoot, cleanPackageRoot, { recursive: true })
+  fs.mkdirSync(fixtureMobileRoot, { recursive: true })
 
-  // Restore the package's upstream 1.4.0 guard in the tarball. npm ci below
-  // must apply the tracked MaintainEX postinstall patch to the installed copy.
-  const rsaPath = path.join(cleanPackageRoot, 'lib/rsa.js')
-  const rsa = fs.readFileSync(rsaPath, 'utf8')
-  const marker = '// MaintainEX CVE-2026-85393 nested DigestAlgorithm child-count validation'
-  let pristine = rsa
-  if (rsa.includes(marker)) {
-    const guardStart = rsa.lastIndexOf('obj.value.length !== 2 ||', rsa.indexOf(marker))
-    const countCheck = rsa.indexOf('obj.value[0].value.length', guardStart)
-    const guardEnd = rsa.indexOf(') {', countCheck)
-    if (guardStart < 0 || countCheck < 0 || guardEnd < 0) {
-      throw new Error('Could not locate the installed MaintainEX guard in the node-forge fixture')
-    }
-    pristine = rsa.slice(0, guardStart) + 'obj.value.length !== 2) {' + rsa.slice(guardEnd + 3)
+  const sourcePackageRoot = path.dirname(sourcePackagePath)
+  const sourceManifest = JSON.parse(fs.readFileSync(sourcePackagePath, 'utf8'))
+  if (sourceManifest.name !== 'node-forge' || sourceManifest.version !== '1.4.2') {
+    throw new Error(`Expected upstream node-forge 1.4.2, found ${sourceManifest.name}@${sourceManifest.version}`)
   }
-  if ((rsa.includes(marker) && pristine === rsa) || !pristine.includes('obj.value.length !== 2) {')) {
-    throw new Error('Could not prepare the local node-forge 1.4.0 package fixture')
-  }
-  fs.writeFileSync(rsaPath, pristine)
 
-  const packed = JSON.parse(runNpm(['pack', cleanPackageRoot, '--pack-destination', fixtureRoot, '--json'], process.cwd()))
+  const packed = JSON.parse(runNpm(['pack', sourcePackageRoot, '--pack-destination', fixtureRoot, '--json'], process.cwd()))
   const tarballName = packed[0]?.filename
-  if (!tarballName) throw new Error('npm pack did not return a node-forge fixture tarball')
+  if (!tarballName) throw new Error('Could not pack the installed node-forge 1.4.2 fixture')
 
-  fs.mkdirSync(path.join(fixtureMobileRoot, 'scripts'), { recursive: true })
-  fs.copyFileSync(patchScriptPath, path.join(fixtureMobileRoot, 'scripts', 'apply-node-forge-security-patch.cjs'))
   fs.writeFileSync(path.join(fixtureMobileRoot, 'package.json'), JSON.stringify({
-    name: 'maintainex-node-forge-install-fixture',
+    name: 'maintainex-node-forge-upstream-fixture',
     version: '1.0.0',
     private: true,
-    scripts: { postinstall: 'node scripts/apply-node-forge-security-patch.cjs' },
     dependencies: { 'node-forge': `file:../../../${tarballName}` },
   }, null, 2) + '\n')
 
+  // Prove that a clean, lockfile-backed install retains the upstream fix.
   runNpm(['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund'], fixtureMobileRoot)
-
-  // First prove that the package fixture is vulnerable with lifecycle scripts
-  // disabled, then install from the same lock with postinstall enabled.
   runNpm(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], fixtureMobileRoot)
-  const fixtureRequire = createRequire(path.join(fixtureMobileRoot, 'package.json'))
-  const unpatchedForge = fixtureRequire('node-forge')
-  const unpatchedKeys = unpatchedForge.pki.rsa.generateKeyPair({ bits: 1024, e: 3 })
-  expect(verifyDigestInfo(unpatchedForge, unpatchedKeys.privateKey, unpatchedKeys.publicKey, { includeNull: false, extraChild: true })).toBe(true)
-  expect(verifyDigestInfo(unpatchedForge, unpatchedKeys.privateKey, unpatchedKeys.publicKey, { includeNull: true, extraChild: true })).toBe(true)
-  expect(verifyDigestInfo(unpatchedForge, unpatchedKeys.privateKey, unpatchedKeys.publicKey, { includeNull: true, extraChild: false, nonEmptyNull: true })).toBe(true)
 
-  runNpm(['ci', '--no-audit', '--no-fund'], fixtureMobileRoot)
-  const installedPackageRoot = path.dirname(fixtureRequire.resolve('node-forge/package.json'))
-  for (const cachedModule of Object.keys(fixtureRequire.cache)) {
-    if (cachedModule.startsWith(installedPackageRoot + path.sep)) delete fixtureRequire.cache[cachedModule]
+  const fixtureRequire = createRequire(path.join(fixtureMobileRoot, 'package.json'))
+  const installedManifest = fixtureRequire('node-forge/package.json')
+  if (installedManifest.version !== '1.4.2') {
+    throw new Error(`Clean install resolved unexpected node-forge ${installedManifest.version}`)
   }
   forge = fixtureRequire('node-forge')
   keys = forge.pki.rsa.generateKeyPair({ bits: 1024, e: 3 })
@@ -127,19 +99,14 @@ afterAll(() => {
   if (fixtureRoot) fs.rmSync(fixtureRoot, { recursive: true, force: true })
 })
 
-describe('node-forge CVE-2026-85393 install patch', () => {
-  it('applies on clean npm ci and safely reapplies without modifying the installed package', () => {
+describe('upstream node-forge DigestInfo validation', () => {
+  it('preserves the upstream guard after a clean npm ci install', () => {
     const fixtureRequire = createRequire(path.join(fixtureMobileRoot, 'package.json'))
     const installedPath = fixtureRequire.resolve('node-forge/lib/rsa.js')
-    const installedBefore = fs.readFileSync(installedPath, 'utf8')
-    const hardenedGuard = "obj.value[0].value.length !== (('parameters' in capture) ? 2 : 1) ||"
-    expect(installedBefore).toContain('MaintainEX CVE-2026-85393 nested DigestAlgorithm child-count validation')
-    expect(installedBefore).toContain(hardenedGuard)
-    expect(installedBefore).toContain("('parameters' in capture && capture.parameters.length !== 0)) {")
-
-    const fixturePatcher = require(path.join(fixtureMobileRoot, 'scripts/apply-node-forge-security-patch.cjs'))
-    fixturePatcher.patchNodeForge(path.dirname(path.dirname(installedPath)))
-    expect(fs.readFileSync(installedPath, 'utf8')).toBe(installedBefore)
+    const installedSource = fs.readFileSync(installedPath, 'utf8')
+    expect(installedSource).toContain('require a canonical DER DigestInfo')
+    expect(installedSource).toContain('_encodeDigestInfo(oid, capture.digest, true)')
+    expect(installedSource).not.toContain('MaintainEX CVE-2026-85393')
   })
 
   it('accepts valid SHA-256 AlgorithmIdentifier forms with NULL present or absent', () => {

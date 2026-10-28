@@ -10,6 +10,7 @@ on:
       - phase0-7-integration-fix
       - phase8-country-engine
       - phase9-production-readiness
+      - feature/payment-restructuring
   pull_request:
     branches:
       - main
@@ -101,6 +102,7 @@ jobs:
         run: npx prisma validate
 
       - name: Bootstrap isolated PostgreSQL from the checked-in baseline procedure
+        id: postgres_bootstrap
         run: bash scripts/bootstrap-fresh-database.sh
 
       - name: Verify migration deploy is no-op
@@ -174,7 +176,7 @@ jobs:
           retention-days: 3
 
       - name: International launch Phases 04-11 blocking acceptance gates
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
         run: |
           set -euo pipefail
           npx vitest run \
@@ -203,11 +205,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
       - name: International launch market regression checks
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
         run: npx vitest run tests/regions/international-launch-regions.test.ts tests/security/international-v2-search-market-contract.test.ts tests/domain/catalog-market-eligibility.test.ts tests/domain/catalog-inventory.test.ts tests/domain/international-template-job-route-market.test.ts tests/pricing/international-estimate-market-contract.test.ts tests/pricing/international-authoritative-job-country.test.ts tests/security/international-tracking-issue-report-contract.test.ts tests/security/international-safety-escalation-contract.test.ts tests/security/international-active-v2-safety-report-contract.test.ts tests/integration/phase04-crew-commit-postgres.test.ts
 
       - name: Schema integrity tests
         run: npx vitest run tests/structural/schema-integrity.test.ts tests/structural/migration-validation.test.ts tests/structural/crm-legacy-role-retirement.test.ts tests/structural/crm-app-web-v2.test.ts tests/structural/crm-legacy-customer-api-retirement.test.ts tests/structural/crm-v2-shell-permissions.test.ts tests/structural/crm-v2-visual-contract.test.ts tests/structural/crm-reference-parity-all-pages.test.ts tests/structural/crm-global-readability.test.ts tests/structural/crm-v2-migrated-page-contract.test.ts tests/structural/crm-v2-shell.test.ts tests/structural/crm-phase14-v2.test.ts tests/structural/crm-phase15-legacy-demolition.test.ts --reporter=verbose 2>&1 | tee /tmp/schema-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload schema test diagnostics
         if: always()
@@ -224,11 +227,11 @@ jobs:
           tests/security/crm-catalog-v2.test.ts
           tests/security/mobile-taxonomy-source-v2.test.ts
           --reporter=verbose
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Migration preservation tests
         run: npx vitest run tests/structural/migration-preservation.test.ts --reporter=verbose 2>&1 | tee /tmp/migration-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload migration test diagnostics
         if: always()
@@ -241,7 +244,7 @@ jobs:
 
       - name: Country engine invariant tests
         run: npx vitest run tests/finance/country-engine-invariants.test.ts tests/security/matching-isolation.test.ts tests/rbac/admin-country-rbac.test.ts tests/security/quote-country-eligibility.test.ts --reporter=verbose 2>&1 | tee /tmp/invariant-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload invariant test diagnostics
         if: always()
@@ -263,7 +266,7 @@ jobs:
           tests/auth/staff-jwt.test.ts
           tests/auth/staff-auth-verification.test.ts
           --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload Phase 9 security test diagnostics
         if: always()
@@ -306,7 +309,7 @@ jobs:
           tests/notifications/booking-notifications.test.ts
           tests/notifications/company-job-recipient-routing.test.ts
           --reporter=verbose 2>&1 | tee /tmp/core-app-lifecycle-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload core app lifecycle diagnostics
         if: always()
@@ -335,7 +338,7 @@ jobs:
           tests/finance/commission-currency-isolation.test.ts tests/finance/commission-governance.test.ts tests/finance/commission-settlement-actions.test.ts tests/finance/settlement-history-v2.test.ts
           tests/quotes/change-order.test.ts
           --reporter=verbose 2>&1 | tee /tmp/financial-flow-tests.txt
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Upload financial flow test diagnostics
         if: always()
@@ -363,7 +366,7 @@ jobs:
           retention-days: 3
 
       - name: Full regression suite including local HTTP security (blocking)
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
         run: |
           set -euo pipefail
           NODE_ENV=production ALLOW_TEST_OTP=false node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3198 > /tmp/http-test-server.txt 2>&1 &
@@ -390,7 +393,7 @@ jobs:
       # Audit persisted integrity after every fixture teardown. The full suite
       # is serialized above so database snapshots cannot observe partial cleanup.
       - name: Final PostgreSQL orphan audit after regression cleanup (blocking)
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
         run: |
           set -euo pipefail
           [[ "$DATABASE_URL" == *'@localhost:5432/maintainex_test_phase07_ci' ]] || {
@@ -448,6 +451,7 @@ jobs:
         if: always()
 
       - name: Docker container start
+        id: docker_container_start
         run: |
           docker run -d \
             --name phase9-ci-test \
@@ -484,9 +488,10 @@ jobs:
           fi
           echo "Container is alive. Startup logs:"
           docker logs phase9-ci-test 2>&1 | tail -20 || true
-        if: always()
+        if: always() && steps.postgres_bootstrap.outcome == 'success'
 
       - name: Docker health check
+        id: docker_health_check
         run: |
           echo "Waiting for Next.js to finish booting after prisma migrate..."
           for i in 1 2 3 4 5 6 7 8; do
@@ -509,14 +514,14 @@ jobs:
           echo "Health check FAILED after 8 attempts"
           docker logs phase9-ci-test 2>&1 | tail -50 || true
           exit 1
-        if: always()
+        if: always() && steps.docker_container_start.outcome == 'success'
 
       - name: International launch running-container market-isolation smoke
         run: |
           set -euo pipefail
           node scripts/international-catalogue-smoke.mjs --self-test
           node scripts/international-catalogue-smoke.mjs http://127.0.0.1:3199
-        if: always()
+        if: always() && steps.docker_health_check.outcome == 'success'
       - name: Verify non-root user
         run: |
           RUNNING=$(docker inspect -f '{{.State.Running}}' phase9-ci-test 2>/dev/null || echo "false")
@@ -536,7 +541,7 @@ jobs:
             exit 1
           fi
           echo "PASS: Container running as non-root (UID $UID_VALUE)"
-        if: always()
+        if: always() && steps.docker_health_check.outcome == 'success'
 
       - name: Docker cleanup
         if: always()

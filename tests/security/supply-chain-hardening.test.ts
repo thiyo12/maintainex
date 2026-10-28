@@ -65,10 +65,9 @@ describe('dependency and CI supply-chain hardening', () => {
       'GHSA-vfj7-8cjw-p6xm',
       'GHSA-5p2g-fcmc-qvqq',
       'GHSA-w3rx-r6r6-pgpr',
-      'GHSA-86w9-cpqp-85rv',
     ]
     for (const advisory of exceptionUrls) expect(mobileAudit).toContain(advisory)
-    expect((mobileAudit.match(/github\.com\/advisories\/GHSA-/g) || []).length).toBe(4)
+    expect((mobileAudit.match(/github\.com\/advisories\/GHSA-/g) || []).length).toBe(3)
     expect(mobileAudit).not.toContain('audit || true')
     expect(mobileAudit).not.toContain('--audit-level=critical')
   })
