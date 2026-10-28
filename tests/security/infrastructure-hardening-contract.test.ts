@@ -70,13 +70,16 @@ describe('production infrastructure source hardening', () => {
     expect(health).not.toContain('company-marketplace-qa-20260924')
   })
 
-  it('rejects Docker builds without exactly 40 lowercase hex GIT_SHA characters', () => {
+  it('requires exact release SHA from build arg or checked-out Git metadata', () => {
     const dockerfile = source('Dockerfile')
+    const dockerignore = source('.dockerignore')
 
     expect(dockerfile).not.toContain('ARG GIT_SHA=unknown')
     expect(dockerfile).toContain('ARG GIT_SHA')
-    expect(dockerfile).toContain("GIT_SHA build arg must be exactly 40 lowercase hex characters")
+    expect(dockerfile).toContain('fs.readFileSync(".git/HEAD"')
+    expect(dockerfile).toContain('could not determine full Git commit SHA')
     expect(dockerfile).toContain("grep -Eq '^[0-9a-f]{40}$'")
+    expect(dockerignore).not.toMatch(/^\.git$/m)
   })
 
   it('fails container startup closed when the baked release SHA is missing or malformed', () => {

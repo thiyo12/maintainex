@@ -7,8 +7,8 @@
 # Keep .env.example for reference
 !.env.example
 
-# Version control (huge, not needed in build context)
-.git
+# Keep .git for the Dockerfile to derive the immutable release SHA when
+# the builder (such as Dokploy) does not provide a GIT_SHA build argument.
 .gitignore
 Dockerfile.bak
 
@@ -83,4 +83,3 @@ envs/
 .terraform/
 *.tfstate
 *.tfstate.*
-
